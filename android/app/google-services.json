@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "69645692792",
+    "project_id": "cst-abinaya-demo",
+    "storage_bucket": "cst-abinaya-demo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:69645692792:android:d88cf2671fd29b468fe28d",
+        "android_client_info": {
+          "package_name": "com.example.demo_cst"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhJGVok7aOla-PSWuCBe6b6hHVg-bLzvE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
