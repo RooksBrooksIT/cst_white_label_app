@@ -255,7 +255,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           unselectedLabelColor: Colors.white70,
           labelStyle: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
           ),
           tabs: [
             Tab(text: 'Create New Worker'),
@@ -322,7 +322,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   SizedBox(height: 16),
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black),
+                      border: Border.all(),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Padding(
@@ -506,7 +506,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           icon: Padding(
             padding: EdgeInsets.only(left: 12),
-            child: Icon(icon, color: Colors.black),
+            child: Icon(icon, ),
           ),
         ),
         readOnly: isReadOnly,
@@ -754,7 +754,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           ),
           child: Row(
             children: [
-              Icon(Icons.work, size: 16, color: Colors.black),
+              Icon(Icons.work, size: 16, ),
               SizedBox(width: 8),
               Text(
                 'Designation: ${data['designation'] ?? ''}',
@@ -780,7 +780,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       decoration: BoxDecoration(
         border: Border.all(color: const Color.fromARGB(255, 44, 88, 172)),
         borderRadius: BorderRadius.circular(6),
-        color: Colors.white,
+        
       ),
       child: TextField(
         controller: controller,

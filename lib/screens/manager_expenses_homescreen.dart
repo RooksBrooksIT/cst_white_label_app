@@ -23,7 +23,7 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
           'Manager Expenses',
           style: TextStyle(
             fontWeight: FontWeight.bold, 
-            color: Colors.white,
+            
             fontSize: 20,
           ),
         ),
@@ -139,7 +139,7 @@ class _SectionCard extends StatelessWidget {
                     ],
                   ),
                   padding: const EdgeInsets.all(16),
-                  child: Icon(icon, color: Colors.white, size: 32),
+                  child: Icon(icon,  size: 32),
                 ),
                 const SizedBox(width: 20),
                 Expanded(

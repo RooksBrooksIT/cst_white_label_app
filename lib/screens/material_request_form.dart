@@ -217,7 +217,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ), dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -376,7 +376,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+        
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
@@ -400,7 +400,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+        
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       dropdownColor: Colors.white,
@@ -410,7 +410,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           value: item,
           child: Text(
             item.toString(),
-            style: TextStyle(color: Colors.black87),
+            style: TextStyle(),
           ),
         );
       }).toList(),
@@ -466,7 +466,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               borderSide: BorderSide(color: primaryColor, width: 2),
             ),
             filled: true,
-            fillColor: Colors.white,
+            
             suffixIcon: Icon(Icons.calendar_today, color: primaryColor),
             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -499,7 +499,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       child: Scaffold(
         backgroundColor: backgroundColor,
         appBar: AppBar(
-          title: Text('Material Request Form',style: TextStyle(color: Colors.white),),
+          title: Text('Material Request Form',style: TextStyle(),),
           centerTitle: true,
           elevation: 0,
           flexibleSpace: Container(
@@ -838,7 +838,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                                 SizedBox(width: 8),
                                 Text(
                                   "Submit Request",
-                                  style: TextStyle(color: Colors.white),
+                                  style: TextStyle(),
                                 ),
                               ],
                             ),

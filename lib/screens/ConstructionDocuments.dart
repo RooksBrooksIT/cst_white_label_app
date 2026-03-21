@@ -51,7 +51,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
           'Construction Documents',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
           ),
         ),
         backgroundColor: primaryColor,
@@ -80,7 +80,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        
                       ),
                     ),
                     SizedBox(height: 12),
@@ -165,7 +165,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  
                                 ),
                               ),
                               SizedBox(height: 8),
@@ -181,7 +181,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  
                                 ),
                               ),
                               SizedBox(height: 16),
@@ -206,7 +206,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: Colors.black87,
+                                              
                                             ),
                                           ),
                                         ),
@@ -217,7 +217,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: Colors.black87,
+                                              
                                             ),
                                             textAlign: TextAlign.center,
                                           ),
@@ -241,7 +241,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                                 docName,
                                                 style: TextStyle(
                                                   fontSize: 15,
-                                                  color: Colors.black87,
+                                                  
                                                 ),
                                               ),
                                             ),

@@ -143,7 +143,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
             ),
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: isLoading
           ? Center(
@@ -152,7 +152,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
                 children: [
                   CircularProgressIndicator.adaptive(
                     valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                    backgroundColor: Colors.white,
+                    
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -199,7 +199,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
                           ),
                           child: const Text(
                             'Try Again',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(),
                           ),
                         ),
                       ],
@@ -265,7 +265,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
               ],
             ),
             const SizedBox(height: 16),
-            Divider(height: 1, color: Colors.grey[300]),
+            Divider(height: 1, ),
             const SizedBox(height: 16),
             _buildDetailRow(
                 'Site ID',
@@ -326,7 +326,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
               ],
             ),
             const SizedBox(height: 16),
-            Divider(height: 1, color: Colors.grey[300]),
+            Divider(height: 1, ),
             const SizedBox(height: 16),
             _buildDetailRow('Amount Paid',
                 _formatCurrency(projectData?['amountPaid']), Icons.payment),
@@ -427,11 +427,11 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -475,7 +475,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
               Container(
                 height: 10,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  
                   borderRadius: BorderRadius.circular(5),
                 ),
               ),

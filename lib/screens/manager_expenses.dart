@@ -81,7 +81,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         padding: const EdgeInsets.all(16.0),
         child: Text(
           'No bills added yet.',
-          style: TextStyle(color: Colors.grey[600]),
+          style: TextStyle(),
         ),
       );
     }
@@ -220,7 +220,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       appBar: AppBar(
         title: const Text(
           'Manager Expenses',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: primaryColor,
         toolbarHeight: 50,
@@ -321,7 +321,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                           onPressed: () => _selectDate(context),
                           label: Text(
                             DateFormat('dd/MM/yy').format(selectedDate),
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(),
                           ),
                         ),
                       ],
@@ -372,7 +372,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                           onPressed: _addBill,
                           label: const Text(
                             "Upload Bill",
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
@@ -386,11 +386,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: const [
-                              Icon(Icons.add, color: Colors.white),
+                              Icon(Icons.add, ),
                               SizedBox(width: 4),
                               Text(
                                 'Add',
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(),
                               ),
                             ],
                           ),
@@ -638,7 +638,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                                     child: const Text(
                                       'OK',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                       ),
@@ -672,13 +672,13 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
+                          
                           strokeWidth: 2.5,
                         ),
                       )
                     : const Text(
                         'Submit',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(),
                       ),
               ),
             ),

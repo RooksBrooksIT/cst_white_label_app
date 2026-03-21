@@ -295,7 +295,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 22,
-            color: Colors.white,
+            
             letterSpacing: 0.7,
           ),
         ),
@@ -471,7 +471,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                     ),
                   ),
                   controller: TextEditingController(text: projectName ?? ''),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 TextField(
@@ -488,7 +488,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                       horizontal: 18,
                     ),
                   ),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 DropdownButtonFormField<String>(
@@ -555,7 +555,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                   controller: TextEditingController(
                     text: selectedSupervisor ?? '',
                   ),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 TextFormField(
@@ -575,7 +575,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                   controller: TextEditingController(
                     text: selectedProjectStage ?? '',
                   ),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 TextField(
@@ -596,7 +596,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                     ),
                   ),
                   maxLines: 4,
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 TextFormField(
@@ -622,7 +622,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         ? DateFormat('yyyy-MM-dd').format(startDate!)
                         : '',
                   ),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 TextFormField(
@@ -645,7 +645,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         ? DateFormat('yyyy-MM-dd').format(endDate!)
                         : '',
                   ),
-                  style: TextStyle(fontSize: fontSize, color: Colors.black87),
+                  style: TextStyle(fontSize: fontSize, ),
                 ),
                 SizedBox(height: 20),
                 GestureDetector(
@@ -675,7 +675,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                       ),
                       style: TextStyle(
                         fontSize: fontSize,
-                        color: Colors.black87,
+                        
                       ),
                     ),
                   ),
@@ -805,7 +805,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               surface: Colors.white,
               onSurface: primaryColor,
             ),
-            dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );

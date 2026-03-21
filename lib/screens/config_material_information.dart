@@ -1249,12 +1249,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               ? 'Site To Site Transfer'
               : 'Site To Company Transfer',
           style: const TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.bold,
           ),
         ),
         backgroundColor: const Color(0xFF772323),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -2061,7 +2061,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 6),
@@ -2109,7 +2109,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 6),
@@ -2175,7 +2175,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 6),
@@ -2253,7 +2253,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 6),
@@ -2346,7 +2346,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 6),
@@ -2386,7 +2386,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: Colors.black87,
+            
           ),
         ),
         const SizedBox(height: 8),

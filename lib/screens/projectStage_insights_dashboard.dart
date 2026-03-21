@@ -253,7 +253,7 @@ class _ProjectstageInsightsDashboardState
               primary: primaryColor,
               onPrimary: Colors.white,
               onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ), dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -279,7 +279,7 @@ class _ProjectstageInsightsDashboardState
               primary: primaryColor,
               onPrimary: Colors.white,
               onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ), dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -305,7 +305,7 @@ class _ProjectstageInsightsDashboardState
               primary: primaryColor,
               onPrimary: Colors.white,
               onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ), dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -399,7 +399,7 @@ class _ProjectstageInsightsDashboardState
         title: Text(
           'Project Stage Insights',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
@@ -407,7 +407,7 @@ class _ProjectstageInsightsDashboardState
         centerTitle: true,
         elevation: 0,
         backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
       ),
       body: FutureBuilder<List<SupervisorEntry>>(
         future: supervisorEntriesFuture,
@@ -621,14 +621,14 @@ class _ProjectstageInsightsDashboardState
                         title: 'Daily Expense',
                         subtitle: 'View expenses for a specific day',
                       ),
-                      Divider(height: 20, thickness: 0.5, color: Colors.grey[300]),
+                      Divider(height: 20, thickness: 0.5, ),
                       _buildReportOption(
                         type: ReportType.expenseRange,
                         icon: Icons.date_range,
                         title: 'Expense Range',
                         subtitle: 'View expenses between dates',
                       ),
-                      Divider(height: 20, thickness: 0.5, color: Colors.grey[300]),
+                      Divider(height: 20, thickness: 0.5, ),
                       _buildReportOption(
                         type: ReportType.siteSummary,
                         icon: Icons.summarize,
@@ -954,7 +954,7 @@ class _ProjectstageInsightsDashboardState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -984,11 +984,11 @@ class _ProjectstageInsightsDashboardState
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

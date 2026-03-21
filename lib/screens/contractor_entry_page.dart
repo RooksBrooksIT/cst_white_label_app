@@ -634,7 +634,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: Colors.grey),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -667,7 +667,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -790,7 +790,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
+                  icon: Icon(Icons.arrow_back, ),
                   onPressed: () => Navigator.pop(context),
                   splashRadius: 24,
                 ),
@@ -799,7 +799,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                     child: Text(
                       'Contractor Entry',
                       style: TextStyle(
-                        color: Colors.white,
+                        
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.1,
@@ -808,7 +808,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.logout, color: Colors.white, size: 22),
+                  icon: Icon(Icons.logout,  size: 22),
                   onPressed: () async {
                     final shouldLogout = await showDialog<bool>(
                       context: context,
@@ -846,7 +846,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      color: Colors.white,
+      
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -952,7 +952,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      color: Colors.white,
+      
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -1123,7 +1123,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      color: Colors.white,
+      
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -1285,7 +1285,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      color: Colors.white,
+      
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -1309,7 +1309,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSummarySection() {
     return Container(
       width: double.infinity,
-      color: Colors.white,
+      
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: EdgeInsets.zero,
       child: Column(
@@ -1422,11 +1422,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                               height: fontSize + 10,
                               width: fontSize + 10,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, ),
                             )
                           : Text(
                               'Save Entry',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(),
                             ),
                     ),
                   ),

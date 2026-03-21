@@ -188,7 +188,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 (route) => false,
               );
             },
-            child: const Text("Yes", style: TextStyle(color: Colors.white)),
+            child: const Text("Yes", style: TextStyle()),
           ),
         ],
       ),
@@ -223,7 +223,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
-                  color: Colors.white,
+                  
                 ),
               ),
               backgroundColor: primaryColor,
@@ -237,14 +237,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               leading: IconButton(
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
+                  
                 ),
                 onPressed: () => _showLogoutDialog(context),
                 tooltip: "Back / Logout",
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white),
+                  icon: const Icon(Icons.logout, ),
                   tooltip: "Logout",
                   onPressed: () => _showLogoutDialog(context),
                 ),
@@ -259,7 +259,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   elevation: 8,
-                  color: Colors.white,
+                  
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Column(
@@ -270,7 +270,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                           backgroundColor: primaryColor,
                           child: const Icon(
                             Icons.person,
-                            color: Colors.white,
+                            
                             size: 54,
                           ),
                         ),
@@ -314,7 +314,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         style: const TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          
           letterSpacing: 0.4,
         ),
       ),
@@ -340,7 +340,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       elevation: 5,
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      color: Colors.white,
+      
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: item.onTap,

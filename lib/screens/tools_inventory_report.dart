@@ -111,7 +111,7 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
       appBar: AppBar(
         title: const Text(
           'Tools Inventory',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: _primaryColor,
         elevation: 2,
@@ -126,7 +126,7 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
             icon: const Icon(Icons.refresh),
             onPressed: _loadInventoryData,
             tooltip: 'Refresh',
-            color: Colors.white,
+            
           ),
         ],
       ),
@@ -373,7 +373,7 @@ class _SummaryCard extends StatelessWidget {
       width: fullWidth ? double.infinity : null,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(

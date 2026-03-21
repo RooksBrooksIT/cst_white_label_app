@@ -12,7 +12,6 @@ void main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Start the app
   runApp(const MyApp());
 }
 
@@ -30,7 +29,7 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
         appBarTheme: const AppBarTheme(
           elevation: 0,
-          centerTitle: true, 
+          centerTitle: true,
           backgroundColor: Colors.transparent,
           iconTheme: IconThemeData(color: Colors.blueGrey),
         ),

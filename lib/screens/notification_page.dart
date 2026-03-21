@@ -81,7 +81,7 @@ class NotificationPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Colors.grey.shade200,
@@ -168,7 +168,7 @@ class NotificationPage extends StatelessWidget {
                                                     child: Text(
                                                       mat['priority'] ?? 'Medium',
                                                       style: const TextStyle(
-                                                        color: Colors.white,
+                                                        
                                                         fontSize: 12,
                                                       ),
                                                     ),
@@ -231,7 +231,7 @@ class NotificationPage extends StatelessWidget {
       label: Text(
         status,
         style: const TextStyle(
-          color: Colors.white,
+          
           fontWeight: FontWeight.bold,
         ),
       ),

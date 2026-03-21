@@ -375,7 +375,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       appBar: AppBar(
         title: const Text(
           'Site to Company Return',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, ),
         ),
         centerTitle: true,
         backgroundColor: _primaryColor,
@@ -404,7 +404,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -460,7 +460,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -510,11 +510,11 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         icon: const Icon(
                           Icons.add,
                           size: 20,
-                          color: Colors.white,
+                          
                         ),
                         label: const Text(
                           'Add Tool',
-                          style: TextStyle(color: Colors.white),
+                          style: TextStyle(),
                         ),
                         onPressed: _addTool,
                         style: ElevatedButton.styleFrom(
@@ -547,7 +547,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -647,7 +647,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
           borderSide: BorderSide(color: Colors.grey.shade400),
         ),
         filled: true,
-        fillColor: Colors.white,
+        
       ),
       items: items.asMap().entries.map((entry) {
         final index = entry.key;
@@ -682,7 +682,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
             borderSide: BorderSide(color: Colors.grey.shade400),
           ),
           filled: true,
-          fillColor: Colors.white,
+          
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -752,7 +752,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         'Tool Id',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                     ),
@@ -768,7 +768,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         'Tool Code',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                     ),
@@ -784,7 +784,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         'Count',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                     ),
@@ -825,7 +825,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         ),
                         child: Text(
                           tool['tool'] ?? '',
-                          style: const TextStyle(color: Colors.black87),
+                          style: const TextStyle(),
                         ),
                       ),
                     ),
@@ -838,7 +838,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         ),
                         child: Text(
                           toolCode,
-                          style: const TextStyle(color: Colors.black87),
+                          style: const TextStyle(),
                         ),
                       ),
                     ),
@@ -851,7 +851,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                         ),
                         child: Text(
                           tool['count'].toString(),
-                          style: const TextStyle(color: Colors.black87),
+                          style: const TextStyle(),
                         ),
                       ),
                     ),

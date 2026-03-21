@@ -109,7 +109,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         backgroundColor: Color(0xFF0b3470),
         title: const Text(
           "Tool Master",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         elevation: 4,
@@ -149,7 +149,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            color: Colors.white,
+            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -229,7 +229,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            color: Colors.white,
+            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -361,7 +361,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Color(0xFF0b3470)),
       ),
@@ -402,7 +402,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      
                     ),
                   )
                 : Icon(Icons.save, size: 20),
@@ -426,7 +426,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             style: OutlinedButton.styleFrom(
               foregroundColor: Color(0xFF0b3470),
               side: BorderSide(color: Color(0xFF0b3470)),
-              backgroundColor: Colors.white,
+              
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -472,7 +472,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             style: OutlinedButton.styleFrom(
               foregroundColor: Color(0xFF0b3470),
               side: BorderSide(color: Color(0xFF0b3470)),
-              backgroundColor: Colors.white,
+              
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

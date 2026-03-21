@@ -404,7 +404,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                           backgroundColor: Colors.blue,
                           child: Text(
                             data['driverId']?.toString().substring(2) ?? '',
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(),
                           ),
                         ),
                         title: Text(

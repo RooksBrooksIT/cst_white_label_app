@@ -176,7 +176,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             children: [
               Text(
                 'Editing password for "$supervisorName"',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 14, ),
               ),
               SizedBox(height: 16),
               TextFormField(
@@ -218,7 +218,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+              child: Text('Cancel', style: TextStyle()),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -239,7 +239,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text('Save', style: TextStyle(color: Colors.white)),
+              child: Text('Save', style: TextStyle()),
             ),
           ],
         ),
@@ -279,7 +279,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  Icon(Icons.check_circle,  size: 20),
                   SizedBox(width: 8),
                   Text('Password updated successfully'),
                 ],
@@ -297,7 +297,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.error, color: Colors.white, size: 20),
+                  Icon(Icons.error,  size: 20),
                   SizedBox(width: 8),
                   Text('Failed to update password: $e'),
                 ],
@@ -361,7 +361,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.error, color: Colors.white, size: 20),
+              Icon(Icons.error,  size: 20),
               SizedBox(width: 8),
               Text('Failed to create supervisor account: $e'),
             ],
@@ -409,7 +409,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 Text(
                   'Your supervisor details have been saved successfully.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                  style: TextStyle(fontSize: 16, ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -428,7 +428,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   },
                   child: const Text(
                     'OK',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
+                    style: TextStyle(fontSize: 16, ),
                   ),
                 ),
               ],
@@ -467,12 +467,12 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       appBar: AppBar(
         title: const Text(
           'Site Supervisor Configuration',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: primaryColor,
         centerTitle: true,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
       ),
       body: Column(
         children: [
@@ -482,9 +482,9 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
+                border: Border.all(color: Colors.grey),
               ),
               child: Row(
                 children: [
@@ -640,7 +640,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               const SizedBox(height: 4),
               Text(
                 'Please fill in all required fields (*)',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 14, ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -673,7 +673,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           controller: controller,
           decoration: InputDecoration(
             hintText: 'Enter $label',
-            hintStyle: TextStyle(color: Colors.grey[500]),
+            hintStyle: TextStyle(),
             filled: true,
             fillColor: Colors.grey[50],
             focusedBorder: OutlineInputBorder(
@@ -682,7 +682,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[400]!),
+              borderSide: BorderSide(color: Colors.grey),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.symmetric(
@@ -726,7 +726,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             return null;
           },
           cursorColor: primaryColor,
-          style: TextStyle(color: Colors.black87, fontSize: 15),
+          style: TextStyle( fontSize: 15),
         ),
       ],
     );
@@ -749,8 +749,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
-              border: Border.all(color: Colors.grey[400]!),
+              
+              border: Border.all(color: Colors.grey),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -766,7 +766,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 SizedBox(width: 12),
                 Text(
                   'Loading designations...',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(),
                 ),
               ],
             ),
@@ -789,7 +789,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         DropdownButtonFormField<String>(
           decoration: InputDecoration(
             hintText: 'Select Designation',
-            hintStyle: TextStyle(color: Colors.grey[500]),
+            hintStyle: TextStyle(),
             filled: true,
             fillColor: Colors.grey[50],
             focusedBorder: OutlineInputBorder(
@@ -798,7 +798,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[400]!),
+              borderSide: BorderSide(color: Colors.grey),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.symmetric(
@@ -813,7 +813,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   value: designation,
                   child: Text(
                     designation,
-                    style: TextStyle(color: Colors.black87, fontSize: 15),
+                    style: TextStyle( fontSize: 15),
                   ),
                 ),
               )
@@ -830,7 +830,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             return null;
           },
           dropdownColor: Colors.white,
-          style: TextStyle(color: Colors.black87, fontSize: 15),
+          style: TextStyle( fontSize: 15),
         ),
       ],
     );
@@ -852,24 +852,24 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         Container(
           height: 150,
           decoration: BoxDecoration(
-            color: Colors.grey[50],
-            border: Border.all(color: Colors.grey[400]!),
+            
+            border: Border.all(color: Colors.grey),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.camera_alt, size: 40, color: Colors.grey[500]),
+                Icon(Icons.camera_alt, size: 40, ),
                 const SizedBox(height: 8),
                 Text(
                   'Upload Supervisor Photo',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '(Optional)',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  style: TextStyle( fontSize: 12),
                 ),
               ],
             ),
@@ -905,18 +905,18 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.person_add, size: 20, color: Colors.white),
+                      Icon(Icons.person_add, size: 20, ),
                       SizedBox(width: 8),
                       Text(
                         'Create Account',
-                        style: TextStyle(fontSize: 16, color: Colors.white),
+                        style: TextStyle(fontSize: 16, ),
                       ),
                     ],
                   ),
           ),
         ),
         const SizedBox(width: 12),
-        Container(width: 1, height: 40, color: Colors.grey[300]),
+        Container(width: 1, height: 40, ),
         const SizedBox(width: 12),
         Expanded(
           child: OutlinedButton(
@@ -1045,20 +1045,20 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.people, size: 60, color: Colors.grey[400]),
+                      Icon(Icons.people, size: 60, ),
                       SizedBox(height: 16),
                       Text(
                         'No Supervisors Found',
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.grey[600],
+                          
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       SizedBox(height: 8),
                       Text(
                         'Create your first supervisor account',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                        style: TextStyle(fontSize: 14, ),
                       ),
                     ],
                   ),
@@ -1178,12 +1178,12 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                               horizontal: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              
                               border: Border.all(color: Colors.grey.shade200),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  
                                   blurRadius: 2,
                                   offset: Offset(0, 1),
                                 ),
@@ -1202,7 +1202,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                         supervisorId,
                                         style: const TextStyle(
                                           fontSize: 13,
-                                          color: Colors.black87,
+                                          
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1211,7 +1211,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                           designation,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: Colors.grey[600],
+                                            
                                           ),
                                         ),
                                     ],
@@ -1236,22 +1236,22 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                                     Container(
                                                       width: 60,
                                                       height: 60,
-                                                      color: Colors.grey[300],
+                                                      
                                                       child: Icon(
                                                         Icons.person,
                                                         size: 30,
-                                                        color: Colors.grey[600],
+                                                        
                                                       ),
                                                     ),
                                           )
                                         : Container(
                                             width: 60,
                                             height: 60,
-                                            color: Colors.grey[300],
+                                            
                                             child: Icon(
                                               Icons.person,
                                               size: 30,
-                                              color: Colors.grey[600],
+                                              
                                             ),
                                           ),
                                   ),
@@ -1275,7 +1275,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                     password,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Colors.black87,
+                                      
                                       fontWeight: FontWeight.w500,
                                       fontFamily: 'Monospace',
                                     ),

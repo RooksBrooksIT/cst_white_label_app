@@ -83,9 +83,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.save, color: Colors.white),
+                          icon: const Icon(Icons.save, ),
                           label: const Text('Save',
-                              style: TextStyle(color: Colors.white)),
+                              style: TextStyle()),
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                                 isDuplicate ? Colors.grey : kPrimaryColor,
@@ -182,7 +182,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   ),
                   child: const Text(
                     'OK',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(),
                   ),
                 ),
               ],
@@ -214,7 +214,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: Colors.black87,
+                    
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -223,7 +223,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 15,
-                    color: Colors.black54,
+                    
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -235,7 +235,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                     ),
                   ),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK', style: TextStyle(color: Colors.white)),
+                  child: const Text('OK', style: TextStyle()),
                 ),
               ],
             ),
@@ -298,7 +298,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               ),
               onPressed: () => Navigator.of(context).pop(true),
               child:
-                  const Text('Delete', style: TextStyle(color: Colors.white)),
+                  const Text('Delete', style: TextStyle()),
             ),
           ],
         );
@@ -352,7 +352,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),
@@ -383,7 +383,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
       appBar: AppBar(
         title: const Text(
           'Project Stage Configuration',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20,color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20,),
         ),
         centerTitle: true,
         backgroundColor: kPrimaryColor,
@@ -401,7 +401,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                 child: Material(
                   elevation: 4,
                   borderRadius: BorderRadius.circular(16),
-                  color: Colors.white,
+                  
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
@@ -491,7 +491,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.add,
-                                      color: Colors.white, size: 24),
+                                       size: 24),
                                 ),
                               ),
                             ),

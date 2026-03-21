@@ -243,14 +243,14 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
         title: Text(
           'Site Summary',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         elevation: 0,
       ),
       body: Padding(

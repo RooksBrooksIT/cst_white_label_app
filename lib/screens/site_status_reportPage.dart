@@ -40,12 +40,12 @@ class SiteStatusReportPage extends StatelessWidget {
           '$status Sites',
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            
           ),
         ),
         backgroundColor: statusColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: Container(
         color: const Color(0xFFF8F9FA), // Light background
@@ -226,11 +226,11 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -273,7 +273,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
                   decoration: BoxDecoration(
                     color: balanceColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all( width: 2),
                   ),
                 ),
                 const SizedBox(width: 8),

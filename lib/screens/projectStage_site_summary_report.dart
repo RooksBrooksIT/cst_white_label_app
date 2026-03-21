@@ -417,11 +417,11 @@ class _ProjectstageSiteSummaryReportState
       backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text('Site Summary',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: TextStyle(fontWeight: FontWeight.bold, )),
         centerTitle: true,
         backgroundColor: primaryColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             bottom: Radius.circular(20),

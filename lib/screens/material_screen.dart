@@ -469,7 +469,7 @@ class _MaterialScreenState extends State<MaterialScreen>
       appBar: AppBar(
         title: const Text(
           'Material Configuration',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         elevation: 0,
@@ -541,7 +541,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                                     fillColor: Colors.grey[50],
                                   ),
                                   style: const TextStyle(
-                                    color: Colors.black,
+                                    
                                     fontWeight: FontWeight.bold,
                                     fontSize: 18,
                                     letterSpacing: 1.5,
@@ -576,7 +576,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                               fillColor: Colors.grey[50],
                             ),
                             style: const TextStyle(
-                              color: Colors.black,
+                              
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                               letterSpacing: 1.2,
@@ -745,7 +745,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                               fillColor: Colors.grey[50],
                             ),
                             style: const TextStyle(
-                              color: Colors.black,
+                              
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                               letterSpacing: 1.5,
@@ -771,7 +771,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                               filled: true,
                               fillColor: Colors.grey[50],
                             ),
-                            style: TextStyle(color: Colors.grey[700]),
+                            style: TextStyle(),
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -970,7 +970,7 @@ class _MaterialScreenState extends State<MaterialScreen>
         fillColor: Colors.grey[50],
         enabled: false,
       ),
-      style: TextStyle(color: Colors.grey[700]),
+      style: TextStyle(),
     );
   }
 

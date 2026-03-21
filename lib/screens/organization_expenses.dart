@@ -56,7 +56,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         padding: const EdgeInsets.all(16.0),
         child: Text(
           'No bills added yet.',
-          style: TextStyle(color: Colors.grey[600]),
+          style: TextStyle(),
         ),
       );
     }
@@ -341,7 +341,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('OK', style: TextStyle(color: Colors.black)),
+              child: const Text('OK', style: TextStyle()),
             ),
           ],
         ),
@@ -440,7 +440,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       appBar: AppBar(
         title: const Text(
           'Organization Expenses',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: primaryColor,
         toolbarHeight: 50,
@@ -537,7 +537,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           onPressed: () => _selectDate(context),
                           label: Text(
                             DateFormat('dd/MM/yy').format(selectedDate),
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(),
                           ),
                         ),
                       ],
@@ -588,7 +588,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           onPressed: _addBill,
                           label: const Text(
                             "Upload Bill",
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
@@ -602,11 +602,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.add, color: Colors.white),
+                              const Icon(Icons.add, ),
                               SizedBox(width: 4),
                               const Text(
                                 'Add',
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(),
                               ),
                             ],
                           ),
@@ -666,7 +666,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     onPressed: isSubmitting ? null : _resetForm,
                     child: const Text(
                       'Reset',
-                      style: TextStyle(color: Colors.black),
+                      style: TextStyle(),
                     ),
                   ),
                 ),
@@ -715,7 +715,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           )
                         : const Text(
                             'Submit',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(),
                           ),
                   ),
                 ),

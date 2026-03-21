@@ -183,7 +183,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
         title: const Text(
           "Tool Distribution Details",
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
@@ -191,7 +191,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
         backgroundColor: primaryColor,
         elevation: 3,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -258,7 +258,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                           "Distributed across ${inventoryData.length} sites",
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.grey[700],
+                            
                           ),
                         ),
                       ],
@@ -303,7 +303,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                   primaryColor,
                                 ),
                                 headingTextStyle: const TextStyle(
-                                  color: Colors.white,
+                                  
                                   fontWeight: FontWeight.bold,
                                 ),
                                 columnSpacing: 30,

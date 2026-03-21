@@ -497,7 +497,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                     //   vehicle['modelName'],
                                     //   style: TextStyle(
                                     //     fontSize: 14,
-                                    //     color: Colors.grey[600],
+                                    //     
                                     //   ),
                                     // ),
                                     // if (vehicle['numberPlate'] != null &&
@@ -508,7 +508,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                     //     'Plate: ${vehicle['numberPlate']}',
                                     //     style: TextStyle(
                                     //       fontSize: 12,
-                                    //       color: Colors.grey[500],
+                                    //       
                                     //     ),
                                     //   ),
                                   ],

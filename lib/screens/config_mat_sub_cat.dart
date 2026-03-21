@@ -207,7 +207,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
       appBar: AppBar(
         title: const Text(
           'Material Sub Category Master',
-          style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5,color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5,),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
@@ -249,7 +249,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -261,7 +261,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          
                           prefixIcon: const Icon(Icons.category, color: primaryColor),
                         ),
                         isExpanded: true,
@@ -287,7 +287,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -299,7 +299,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          
                           prefixIcon: const Icon(Icons.straighten, color: primaryColor),
                         ),
                         isExpanded: true,
@@ -324,7 +324,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -336,7 +336,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          
                           prefixIcon: const Icon(Icons.label_important, color: primaryColor),
                         ),
                       ),

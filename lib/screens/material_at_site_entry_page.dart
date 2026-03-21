@@ -201,7 +201,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         labelText: 'Select Date to Update',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 14,
@@ -458,7 +458,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               primary: primaryColor,
               onPrimary: Colors.white,
               onSurface: Colors.black,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ), dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -592,7 +592,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            
           ),
           isExpanded: true,
           icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
@@ -618,7 +618,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -823,7 +823,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
             filled: true,
-            fillColor: Colors.white,
+            
           ),
           isExpanded: true,
           icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
@@ -877,7 +877,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
             filled: true,
-            fillColor: Colors.white,
+            
           ),
           isExpanded: true,
           icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
@@ -944,7 +944,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             return Material(
               elevation: 0,
               borderRadius: BorderRadius.circular(8),
-              color: Colors.white,
+              
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Row(
@@ -1087,7 +1087,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                     return Material(
                       elevation: 0,
                       borderRadius: BorderRadius.circular(8),
-                      color: Colors.white,
+                      
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(

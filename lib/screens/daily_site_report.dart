@@ -464,13 +464,13 @@ class _DailySiteExpensesReportPageState
         title: Text(
           'Daily Site Expenses Report',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
         backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         elevation: 2,
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -984,12 +984,12 @@ class _DailySiteExpensesReportPageState
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
                       children: [
-                        Icon(Icons.summarize, color: Colors.white, size: 32),
+                        Icon(Icons.summarize,  size: 32),
                         SizedBox(height: 12),
                         Text(
                           'Grand Total',
                           style: TextStyle(
-                            color: Colors.white,
+                            
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                           ),
@@ -998,7 +998,7 @@ class _DailySiteExpensesReportPageState
                         Text(
                           '₹$totalAmount',
                           style: TextStyle(
-                            color: Colors.white,
+                            
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1014,7 +1014,7 @@ class _DailySiteExpensesReportPageState
                   child: ElevatedButton.icon(
                     icon: Icon(
                       Icons.picture_as_pdf,
-                      color: Colors.white,
+                      
                       size: 20,
                     ),
                     label: Text(
@@ -1222,7 +1222,7 @@ class _DailySiteExpensesReportPageState
           Text(
             title,
             style: TextStyle(
-              color: Colors.white,
+              
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),

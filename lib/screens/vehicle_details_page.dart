@@ -353,7 +353,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                             'Generated Vehicle ID:',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.grey[600],
+                              
                             ),
                           ),
                           Text(
@@ -414,7 +414,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                     'Format: TN-00-XX-0000',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[600],
+                                      
                                     ),
                                   ),
                                 );
@@ -538,7 +538,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),

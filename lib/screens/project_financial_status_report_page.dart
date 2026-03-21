@@ -90,7 +90,7 @@ class _ProjectFinancialStatusReportPageState
           style: TextStyle(
             fontSize: isSmallScreen ? 18 : 20,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            
             letterSpacing: 0.5,
           ),
         ),
@@ -117,7 +117,7 @@ class _ProjectFinancialStatusReportPageState
             ),
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: Container(
         color: backgroundColor,
@@ -203,7 +203,7 @@ class _ProjectFinancialStatusReportPageState
                               value: selectedSiteId,
                               hint: Text(
                                 "Select Site ID",
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(),
                               ),
                               onChanged: (value) async {
                                 setState(() {
@@ -278,7 +278,7 @@ class _ProjectFinancialStatusReportPageState
                                   ),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade50,
+                                
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 16,
@@ -391,7 +391,7 @@ class _ProjectFinancialStatusReportPageState
   InputDecoration _buildInputDecoration({String? hintText, IconData? icon}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: Colors.grey[600]),
+      hintStyle: TextStyle(),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.grey.shade400),
@@ -408,7 +408,7 @@ class _ProjectFinancialStatusReportPageState
         ),
       ),
       filled: true,
-      fillColor: Colors.grey.shade50,
+      
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 16,
         vertical: 16,

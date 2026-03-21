@@ -149,7 +149,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         title: const Text(
           'Material Report',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w700,
             fontSize: 22,
           ),
@@ -192,7 +192,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: Colors.grey[700],
+                        
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -258,7 +258,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
+                      
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -267,7 +267,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
               const SizedBox(height: 10),
               Text(
                 'Showing results for: $selectedMaterial',
-                style: TextStyle(fontSize: 15, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 15, ),
               ),
               const SizedBox(height: 18),
               if (isReportLoading)
@@ -287,14 +287,14 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                       'No data available',
                       style: TextStyle(
                         fontSize: 20,
-                        color: Colors.grey[600],
+                        
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'No sites found for the selected material',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                      style: TextStyle(fontSize: 16, ),
                     ),
                   ],
                 ),
@@ -329,7 +329,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey[800],
+                      
                     ),
                   ),
                   Text(
@@ -363,7 +363,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                         'SITE ID',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Colors.grey[700],
+                          
                         ),
                       ),
                     ),
@@ -373,7 +373,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                         'QUANTITY',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Colors.grey[700],
+                          
                         ),
                       ),
                     ),
@@ -386,7 +386,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                               Text(
                                 r.siteId,
                                 style: TextStyle(
-                                  color: Colors.grey[800],
+                                  
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

@@ -160,10 +160,10 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, color: Colors.white, size: 24),
+                  child: Icon(icon,  size: 24),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -173,7 +173,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                       Text(
                         title,
                         style: const TextStyle(
-                          color: Colors.white,
+                          
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -182,7 +182,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          
                           fontSize: 14,
                         ),
                       ),
@@ -191,7 +191,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                 ),
                 const Icon(
                   Icons.arrow_forward_ios,
-                  color: Colors.white,
+                  
                   size: 16,
                 ),
               ],
@@ -233,7 +233,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               },
               child: const Text(
                 'Logout',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(),
               ),
             ),
           ],
@@ -254,7 +254,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -265,7 +265,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               SizedBox(height: 20),
               Text(
                 'Loading your dashboard...',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 16, ),
               ),
             ],
           ),
@@ -279,7 +279,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         appBar: AppBar(
           title: const Text(
             'Customer Dashboard',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(),
           ),
           centerTitle: true,
           backgroundColor: Color(0xFF003768),
@@ -290,7 +290,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
             ),
           ),
           leading: IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            icon: const Icon(Icons.menu, ),
             onPressed: () {
               // Drawer/menu functionality if needed
             },
@@ -299,12 +299,12 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
             // Refresh button to refetch siteId if needed
             IconButton(
               icon: const Icon(Icons.refresh),
-              color: Colors.white,
+              
               onPressed: _refreshSiteId,
             ),
             IconButton(
               icon: const Icon(Icons.logout),
-              color: Colors.white,
+              
               onPressed: () => _showLogoutDialog(context),
             ),
           ],
@@ -323,13 +323,13 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
+                        
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Manage your account and services',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 16, ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -338,7 +338,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                           'Site ID: ',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey[500],
+                            
                             fontWeight: FontWeight.w500,
                           ),
                         ),

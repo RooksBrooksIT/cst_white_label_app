@@ -36,12 +36,12 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           "Weekly Financial Report",
-          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w600, ),
         ),
         backgroundColor: primaryColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: CustomScrollView(
         slivers: [
@@ -400,7 +400,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           dataRowHeight: 48,
           headingTextStyle: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
             fontSize: 14,
           ),
           headingRowColor: WidgetStateProperty.all(primaryColor),
@@ -552,7 +552,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

@@ -38,9 +38,9 @@ class _ContractorPageState extends State<ContractorPage> {
       appBar: AppBar(
         backgroundColor: primaryColor,
         title: const Text("New Contractor",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: TextStyle( fontWeight: FontWeight.w700)),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
         elevation: 3,
         shadowColor: Colors.black38,
       ),
@@ -53,7 +53,7 @@ class _ContractorPageState extends State<ContractorPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -150,7 +150,7 @@ class _ContractorPageState extends State<ContractorPage> {
                                       ))
                                   : const Text("Save",
                                       style: TextStyle(
-                                          fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                                          fontSize: 16, fontWeight: FontWeight.w700, )),
                             ),
                           ),
                         ),
@@ -174,7 +174,7 @@ class _ContractorPageState extends State<ContractorPage> {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -266,7 +266,7 @@ class _ContractorPageState extends State<ContractorPage> {
         labelText: label,
         labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
         filled: true,
-        fillColor: Colors.white,
+        
         counterText: '',
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         border: OutlineInputBorder(
@@ -304,7 +304,7 @@ class _ContractorPageState extends State<ContractorPage> {
             labelText: "Project Stage",
             labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
             filled: true,
-            fillColor: Colors.white,
+            
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
@@ -323,7 +323,7 @@ class _ContractorPageState extends State<ContractorPage> {
               .toList(),
           onChanged: stages.isNotEmpty ? (v) => setState(() => _selectedProjectField = v) : null,
           validator: (v) => v == null ? "Please select a project stage" : null,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, ),
           dropdownColor: Colors.white,
         );
       },

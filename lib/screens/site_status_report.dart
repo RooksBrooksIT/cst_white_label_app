@@ -149,7 +149,7 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
             border: Border.all(color: Colors.grey.withOpacity(0.3), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -261,12 +261,12 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
           style: TextStyle(
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
-            color: Colors.white,
+            
           ),
         ),
         centerTitle: true,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: primaryColor))

@@ -206,7 +206,7 @@ class _SiteScreenState extends State<SiteScreen>
       appBar: AppBar(
         title: const Text(
           'Site Details',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(),
         ),
         centerTitle: true,
         elevation: 0,
@@ -545,7 +545,7 @@ class _SiteScreenState extends State<SiteScreen>
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 18,
               vertical: 14,
@@ -566,7 +566,7 @@ class _SiteScreenState extends State<SiteScreen>
           style: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 16,
-            color: Colors.black87,
+            
           ),
           dropdownColor: Colors.white,
           validator: (value) => value == null ? 'Please select $label' : null,
@@ -594,7 +594,7 @@ class _SiteScreenState extends State<SiteScreen>
           child: InputDecorator(
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.white,
+              
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 16,
@@ -894,7 +894,7 @@ class _SiteScreenState extends State<SiteScreen>
                 Text(
                   'Project created with ID $siteId.\nPlease update the project details.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 17, color: Colors.black87),
+                  style: const TextStyle(fontSize: 17, ),
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
@@ -921,7 +921,7 @@ class _SiteScreenState extends State<SiteScreen>
                   },
                   child: const Text(
                     'OK',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle( fontSize: 16),
                   ),
                 ),
               ],

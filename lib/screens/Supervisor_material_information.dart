@@ -936,10 +936,10 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
               ? 'Site To Site Transfer'
               : 'Site To Company Transfer',
           style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              const TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF772323),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -1500,7 +1500,7 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
         Text(
           label,
           style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+              fontWeight: FontWeight.bold, fontSize: 14, ),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -1543,7 +1543,7 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
         Text(
           label,
           style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+              fontWeight: FontWeight.bold, fontSize: 14, ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -1600,7 +1600,7 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
         Text(
           'Material Name *',
           style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+              fontWeight: FontWeight.bold, fontSize: 14, ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -1675,7 +1675,7 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
         Text(
           title,
           style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+              fontWeight: FontWeight.bold, fontSize: 14, ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -1712,7 +1712,7 @@ class _MaterialInfoScreenState extends State<supervisorMaterialInfoScreen> {
         const Text(
           'Materials to Transfer:',
           style: TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+              fontWeight: FontWeight.bold, fontSize: 16, ),
         ),
         const SizedBox(height: 8),
         Container(

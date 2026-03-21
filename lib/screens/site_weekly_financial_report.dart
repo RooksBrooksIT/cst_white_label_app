@@ -108,12 +108,12 @@ class _SiteWeeklyFinancialReportState
       appBar: AppBar(
         title: const Text(
           'Weekly Financial Report',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle( fontWeight: FontWeight.w600),
         ),
         backgroundColor: primaryColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       backgroundColor: backgroundColor,
       body: isLoading
@@ -159,7 +159,7 @@ class _SiteWeeklyFinancialReportState
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),

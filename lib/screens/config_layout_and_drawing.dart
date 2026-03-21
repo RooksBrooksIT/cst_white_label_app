@@ -165,7 +165,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
       appBar: AppBar(
         title: const Text(
           'Layout and Drawings',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(),
         ),
         backgroundColor: primaryColor,
         centerTitle: true,
@@ -207,7 +207,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                             snapshot.data!.isEmpty) {
                           return const Text(
                             'No sites found',
-                            style: TextStyle(color: Colors.black54),
+                            style: TextStyle(),
                           );
                         }
                         allSites = snapshot.data!;
@@ -234,7 +234,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                               ),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 16,
@@ -262,7 +262,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                             color: primaryColor,
                           ),
                           style: TextStyle(
-                            color: Colors.grey[900],
+                            
                             fontWeight: FontWeight.w500,
                           ),
                         );
@@ -272,21 +272,21 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                     _readonlyTextField(
                       controller: supervisorNameController,
                       label: 'Supervisor Name',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 24),
                     _readonlyTextField(
                       controller: projectNameController,
                       label: 'Project Name',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 24),
                     _readonlyTextField(
                       controller: projectPhaseController,
                       label: 'Project Phase',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                   ],
@@ -310,7 +310,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                        
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -666,7 +666,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
         labelText: label,
         labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
         filled: true,
-        fillColor: Colors.white,
+        
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,

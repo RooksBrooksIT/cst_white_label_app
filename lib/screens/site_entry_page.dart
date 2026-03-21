@@ -518,7 +518,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           borderSide: BorderSide(color: mainColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        
         contentPadding: const EdgeInsets.symmetric(
           vertical: 12,
           horizontal: 16,
@@ -527,7 +527,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       ),
       keyboardType: TextInputType.number,
       cursorColor: mainColor,
-      style: const TextStyle(color: Colors.black87),
+      style: const TextStyle(),
       onChanged: (_) => setState(() {}),
     );
   }
@@ -537,7 +537,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -910,13 +910,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           },
           child: const Text(
             'Daily Site Entry',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            style: TextStyle( fontWeight: FontWeight.w600),
           ),
         ),
         centerTitle: true,
         backgroundColor: mainColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -962,7 +962,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       filled: true,
-                                      fillColor: Colors.grey.shade50,
+                                      
                                       isDense: true,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
@@ -1278,8 +1278,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                           ),
                                                     ),
                                                     filled: true,
-                                                    fillColor:
-                                                        Colors.grey.shade50,
+                                                    
                                                     isDense: true,
                                                     contentPadding:
                                                         const EdgeInsets.symmetric(
@@ -1598,8 +1597,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                           ),
                                                     ),
                                                     filled: true,
-                                                    fillColor:
-                                                        Colors.grey.shade50,
+                                                    
                                                     isDense: true,
                                                     contentPadding:
                                                         const EdgeInsets.symmetric(
@@ -1906,7 +1904,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        
                                       ),
                                     )
                                   : const Text(

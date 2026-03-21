@@ -378,7 +378,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
               child: const Text(
                 'Update',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(),
               ),
             ),
           ],
@@ -531,12 +531,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       appBar: AppBar(
         title: const Text(
           'Material Availability',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF003768),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: _isLoadingMaterials
           ? const Center(
@@ -666,7 +666,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -699,7 +699,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 '• Use this for adding new stock to existing materials',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[700],
+                  
                   height: 1.5,
                 ),
               ),
@@ -820,7 +820,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -857,7 +857,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                           '• Use this for correcting or setting exact counts',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[700],
+                  
                   height: 1.5,
                 ),
               ),
@@ -953,7 +953,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               : 'The existing count will be replaced with the entered count',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -976,7 +976,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1055,7 +1055,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1124,7 +1124,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1158,7 +1158,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         const SizedBox(height: 4),
         Text(
           'Enter a number greater than 0',
-          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          style: TextStyle(fontSize: 14, ),
         ),
       ],
     );

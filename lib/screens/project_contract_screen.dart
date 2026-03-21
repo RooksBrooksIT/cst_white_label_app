@@ -310,7 +310,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                                   },
                             child: const Text(
                               'SAVE',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(),
                             ),
                           ),
                         ],
@@ -380,7 +380,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
         title: const Text(
           'Contract Type Management',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
@@ -388,7 +388,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
         backgroundColor: _primaryColor,
         elevation: 2,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             bottom: Radius.circular(16),
@@ -418,7 +418,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                                 decoration: InputDecoration(
                                   labelText: 'Select Contract Type',
                                   labelStyle: const TextStyle(
-                                    color: Colors.black54,
+                                    
                                   ),
                                   prefixIcon: const Icon(Icons.contrast),
                                   border: OutlineInputBorder(
@@ -453,7 +453,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                               elevation: 2,
                               mini: true,
                               onPressed: _showAddContractTypeModal,
-                              child: const Icon(Icons.add, color: Colors.white),
+                              child: const Icon(Icons.add, ),
                             ),
                           ],
                         ),

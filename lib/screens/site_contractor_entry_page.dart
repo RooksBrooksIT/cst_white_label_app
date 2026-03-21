@@ -496,7 +496,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -682,8 +682,8 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       appBar: AppBar(
         backgroundColor: _primaryColor,
         title: const Text('Contractor Entry',
-            style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
+            style: TextStyle()),
+        iconTheme: const IconThemeData(),
         elevation: 0,
       ),
       body: Column(
@@ -1394,7 +1394,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                  strokeWidth: 2, ))
                           : const Text('Save Entry',
                               style: TextStyle(fontSize: 16)),
                     ),

@@ -40,7 +40,7 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
       appBar: AppBar(
         title: Text(
           'Work Schedule Approvals',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: primaryColor,
         bottom: TabBar(
@@ -240,7 +240,7 @@ class _ApprovalCardState extends State<ApprovalCard>
                           data['projectName'] ?? '',
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.black87,
+                            
                           ),
                         ),
                       ],
@@ -294,7 +294,7 @@ class _ApprovalCardState extends State<ApprovalCard>
                       ],
                     ),
                     SizedBox(height: 8),
-                    Divider(color: Colors.grey[300]),
+                    Divider(),
                     SizedBox(height: 8),
                     _buildInfoRow('Site', data['siteId']),
                     _buildInfoRow('Supervisor', data['supervisorName']),
@@ -487,7 +487,7 @@ class _ApprovalCardState extends State<ApprovalCard>
             2: FlexColumnWidth(2),
           },
           border: TableBorder.all(
-            color: Colors.grey[300]!,
+            color: Colors.grey,
             width: 1,
             borderRadius: BorderRadius.circular(4),
           ),

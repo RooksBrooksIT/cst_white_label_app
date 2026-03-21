@@ -136,7 +136,7 @@ class _customerProjectFinancialStatusReportPageState
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -211,7 +211,7 @@ class _customerProjectFinancialStatusReportPageState
           style: TextStyle(
             fontSize: isSmallScreen ? 18 : 22,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
           ),
         ),
         backgroundColor: Color(0xFF003768),
@@ -254,7 +254,7 @@ class _customerProjectFinancialStatusReportPageState
                                 'Site ID',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  
                                 ),
                               ),
                               Text(

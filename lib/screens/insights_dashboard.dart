@@ -15,14 +15,14 @@ class InsightsDashboard extends StatelessWidget {
         title: const Text(
           'Insights Dashboard',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
         ),
         backgroundColor: const Color(0xFF0b3470),
         elevation: 2,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       backgroundColor: const Color(0xFFf8f9fa),
       body: SingleChildScrollView(
@@ -223,7 +223,7 @@ class InsightsDashboard extends StatelessWidget {
                       description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[700],
+                        
                         height: 1.4,
                       ),
                     ),

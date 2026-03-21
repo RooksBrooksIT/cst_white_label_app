@@ -119,7 +119,8 @@ class _ProjectStageDailySiteExpensesReportPageState
 
       final entryDateObj = _parseFirestoreDate(data['date']);
 
-      final isSameDate = entryDateObj != null &&
+      final isSameDate =
+          entryDateObj != null &&
           DateFormat('yyyy-MM-dd').format(entryDateObj) ==
               DateFormat('yyyy-MM-dd').format(widget.date);
 
@@ -143,13 +144,26 @@ class _ProjectStageDailySiteExpensesReportPageState
         cells: [
           DataCell(Text('Labour', style: TextStyle(color: textColor))),
           DataCell(
-              Text(labour['type'] ?? '', style: TextStyle(color: textColor))),
-          DataCell(Text('${labour['count'] ?? ''}',
-              style: TextStyle(color: textColor))),
-          DataCell(Text('${labour['unitSalary'] ?? ''}',
-              style: TextStyle(color: textColor))),
-          DataCell(Text('${labour['amount'] ?? ''}',
-              style: TextStyle(color: textColor))),
+            Text(labour['type'] ?? '', style: TextStyle(color: textColor)),
+          ),
+          DataCell(
+            Text(
+              '${labour['count'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
+          DataCell(
+            Text(
+              '${labour['unitSalary'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
+          DataCell(
+            Text(
+              '${labour['amount'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
         ],
       );
     }).toList();
@@ -161,13 +175,26 @@ class _ProjectStageDailySiteExpensesReportPageState
         cells: [
           DataCell(Text('Material', style: TextStyle(color: textColor))),
           DataCell(
-              Text(material['type'] ?? '', style: TextStyle(color: textColor))),
-          DataCell(Text('${material['quantity'] ?? ''}',
-              style: TextStyle(color: textColor))),
-          DataCell(Text('${material['unitPrice'] ?? ''}',
-              style: TextStyle(color: textColor))),
-          DataCell(Text('${material['amount'] ?? ''}',
-              style: TextStyle(color: textColor))),
+            Text(material['type'] ?? '', style: TextStyle(color: textColor)),
+          ),
+          DataCell(
+            Text(
+              '${material['quantity'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
+          DataCell(
+            Text(
+              '${material['unitPrice'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
+          DataCell(
+            Text(
+              '${material['amount'] ?? ''}',
+              style: TextStyle(color: textColor),
+            ),
+          ),
         ],
       );
     }).toList();
@@ -187,11 +214,16 @@ class _ProjectStageDailySiteExpensesReportPageState
             cells: [
               DataCell(Text('Expense', style: TextStyle(color: textColor))),
               DataCell(
-                  Text(field['type']!, style: TextStyle(color: textColor))),
+                Text(field['type']!, style: TextStyle(color: textColor)),
+              ),
               DataCell(Text('-', style: TextStyle(color: textColor))),
               DataCell(Text('-', style: TextStyle(color: textColor))),
-              DataCell(Text('${data[field['key']]}',
-                  style: TextStyle(color: textColor))),
+              DataCell(
+                Text(
+                  '${data[field['key']]}',
+                  style: TextStyle(color: textColor),
+                ),
+              ),
             ],
           ),
         );
@@ -239,11 +271,9 @@ class _ProjectStageDailySiteExpensesReportPageState
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(12),
-          ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
         ),
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -260,10 +290,7 @@ class _ProjectStageDailySiteExpensesReportPageState
                   SizedBox(height: 16),
                   Text(
                     'Loading report data...',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: primaryColor, fontSize: 16),
                   ),
                 ],
               ),
@@ -289,18 +316,11 @@ class _ProjectStageDailySiteExpensesReportPageState
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.receipt_long,
-                        size: 48,
-                        color: textLightColor,
-                      ),
+                      Icon(Icons.receipt_long, size: 48, color: textLightColor),
                       SizedBox(height: 16),
                       Text(
                         'No report found for this date.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: textLightColor,
-                        ),
+                        style: TextStyle(fontSize: 16, color: textLightColor),
                       ),
                     ],
                   ),
@@ -334,42 +354,72 @@ class _ProjectStageDailySiteExpensesReportPageState
                     contractRows.add(
                       DataRow(
                         cells: [
-                          DataCell(Text('Expense',
-                              style: TextStyle(color: textColor))),
-                          DataCell(Text(field['type']!,
-                              style: TextStyle(color: textColor))),
                           DataCell(
-                              Text('-', style: TextStyle(color: textColor))),
+                            Text('Expense', style: TextStyle(color: textColor)),
+                          ),
                           DataCell(
-                              Text('-', style: TextStyle(color: textColor))),
-                          DataCell(Text('${contractData[field['key']]}',
-                              style: TextStyle(color: textColor))),
+                            Text(
+                              field['type']!,
+                              style: TextStyle(color: textColor),
+                            ),
+                          ),
+                          DataCell(
+                            Text('-', style: TextStyle(color: textColor)),
+                          ),
+                          DataCell(
+                            Text('-', style: TextStyle(color: textColor)),
+                          ),
+                          DataCell(
+                            Text(
+                              '${contractData[field['key']]}',
+                              style: TextStyle(color: textColor),
+                            ),
+                          ),
                         ],
                       ),
                     );
                     contractTotal +=
                         num.tryParse(contractData[field['key']].toString()) ??
-                            0;
+                        0;
                   }
                 }
                 // Add labours
                 final labours =
                     (contractData['labours'] ?? []) as List<dynamic>;
                 for (var labour in labours) {
-                  contractRows.add(DataRow(
-                    cells: [
-                      DataCell(
-                          Text('Labour', style: TextStyle(color: textColor))),
-                      DataCell(Text(labour['type'] ?? '',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${labour['count'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${labour['unitSalary'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${labour['amount'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                    ],
-                  ));
+                  contractRows.add(
+                    DataRow(
+                      cells: [
+                        DataCell(
+                          Text('Labour', style: TextStyle(color: textColor)),
+                        ),
+                        DataCell(
+                          Text(
+                            labour['type'] ?? '',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${labour['count'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${labour['unitSalary'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${labour['amount'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
                   contractTotal +=
                       num.tryParse(labour['amount']?.toString() ?? '0') ?? 0;
                 }
@@ -377,20 +427,39 @@ class _ProjectStageDailySiteExpensesReportPageState
                 final materials =
                     (contractData['materials'] ?? []) as List<dynamic>;
                 for (var material in materials) {
-                  contractRows.add(DataRow(
-                    cells: [
-                      DataCell(
-                          Text('Material', style: TextStyle(color: textColor))),
-                      DataCell(Text(material['type'] ?? '',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${material['quantity'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${material['unitPrice'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                      DataCell(Text('${material['amount'] ?? ''}',
-                          style: TextStyle(color: textColor))),
-                    ],
-                  ));
+                  contractRows.add(
+                    DataRow(
+                      cells: [
+                        DataCell(
+                          Text('Material', style: TextStyle(color: textColor)),
+                        ),
+                        DataCell(
+                          Text(
+                            material['type'] ?? '',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${material['quantity'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${material['unitPrice'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${material['amount'] ?? ''}',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
                   contractTotal +=
                       num.tryParse(material['amount']?.toString() ?? '0') ?? 0;
                 }
@@ -402,13 +471,15 @@ class _ProjectStageDailySiteExpensesReportPageState
               ? managerEntries.first.data() as Map<String, dynamic>?
               : null;
 
-          final siteId = widget.siteId ??
+          final siteId =
+              widget.siteId ??
               supervisorData?['siteId'] ??
               managerData?['siteId'] ??
               orgData?['siteId'] ??
               'N/A';
 
-          final supervisorName = supervisorData?['supervisorName'] ??
+          final supervisorName =
+              supervisorData?['supervisorName'] ??
               managerData?['supervisorName'] ??
               orgData?['supervisorName'] ??
               widget.supervisorId;
@@ -431,45 +502,65 @@ class _ProjectStageDailySiteExpensesReportPageState
           List<DataRow> managerRows = [];
           num managerTotal = 0;
           if (managerEntries.isNotEmpty) {
-            final selectedDateStr =
-                DateFormat('yyyy-MM-dd').format(widget.date);
+            final selectedDateStr = DateFormat(
+              'yyyy-MM-dd',
+            ).format(widget.date);
             for (var doc in managerEntries) {
               final managerData = doc.data() as Map<String, dynamic>?;
               if (managerData != null && managerData['bills'] != null) {
-                final bills =
-                    (managerData['bills'] as List<dynamic>).where((bill) {
+                final bills = (managerData['bills'] as List<dynamic>).where((
+                  bill,
+                ) {
                   final billDateObj = _parseFirestoreDate(bill['billDate']);
                   if (billDateObj == null) return false;
                   return DateFormat('yyyy-MM-dd').format(billDateObj) ==
                       selectedDateStr;
                 }).toList();
 
-                managerRows.addAll(bills.map<DataRow>((bill) {
-                  String billDateStr = '-';
-                  final parsedDate = _parseFirestoreDate(bill['billDate']);
-                  if (parsedDate != null) {
-                    billDateStr = DateFormat('yyyy-MM-dd').format(parsedDate);
-                  }
-                  return DataRow(cells: [
-                    DataCell(Text(bill['billNo']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(Text(bill['billVendor']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(Text(bill['billAmount']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(
-                        Text(billDateStr, style: TextStyle(color: textColor))),
-                  ]);
-                }));
+                managerRows.addAll(
+                  bills.map<DataRow>((bill) {
+                    String billDateStr = '-';
+                    final parsedDate = _parseFirestoreDate(bill['billDate']);
+                    if (parsedDate != null) {
+                      billDateStr = DateFormat('yyyy-MM-dd').format(parsedDate);
+                    }
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Text(
+                            bill['billNo']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            bill['billVendor']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            bill['billAmount']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(billDateStr, style: TextStyle(color: textColor)),
+                        ),
+                      ],
+                    );
+                  }),
+                );
 
                 for (final bill in bills) {
                   if (bill['billAmount'] is num) {
                     managerTotal += bill['billAmount'] as num;
                   } else if (bill['billAmount'] is String) {
                     final parsed = double.tryParse(
-                      bill['billAmount']
-                          .toString()
-                          .replaceAll(RegExp(r'[^0-9.]'), ''),
+                      bill['billAmount'].toString().replaceAll(
+                        RegExp(r'[^0-9.]'),
+                        '',
+                      ),
                     );
                     if (parsed != null) managerTotal += parsed;
                   }
@@ -482,8 +573,9 @@ class _ProjectStageDailySiteExpensesReportPageState
           List<DataRow> orgRows = [];
           num orgTotal = 0;
           if (orgEntries.isNotEmpty) {
-            final selectedDateStr =
-                DateFormat('yyyy-MM-dd').format(widget.date);
+            final selectedDateStr = DateFormat(
+              'yyyy-MM-dd',
+            ).format(widget.date);
             for (final doc in orgEntries) {
               final orgData = doc.data() as Map<String, dynamic>?;
               if (orgData != null && orgData['bills'] != null) {
@@ -494,32 +586,50 @@ class _ProjectStageDailySiteExpensesReportPageState
                   return DateFormat('yyyy-MM-dd').format(billDateObj) ==
                       selectedDateStr;
                 }).toList();
-                orgRows.addAll(filteredBills.map<DataRow>((bill) {
-                  String billDate = '-';
-                  final parsedDate = _parseFirestoreDate(bill['billDate']);
-                  if (parsedDate != null) {
-                    billDate = DateFormat('yyyy-MM-dd').format(parsedDate);
-                  }
-                  return DataRow(cells: [
-                    DataCell(Text(bill['billNo']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(Text(bill['billVendor']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(Text(bill['billAmount']?.toString() ?? '-',
-                        style: TextStyle(color: textColor))),
-                    DataCell(
-                        Text(billDate, style: TextStyle(color: textColor))),
-                  ]);
-                }));
+                orgRows.addAll(
+                  filteredBills.map<DataRow>((bill) {
+                    String billDate = '-';
+                    final parsedDate = _parseFirestoreDate(bill['billDate']);
+                    if (parsedDate != null) {
+                      billDate = DateFormat('yyyy-MM-dd').format(parsedDate);
+                    }
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Text(
+                            bill['billNo']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            bill['billVendor']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            bill['billAmount']?.toString() ?? '-',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        DataCell(
+                          Text(billDate, style: TextStyle(color: textColor)),
+                        ),
+                      ],
+                    );
+                  }),
+                );
 
                 for (final bill in filteredBills) {
                   if (bill['billAmount'] is num) {
                     orgTotal += bill['billAmount'] as num;
                   } else if (bill['billAmount'] is String) {
                     final parsed = double.tryParse(
-                      bill['billAmount']
-                          .toString()
-                          .replaceAll(RegExp(r'[^0-9.]'), ''),
+                      bill['billAmount'].toString().replaceAll(
+                        RegExp(r'[^0-9.]'),
+                        '',
+                      ),
                     );
                     if (parsed != null) orgTotal += parsed;
                   }
@@ -556,14 +666,14 @@ class _ProjectStageDailySiteExpensesReportPageState
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.summarize, color: Colors.white, size: 28),
+                            Icon(Icons.summarize, size: 28),
                             SizedBox(width: 12),
                             Text(
                               'DAILY EXPENSE REPORT',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+
                                 letterSpacing: 1.2,
                               ),
                             ),
@@ -573,94 +683,147 @@ class _ProjectStageDailySiteExpensesReportPageState
                         _buildInfoRowWhite('Site ID', siteId),
                         _siteNameLoading
                             ? Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4.0),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4.0,
+                                ),
                                 child: Row(
                                   children: [
                                     SizedBox(
-                                        width: 100,
-                                        child: Text('Site Name:',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white
-                                                    .withOpacity(0.8)))),
+                                      width: 100,
+                                      child: Text(
+                                        'Site Name:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withOpacity(0.8),
+                                        ),
+                                      ),
+                                    ),
                                     SizedBox(width: 8),
                                     SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               )
                             : _siteName != null && _siteName!.isNotEmpty
-                                ? _buildInfoRowWhite('Site Name', _siteName!)
-                                : SizedBox.shrink(),
+                            ? _buildInfoRowWhite('Site Name', _siteName!)
+                            : SizedBox.shrink(),
                         _buildInfoRowWhite('Supervisor', supervisorName),
-                        _buildInfoRowWhite('Project Stage', widget.projectStage),
+                        _buildInfoRowWhite(
+                          'Project Stage',
+                          widget.projectStage,
+                        ),
                         _buildInfoRowWhite('Date', formattedDate),
                       ],
                     ),
                   ),
                 ),
                 SizedBox(height: 24),
-                
+
                 if (supervisorRows.isNotEmpty) ...[
-                  _buildSectionHeader('Site Supervisor Expenses', Icons.engineering),
+                  _buildSectionHeader(
+                    'Site Supervisor Expenses',
+                    Icons.engineering,
+                  ),
                   SizedBox(height: 12),
                   _buildDataTable(
                     headerColor: primaryLightColor.withOpacity(0.2),
                     columns: const [
                       DataColumn(
-                          label: Text('Type',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Type',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Item',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Item',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Quantity',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Quantity',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Unit',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Unit',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Amount',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Amount',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                     rows: supervisorRows,
                   ),
                   SizedBox(height: 16),
-                  _buildSubtotalCard('Supervisor Total', supervisorTotal, primaryLightColor),
+                  _buildSubtotalCard(
+                    'Supervisor Total',
+                    supervisorTotal,
+                    primaryLightColor,
+                  ),
                   SizedBox(height: 24),
                 ],
-                
+
                 if (managerRows.isNotEmpty) ...[
-                  _buildSectionHeader('Manager Expenses', Icons.manage_accounts),
+                  _buildSectionHeader(
+                    'Manager Expenses',
+                    Icons.manage_accounts,
+                  ),
                   SizedBox(height: 12),
                   _buildDataTable(
                     headerColor: primaryLightColor.withOpacity(0.2),
                     columns: const [
                       DataColumn(
-                          label: Text('Bill No',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Bill No',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Vendor',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Vendor',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Amount',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Amount',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Date',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Date',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                     rows: managerRows,
                   ),
                   SizedBox(height: 16),
-                  _buildSubtotalCard('Manager Total', managerTotal, primaryLightColor),
+                  _buildSubtotalCard(
+                    'Manager Total',
+                    managerTotal,
+                    primaryLightColor,
+                  ),
                   SizedBox(height: 24),
                 ],
-                
+
                 if (orgRows.isNotEmpty) ...[
                   _buildSectionHeader('Organization Expenses', Icons.business),
                   SizedBox(height: 12),
@@ -668,25 +831,41 @@ class _ProjectStageDailySiteExpensesReportPageState
                     headerColor: primaryLightColor.withOpacity(0.2),
                     columns: const [
                       DataColumn(
-                          label: Text('Bill No',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Bill No',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Vendor',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Vendor',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Amount',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Amount',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Date',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Date',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                     rows: orgRows,
                   ),
                   SizedBox(height: 16),
-                  _buildSubtotalCard('Organization Total', orgTotal, primaryLightColor),
+                  _buildSubtotalCard(
+                    'Organization Total',
+                    orgTotal,
+                    primaryLightColor,
+                  ),
                   SizedBox(height: 24),
                 ],
-                
+
                 if (contractRows.isNotEmpty) ...[
                   _buildSectionHeader('Contract Expenses', Icons.handshake),
                   SizedBox(height: 12),
@@ -694,28 +873,47 @@ class _ProjectStageDailySiteExpensesReportPageState
                     headerColor: primaryLightColor.withOpacity(0.2),
                     columns: const [
                       DataColumn(
-                          label: Text('Type',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Type',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Item',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Item',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Quantity',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Quantity',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Unit',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Unit',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       DataColumn(
-                          label: Text('Amount',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        label: Text(
+                          'Amount',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                     rows: contractRows,
                   ),
                   SizedBox(height: 16),
-                  _buildSubtotalCard('Contract Total', contractTotal, primaryLightColor),
+                  _buildSubtotalCard(
+                    'Contract Total',
+                    contractTotal,
+                    primaryLightColor,
+                  ),
                   SizedBox(height: 24),
                 ],
-                
+
                 // Grand Total Card
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 8),
@@ -737,16 +935,17 @@ class _ProjectStageDailySiteExpensesReportPageState
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 24, horizontal: 16),
+                      vertical: 24,
+                      horizontal: 16,
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.summarize, color: Colors.white, size: 36),
+                        Icon(Icons.summarize, size: 36),
                         const SizedBox(height: 12),
                         Text(
                           'GRAND TOTAL',
                           style: TextStyle(
-                            color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 1.2,
@@ -756,15 +955,10 @@ class _ProjectStageDailySiteExpensesReportPageState
                         Text(
                           '₹${totalAmount.toStringAsFixed(2)}',
                           style: TextStyle(
-                            color: Colors.white,
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                             shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
+                              Shadow(blurRadius: 8, offset: Offset(0, 2)),
                             ],
                           ),
                         ),
@@ -772,19 +966,25 @@ class _ProjectStageDailySiteExpensesReportPageState
                     ),
                   ),
                 ),
-                
+
                 SizedBox(height: 24),
-                
+
                 // PDF Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    icon: Icon(Icons.picture_as_pdf, color: Colors.white, size: 24),
-                    label: Text('Generate PDF Report', style: TextStyle(fontSize: 16)),
+                    icon: Icon(Icons.picture_as_pdf, size: 24),
+                    label: Text(
+                      'Generate PDF Report',
+                      style: TextStyle(fontSize: 16),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -804,8 +1004,9 @@ class _ProjectStageDailySiteExpensesReportPageState
                         );
                         return;
                       }
-                      final selectedDateStr =
-                          DateFormat('yyyy-MM-dd').format(widget.date);
+                      final selectedDateStr = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(widget.date);
                       final supervisor = supervisorData;
                       num supervisorTotal = 0;
                       if (supervisor != null) {
@@ -816,23 +1017,29 @@ class _ProjectStageDailySiteExpensesReportPageState
                         ];
                         for (var field in expenseFields) {
                           if (supervisor.containsKey(field['key'])) {
-                            supervisorTotal += num.tryParse(
-                                    supervisor[field['key']].toString()) ??
+                            supervisorTotal +=
+                                num.tryParse(
+                                  supervisor[field['key']].toString(),
+                                ) ??
                                 0;
                           }
                         }
                         final labours =
                             (supervisor['labours'] ?? []) as List<dynamic>;
                         for (var labour in labours) {
-                          supervisorTotal += num.tryParse(
-                                  labour['amount']?.toString() ?? '0') ??
+                          supervisorTotal +=
+                              num.tryParse(
+                                labour['amount']?.toString() ?? '0',
+                              ) ??
                               0;
                         }
                         final materials =
                             (supervisor['materials'] ?? []) as List<dynamic>;
                         for (var material in materials) {
-                          supervisorTotal += num.tryParse(
-                                  material['amount']?.toString() ?? '0') ??
+                          supervisorTotal +=
+                              num.tryParse(
+                                material['amount']?.toString() ?? '0',
+                              ) ??
                               0;
                         }
                       }
@@ -844,17 +1051,22 @@ class _ProjectStageDailySiteExpensesReportPageState
                             managerData['bills'] != null) {
                           final bills = (managerData['bills'] as List<dynamic>)
                               .where((bill) {
-                            final billDateObj =
-                                _parseFirestoreDate(bill['billDate']);
-                            if (billDateObj == null) return false;
-                            return DateFormat('yyyy-MM-dd')
-                                    .format(billDateObj) ==
-                                selectedDateStr;
-                          }).toList();
+                                final billDateObj = _parseFirestoreDate(
+                                  bill['billDate'],
+                                );
+                                if (billDateObj == null) return false;
+                                return DateFormat(
+                                      'yyyy-MM-dd',
+                                    ).format(billDateObj) ==
+                                    selectedDateStr;
+                              })
+                              .toList();
                           for (var bill in bills) {
                             managerBills.add(Map<String, dynamic>.from(bill));
-                            managerTotal += num.tryParse(
-                                    bill['billAmount']?.toString() ?? '0') ??
+                            managerTotal +=
+                                num.tryParse(
+                                  bill['billAmount']?.toString() ?? '0',
+                                ) ??
                                 0;
                           }
                         }
@@ -866,17 +1078,21 @@ class _ProjectStageDailySiteExpensesReportPageState
                         if (orgData != null && orgData['bills'] != null) {
                           final bills = orgData['bills'] as List<dynamic>;
                           final filteredBills = bills.where((bill) {
-                            final billDateObj =
-                                _parseFirestoreDate(bill['billDate']);
+                            final billDateObj = _parseFirestoreDate(
+                              bill['billDate'],
+                            );
                             if (billDateObj == null) return false;
-                            return DateFormat('yyyy-MM-dd')
-                                    .format(billDateObj) ==
+                            return DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(billDateObj) ==
                                 selectedDateStr;
                           }).toList();
                           for (var bill in filteredBills) {
                             orgBills.add(Map<String, dynamic>.from(bill));
-                            orgTotal += num.tryParse(
-                                    bill['billAmount']?.toString() ?? '0') ??
+                            orgTotal +=
+                                num.tryParse(
+                                  bill['billAmount']?.toString() ?? '0',
+                                ) ??
                                 0;
                           }
                         }
@@ -887,8 +1103,9 @@ class _ProjectStageDailySiteExpensesReportPageState
                         final contractData =
                             doc.data() as Map<String, dynamic>?;
                         if (contractData != null) {
-                          contractEntriesList
-                              .add(Map<String, dynamic>.from(contractData));
+                          contractEntriesList.add(
+                            Map<String, dynamic>.from(contractData),
+                          );
                           final expenseFields = [
                             {'type': 'Food', 'key': 'food'},
                             {'type': 'Fuel', 'key': 'fuel'},
@@ -896,28 +1113,36 @@ class _ProjectStageDailySiteExpensesReportPageState
                           ];
                           for (var field in expenseFields) {
                             if (contractData.containsKey(field['key'])) {
-                              contractTotal += num.tryParse(
-                                      contractData[field['key']].toString()) ??
+                              contractTotal +=
+                                  num.tryParse(
+                                    contractData[field['key']].toString(),
+                                  ) ??
                                   0;
                             }
                           }
                           final labours =
                               (contractData['labours'] ?? []) as List<dynamic>;
                           for (var labour in labours) {
-                            contractTotal += num.tryParse(
-                                    labour['amount']?.toString() ?? '0') ??
+                            contractTotal +=
+                                num.tryParse(
+                                  labour['amount']?.toString() ?? '0',
+                                ) ??
                                 0;
                           }
-                          final materials = (contractData['materials'] ?? [])
-                              as List<dynamic>;
+                          final materials =
+                              (contractData['materials'] ?? [])
+                                  as List<dynamic>;
                           for (var material in materials) {
-                            contractTotal += num.tryParse(
-                                    material['amount']?.toString() ?? '0') ??
+                            contractTotal +=
+                                num.tryParse(
+                                  material['amount']?.toString() ?? '0',
+                                ) ??
                                 0;
                           }
                         }
                       }
-                      final grandTotal = supervisorTotal +
+                      final grandTotal =
+                          supervisorTotal +
                           managerTotal +
                           orgTotal +
                           contractTotal;
@@ -932,13 +1157,11 @@ class _ProjectStageDailySiteExpensesReportPageState
                         grandTotal: grandTotal,
                         contractEntries: contractEntriesList,
                       );
-                      await Printing.layoutPdf(
-                        onLayout: (format) => pdfBytes,
-                      );
+                      await Printing.layoutPdf(onLayout: (format) => pdfBytes);
                     },
                   ),
                 ),
-                
+
                 SizedBox(height: 24),
               ],
             ),
@@ -986,18 +1209,12 @@ class _ProjectStageDailySiteExpensesReportPageState
             width: 100,
             child: Text(
               '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withOpacity(0.9),
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
           SizedBox(width: 8),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-            ),
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -1050,7 +1267,8 @@ class _ProjectStageDailySiteExpensesReportPageState
           horizontalMargin: 16,
           columnSpacing: 24,
           headingRowColor: WidgetStateProperty.all(
-              headerColor ?? primaryLightColor.withOpacity(0.2)),
+            headerColor ?? primaryLightColor.withOpacity(0.2),
+          ),
           columns: columns,
           rows: rows,
         ),
@@ -1099,9 +1317,10 @@ class _ProjectStageDailySiteExpensesReportPageState
     pdf.addPage(
       pw.MultiPage(
         build: (pw.Context context) => [
-          pw.Text('ProjectStage Daily Site Expenses Report',
-              style:
-                  pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'ProjectStage Daily Site Expenses Report',
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 12),
           pw.Text('Supervisor ID: ${widget.supervisorId}'),
           pw.Text('Site ID: ${widget.siteId ?? "N/A"}'),
@@ -1111,64 +1330,76 @@ class _ProjectStageDailySiteExpensesReportPageState
 
           // Supervisor Section
           if (supervisorData != null) ...[
-            pw.Text('Site Supervisor Expenses',
-                style:
-                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Site Supervisor Expenses',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             _pdfSupervisorTable(supervisorData),
             pw.SizedBox(height: 8),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Supervisor Total: ₹$supervisorTotal',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              child: pw.Text(
+                'Supervisor Total: ₹$supervisorTotal',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
             ),
             pw.SizedBox(height: 16),
           ],
 
           // Manager Section
           if (managerBills.isNotEmpty) ...[
-            pw.Text('Manager Expenses',
-                style:
-                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Manager Expenses',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             _pdfBillsTable(managerBills),
             pw.SizedBox(height: 8),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Manager Total: ₹$managerTotal',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              child: pw.Text(
+                'Manager Total: ₹$managerTotal',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
             ),
             pw.SizedBox(height: 16),
           ],
 
           // Organization Section
           if (orgBills.isNotEmpty) ...[
-            pw.Text('Organization Expenses',
-                style:
-                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Organization Expenses',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             _pdfBillsTable(orgBills),
             pw.SizedBox(height: 8),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Organization Total: ₹$orgTotal',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              child: pw.Text(
+                'Organization Total: ₹$orgTotal',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
             ),
             pw.SizedBox(height: 16),
           ],
 
           // Contractor Section
           if (contractEntries.isNotEmpty) ...[
-            pw.Text('Contractor Expenses',
-                style:
-                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Contractor Expenses',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             _pdfContractorTable(contractEntries),
             pw.SizedBox(height: 8),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Contractor Total: ₹$contractTotal',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              child: pw.Text(
+                'Contractor Total: ₹$contractTotal',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
             ),
             pw.SizedBox(height: 16),
           ],
@@ -1185,19 +1416,23 @@ class _ProjectStageDailySiteExpensesReportPageState
               ),
               child: pw.Column(
                 children: [
-                  pw.Text('Grand Total',
-                      style: pw.TextStyle(
-                        color: PdfColor.fromInt(0xFFFFFFFF),
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 18,
-                      )),
+                  pw.Text(
+                    'Grand Total',
+                    style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xFFFFFFFF),
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
                   pw.SizedBox(height: 6),
-                  pw.Text('₹$grandTotal',
-                      style: pw.TextStyle(
-                        color: PdfColor.fromInt(0xFFFFFFFF),
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 28,
-                      )),
+                  pw.Text(
+                    '₹$grandTotal',
+                    style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xFFFFFFFF),
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 28,
+                    ),
+                  ),
                 ],
               ),
             ),

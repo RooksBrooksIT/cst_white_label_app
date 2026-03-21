@@ -180,7 +180,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
               surface: Colors.white,
               onSurface: Colors.black,
             ),
-            dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -538,7 +538,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
       appBar: AppBar(
         title: const Text(
           "Project Configuration",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle( fontWeight: FontWeight.w600),
         ),
         backgroundColor: primaryColor,
         centerTitle: true,
@@ -561,11 +561,11 @@ class _ProjectScreenState extends State<ProjectScreen> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -769,7 +769,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 ),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Padding(
@@ -820,7 +820,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                             ),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               padding: const EdgeInsets.all(16),
@@ -1081,7 +1081,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Padding(
@@ -1481,7 +1481,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Padding(
@@ -1552,7 +1552,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Padding(

@@ -320,7 +320,7 @@ class _SupervisorWorkSchedulePageState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[700])),
+            child: Text('Cancel', style: TextStyle()),
           ),
           TextButton(
             onPressed: () {
@@ -338,9 +338,9 @@ class _SupervisorWorkSchedulePageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Work Schedule', style: TextStyle(color: Colors.white)),
+        title: Text('Work Schedule', style: TextStyle()),
         backgroundColor: mainColor,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         elevation: 0,
       ),
       body: _isLoadingSupervisorSite
@@ -388,7 +388,7 @@ class _SupervisorWorkSchedulePageState
                                     'ID: ${widget.supervisorId}',
                                     style: TextStyle(
                                       fontSize: 16,
-                                      color: Colors.black87,
+                                      
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -416,7 +416,7 @@ class _SupervisorWorkSchedulePageState
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide:
-                                        BorderSide(color: Colors.grey[300]!),
+                                        BorderSide(color: Colors.grey),
                                   ),
                                   prefixIcon:
                                       Icon(Icons.location_on_outlined, color: mainColor),
@@ -432,7 +432,7 @@ class _SupervisorWorkSchedulePageState
                                     child: Text(
                                       displayName,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: Colors.black),
+                                      style: TextStyle(),
                                     ),
                                   );
                                 }).toList(),
@@ -469,7 +469,7 @@ class _SupervisorWorkSchedulePageState
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide:
-                                        BorderSide(color: Colors.grey[300]!),
+                                        BorderSide(color: Colors.grey),
                                   ),
                                   prefixIcon:
                                       Icon(Icons.calendar_today, color: mainColor),
@@ -505,13 +505,13 @@ class _SupervisorWorkSchedulePageState
                               child: Row(
                                 children: [
                                   Icon(Icons.group_add,
-                                      color: Colors.white, size: 26),
+                                       size: 26),
                                   SizedBox(width: 10),
                                   Text('Add Labour',
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        
                                       )),
                                 ],
                               ),
@@ -549,7 +549,7 @@ class _SupervisorWorkSchedulePageState
                                             prefixIcon:
                                                 Icon(Icons.person, color: mainColor),
                                             filled: true,
-                                            fillColor: Colors.white,
+                                            
                                           ),
                                           items: _labours.map((labour) {
                                             final designation =
@@ -568,7 +568,7 @@ class _SupervisorWorkSchedulePageState
                                                     style: TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        color: Colors.black),
+                                                        ),
                                                   ),
                                                   if (designation.isNotEmpty)
                                                     ...[
@@ -598,8 +598,7 @@ class _SupervisorWorkSchedulePageState
                                                       Text('($labourId)',
                                                           style: TextStyle(
                                                               fontSize: 12,
-                                                              color:
-                                                                  Colors.grey[700])),
+                                                              )),
                                                     ],
                                                 ],
                                               ),
@@ -656,7 +655,7 @@ class _SupervisorWorkSchedulePageState
                                                 SizedBox(width: 8),
                                                 Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.white,
+                                                    
                                                     border: Border.all(
                                                         color: mainColor),
                                                     borderRadius:
@@ -726,10 +725,10 @@ class _SupervisorWorkSchedulePageState
                                                   _selectedLabourCount = 1;
                                                 });
                                               },
-                                        icon: Icon(Icons.add, color: Colors.white),
+                                        icon: Icon(Icons.add, ),
                                         label: Text('Add Labours',
                                             style:
-                                                TextStyle(color: Colors.white)),
+                                                TextStyle()),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: mainColor,
                                           shape: RoundedRectangleBorder(
@@ -803,7 +802,7 @@ class _SupervisorWorkSchedulePageState
                                   horizontal: 32, vertical: 15),
                             ),
                             child: Text('Reset',
-                                style: TextStyle(color: Colors.white)),
+                                style: TextStyle()),
                           ),
                           ElevatedButton(
                             onPressed:
@@ -821,12 +820,12 @@ class _SupervisorWorkSchedulePageState
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      
                                       strokeWidth: 2,
                                     ),
                                   )
                                 : Text('Send for Approval',
-                                    style: TextStyle(color: Colors.white)),
+                                    style: TextStyle()),
                           ),
                         ],
                       )
@@ -844,7 +843,7 @@ class _SupervisorWorkSchedulePageState
         labelText: label,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide(color: Colors.grey),
         ),
         prefixIcon: Icon(icon, color: mainColor),
         filled: true,

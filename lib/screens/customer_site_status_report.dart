@@ -388,7 +388,7 @@ class _ProjectstageInsightsDashboardState
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.white,
+        
         foregroundColor: const Color(0xFF003768),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
@@ -410,14 +410,14 @@ class _ProjectstageInsightsDashboardState
                         Icon(
                           Icons.search_off,
                           size: 64,
-                          color: Colors.grey[400],
+                          
                         ),
                         const SizedBox(height: 16),
                         Text(
                           _userSiteId != null
                               ? 'No data found for your site'
                               : 'No supervisor entries found',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(),
                         ),
                         if (_userSiteId != null) ...[
                           const SizedBox(height: 8),
@@ -492,7 +492,7 @@ class _ProjectstageInsightsDashboardState
                       //                   'Name',
                       //                   style: TextStyle(
                       //                     fontSize: 12,
-                      //                     color: Colors.grey[600],
+                      //                     
                       //                   ),
                       //                 ),
                       //                 Text(
@@ -522,7 +522,7 @@ class _ProjectstageInsightsDashboardState
                       //                   'Phone Number',
                       //                   style: TextStyle(
                       //                     fontSize: 12,
-                      //                     color: Colors.grey[600],
+                      //                     
                       //                   ),
                       //                 ),
                       //                 Text(
@@ -574,7 +574,7 @@ class _ProjectstageInsightsDashboardState
                                           'Site ID',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            
                                           ),
                                         ),
                                         Text(
@@ -887,7 +887,7 @@ class _ProjectstageInsightsDashboardState
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1011,7 +1011,7 @@ class _ProjectstageInsightsDashboardState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -1041,11 +1041,11 @@ class _ProjectstageInsightsDashboardState
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       filled: true,
       fillColor: Colors.grey[50],

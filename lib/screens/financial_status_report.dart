@@ -223,12 +223,12 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
       appBar: AppBar(
         title: const Text(
           'Financial Status Report',
-          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w600, ),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: primaryColor))
@@ -276,7 +276,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -331,7 +331,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Divider(color: Colors.grey[300]),
+                        Divider(),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -503,7 +503,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -613,7 +613,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

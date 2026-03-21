@@ -337,13 +337,13 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         title: Text(
           'Site Expenses Report',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
         ),
         backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         centerTitle: true,
       ),
       body: Padding(
@@ -471,7 +471,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                                     child: Text(
                                       entry['date'],
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
                                       ),

@@ -59,7 +59,7 @@ class _SupervisorMaterialViewRequestScreenState
       appBar: AppBar(
         title: const Text(
           'Material Requests',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle( fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
@@ -228,7 +228,7 @@ class _SupervisorMaterialViewRequestScreenState
           Text(
             'Welcome, ${widget.supervisorName}',
             style: const TextStyle(
-              color: Colors.white,
+              
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
@@ -255,7 +255,7 @@ class _SupervisorMaterialViewRequestScreenState
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -400,7 +400,7 @@ class _FilterChip extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                
                 blurRadius: 5,
                 offset: const Offset(0, 2),
               ),
@@ -480,11 +480,11 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -517,7 +517,7 @@ class _RequestCard extends StatelessWidget {
                       Text(
                         'Request ID: $matReqId',
                         style: const TextStyle(
-                          color: Colors.white,
+                          
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -539,18 +539,18 @@ class _RequestCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_statusIcon(status), color: Colors.white, size: 16),
+                      Icon(_statusIcon(status),  size: 16),
                       const SizedBox(width: 4),
                       Text(
                         status.toUpperCase(),
                         style: const TextStyle(
-                          color: Colors.white,
+                          
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),

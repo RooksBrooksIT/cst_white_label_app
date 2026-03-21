@@ -653,7 +653,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                     Chip(
                       label: Text(
                         '${_attendanceStatus.values.where((status) => status.isNotEmpty).length}/${_workers.length} marked',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(),
                       ),
                       backgroundColor: Colors.blue,
                     ),

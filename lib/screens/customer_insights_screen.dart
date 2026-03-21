@@ -232,7 +232,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       appBar: AppBar(
         title: const Text(
           'CST Insights',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -260,14 +260,14 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                         Icon(
                           Icons.search_off,
                           size: 64,
-                          color: Colors.grey[400],
+                          
                         ),
                         const SizedBox(height: 16),
                         Text(
                           _userSiteId != null
                               ? 'No data found for your site'
                               : 'No supervisor entries found',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(),
                         ),
                         if (_userSiteId != null) ...[
                           const SizedBox(height: 8),
@@ -331,7 +331,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       //                   'Name',
                       //                   style: TextStyle(
                       //                     fontSize: 12,
-                      //                     color: Colors.grey[600],
+                      //                     
                       //                   ),
                       //                 ),
                       //                 Text(
@@ -361,7 +361,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       //                   'Phone Number',
                       //                   style: TextStyle(
                       //                     fontSize: 12,
-                      //                     color: Colors.grey[600],
+                      //                     
                       //                   ),
                       //                 ),
                       //                 Text(
@@ -413,7 +413,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                                           'Site ID',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            
                                           ),
                                         ),
                                         Text(
@@ -583,7 +583,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -707,7 +707,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -737,11 +737,11 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       filled: true,
       fillColor: Colors.grey[50],

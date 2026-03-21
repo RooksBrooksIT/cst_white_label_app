@@ -386,7 +386,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       appBar: AppBar(
         title: const Text(
           'Tools Movement',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, ),
         ),
         centerTitle: true,
         backgroundColor: _primaryColor,
@@ -570,7 +570,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         horizontal: 16,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -847,7 +847,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         horizontal: 16,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1275,7 +1275,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           borderSide: BorderSide(color: _primaryColor),
         ),
         filled: true,
-        fillColor: Colors.white,
+        
         contentPadding: const EdgeInsets.symmetric(
           vertical: 14,
           horizontal: 16,
@@ -1319,7 +1319,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             borderSide: BorderSide(color: _primaryColor.withOpacity(0.3)),
           ),
           filled: true,
-          fillColor: Colors.white,
+          
           contentPadding: const EdgeInsets.symmetric(
             vertical: 14,
             horizontal: 16,

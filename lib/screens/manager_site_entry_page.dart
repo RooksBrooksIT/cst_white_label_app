@@ -432,7 +432,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
               borderRadius: BorderRadius.circular(16.0),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1028,7 +1028,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -1239,12 +1239,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.white),
+          Icon(icon, size: 20, ),
           const SizedBox(width: 8),
           Flexible(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 16, color: Colors.white),
+                style: const TextStyle(fontSize: 16, ),
                 children: [
                   TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.w500)),
                   TextSpan(text: value, style: const TextStyle(fontWeight: FontWeight.w400)),
@@ -1275,12 +1275,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
             );
           },
           child: const Text('Manager Daily Site Entry',
-              style: TextStyle(color: Colors.white)),
+              style: TextStyle()),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(),
       ),
       backgroundColor: lightBackgroundColor,
       body: LayoutBuilder(
@@ -1320,17 +1320,17 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               Row(
                                 children: [
                                   Icon(Icons.construction,
-                                      size: 22, color: Colors.white),
+                                      size: 22, ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: isLoadingSites
                                         ? const Center(
                                             child: CircularProgressIndicator(
-                                              color: Colors.white,
+                                              
                                             ))
                                         : Container(
                                             decoration: BoxDecoration(
-                                              color: Colors.white,
+                                              
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Padding(
@@ -1381,7 +1381,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               Row(
                                 children: [
                                   Icon(Icons.calendar_today,
-                                      size: 20, color: Colors.white),
+                                      size: 20, ),
                                   const SizedBox(width: 8),
                                   Flexible(
                                     child: Text(
@@ -1390,7 +1390,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                               .format(selectedDate!)
                                           : 'No date chosen',
                                       style: const TextStyle(
-                                          fontSize: 16, color: Colors.white),
+                                          fontSize: 16, ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -1399,8 +1399,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                       ? const SizedBox.shrink()
                                       : TextButton.icon(
                                           onPressed: _pickDate,
-                                          icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                                          label: const Text('Change', style: TextStyle(color: Colors.white)),
+                                          icon: const Icon(Icons.edit, size: 16, ),
+                                          label: const Text('Change', style: TextStyle()),
                                           style: TextButton.styleFrom(
                                             padding: EdgeInsets.zero,
                                             minimumSize: Size.zero,
@@ -2199,7 +2199,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                         width: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          
                                         ),
                                       )
                                     : const Text('Update Entry',
@@ -2226,7 +2226,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        
                                       ),
                                     )
                                   : const Text('Save Entry',

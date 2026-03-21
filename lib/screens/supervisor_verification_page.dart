@@ -373,7 +373,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
       appBar: AppBar(
         title: const Text(
           'Supervisor Verification',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(),
         ),
         backgroundColor: primaryColor,
         elevation: 0,
@@ -384,7 +384,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
             child: const Text(
               'SKIP',
               style: TextStyle(
-                color: Colors.white,
+                
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -524,14 +524,14 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              
                               strokeWidth: 3,
                             ),
                           )
                         : const Text(
                             'Verify & Continue to Site Entry',
                             style: TextStyle(
-                                color: Colors.white,
+                                
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16),
                           ),

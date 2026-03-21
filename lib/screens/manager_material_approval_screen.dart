@@ -57,12 +57,12 @@ class _ManagerMaterialApprovalScreenState
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Color(0xFF0b3470)),
           ),
-          fillColor: Colors.white,
+          
           filled: true,
           contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         ),
         cursorColor: Color(0xFF0b3470),
-        style: TextStyle(color: Colors.black87),
+        style: TextStyle(),
         onChanged: onChanged,
       ),
     );
@@ -75,7 +75,7 @@ class _ManagerMaterialApprovalScreenState
       onTap: () => _showRequestDetailsModal(context, data, docId),
       child: Card(
         margin: getSymmetricPadding(context, fraction: 0.04).copyWith(top: 12, bottom: 10),
-        color: Colors.white,
+        
         elevation: 6,
         shadowColor: Colors.black12,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -123,13 +123,13 @@ class _ManagerMaterialApprovalScreenState
               ),
               SizedBox(height: 14),
               Text("Site: ${data['siteId'] ?? ''}",
-                  style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+                  style: TextStyle(fontSize: 16, )),
               Text("Project: ${data['projectName'] ?? ''}",
-                  style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+                  style: TextStyle(fontSize: 16, )),
               Text("Supervisor: ${data['supervisorName'] ?? ''}",
-                  style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+                  style: TextStyle(fontSize: 16, )),
               Text("Date: ${data['date'] ?? ''}",
-                  style: TextStyle(fontSize: 15, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 15, )),
               SizedBox(height: 12),
               Row(
                 children: [
@@ -176,7 +176,7 @@ class _ManagerMaterialApprovalScreenState
                           height: 5,
                           margin: EdgeInsets.only(bottom: 18),
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
+                            
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
@@ -237,9 +237,9 @@ class _ManagerMaterialApprovalScreenState
                         children: [
                           if (isProcessing)
                             ElevatedButton.icon(
-                              icon: Icon(Icons.check, color: Colors.white),
+                              icon: Icon(Icons.check, ),
                               label: Text("Approve",
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  style: TextStyle( fontWeight: FontWeight.w600)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Color(0xFF0b3470),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -267,7 +267,7 @@ class _ManagerMaterialApprovalScreenState
                             onPressed: () => Navigator.pop(context),
                             child: Text("Close",
                                 style:
-                                    TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    TextStyle( fontWeight: FontWeight.w600)),
                           ),
                         ],
                       ),
@@ -297,9 +297,9 @@ class _ManagerMaterialApprovalScreenState
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: Offset(0, 3))],
+        boxShadow: [BoxShadow( blurRadius: 6, offset: Offset(0, 3))],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -327,11 +327,11 @@ class _ManagerMaterialApprovalScreenState
                   SizedBox(height: 4),
                   Text(
                     'Quantity: ${mat['materialQty']} ${mat['materialUnit']}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+                    style: TextStyle(fontSize: 14, ),
                   ),
                   Text(
                     'Priority: ${mat['priority']}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+                    style: TextStyle(fontSize: 14, ),
                   ),
                 ],
               ),
@@ -349,7 +349,7 @@ class _ManagerMaterialApprovalScreenState
       appBar: AppBar(
         title: Text(
           "Material Approval",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 22),
+          style: TextStyle( fontWeight: FontWeight.w700, fontSize: 22),
         ),
         centerTitle: true,
         elevation: 3,
@@ -360,7 +360,7 @@ class _ManagerMaterialApprovalScreenState
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(52),
           child: Material(
-            color: Colors.white,
+            
             child: TabBar(
               controller: _tabController,
               labelColor: Color(0xFF0b3470),
@@ -400,7 +400,7 @@ class _ManagerMaterialApprovalScreenState
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return Center(
                           child: Text('No processing requests found.',
-                              style: TextStyle(fontSize: 18, color: Colors.grey[700])),
+                              style: TextStyle(fontSize: 18, )),
                         );
                       }
                       final docs = snapshot.data!.docs.where((doc) {
@@ -445,7 +445,7 @@ class _ManagerMaterialApprovalScreenState
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return Center(
                           child: Text('No approved requests',
-                              style: TextStyle(fontSize: 18, color: Colors.grey[700])),
+                              style: TextStyle(fontSize: 18, )),
                         );
                       }
                       final docs = snapshot.data!.docs.where((doc) {

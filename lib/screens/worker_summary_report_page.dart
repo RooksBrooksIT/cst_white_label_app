@@ -961,7 +961,7 @@ class _WorkerAttendanceSalaryPageState
               'Current Month: ${DateFormat('MMMM yyyy').format(DateTime.now())}',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -1004,11 +1004,11 @@ class _WorkerAttendanceSalaryPageState
                       ),
                       Text(
                         '${worker['designation']} • ${worker['site']}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle( fontSize: 12),
                       ),
                       Text(
                         'Site ID: ${worker['siteId'] ?? 'N/A'}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                        style: TextStyle( fontSize: 10),
                       ),
                     ],
                   ),
@@ -1058,7 +1058,7 @@ class _WorkerAttendanceSalaryPageState
                   children: [
                     Text(
                       'Base Salary',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                      style: TextStyle( fontSize: 10),
                     ),
                     Text(
                       '₹${worker['baseSalary']}/day',
@@ -1074,7 +1074,7 @@ class _WorkerAttendanceSalaryPageState
                   children: [
                     Text(
                       'Total Salary',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                      style: TextStyle( fontSize: 10),
                     ),
                     Text(
                       '₹${worker['calculatedSalary'].toStringAsFixed(2)}',
@@ -1091,7 +1091,7 @@ class _WorkerAttendanceSalaryPageState
             SizedBox(height: 4),
             Text(
               'Month: ${DateFormat('MMM yyyy').format(DateTime.parse('${worker['month']}-01'))}',
-              style: TextStyle(color: Colors.grey[600], fontSize: 10),
+              style: TextStyle( fontSize: 10),
             ),
           ],
         ),
@@ -1123,7 +1123,7 @@ class _WorkerAttendanceSalaryPageState
 
     return Container(
       padding: EdgeInsets.all(16),
-      color: Colors.grey[100],
+      
       child: Row(
         children: [
           Expanded(

@@ -75,14 +75,14 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         title: Text(
           'Incentive Calculation',
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
         ),
         backgroundColor: primaryColor,
         elevation: 4,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
       ),
       body: _loading
           ? Center(
@@ -151,7 +151,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                   borderSide: BorderSide(color: primaryColor, width: 2),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade50,
+                                
                                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               ),
                               dropdownColor: cardColor,
@@ -202,7 +202,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                   borderSide: BorderSide(color: primaryColor, width: 2),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade50,
+                                
                                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               ),
                               controller: TextEditingController(text: _supervisorName),
@@ -227,7 +227,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                   borderSide: BorderSide(color: primaryColor, width: 2),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade50,
+                                
                                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               ),
                               dropdownColor: cardColor,

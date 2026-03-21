@@ -597,7 +597,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: SingleChildScrollView(
@@ -649,9 +649,9 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       width: double.infinity,
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(4),
-        color: Colors.grey[50],
+        
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,12 +660,12 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[600],
+              
               fontWeight: FontWeight.bold,
             ),
           ),
           SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+          Text(value, style: TextStyle(fontSize: 16, )),
         ],
       ),
     );

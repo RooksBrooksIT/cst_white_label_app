@@ -118,10 +118,10 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.save, color: Colors.white),
+                          icon: const Icon(Icons.save, ),
                           label: const Text(
                             'Save',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
@@ -290,7 +290,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
           'Sub Category Setup',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
             fontSize: 20,
           ),
         ),
@@ -307,7 +307,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
             child: Material(
               elevation: 4,
               borderRadius: BorderRadius.circular(24),
-              color: Colors.white,
+              
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Form(
@@ -429,7 +429,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.add,
-                                      color: Colors.white, size: 24),
+                                       size: 24),
                                 ),
                               ),
                             ),
@@ -499,7 +499,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),

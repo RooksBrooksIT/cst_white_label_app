@@ -149,7 +149,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         height: 5,
                         margin: EdgeInsets.only(bottom: 18),
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -403,9 +403,9 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton.icon(
-                            icon: Icon(Icons.check, color: Colors.white),
+                            icon: Icon(Icons.check, ),
                             label: Text("Approve",
-                                style: TextStyle(color: Colors.white)),
+                                style: TextStyle()),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               shape: RoundedRectangleBorder(
@@ -484,9 +484,9 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                           ),
                           SizedBox(width: 10),
                           ElevatedButton.icon(
-                            icon: Icon(Icons.close, color: Colors.white),
+                            icon: Icon(Icons.close, ),
                             label: Text("Reject",
-                                style: TextStyle(color: Colors.white)),
+                                style: TextStyle()),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Color(0xFF003768),
                               shape: RoundedRectangleBorder(
@@ -542,7 +542,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       height: 5,
                       margin: EdgeInsets.only(bottom: 18),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -770,7 +770,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
           child: Card(
             margin: getSymmetricPadding(context, fraction: 0.04)
                 .copyWith(top: 12, bottom: 10),
-            color: Colors.white,
+            
             elevation: 7,
             shadowColor: Colors.black12,
             shape:
@@ -869,7 +869,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text("Work Schedule Requests",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: TextStyle( fontWeight: FontWeight.bold)),
         centerTitle: true,
         elevation: 3,
         backgroundColor: Color(0xFF003768),
@@ -881,7 +881,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
           child: Column(
             children: [
               Material(
-                color: Colors.white,
+                
                 child: TabBar(
                   controller: _tabController,
                   labelColor: Color(0xFF003768),
@@ -907,7 +907,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       borderSide: BorderSide(color: Color(0xFF772323)),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    
                     contentPadding:
                         EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                   ),
@@ -997,11 +997,11 @@ class _LabourRequirementCard extends StatelessWidget {
     return Container(
       margin: EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            
             blurRadius: 4,
             offset: Offset(0, 2),
           ),
@@ -1066,7 +1066,7 @@ class _LabourRequirementCard extends StatelessWidget {
                             children: [
                               Text('ID: $labourId',
                                   style: TextStyle(
-                                      fontSize: 12, color: Colors.grey[700])),
+                                      fontSize: 12, )),
                               Text('Salary: ₹$salary',
                                   style: TextStyle(
                                       fontSize: 12, color: Colors.grey)),
@@ -1092,7 +1092,7 @@ class _LabourRequirementCard extends StatelessWidget {
                         SizedBox(height: 2),
                         Text('ID: $labourId',
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey[700])),
+                                fontSize: 12, )),
                         Text('Salary: ₹$salary',
                             style: TextStyle(fontSize: 12, color: Colors.grey)),
                         Text('Count: $count',

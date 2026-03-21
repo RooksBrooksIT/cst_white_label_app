@@ -57,7 +57,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
           builder: (context, setState) {
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(24),
                 ),
@@ -75,7 +75,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                     width: 48,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[400],
+                      
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -264,7 +264,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
               'Project Category Setup',
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                
               ),
             ),
             centerTitle: true,
@@ -297,7 +297,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                                   backgroundColor: primaryColor,
                                   radius: 24,
                                   child: const Icon(Icons.category,
-                                      size: 28, color: Colors.white),
+                                      size: 28, ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -315,7 +315,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                                       Text(
                                         'Select or create a project category',
                                         style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey[600],
+                                          
                                         ),
                                       ),
                                     ],
@@ -397,7 +397,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                                           ),
                                         ),
                                         icon: Icon(Icons.arrow_drop_down,
-                                            color: Colors.grey[600]),
+                                            ),
                                         items: dropdownItems,
                                         onChanged: (String? newValue) {
                                           setState(() {
@@ -519,7 +519,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),

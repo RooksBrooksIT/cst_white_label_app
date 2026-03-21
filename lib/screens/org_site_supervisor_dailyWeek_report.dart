@@ -352,11 +352,11 @@ class _DailySitePaymentReportScreenState
             if (fontSizeBase < 16) fontSizeBase = 16;
             return Text(
               'Site Payment Report',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(),
             );
           },
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         elevation: 2,
       ),
       body: LayoutBuilder(
@@ -666,7 +666,7 @@ class _DailySitePaymentReportScreenState
                                               'Date',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                                
                                                 fontSize: fontSizeBase,
                                               ),
                                             ),
@@ -679,7 +679,7 @@ class _DailySitePaymentReportScreenState
                                               'Payment',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                                
                                                 fontSize: fontSizeBase,
                                               ),
                                             ),
@@ -784,7 +784,7 @@ class _DailySitePaymentReportScreenState
                                 child: Icon(
                                   Icons.cancel_outlined,
                                   size: fontSizeBase * 1.5,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                               ElevatedButton(
@@ -802,7 +802,7 @@ class _DailySitePaymentReportScreenState
                                 child: Icon(
                                   Icons.restart_alt,
                                   size: fontSizeBase * 1.5,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                               ElevatedButton(
@@ -824,7 +824,7 @@ class _DailySitePaymentReportScreenState
                                 child: Icon(
                                   Icons.print,
                                   size: fontSizeBase * 1.5,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                             ],

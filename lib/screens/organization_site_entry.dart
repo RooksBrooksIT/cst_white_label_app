@@ -592,7 +592,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -920,7 +920,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           },
           child: const Text(
             'Organiser Daily Site Entry',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle( fontWeight: FontWeight.bold),
           ),
         ),
         centerTitle: true,
@@ -1852,7 +1852,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        
                                       ),
                                     )
                                   : const Text(

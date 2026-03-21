@@ -166,7 +166,7 @@ class ProjectDetailsPage extends StatelessWidget {
                 project.projectName,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  
                 ),
               );
             }
@@ -174,7 +174,7 @@ class ProjectDetailsPage extends StatelessWidget {
               'Project Details',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                
               ),
             );
           },
@@ -209,13 +209,13 @@ class ProjectDetailsPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'Error loading project',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 18, ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     snapshot.error.toString(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 14, ),
                   ),
                 ],
               ),
@@ -236,12 +236,12 @@ class ProjectDetailsPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'Project not found',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 18, ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'siteId: $siteId',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 12, ),
                   ),
                 ],
               ),
@@ -252,7 +252,7 @@ class ProjectDetailsPage extends StatelessWidget {
           final project = Project.fromFirestore(snapshot.data!.docs.first);
 
           return Container(
-            color: Colors.grey[50],
+            
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -493,7 +493,7 @@ class ProjectDetailsPage extends StatelessWidget {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
+                
                 fontSize: 14,
               ),
             ),
@@ -505,7 +505,7 @@ class ProjectDetailsPage extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w400,
-                color: Colors.black87,
+                
               ),
               softWrap: true,
             ),
@@ -527,7 +527,7 @@ class ProjectDetailsPage extends StatelessWidget {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
+                
                 fontSize: 14,
               ),
             ),
@@ -542,12 +542,12 @@ class ProjectDetailsPage extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w400,
-                    color: Colors.black87,
+                    
                   ),
                 ),
                 Text(
                   _formatTime(date),
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 13, ),
                 ),
               ],
             ),
@@ -568,7 +568,7 @@ class ProjectDetailsPage extends StatelessWidget {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
+                
                 fontSize: 14,
               ),
             ),

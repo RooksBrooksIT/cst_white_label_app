@@ -608,13 +608,13 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
           'Contractor Report',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
           ),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -793,7 +793,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        
                         strokeWidth: 2,
                       ),
                     )
@@ -1077,7 +1077,7 @@ class _DetailCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [

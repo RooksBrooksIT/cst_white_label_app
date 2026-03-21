@@ -403,7 +403,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 const SizedBox(height: 4),
                 Text(
                   designation,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 14, ),
                 ),
               ],
             ),

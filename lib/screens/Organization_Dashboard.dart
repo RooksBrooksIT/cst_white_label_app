@@ -45,7 +45,7 @@ class OrganizationDashboard extends StatelessWidget {
         style: TextStyle(
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          color: Colors.white,
+          
         ),
       ),
       centerTitle: true,
@@ -53,14 +53,14 @@ class OrganizationDashboard extends StatelessWidget {
       backgroundColor: const Color(0xFF003768),
       leading: GestureDetector(
         onTap: () => _showLogoutConfirmation(context),
-        child: const Icon(Icons.arrow_back, color: Colors.white),
+        child: const Icon(Icons.arrow_back, ),
       ),
       actions: [
         GestureDetector(
           onTap: () => _showLogoutConfirmation(context),
           child: const Padding(
             padding: EdgeInsets.all(16.0),
-            child: Icon(Icons.logout, color: Colors.white),
+            child: Icon(Icons.logout, ),
           ),
         ),
       ],
@@ -84,7 +84,7 @@ class OrganizationDashboard extends StatelessWidget {
             child: Text(
               'No',
               style: TextStyle(
-                color: Colors.grey[600],
+                
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -137,14 +137,14 @@ class OrganizationDashboard extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
+              border: Border.all( width: 3),
               boxShadow: const [
                 BoxShadow(color: Colors.black26, blurRadius: 10),
               ],
             ),
             child: const CircleAvatar(
               radius: 40,
-              backgroundColor: Colors.white,
+              
               child: Icon(Icons.person, size: 50, color: Color(0xFF2A5C8A)),
             ),
           ),
@@ -154,7 +154,7 @@ class OrganizationDashboard extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              
             ),
           ),
           const SizedBox(height: 4),
@@ -222,12 +222,12 @@ class OrganizationDashboard extends StatelessWidget {
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.logout, color: Colors.white),
+              Icon(Icons.logout, ),
               SizedBox(width: 10),
               Text(
                 "LOGOUT",
                 style: TextStyle(
-                  color: Colors.white,
+                  
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   letterSpacing: 1.1,
@@ -262,7 +262,7 @@ class OrganizationDashboard extends StatelessWidget {
       children: [
         Text(
           "Welcome back,",
-          style: TextStyle(fontSize: 18, color: Colors.white),
+          style: TextStyle(fontSize: 18, ),
         ),
         const SizedBox(height: 4),
         const Text(
@@ -270,7 +270,7 @@ class OrganizationDashboard extends StatelessWidget {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            
           ),
         ),
       ],
@@ -414,7 +414,7 @@ class OrganizationDashboard extends StatelessWidget {
         style: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          
         ),
       ),
     );
@@ -431,7 +431,7 @@ class OrganizationDashboard extends StatelessWidget {
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.white.withOpacity(0.9),
+      
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -454,7 +454,7 @@ class OrganizationDashboard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey[800],
+                    
                   ),
                 ),
               ),

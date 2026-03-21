@@ -249,7 +249,7 @@ class _LabourScreenState extends State<LabourScreen> {
       appBar: AppBar(
         title: Text(
           "Labour Configuration",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle( fontWeight: FontWeight.bold),
         ),
         backgroundColor: Color(0xFF0b3470),
         centerTitle: true,
@@ -471,7 +471,7 @@ class _LabourScreenState extends State<LabourScreen> {
                             (states) => Color(0xFF0b3470),
                           ),
                           border: TableBorder.all(
-                            color: Colors.grey[300]!,
+                            color: Colors.grey,
                             width: 1,
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -481,7 +481,7 @@ class _LabourScreenState extends State<LabourScreen> {
                                 'Labour ID',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                             ),
@@ -490,7 +490,7 @@ class _LabourScreenState extends State<LabourScreen> {
                                 'Designation',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                             ),
@@ -499,7 +499,7 @@ class _LabourScreenState extends State<LabourScreen> {
                                 'Salary',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  
                                 ),
                               ),
                             ),
@@ -682,24 +682,24 @@ class _LabourScreenState extends State<LabourScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        Text(label, style: TextStyle(fontSize: 14, )),
         SizedBox(height: 4),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.grey[100],
+            
           ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.grey[700]),
+              Icon(icon, ),
               SizedBox(width: 12),
               Text(
                 value,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+                  
                 ),
               ),
             ],

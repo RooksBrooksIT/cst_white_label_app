@@ -194,12 +194,12 @@ class _ProjectStageExpensesReportPageState
         title: Text(
           "Project Stage Expenses Report",
           style: TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
         centerTitle: true,
       ),
       body: isLoading
@@ -474,7 +474,7 @@ class _ProjectStageExpensesReportPageState
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withOpacity(0.9),
+                
                 letterSpacing: 0.5,
               ),
               textAlign: TextAlign.center,
@@ -485,7 +485,7 @@ class _ProjectStageExpensesReportPageState
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                
               ),
               textAlign: TextAlign.center,
             ),
@@ -494,7 +494,7 @@ class _ProjectStageExpensesReportPageState
               "Project Stage: ${widget.projectStage}",
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.8),
+                
               ),
               textAlign: TextAlign.center,
             ),

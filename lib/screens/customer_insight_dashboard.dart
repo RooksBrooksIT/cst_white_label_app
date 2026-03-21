@@ -24,7 +24,7 @@ class CustomerWorkProgress extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Insights Dashboard',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle( fontWeight: FontWeight.w600),
         ),
         backgroundColor: Color(0xFF003768),
         elevation: 0,
@@ -178,7 +178,7 @@ class CustomerWorkProgress extends StatelessWidget {
                     description,
                     style: Theme.of(
                       context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
+                    ).textTheme.bodyMedium?.copyWith(),
                   ),
                 ],
               ),

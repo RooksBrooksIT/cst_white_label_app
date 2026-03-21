@@ -409,7 +409,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                    color: Colors.white,
+                    
                     strokeWidth: 2,
                   ),
                 )
@@ -429,7 +429,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
           label: const Text('Clear'),
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.grey[700],
-            side: BorderSide(color: Colors.grey[400]!),
+            side: BorderSide(color: Colors.grey),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -498,7 +498,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
                         filled: true,
-                        fillColor: Colors.white,
+                        
                       ),
                     ),
                   ),
@@ -511,7 +511,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),
                     ),
-                    child: const Icon(Icons.add, color: Colors.white),
+                    child: const Icon(Icons.add, ),
                   ),
                 ],
               ),
@@ -587,7 +587,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
                         filled: true,
-                        fillColor: Colors.white,
+                        
                       ),
                     ),
                   ),
@@ -600,7 +600,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),
                     ),
-                    child: const Icon(Icons.add, color: Colors.white),
+                    child: const Icon(Icons.add, ),
                   ),
                 ],
               ),
@@ -650,7 +650,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
       appBar: AppBar(
         title: const Text(
           'Material Master',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(),
         ),
         backgroundColor: primaryColor,
         centerTitle: true,

@@ -116,7 +116,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      color: Colors.grey[100],
+      
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -608,7 +608,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                       ),
                       Text(
                         worker.designation,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 14, ),
                       ),
                     ],
                   ),

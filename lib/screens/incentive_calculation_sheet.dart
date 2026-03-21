@@ -245,9 +245,9 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           backgroundColor: _primaryColor,
           title: const Text(
             'Incentive Sheet',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(),
           ),
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: const IconThemeData(),
           elevation: 0,
         ),
         body: Center(
@@ -284,9 +284,9 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           backgroundColor: _primaryColor,
           title: const Text(
             'Incentive Sheet',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(),
           ),
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: const IconThemeData(),
           elevation: 0,
         ),
         body: _loading
@@ -334,7 +334,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
             _primaryColor.withOpacity(0.9),
           ),
           headingTextStyle: const TextStyle(
-            color: Colors.white,
+            
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
@@ -462,7 +462,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                   child: Text(
                     '${_incentivePercentage.round()}%',
                     style: const TextStyle(
-                      color: Colors.white,
+                      
                       fontWeight: FontWeight.bold,
                     ),
                   ),

@@ -317,13 +317,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         backgroundColor: mainColor,
         title: const Text(
           'Site Payment',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(),
         ),
         centerTitle: true,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(),
       ),
-      backgroundColor: Colors.white,
+      
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -358,7 +358,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                       radius: isSmallScreen ? 20 : 28,
                       child: Icon(
                         Icons.payments,
-                        color: Colors.white,
+                        
                         size: isSmallScreen ? 24 : 32,
                       ),
                     ),
@@ -521,7 +521,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 Text(
                   '* indicates required fields',
                   style: TextStyle(
-                    color: Colors.grey[600],
+                    
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                   ),
@@ -549,7 +549,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   Widget _buildDropdownContainer({required Widget child}) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -566,7 +566,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   Widget _buildTextFieldContainer({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -583,7 +583,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   InputDecoration _inputDecoration() {
     return InputDecoration(
       filled: true,
-      fillColor: Colors.white,
+      
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -716,12 +716,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             ? Container(
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'No weeks available for selected month',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(),
                 ),
               )
             : Wrap(
@@ -812,7 +812,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              
               border: Border.all(color: mainColor.withOpacity(0.2)),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
@@ -844,7 +844,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         SizedBox(height: 8),
         Text(
           'Available dates: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          style: TextStyle( fontSize: 12),
         ),
       ],
     );
@@ -892,7 +892,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         'ADD PAYMENT',
         style: TextStyle(
           fontSize: 16,
-          color: Colors.white,
+          
           fontWeight: FontWeight.bold,
           letterSpacing: 1.1,
         ),
@@ -934,7 +934,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         'CANCEL',
         style: TextStyle(
           fontSize: 16,
-          color: Colors.grey[700],
+          
           fontWeight: FontWeight.bold,
           letterSpacing: 1.1,
         ),
