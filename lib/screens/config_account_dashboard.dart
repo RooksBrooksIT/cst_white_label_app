@@ -187,7 +187,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         style: TextStyle(
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          
+          color: Colors.white,
         ),
       ),
       backgroundColor: primaryColor,
@@ -197,14 +197,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, ),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
         onPressed: () {
           Navigator.pop(context);
         },
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout_rounded, ),
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
           onPressed: () => _showLogoutConfirmation(context),
         ),
       ],
@@ -233,7 +233,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           ),
           content: const Text(
             'Are you sure you want to logout?',
-            style: TextStyle(fontSize: 16, ),
+            style: TextStyle(fontSize: 16, color: Colors.black87),
           ),
           actionsPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -257,7 +257,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               child: Text(
                 'No',
                 style: TextStyle(
-                  
+                  color: Colors.grey[600],
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -293,7 +293,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               child: const Text(
                 'Yes',
                 style: TextStyle(
-                  
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -338,7 +338,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            
+            color: Colors.white,
           ),
         ),
       ],
@@ -353,7 +353,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         style: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          
+          color: Colors.white,
         ),
       ),
     );
@@ -380,7 +380,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      
+      color: Colors.white,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _navigateToScreen(context, item.title),
@@ -403,7 +403,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    
+                    color: Colors.grey[800],
                   ),
                 ),
               ),

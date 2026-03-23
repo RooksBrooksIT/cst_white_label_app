@@ -93,7 +93,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           'Materials information',
           Icons.warehouse_outlined,
           primaryColor,
-          () => _navigate(context, supervisorMaterialInfoScreen()),
+          () => _navigate(context, SupervisorMaterialInfoScreen()),
         ),
         DashboardItem(
           'Tools Movement',

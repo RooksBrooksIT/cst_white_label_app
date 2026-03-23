@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/utils/responsive.dart';
 import 'package:flutter/services.dart';
 
 class AppColors {
@@ -74,201 +76,213 @@ class _LetsStartPageState extends State<LetsStartPage>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final bool isTablet = Responsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.bgColor,
-      body: Column(
-        children: [
-          // Hero gradient header
-          AnimatedBuilder(
-            animation: _headerController,
-            builder: (context, child) {
-              return Opacity(
-                opacity: _headerOpacity.value,
-                child: Transform.translate(
-                  offset: Offset(0, _headerSlide.value),
-                  child: Container(
-                    width: double.infinity,
-                    height: size.height * (isTablet ? 0.42 : 0.38),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF001D3D),
-                          Color(0xFF003768),
-                          Color(0xFF005A9E),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(36),
-                        bottomRight: Radius.circular(36),
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 48 : 28,
-                          vertical: 20,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(
-                                Icons.construction_rounded,
-                                color: Colors.white,
-                                size: 28,
-                              ),
+      body: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height),
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                // Hero gradient header
+                AnimatedBuilder(
+                  animation: _headerController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _headerOpacity.value,
+                      child: Transform.translate(
+                        offset: Offset(0, _headerSlide.value),
+                        child: Container(
+                          width: double.infinity,
+                          height: Responsive.scaleV(context, isTablet ? 0.42 : 0.38),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF001D3D),
+                                Color(0xFF003768),
+                                Color(0xFF005A9E),
+                              ],
                             ),
-                            const Spacer(),
-                            const Text(
-                              'Welcome to\nConstruct Pro',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                height: 1.2,
-                              ),
+                            
+                            borderRadius: BorderRadius.only(
+                              bottomLeft: Radius.circular(36),
+                              bottomRight: Radius.circular(36),
                             ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Your complete solution for civil construction projects.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withOpacity(0.75),
-                                height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Content section
-          Expanded(
-            child: AnimatedBuilder(
-              animation: _contentController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _contentOpacity.value,
-                  child: Transform.translate(
-                    offset: Offset(0, _contentSlide.value),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? size.width * 0.2 : 24,
-                      ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 32),
-
-                          // Feature highlights
-                          _buildFeatureRow(
-                            icon: Icons.group_rounded,
-                            color: const Color(0xFF003768),
-                            title: 'Team Management',
-                            subtitle: 'Manage all your teams in one place',
                           ),
-                          const SizedBox(height: 16),
-                          _buildFeatureRow(
-                            icon: Icons.bar_chart_rounded,
-                            color: const Color(0xFF017FDF),
-                            title: 'Real-time Reports',
-                            subtitle: 'Track progress with live analytics',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildFeatureRow(
-                            icon: Icons.inventory_2_rounded,
-                            color: const Color(0xFF00897B),
-                            title: 'Material Tracking',
-                            subtitle: 'Monitor materials across all sites',
-                          ),
-
-                          const Spacer(),
-
-                          // CTA button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF003768),
-                                    Color(0xFF017FDF),
-                                  ],
+                          child: SafeArea(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: Responsive.scaleH(context, isTablet ? 0.08 : 0.06),
+                                  vertical: Responsive.scaleV(context, 0.02),
                                 ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF003768,
-                                    ).withOpacity(0.35),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Icon(
+                                      Icons.construction_rounded,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
                                   ),
-                                ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushReplacementNamed(
-                                    context,
-                                    '/dashboard',
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                  const Spacer(),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.appName,
+                                    builder: (context, name, _) {
+                                      return Text(
+                                        'Welcome to\n$name',
+                                        style: TextStyle(
+                                          fontSize: Responsive.fontSize(context, 32),
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          height: 1.2,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
+                                  const SizedBox(height: 10),
                                     Text(
-                                      'Get Started',
+                                      'Your complete solution for civil construction projects.',
                                       style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        letterSpacing: 0.5,
+                                        fontSize: Responsive.fontSize(context, 14),
+                                        color: Colors.white.withOpacity(0.75),
+                                        height: 1.5,
                                       ),
                                     ),
-                                    SizedBox(width: 8),
-                                    Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ],
-                                ),
+                                    SizedBox(height: Responsive.scaleV(context, 0.03)),
+                                ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 32),
-                        ],
+                        ),
                       ),
-                    ),
+                    );
+                  },
+                ),
+
+                // Content section
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _contentController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _contentOpacity.value,
+                        child: Transform.translate(
+                          offset: Offset(0, _contentSlide.value),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: Responsive.scaleH(context, isTablet ? 0.15 : 0.06),
+                              ),
+                            child: Column(
+                                children: [
+                                  SizedBox(height: Responsive.scaleV(context, 0.04)),
+
+                                // Feature highlights
+                                  _buildFeatureRow(
+                                    icon: Icons.group_rounded,
+                                    color: const Color(0xFF003768),
+                                    title: 'Team Management',
+                                    subtitle: 'Manage all your teams in one place',
+                                  ),
+                                  SizedBox(height: Responsive.scaleV(context, 0.02)),
+                                  _buildFeatureRow(
+                                    icon: Icons.bar_chart_rounded,
+                                    color: const Color(0xFF017FDF),
+                                    title: 'Real-time Reports',
+                                    subtitle: 'Track progress with live analytics',
+                                  ),
+                                  SizedBox(height: Responsive.scaleV(context, 0.02)),
+                                  _buildFeatureRow(
+                                    icon: Icons.inventory_2_rounded,
+                                    color: const Color(0xFF00897B),
+                                    title: 'Material Tracking',
+                                    subtitle: 'Monitor materials across all sites',
+                                  ),
+
+                                const Spacer(),
+                                // CTA button
+                                Container(
+                                  width: double.infinity,
+                                  height: Responsive.scaleV(context, 0.07),
+                                  constraints: const BoxConstraints(minHeight: 56),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF003768),
+                                          Color(0xFF017FDF),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF003768,
+                                          ).withOpacity(0.35),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pushReplacementNamed(
+                                            context,
+                                            '/authSelection',
+                                          );
+                                        },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.transparent,
+                                        shadowColor: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                            Text(
+                                              'Get Started',
+                                              style: TextStyle(
+                                                fontSize: Responsive.fontSize(context, 17),
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          const SizedBox(width: 8),
+                                          const Icon(
+                                            Icons.arrow_forward_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

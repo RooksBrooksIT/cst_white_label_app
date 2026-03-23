@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/utils/responsive.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -6,7 +8,6 @@ class SplashScreen extends StatefulWidget {
   @override
   _SplashScreenState createState() => _SplashScreenState();
 }
-
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _logoController;
@@ -120,8 +121,12 @@ class _SplashScreenState extends State<SplashScreen>
                                 child: Transform.scale(
                                   scale: _ringScale.value,
                                   child: Container(
-                                    width: 130,
-                                    height: 130,
+                                    width: Responsive.scaleH(context, 0.35),
+                                    height: Responsive.scaleH(context, 0.35),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 160,
+                                      maxHeight: 160,
+                                    ),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
@@ -138,8 +143,12 @@ class _SplashScreenState extends State<SplashScreen>
                                 child: Transform.scale(
                                   scale: _logoScale.value,
                                   child: Container(
-                                    width: 100,
-                                    height: 100,
+                                    width: Responsive.scaleH(context, 0.28),
+                                    height: Responsive.scaleH(context, 0.28),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 120,
+                                      maxHeight: 120,
+                                    ),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.white.withOpacity(0.15),
@@ -169,7 +178,7 @@ class _SplashScreenState extends State<SplashScreen>
                           );
                         },
                       ),
-                      const SizedBox(height: 36),
+                      SizedBox(height: Responsive.scaleV(context, 0.05)),
                       // App name and tagline
                       AnimatedBuilder(
                         animation: _textController,
@@ -180,20 +189,25 @@ class _SplashScreenState extends State<SplashScreen>
                               offset: Offset(0, _textSlide.value),
                               child: Column(
                                 children: [
-                                  const Text(
-                                    'Construct Pro',
-                                    style: TextStyle(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      letterSpacing: 1.0,
-                                    ),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.appName,
+                                    builder: (context, name, _) {
+                                      return Text(
+                                        name,
+                                        style: TextStyle(
+                                          fontSize: Responsive.fontSize(context, 32),
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 1.0,
+                                        ),
+                                      );
+                                    },
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Build smarter. Manage better.',
                                     style: TextStyle(
-                                      fontSize: 15,
+                                      fontSize: Responsive.fontSize(context, 15),
                                       color: Colors.white.withOpacity(0.7),
                                       letterSpacing: 0.3,
                                     ),
@@ -210,9 +224,9 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               // Slim progress bar at bottom
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 48,
-                  vertical: 40,
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.scaleH(context, 0.12),
+                  vertical: Responsive.scaleV(context, 0.05),
                 ),
                 child: Column(
                   children: [
@@ -236,7 +250,7 @@ class _SplashScreenState extends State<SplashScreen>
                     Text(
                       'Loading...',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: Responsive.fontSize(context, 12),
                         color: Colors.white.withOpacity(0.5),
                         letterSpacing: 0.5,
                       ),

@@ -12,12 +12,50 @@ import 'package:demo_cst/screens/tools_inventory_report.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'organisation_loginPage.dart';
 import 'config_account_dashboard.dart';
-import 'site_entry_page.dart';
 import 'org_site_payment_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'manager_approval_screen.dart';
+import '../utils/responsive.dart';
 
-class OrganizationDashboard extends StatelessWidget {
+class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
+
+  @override
+  _OrganizationDashboardState createState() => _OrganizationDashboardState();
+}
+
+class _OrganizationDashboardState extends State<OrganizationDashboard> {
+  String _referralCode = 'Loading...';
+  String _orgName = 'Organization User';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrgData();
+  }
+
+  Future<void> _fetchOrgData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? docPath = prefs.getString('org_doc_path');
+      final String? name = prefs.getString('org_name');
+
+      if (name != null) setState(() => _orgName = name);
+
+      if (docPath != null) {
+        final doc = await FirebaseFirestore.instance.doc(docPath).get();
+        if (doc.exists) {
+          setState(() {
+            _referralCode = doc.data()?['referralCode'] ?? 'Not Set';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching org data: $e');
+      setState(() => _referralCode = 'Error');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,29 +78,28 @@ class OrganizationDashboard extends StatelessWidget {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      title: const Text(
+      title: Text(
         "Organization Dashboard",
         style: TextStyle(
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          
+          color: Colors.white,
+          fontSize: Responsive.fontSize(context, 20),
         ),
       ),
       centerTitle: true,
       elevation: 0,
       backgroundColor: const Color(0xFF003768),
-      leading: GestureDetector(
-        onTap: () => _showLogoutConfirmation(context),
-        child: const Icon(Icons.arrow_back, ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => _showLogoutConfirmation(context),
       ),
       actions: [
-        GestureDetector(
-          onTap: () => _showLogoutConfirmation(context),
-          child: const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Icon(Icons.logout, ),
-          ),
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.white),
+          onPressed: () => _showLogoutConfirmation(context),
         ),
+        SizedBox(width: Responsive.scaleH(context, 8)),
       ],
     );
   }
@@ -84,7 +121,7 @@ class OrganizationDashboard extends StatelessWidget {
             child: Text(
               'No',
               style: TextStyle(
-                
+                color: Colors.grey[600],
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -114,147 +151,6 @@ class OrganizationDashboard extends StatelessWidget {
     }
   }
 
-  Widget _buildDrawerHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 50, bottom: 30),
-      decoration: const BoxDecoration(
-        color: Color(0xFF772323),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all( width: 3),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 10),
-              ],
-            ),
-            child: const CircleAvatar(
-              radius: 40,
-              
-              child: Icon(Icons.person, size: 50, color: Color(0xFF2A5C8A)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            "Organization User",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "admin@organization.com",
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerMenuItems(BuildContext context) {
-    return Expanded(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          const DrawerMenuItem(
-            icon: Icons.dashboard,
-            title: "Dashboard",
-            isSelected: true,
-          ),
-          DrawerMenuItem(
-            icon: Icons.settings,
-            title: "Account Settings",
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            colors: [
-              Color.fromARGB(255, 129, 37, 30),
-              Color.fromARGB(122, 230, 73, 73),
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0xFFFF4B2B).withOpacity(0.3),
-              blurRadius: 10,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          onPressed: () => _showLogoutConfirmation(context),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.logout, ),
-              SizedBox(width: 10),
-              Text(
-                "LOGOUT",
-                style: TextStyle(
-                  
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWelcomeSection(),
-            const SizedBox(height: 24),
-            _buildDashboardSections(context),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildWelcomeSection() {
     return Column(
@@ -262,18 +158,85 @@ class OrganizationDashboard extends StatelessWidget {
       children: [
         Text(
           "Welcome back,",
-          style: TextStyle(fontSize: 18, ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          "Organization User",
           style: TextStyle(
-            fontSize: 28,
+            fontSize: Responsive.fontSize(context, 18),
+            color: Colors.white.withOpacity(0.9),
+          ),
+        ),
+        SizedBox(height: Responsive.scaleV(context, 4)),
+        Text(
+          _orgName,
+          style: TextStyle(
+            fontSize: Responsive.fontSize(context, 28),
             fontWeight: FontWeight.bold,
-            
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: Responsive.scaleV(context, 12)),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.scaleH(context, 16),
+            vertical: Responsive.scaleV(context, 8),
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Referral Code: ',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  fontSize: Responsive.fontSize(context, 14),
+                ),
+              ),
+              Text(
+                _referralCode,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: Responsive.fontSize(context, 18),
+                  letterSpacing: 1.2,
+                ),
+              ),
+              SizedBox(width: Responsive.scaleH(context, 8)),
+              IconButton(
+                icon: Icon(
+                  Icons.copy,
+                  size: Responsive.scaleH(context, 20),
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _referralCode));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Referral code copied to clipboard')),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeSection(),
+            SizedBox(height: Responsive.scaleV(context, 24)),
+            _buildDashboardSections(context),
+          ],
+        ),
+      ),
     );
   }
 
@@ -408,13 +371,16 @@ class OrganizationDashboard extends StatelessWidget {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      padding: EdgeInsets.only(
+        top: Responsive.scaleV(context, 24),
+        bottom: Responsive.scaleV(context, 12),
+      ),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 20,
+        style: TextStyle(
+          fontSize: Responsive.fontSize(context, 20),
           fontWeight: FontWeight.bold,
-          
+          color: Colors.white,
         ),
       ),
     );
@@ -430,45 +396,47 @@ class OrganizationDashboard extends StatelessWidget {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.only(bottom: 12),
-      
+      margin: EdgeInsets.only(bottom: Responsive.scaleV(context, 12)),
+      color: Colors.white.withOpacity(0.95),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(Responsive.scaleH(context, 10)),
                 decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: iconColor, size: 28),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: Responsive.scaleH(context, 28),
+                ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: Responsive.scaleH(context, 16)),
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    
+                    fontSize: Responsive.fontSize(context, 16),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: iconColor),
+              Icon(
+                Icons.chevron_right,
+                color: iconColor,
+                size: Responsive.scaleH(context, 24),
+              ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  void _showNotifications(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notifications feature coming soon')),
     );
   }
 
@@ -486,15 +454,7 @@ class OrganizationDashboard extends StatelessWidget {
     );
   }
 
-  void _navigateToSupervisorEntry(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const SiteEntryPage(userName: '', userDetails: {}),
-      ),
-    );
-  }
+
 
   void _navigateToInsights(BuildContext context) {
     Navigator.push(

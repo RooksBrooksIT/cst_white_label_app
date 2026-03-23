@@ -3,6 +3,7 @@ import 'package:demo_cst/screens/Organisation_LoginPage.dart';
 import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/customer_login_page.dart';
 import 'package:demo_cst/screens/supervisor_login_page.dart';
+import 'package:demo_cst/utils/responsive.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -43,162 +44,180 @@ class _MainDashboardState extends State<MainDashboard>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-
-    return WillPopScope(
-      onWillPop: () async {
+    final theme = Theme.of(context);
+    final primary = theme.primaryColor;
+    
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.pushReplacementNamed(context, '/letsStart');
-        return false;
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0F4F8),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? size.width * 0.12 : 20,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 28),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.scaleH(context, Responsive.isTablet(context) ? 0.08 : 0.06),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: Responsive.scaleV(context, 0.03)),
 
-                // Top bar
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pushReplacementNamed(context, '/letsStart'),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          size: 20,
-                          color: Color(0xFF003768),
-                        ),
+                          // Top bar
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.pushReplacementNamed(context, '/letsStart'),
+                                child: Container(
+                                  width: Responsive.scaleH(context, 0.11),
+                                  height: Responsive.scaleH(context, 0.11),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 48,
+                                    maxHeight: 48,
+                                    minWidth: 40,
+                                    minHeight: 40,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.cardColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.06),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_back_rounded,
+                                    size: 22,
+                                    color: primary,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.construction_rounded,
+                                  color: primary,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: Responsive.scaleV(context, 0.04)),
+                          // Heading
+                          AnimatedBuilder(
+                            animation: _controller,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _fadeAnim.value,
+                                child: Transform.translate(
+                                  offset: Offset(0, _slideAnim.value),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Select Your Role',
+                                        style: TextStyle(
+                                          fontSize: Responsive.fontSize(context, 28),
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.onSurface,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                      SizedBox(height: Responsive.scaleV(context, 0.01)),
+                                      Text(
+                                        'Choose how you\'d like to sign in',
+                                        style: TextStyle(
+                                          fontSize: Responsive.fontSize(context, 15),
+                                          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          SizedBox(height: Responsive.scaleV(context, 0.04)),
+
+                          // Role cards
+                          AnimatedBuilder(
+                            animation: _controller,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _fadeAnim.value,
+                                child: Column(
+                                  children: [
+                                    _buildRoleCard(
+                                      context: context,
+                                      title: 'Organization',
+                                      subtitle: 'Manage org details & data',
+                                      icon: Icons.account_balance_rounded,
+                                      accentColor: primary,
+                                      destination: const Organisation_LoginPage(),
+                                    ),
+                                    SizedBox(height: Responsive.scaleV(context, 0.02)),
+                                    _buildRoleCard(
+                                      context: context,
+                                      title: 'Manager',
+                                      subtitle: 'Configure settings & control',
+                                      icon: Icons.manage_accounts_rounded,
+                                      accentColor: const Color(0xFF5C6BC0),
+                                      destination: const ConfigLoginPage(),
+                                    ),
+                                    SizedBox(height: Responsive.scaleV(context, 0.02)),
+                                    _buildRoleCard(
+                                      context: context,
+                                      title: 'Supervisor',
+                                      subtitle: 'Manage site activities',
+                                      icon: Icons.supervisor_account_rounded,
+                                      accentColor: const Color(0xFF00897B),
+                                      destination: const Supervisor_LoginPage(),
+                                    ),
+                                    SizedBox(height: Responsive.scaleV(context, 0.02)),
+                                    _buildRoleCard(
+                                      context: context,
+                                      title: 'Customer',
+                                      subtitle: 'View your project status',
+                                      icon: Icons.person_rounded,
+                                      accentColor: const Color(0xFFF59E0B),
+                                      destination: const CustomerLoginPage(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                          
+                          const Spacer(),
+                          SizedBox(height: Responsive.scaleV(context, 0.03)),
+                        ],
                       ),
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF003768).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.construction_rounded,
-                        color: Color(0xFF003768),
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 28),
-
-                // Heading
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _fadeAnim.value,
-                      child: Transform.translate(
-                        offset: Offset(0, _slideAnim.value),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Select Your Role',
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Choose how you\'d like to sign in',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 24),
-
-                // Role cards
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: _fadeAnim.value,
-                        child: ListView(
-                          physics: const BouncingScrollPhysics(),
-                          children: [
-                            _buildRoleCard(
-                              context: context,
-                              title: 'Organization',
-                              subtitle: 'Manage org details & data',
-                              icon: Icons.account_balance_rounded,
-                              accentColor: const Color(0xFF003768),
-                              destination: const Organisation_LoginPage(),
-                            ),
-                            const SizedBox(height: 14),
-                            _buildRoleCard(
-                              context: context,
-                              title: 'Manager',
-                              subtitle: 'Configure settings & control',
-                              icon: Icons.manage_accounts_rounded,
-                              accentColor: const Color(0xFF5C6BC0),
-                              destination: const ConfigLoginPage(),
-                            ),
-                            const SizedBox(height: 14),
-                            _buildRoleCard(
-                              context: context,
-                              title: 'Supervisor',
-                              subtitle: 'Manage site activities',
-                              icon: Icons.supervisor_account_rounded,
-                              accentColor: const Color(0xFF00897B),
-                              destination: const Supervisor_LoginPage(),
-                            ),
-                            const SizedBox(height: 14),
-                            _buildRoleCard(
-                              context: context,
-                              title: 'Customer',
-                              subtitle: 'View your project status',
-                              icon: Icons.person_rounded,
-                              accentColor: const Color(0xFFF59E0B),
-                              destination: const CustomerLoginPage(),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                        ),
-                      );
-                    },
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -213,37 +232,56 @@ class _MainDashboardState extends State<MainDashboard>
     required Color accentColor,
     required Widget destination,
   }) {
+    final theme = Theme.of(context);
+    
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => destination),
       ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.scaleH(context, 0.04),
+          vertical: Responsive.scaleV(context, 0.02),
+        ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: accentColor.withOpacity(0.08),
-              blurRadius: 14,
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(
+            color: theme.dividerColor.withOpacity(0.05),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
             // Icon circle
             Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(16),
+              width: Responsive.scaleH(context, 0.12),
+              height: Responsive.scaleH(context, 0.12),
+              constraints: const BoxConstraints(
+                maxWidth: 52,
+                maxHeight: 52,
+                minWidth: 44,
+                minHeight: 44,
               ),
-              child: Icon(icon, color: accentColor, size: 26),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                icon,
+                color: accentColor,
+                size: Responsive.fontSize(context, 24),
+              ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: Responsive.scaleH(context, 0.04)),
             // Text
             Expanded(
               child: Column(
@@ -251,36 +289,28 @@ class _MainDashboardState extends State<MainDashboard>
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E293B),
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 16),
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 13),
+                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
                     ),
                   ),
                 ],
               ),
             ),
             // Arrow
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: accentColor,
-                size: 15,
-              ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+              size: 14,
             ),
           ],
         ),

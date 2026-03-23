@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/customer_dashboard.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// Customer amber accent
-const _kAccent = Color(0xFFF59E0B);
-const _kAccentDark = Color(0xFFB45309);
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/responsive.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
@@ -19,37 +17,101 @@ class _CustomerLoginPageState extends State<CustomerLoginPage>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late AnimationController _controller;
-  late Animation<double> _fadeAnim;
-  late Animation<double> _slideAnim;
+  late Animation<double> _opacityAnimation;
+  late Animation<double> _translateAnimation;
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _referralController = TextEditingController();
   bool _showPassword = false;
   bool _isLoading = false;
 
+  late AnimationController _errorController;
+  late Animation<Offset> _errorSlideAnimation;
+  late Animation<double> _errorFadeAnimation;
+
+  late AnimationController _successController;
+  late Animation<double> _successScaleAnimation;
+  late Animation<double> _successFadeAnimation;
+
+  // SharedPreferences keys - CUSTOMER specific
   static const String _isLoggedInKey = 'cust_isLoggedIn';
   static const String _ownerNameKey = 'cust_ownerName';
   static const String _siteIdKey = 'cust_siteId';
+  static const String _orgPathKey = 'cust_org_path';
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-    _slideAnim = Tween<double>(begin: 40, end: 0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
     _checkLoginStatus();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutQuint),
+    );
+
+    _translateAnimation = Tween<double>(
+      begin: 80,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+
+    _errorController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _errorSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _errorController,
+            curve: Curves.fastOutSlowIn,
+          ),
+        );
+
+    _errorFadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _errorController, curve: Curves.easeIn));
+
+    _successController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _successScaleAnimation = Tween<double>(begin: 0.5, end: 1).animate(
+      CurvedAnimation(parent: _successController, curve: Curves.elasticOut),
+    );
+
+    _successFadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _successController, curve: Curves.easeInCirc),
+    );
   }
 
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
-    if (isLoggedIn && mounted) {
+
+    if (isLoggedIn) {
       final ownerName = prefs.getString(_ownerNameKey) ?? '';
       final siteId = prefs.getString(_siteIdKey) ?? '';
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => CustomerDashboardPage(ownerName: ownerName, ownerPhoneNumber: '', siteId: siteId)),
-      );
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CustomerDashboardPage(
+              ownerName: ownerName,
+              ownerPhoneNumber: '', 
+              siteId: siteId,
+            ),
+          ),
+        );
+      }
     } else {
       _controller.forward();
     }
@@ -58,164 +120,365 @@ class _CustomerLoginPageState extends State<CustomerLoginPage>
   @override
   void dispose() {
     _controller.dispose();
+    _errorController.dispose();
+    _successController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
-
-  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(msg), backgroundColor: Colors.red.shade600, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-  );
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+
       try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection('projects')
+        final referralCode = _referralController.text.trim();
+        
+        final referralDoc = await FirebaseFirestore.instance
+            .collection('referralCodes')
+            .doc(referralCode)
+            .get();
+
+        if (!referralDoc.exists) {
+          _showErrorAnimation('Invalid Referral Code');
+          return;
+        }
+
+        final dynamicPath = referralDoc.data()?['dynamicPath'] as String?;
+        if (dynamicPath == null) {
+          _showErrorAnimation('Organization configuration error');
+          return;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_orgPathKey, dynamicPath);
+        
+        await FirestoreService.initialize();
+
+        final projectsCollection = await FirestoreService.projects;
+        final querySnapshot = await projectsCollection
             .where('ownerName', isEqualTo: _usernameController.text.trim())
             .where('ownerPhoneNumber', isEqualTo: _passwordController.text.trim())
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
+          final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
+          final siteId = data['siteId'] ?? '';
+
           await prefs.setBool(_isLoggedInKey, true);
           await prefs.setString(_ownerNameKey, _usernameController.text.trim());
-          await prefs.setString(_siteIdKey, querySnapshot.docs.first['siteId']);
+          await prefs.setString(_siteIdKey, siteId);
+
           if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CustomerDashboardPage(
-                  ownerName: _usernameController.text.trim(),
-                  ownerPhoneNumber: _passwordController.text.trim(),
-                  siteId: querySnapshot.docs.first['siteId'],
+            _showSuccessAnimation('Login Successful!');
+            Future.delayed(const Duration(milliseconds: 1500), () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CustomerDashboardPage(
+                    ownerName: _usernameController.text.trim(),
+                    ownerPhoneNumber: _passwordController.text.trim(),
+                    siteId: siteId,
+                  ),
                 ),
-              ),
-            );
+              );
+            });
           }
         } else {
-          _showError('Invalid name or phone number');
+          _showErrorAnimation('Invalid username or phone number');
         }
       } catch (e) {
-        _showError('Login failed. Please try again.');
+        debugPrint('Login error: $e');
+        _showErrorAnimation('An error occurred. Please try again.');
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
+  void _showErrorAnimation(String message) {
+    _errorController.reset();
+    _errorController.forward();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: SlideTransition(
+          position: _errorSlideAnimation,
+          child: FadeTransition(
+            opacity: _errorFadeAnimation,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withOpacity(0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccessAnimation(String message) {
+    _successController.reset();
+    _successController.forward();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: ScaleTransition(
+          scale: _successScaleAnimation,
+          child: FadeTransition(
+            opacity: _successFadeAnimation,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green[400],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: size.height - MediaQuery.of(context).padding.top),
-            child: Column(
-              children: [
-                // Header
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF92400E), Color(0xFFB45309), Color(0xFFF59E0B)]),
-                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20)),
-                    ),
-                    const SizedBox(height: 28),
-                    Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(0.3))), child: const Icon(Icons.person_rounded, color: Colors.white, size: 32)),
-                    const SizedBox(height: 16),
-                    const Text('Customer Login', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const SizedBox(height: 4),
-                    Text('View your project status & reports', style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.85))),
-                  ]),
-                ),
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
 
-                // Form
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-                  child: AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) => Opacity(
-                      opacity: _fadeAnim.value,
-                      child: Transform.translate(
-                        offset: Offset(0, _slideAnim.value),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(children: [
-                            // Info chip
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(color: _kAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                              child: Row(children: [
-                                Icon(Icons.info_outline_rounded, color: _kAccentDark, size: 18),
-                                const SizedBox(width: 8),
-                                const Expanded(child: Text('Use your registered name and 10-digit phone number', style: TextStyle(fontSize: 12, color: _kAccentDark))),
-                              ]),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+        ),
+        title: Text(
+          'Customer Login', 
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: Responsive.fontSize(context, 20),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: primaryColor,
+        elevation: 0,
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        primaryColor,
+                        primaryColor.withOpacity(0.8),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.scaleH(context, 0.05),
+                        vertical: Responsive.scaleV(context, 0.05),
+                      ),
+                      child: AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _translateAnimation.value),
+                            child: Opacity(
+                              opacity: _opacityAnimation.value,
+                              child: _buildLoginCard(theme, primaryColor),
                             ),
-                            const SizedBox(height: 20),
-                            _buildField(controller: _usernameController, label: 'Owner Name', icon: Icons.person_outline_rounded, validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _passwordController,
-                              keyboardType: TextInputType.number,
-                              obscureText: !_showPassword,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                              validator: (v) {
-                                if (v == null || v.isEmpty) return 'Required';
-                                if (v.length != 10) return 'Must be exactly 10 digits';
-                                return null;
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'Phone Number',
-                                labelStyle: const TextStyle(color: Color(0xFF64748B)),
-                                prefixIcon: const Icon(Icons.phone_rounded, color: _kAccent, size: 22),
-                                suffixIcon: IconButton(icon: Icon(_showPassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: _kAccent, size: 20), onPressed: () => setState(() => _showPassword = !_showPassword)),
-                                filled: true, fillColor: Colors.white,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _kAccent, width: 1.5)),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity, height: 54,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF92400E), Color(0xFFF59E0B)]), borderRadius: BorderRadius.circular(14), boxShadow: [BoxShadow(color: _kAccent.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 5))]),
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _login,
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                                  child: _isLoading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)) : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5)),
-                                ),
-                              ),
-                            ),
-                          ]),
-                        ),
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoginCard(ThemeData theme, Color primaryColor) {
+    return Card(
+      elevation: 20,
+      shadowColor: Colors.black.withOpacity(0.3),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+      child: Container(
+        width: Responsive.isMobile(context) ? double.infinity : 450,
+        padding: EdgeInsets.all(Responsive.scaleH(context, 0.08)),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.account_balance_rounded, 
+                  size: Responsive.scaleH(context, 0.15), 
+                  color: primaryColor,
+                ),
+              ),
+              SizedBox(height: Responsive.scaleV(context, 0.02)),
+              Text(
+                'Customer Sign In',
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 24), 
+                  fontWeight: FontWeight.bold, 
+                  color: primaryColor,
+                ),
+              ),
+              SizedBox(height: Responsive.scaleV(context, 0.04)),
+              _buildTextField(
+                controller: _referralController,
+                label: 'Referral Code',
+                icon: Icons.business,
+                theme: theme,
+                primaryColor: primaryColor,
+              ),
+              SizedBox(height: Responsive.scaleV(context, 0.02)),
+              _buildTextField(
+                controller: _usernameController,
+                label: 'Username',
+                icon: Icons.person,
+                theme: theme,
+                primaryColor: primaryColor,
+              ),
+              SizedBox(height: Responsive.scaleV(context, 0.02)),
+              _buildTextField(
+                controller: _passwordController,
+                label: 'Phone Number',
+                icon: Icons.phone,
+                isPassword: true,
+                keyboardType: TextInputType.phone,
+                theme: theme,
+                primaryColor: primaryColor,
+              ),
+              SizedBox(height: Responsive.scaleV(context, 0.04)),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 5,
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      : Text(
+                          'LOGIN', 
+                          style: TextStyle(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.bold, 
+                            letterSpacing: 1.2,
+                            fontSize: Responsive.fontSize(context, 16),
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildField({required TextEditingController controller, required String label, required IconData icon, required String? Function(String?) validator}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType keyboardType = TextInputType.text,
+    required ThemeData theme,
+    required Color primaryColor,
+  }) {
     return TextFormField(
-      controller: controller, validator: validator,
-      decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: Color(0xFF64748B)), prefixIcon: Icon(icon, color: _kAccent, size: 22), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _kAccent, width: 1.5)), contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16)),
+      controller: controller,
+      obscureText: isPassword && !_showPassword,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: primaryColor),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off, color: primaryColor),
+                onPressed: () => setState(() => _showPassword = !_showPassword),
+              )
+            : null,
+        filled: true,
+        fillColor: theme.brightness == Brightness.light ? Colors.grey[50] : Colors.grey[900],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12), 
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor),
+        ),
+      ),
+      validator: (v) {
+        if (v == null || v.isEmpty) return 'Required';
+        if (isPassword && v.length < 10) return 'Enter valid phone number';
+        return null;
+      },
     );
   }
 }
