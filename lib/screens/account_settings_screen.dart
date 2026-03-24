@@ -12,9 +12,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Account Settings'),
-      ),
+      appBar: AppBar(title: const Text('Account Settings')),
       body: ListView(
         children: [
           const SizedBox(height: 16),
@@ -28,7 +26,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 secondary: const Icon(Icons.dark_mode_rounded),
                 value: themeMode == ThemeMode.dark,
                 onChanged: (bool value) {
-                  AppTheme.updateThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+                  AppTheme.updateThemeMode(
+                    value ? ThemeMode.dark : ThemeMode.light,
+                  );
                 },
               );
             },

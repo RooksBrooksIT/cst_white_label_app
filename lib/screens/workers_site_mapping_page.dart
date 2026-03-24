@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class WorkerMappingPage extends StatefulWidget {
   const WorkerMappingPage({super.key});
@@ -78,7 +79,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await _firestore.collection('workersConfig').get();
+      final querySnapshot = await FirestoreService.getCollection('workersConfig').get();
       setState(() {
         _workers = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -132,7 +133,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Future<void> _loadExistingWorkersForSite(String site) async {
     try {
-      final doc = await _firestore.collection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection('workerSiteMap').doc(site).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -254,7 +255,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     try {
       // Use site name as document ID
-      final docRef = _firestore.collection('workerSiteMap').doc(_selectedSite!);
+      final docRef = FirestoreService.getCollection('workerSiteMap').doc(_selectedSite!);
 
       final docSnapshot = await docRef.get();
 

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'dart:io';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SupervisorVerificationPage extends StatefulWidget {
   final String supervisorId;
@@ -254,7 +255,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
       await ref.putFile(_selectedImage!);
       final url = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('supervisorPhotoLogs').add({
+      await FirestoreService.getCollection('supervisorPhotoLogs').add({
         'photoUrl': url,
         'timestamp': FieldValue.serverTimestamp(),
         'latitude': _currentPosition!.latitude,

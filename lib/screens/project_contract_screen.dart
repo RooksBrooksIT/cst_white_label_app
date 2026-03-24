@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectContractScreen extends StatefulWidget {
   const ProjectContractScreen({super.key});
@@ -41,7 +42,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
   Future<void> _fetchContractTypes() async {
     try {
       final querySnapshot =
-          await FirebaseFirestore.instance.collection('projectContracts').get();
+          await FirestoreService.getCollection('projectContracts').get();
       if (!mounted) return;
       setState(() {
         _contractTypes = querySnapshot.docs

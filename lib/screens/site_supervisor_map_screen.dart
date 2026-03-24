@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
   const SiteSupervisorMapScreen({super.key});
@@ -692,7 +693,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   Widget _buildInfoTableSection(BuildContext context, double fontSize) {
     return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance.collection('Site').get(),
+      future: FirestoreService.getCollection('Site').get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(

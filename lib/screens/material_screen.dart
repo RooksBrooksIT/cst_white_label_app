@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class MaterialScreen extends StatefulWidget {
   const MaterialScreen({super.key});
@@ -250,7 +251,7 @@ class _MaterialScreenState extends State<MaterialScreen>
       });
 
       final materialName = materialNameController.text.trim();
-      final materialsRef = FirebaseFirestore.instance.collection('materials');
+      final materialsRef = FirestoreService.getCollection('materials');
 
       // Check for duplicate material name
       final existing = await materialsRef

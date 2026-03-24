@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class MaterialAvailability extends StatefulWidget {
   const MaterialAvailability({super.key});
@@ -46,7 +47,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Future<void> _loadMaterials() async {
     try {
-      final querySnapshot = await _firestore.collection('materials').get();
+      final querySnapshot = await FirestoreService.getCollection('materials').get();
       setState(() {
         _materialNames = querySnapshot.docs.map((doc) {
           final data = doc.data();

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import '../utils/app_theme.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SupervisorMaterialInfoScreen extends StatefulWidget {
   const SupervisorMaterialInfoScreen({super.key});
@@ -105,7 +106,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   Future<void> _loadSiteData() async {
     try {
       final querySnapshot =
-          await _firestore.collection('siteSupervisorMap').get();
+          await FirestoreService.getCollection('siteSupervisorMap').get();
 
       if (mounted) {
         setState(() {
@@ -166,7 +167,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   Future<void> _loadMaterialData() async {
     try {
       final querySnapshot =
-          await _firestore.collection('materialsavailablity').get();
+          await FirestoreService.getCollection('materialsavailablity').get();
 
       // Group by materialname and pick the latest entry (by lastupdated) for each
       final Map<String, Map<String, dynamic>> latestByName = {};
@@ -561,7 +562,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       final movementId =
           '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
       final movementRef =
-          _firestore.collection('materialmovementhistory').doc(movementId);
+          FirestoreService.getCollection('materialmovementhistory').doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -647,7 +648,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       final movementId =
           '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
       final movementRef =
-          _firestore.collection('materialmovementhistory').doc(movementId);
+          FirestoreService.getCollection('materialmovementhistory').doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -684,7 +685,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         final newAvailableCount = currentAvailableCount + moveCount;
 
         final materialAvailabilityRef =
-            _firestore.collection('materialsavailablity').doc(docId);
+            FirestoreService.getCollection('materialsavailablity').doc(docId);
         batch.set(
           materialAvailabilityRef,
           {
@@ -698,7 +699,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         // Update materialatsite collection (decrease count at site)
         final materialAtSiteDocId = '${_selectedSiteId}_$matName';
         final materialAtSiteRef =
-            _firestore.collection('materialatsite').doc(materialAtSiteDocId);
+            FirestoreService.getCollection('materialatsite').doc(materialAtSiteDocId);
 
         final existingDoc = await materialAtSiteRef.get();
         if (existingDoc.exists) {

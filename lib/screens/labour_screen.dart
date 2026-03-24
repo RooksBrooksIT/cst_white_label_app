@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class LabourScreen extends StatefulWidget {
   const LabourScreen({super.key});
@@ -137,7 +138,7 @@ class _LabourScreenState extends State<LabourScreen> {
       }
 
       // Save new labour record
-      await FirebaseFirestore.instance.collection('labours').doc(labourId).set({
+      await FirestoreService.getCollection('labours').doc(labourId).set({
         'labourId': labourId,
         'designation': designationController.text.trim(),
         'salary': salaryController.text.trim(),

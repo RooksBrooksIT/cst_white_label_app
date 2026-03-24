@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class WorkersConfigPage extends StatefulWidget {
   const WorkersConfigPage({super.key});
@@ -56,7 +57,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Future<void> _loadDesignations() async {
     try {
-      final querySnapshot = await _firestore.collection('labours').get();
+      final querySnapshot = await FirestoreService.getCollection('labours').get();
       setState(() {
         _designations = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -111,7 +112,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     try {
       final workerId = await _getNextWorkerId();
 
-      await _firestore.collection('workersConfig').doc(workerId).set({
+      await FirestoreService.getCollection('workersConfig').doc(workerId).set({
         'workerId': workerId,
         'name': _nameController.text,
         'phoneNumber': _phoneController.text,
@@ -166,7 +167,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Future<void> _deleteWorker(String docId) async {
     try {
-      await _firestore.collection('workersConfig').doc(docId).delete();
+      await FirestoreService.getCollection('workersConfig').doc(docId).delete();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Worker deleted successfully')));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/expense_service.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ContractorEntryPage extends StatefulWidget {
   final String userName;
@@ -226,7 +227,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     });
     try {
       final snapshot =
-          await FirebaseFirestore.instance.collection('materials').get();
+          await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -268,7 +269,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     });
     try {
       final snapshot =
-          await FirebaseFirestore.instance.collection('labours').get();
+          await FirestoreService.getCollection('labours').get();
       final options = <String>[];
       final salaries = <String, num>{};
       for (var doc in snapshot.docs) {

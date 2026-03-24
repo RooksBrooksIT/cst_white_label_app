@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/screens/financial_status_report.dart';
 import 'package:demo_cst/screens/project_indicator.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 
 class ProjectFinancialStatusReportPage extends StatefulWidget {
@@ -50,7 +51,7 @@ class _ProjectFinancialStatusReportPageState
   Future<void> _fetchSiteIds() async {
     try {
       final snapshot =
-          await FirebaseFirestore.instance.collection('projects').get();
+          await FirestoreService.getCollection('projects').get();
       final ids = snapshot.docs
           .map((doc) {
             final data = doc.data();

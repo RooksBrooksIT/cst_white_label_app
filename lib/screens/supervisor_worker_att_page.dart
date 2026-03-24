@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   const AttendanceManagementPage({super.key});
@@ -40,7 +41,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final querySnapshot = await _firestore.collection('workerSiteMap').get();
+      final querySnapshot = await FirestoreService.getCollection('workerSiteMap').get();
       setState(() {
         _sites = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -73,7 +74,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final doc = await _firestore.collection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection('workerSiteMap').doc(site).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -111,7 +112,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     try {
       final docId =
           '${site}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
-      final doc = await _firestore.collection('WorkerSummary').doc(docId).get();
+      final doc = await FirestoreService.getCollection('WorkerSummary').doc(docId).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -193,7 +194,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       }
 
       // Submit to workersAttendance collection
-      await _firestore.collection('workersAttendance').doc(docId).set({
+      await FirestoreService.getCollection('workersAttendance').doc(docId).set({
         'Day': _currentDate,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -407,7 +408,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         });
 
         // Update the document with modified data
-        await _firestore.collection('workersSummary').doc(docId).set({
+        await FirestoreService.getCollection('workersSummary').doc(docId).set({
           'updatedAt': FieldValue.serverTimestamp(),
           'month': _currentMonth,
           'site': _selectedSite,
@@ -478,7 +479,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           }
         });
 
-        await _firestore.collection('workersSummary').doc(docId).set({
+        await FirestoreService.getCollection('workersSummary').doc(docId).set({
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
           'month': _currentMonth,

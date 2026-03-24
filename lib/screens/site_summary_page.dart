@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart'; // Added for rootBundle
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteSummaryPage extends StatefulWidget {
   final String siteId;
@@ -122,7 +123,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   Future<num> fetchManagerExpenses() async {
     try {
       final query =
-          await FirebaseFirestore.instance.collection('managerEntries').get();
+          await FirestoreService.getCollection('managerEntries').get();
       num total = 0;
       for (var doc in query.docs) {
         final data = doc.data();

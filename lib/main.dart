@@ -4,17 +4,17 @@ import 'firebase_options.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/splash_screen.dart';
 import 'package:demo_cst/screens/main_dashboard.dart';
-import 'package:demo_cst/screens/lets_start_page.dart';
 import 'package:demo_cst/screens/Organisation_LoginPage.dart';
 import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/supervisor_login_page.dart';
 import 'package:demo_cst/screens/customer_login_page.dart';
 import 'package:demo_cst/screens/Organization_Dashboard.dart';
 import 'package:demo_cst/screens/Organisation_RegistrationPage.dart';
+import 'package:demo_cst/screens/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Initialize AppTheme to load stored settings
 
@@ -50,7 +50,8 @@ class MyApp extends StatelessWidget {
                   // Define app routes
                   routes: {
                     '/': (context) => const SplashScreen(),
-                    '/letsStart': (context) => const LetsStartPage(),
+                    '/welcome': (context) => const WelcomeScreen(),
+
                     '/authSelection': (context) =>
                         const MainDashboard(), // Role selection screen
                     '/orgLogin': (context) => const Organisation_LoginPage(),

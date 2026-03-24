@@ -5,6 +5,7 @@ import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'project_screen.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({super.key});
@@ -121,7 +122,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<String> _getNextSiteId(String siteName) async {
-    final snapshot = await FirebaseFirestore.instance.collection('Site').get();
+    final snapshot = await FirestoreService.getCollection('Site').get();
     int maxSiteNum = 0;
     for (final doc in snapshot.docs) {
       if (doc.data().containsKey('siteId')) {
@@ -394,7 +395,7 @@ class _SiteScreenState extends State<SiteScreen>
   // Replace the existing _buildAllSiteTab() with this implementation
   Widget _buildAllSiteTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('Site').snapshots(),
+      stream: FirestoreService.getCollection('Site').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

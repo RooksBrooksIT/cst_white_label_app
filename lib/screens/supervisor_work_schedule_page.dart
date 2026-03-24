@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
@@ -57,7 +58,7 @@ class _SupervisorWorkSchedulePageState
 
   Future<void> _fetchLabours() async {
     final snapshot =
-        await FirebaseFirestore.instance.collection('labours').get();
+        await FirestoreService.getCollection('labours').get();
     setState(() {
       _labours = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -79,7 +80,7 @@ class _SupervisorWorkSchedulePageState
       _loadingPhases = true;
     });
     final snapshot =
-        await FirebaseFirestore.instance.collection('projectStages').get();
+        await FirestoreService.getCollection('projectStages').get();
     final phases = snapshot.docs
         .map((doc) => doc['projectStage']?.toString() ?? '')
         .where((s) => s.isNotEmpty)

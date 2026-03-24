@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ContractorPage extends StatefulWidget {
   const ContractorPage({super.key});
@@ -12,7 +13,7 @@ class _ContractorPageState extends State<ContractorPage> {
   // For displaying contractors table
   // Show new contractors at the end by ordering by contractorId ascending
   Stream<QuerySnapshot<Map<String, dynamic>>> get _contractorsStream =>
-      FirebaseFirestore.instance.collection('contractors').orderBy('contractorId').snapshots();
+      FirestoreService.getCollection('contractors').orderBy('contractorId').snapshots();
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
@@ -288,7 +289,7 @@ class _ContractorPageState extends State<ContractorPage> {
   Widget _buildProjectFieldDropdown() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream:
-          FirebaseFirestore.instance.collection('projectStages').orderBy('projectStage').snapshots(),
+          FirestoreService.getCollection('projectStages').orderBy('projectStage').snapshots(),
       builder: (context, snapshot) {
         final stages = snapshot.data?.docs
                 .map((d) => d.data()['projectStage'])
@@ -346,7 +347,7 @@ class _ContractorPageState extends State<ContractorPage> {
         'contractorId': contractorId,
         'contractorName': contractorNameCombined,
       };
-      await FirebaseFirestore.instance.collection('contractors').doc(contractorId).set(data);
+      await FirestoreService.getCollection('contractors').doc(contractorId).set(data);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

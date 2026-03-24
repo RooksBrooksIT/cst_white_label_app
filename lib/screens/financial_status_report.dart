@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class FinancialStatusReportPage extends StatefulWidget {
   final String siteId;
@@ -187,7 +188,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final col = FirebaseFirestore.instance.collection('projects');
+      final col = FirestoreService.getCollection('projects');
       QuerySnapshot<Map<String, dynamic>> query = await col
           .where('siteId', isEqualTo: widget.siteId)
           .limit(1)

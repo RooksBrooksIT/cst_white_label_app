@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class WorkerAttendanceSalaryPage extends StatefulWidget {
   const WorkerAttendanceSalaryPage({super.key});
@@ -74,7 +75,7 @@ class _WorkerAttendanceSalaryPageState
 
   Future<void> _loadSites() async {
     try {
-      final querySnapshot = await _firestore.collection('workersSummary').get();
+      final querySnapshot = await FirestoreService.getCollection('workersSummary').get();
       final sites = querySnapshot.docs
           .map((doc) {
             final data = doc.data();
@@ -95,7 +96,7 @@ class _WorkerAttendanceSalaryPageState
 
   Future<void> _loadMonths() async {
     try {
-      final querySnapshot = await _firestore.collection('workersSummary').get();
+      final querySnapshot = await FirestoreService.getCollection('workersSummary').get();
 
       // Use a Set to ensure uniqueness from the start
       final Set<String> uniqueMonths = <String>{};
@@ -150,7 +151,7 @@ class _WorkerAttendanceSalaryPageState
             .where('month', isEqualTo: _selectedMonth)
             .get();
       } else {
-        summaryQuery = await _firestore.collection('workersSummary').get();
+        summaryQuery = await FirestoreService.getCollection('workersSummary').get();
       }
 
       final List<Map<String, dynamic>> workers = [];

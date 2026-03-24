@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 // import 'package:ideal_cst/screens/vehichle_inventory_pdf.dart';
 import 'package:demo_cst/screens/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 /// Vehicle Inventory Report
 /// - Filter modes: by Date (string equality on 'date'), by Month (createdAt range), by Site (toLocation equality)
@@ -148,7 +149,7 @@ class _VehicleInventoryReportPageState
   Future<void> _fetchData() async {
     setState(() => _isLoadingData = true);
     try {
-      final col = FirebaseFirestore.instance.collection('vehicleMovements');
+      final col = FirestoreService.getCollection('vehicleMovements');
 
       Query<Map<String, dynamic>> q = col;
 

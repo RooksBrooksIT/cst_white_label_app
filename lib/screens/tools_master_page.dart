@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
@@ -605,7 +606,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       final docId = '${newToolId}_$toolCode';
 
       // Save to tools collection
-      await FirebaseFirestore.instance.collection('tools').doc(docId).set({
+      await FirestoreService.getCollection('tools').doc(docId).set({
         'toolId': newToolId,
         'toolName': toolName,
         'toolOwner': toolOwner,

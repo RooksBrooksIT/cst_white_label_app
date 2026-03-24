@@ -19,69 +19,63 @@ class FirestoreService {
                          prefs.getString('cust_org_path');
   }
 
-  /// Gets the root document reference for the current organization's data.
-  /// Path: /{OrgName_Date}/data/
-  static Future<DocumentReference> getOrgDataRoot() async {
-    if (_cachedDynamicPath == null) {
-      await initialize();
+  /// Gets a collection that is nested under the organization's data root.
+  /// Resulting Path: /{OrgName_Date}/data/{collectionName}
+  /// This method is synchronous to support UI StreamBuilders.
+  static CollectionReference<Map<String, dynamic>> getCollection(String collectionName) {
+    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
+      // Fallback if not initialized or logged out
+      return FirebaseFirestore.instance.collection(collectionName);
     }
-
-    final dynamicPath = _cachedDynamicPath;
-    if (dynamicPath == null || dynamicPath.isEmpty) {
-      throw Exception('Organization not logged in or dynamic path missing');
-    }
-
-    // dynamicPath is "OrgName_Date/data/admin/User"
-    // We need "OrgName_Date/data"
-    final pathParts = dynamicPath.split('/');
-    if (pathParts.length < 2) {
-      throw Exception('Invalid dynamic path format: $dynamicPath');
+    final pathParts = _cachedDynamicPath!.split('/');
+    if (pathParts.isEmpty) {
+      return FirebaseFirestore.instance.collection(collectionName);
     }
 
     final rootCollection = pathParts[0];
-    return FirebaseFirestore.instance.collection(rootCollection).doc('data');
+    return FirebaseFirestore.instance
+        .collection(rootCollection)
+        .doc('data')
+        .collection(collectionName);
   }
 
-  /// Gets a collection that is nested under the organization's data root.
-  /// Resulting Path: /{OrgName_Date}/data/{collectionName}
-  static Future<CollectionReference> getOrgCollection(
-    String collectionName,
-  ) async {
+  /// Gets a specific document reference inside an organization collection.
+  static DocumentReference<Map<String, dynamic>> getDoc(String collectionName, String docId) {
+    return getCollection(collectionName).doc(docId);
+  }
+
+  // Legacy async support wrappers
+  static Future<DocumentReference<Map<String, dynamic>>> getOrgDataRoot() async {
+    if (_cachedDynamicPath == null) await initialize();
+    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
+      throw Exception('Organization not logged in');
+    }
+    final pathParts = _cachedDynamicPath!.split('/');
+    return FirebaseFirestore.instance.collection(pathParts[0]).doc('data');
+  }
+
+  static Future<CollectionReference<Map<String, dynamic>>> getOrgCollection(String name) async {
     final root = await getOrgDataRoot();
-    return root.collection(collectionName);
+    return root.collection(name);
   }
 
-  // Common collection getters for easier refactoring
-  static Future<CollectionReference> get projects =>
-      getOrgCollection('projects');
-  static Future<CollectionReference> get sites => getOrgCollection('Site');
-  static Future<CollectionReference> get supervisors =>
-      getOrgCollection('supervisor');
-  static Future<CollectionReference> get supervisorDesignation =>
-      getOrgCollection('supervisorDesignation');
-  static Future<CollectionReference> get projectCategories =>
-      getOrgCollection('projectCategories');
-  static Future<CollectionReference> get projectStatus =>
-      getOrgCollection('projectStatus');
-  static Future<CollectionReference> get siteSupervisorMap =>
-      getOrgCollection('siteSupervisorMap');
-  static Future<CollectionReference> get totalSiteExpensesPerDay =>
-      getOrgCollection('totalSiteExpensesPerDay');
-  static Future<CollectionReference> get labours => getOrgCollection('labours');
-  static Future<CollectionReference> get materials =>
-      getOrgCollection('materials');
-  static Future<CollectionReference> get contractors =>
-      getOrgCollection('contractors');
-  static Future<CollectionReference> get materialCategories =>
-      getOrgCollection('materialCategories');
-  static Future<CollectionReference> get materialUnits =>
-      getOrgCollection('materialUnits');
-  static Future<CollectionReference> get materialSubCategories =>
-      getOrgCollection('materialSubCategories');
-  static Future<CollectionReference> get projectSubCategories =>
-      getOrgCollection('projectSubCategories');
-  static Future<CollectionReference> get configUsers =>
-      getOrgCollection('configUser');
+  // Common collection getters (Now synchronous)
+  static CollectionReference<Map<String, dynamic>> get projects => getCollection('projects');
+  static CollectionReference<Map<String, dynamic>> get sites => getCollection('Site');
+  static CollectionReference<Map<String, dynamic>> get supervisors => getCollection('supervisor');
+  static CollectionReference<Map<String, dynamic>> get supervisorDesignation => getCollection('supervisorDesignation');
+  static CollectionReference<Map<String, dynamic>> get projectCategories => getCollection('projectCategories');
+  static CollectionReference<Map<String, dynamic>> get projectStatus => getCollection('projectStatus');
+  static CollectionReference<Map<String, dynamic>> get siteSupervisorMap => getCollection('siteSupervisorMap');
+  static CollectionReference<Map<String, dynamic>> get totalSiteExpensesPerDay => getCollection('totalSiteExpensesPerDay');
+  static CollectionReference<Map<String, dynamic>> get labours => getCollection('labours');
+  static CollectionReference<Map<String, dynamic>> get materials => getCollection('materials');
+  static CollectionReference<Map<String, dynamic>> get contractors => getCollection('contractors');
+  static CollectionReference<Map<String, dynamic>> get materialCategories => getCollection('materialCategories');
+  static CollectionReference<Map<String, dynamic>> get materialUnits => getCollection('materialUnits');
+  static CollectionReference<Map<String, dynamic>> get materialSubCategories => getCollection('materialSubCategories');
+  static CollectionReference<Map<String, dynamic>> get projectSubCategories => getCollection('projectSubCategories');
+  static CollectionReference<Map<String, dynamic>> get configUsers => getCollection('configUser');
 
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {

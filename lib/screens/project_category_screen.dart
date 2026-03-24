@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectCategoryScreen extends StatefulWidget {
   const ProjectCategoryScreen({super.key});
@@ -37,7 +38,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
 
   Future<bool> _isDuplicateCategory(String category) async {
     final snapshot =
-        await FirebaseFirestore.instance.collection('projectCategories').get();
+        await FirestoreService.getCollection('projectCategories').get();
     final existingCategories = snapshot.docs
         .map((doc) => (doc['projectCategory'] as String).toLowerCase())
         .toList();

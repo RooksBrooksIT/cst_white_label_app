@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'tools_inventory_details.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ToolsInventoryPage extends StatefulWidget {
   const ToolsInventoryPage({super.key});
@@ -34,9 +35,9 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     setState(() => _dataState = DataState.loading);
     try {
       final results = await Future.wait([
-        FirebaseFirestore.instance.collection('toolsAtCompany').get(),
-        FirebaseFirestore.instance.collection('toolsAtSite').get(),
-        FirebaseFirestore.instance.collection('tools').get(),
+        FirestoreService.getCollection('toolsAtCompany').get(),
+        FirestoreService.getCollection('toolsAtSite').get(),
+        FirestoreService.getCollection('tools').get(),
       ]);
 
       final companyData = results[0].docs

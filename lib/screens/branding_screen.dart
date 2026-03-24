@@ -1,0 +1,642 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'pricing_screen.dart';
+
+class BrandingScreen extends StatefulWidget {
+  final String orgName;
+  final String email;
+  final String phone;
+  final String username;
+  final String password;
+  final String dateStr;
+
+  const BrandingScreen({
+    super.key,
+    required this.orgName,
+    required this.email,
+    required this.phone,
+    required this.username,
+    required this.password,
+    required this.dateStr,
+  });
+
+  @override
+  State<BrandingScreen> createState() => _BrandingScreenState();
+}
+
+class _BrandingScreenState extends State<BrandingScreen> {
+  final TextEditingController _appNameController = TextEditingController();
+  File? _logoFile;
+  bool _isPickingImage = false;
+  bool _isLoading = false;
+  Color _selectedColor = const Color(0xFF017FDF);
+  Color _customColor = const Color(0xFF017FDF);
+
+  final List<Map<String, dynamic>> _colorOptions = [
+    {'label': 'Blue', 'color': const Color(0xFF017FDF)},
+    {'label': 'Green', 'color': const Color(0xFF00A86B)},
+    {'label': 'Purple', 'color': const Color(0xFF7C3AED)},
+    {'label': 'Orange', 'color': const Color(0xFFEA580C)},
+    {'label': 'Custom', 'isCustom': true},
+  ];
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Pick a color'),
+          backgroundColor: const Color(0xFF003768),
+          titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: _customColor,
+              onColorChanged: (color) {
+                setState(() => _customColor = color);
+              },
+              pickerAreaHeightPercent: 0.8,
+              enableAlpha: false,
+              labelTypes: const [],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('CANCEL', style: TextStyle(color: Colors.white70)),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('OK', style: TextStyle(color: Colors.white)),
+              onPressed: () {
+                setState(() => _selectedColor = _customColor);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _appNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickLogo() async {
+    if (_isPickingImage) return;
+    _isPickingImage = true;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      if (picked != null && mounted) {
+        setState(() => _logoFile = File(picked.path));
+      }
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+    } finally {
+      _isPickingImage = false;
+    }
+  }
+
+  Future<void> _goToNextStep() async {
+    setState(() => _isLoading = true);
+    try {
+      final String appName = _appNameController.text.trim().isNotEmpty
+          ? _appNameController.text.trim()
+          : widget.orgName;
+
+      // Check username
+      final userDoc = await FirebaseFirestore.instance
+          .collection('organizationUser')
+          .doc(widget.username)
+          .get();
+      if (userDoc.exists) {
+        _showError('Username already taken.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PricingScreen(
+              orgName: widget.orgName,
+              email: widget.email,
+              phone: widget.phone,
+              username: widget.username,
+              password: widget.password,
+              dateStr: widget.dateStr,
+              appName: appName,
+              logoFile: _logoFile,
+              selectedColor: _selectedColor,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF017FDF);
+
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF001D3D), Color(0xFF003768), Color(0xFF005A9E)],
+            stops: [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Top bar
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+
+              // Step Indicator
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 4,
+                ),
+                child: _buildStepIndicator(),
+              ),
+              const SizedBox(height: 16),
+
+              // Scrollable content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Customize Branding',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Make your app unique with logo & colors',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.65),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // App Information Card
+                      _buildCard(
+                        icon: Icons.grid_view_rounded,
+                        iconBgColor: accent.withOpacity(0.2),
+                        iconColor: accent,
+                        title: 'App Information',
+                        child: TextField(
+                          controller: _appNameController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Enter App Name',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.07),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.15),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.15),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: accent,
+                                width: 1.5,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Company Logo Card
+                      _buildCard(
+                        icon: Icons.upload_rounded,
+                        iconBgColor: const Color(0xFF7C3AED).withOpacity(0.2),
+                        iconColor: const Color(0xFF7C3AED),
+                        title: 'Company Logo',
+                        child: Column(
+                          children: [
+                            GestureDetector(
+                              onTap: _pickLogo,
+                              child: Container(
+                                width: double.infinity,
+                                height: 110,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.15),
+                                  ),
+                                ),
+                                child: _logoFile != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(13),
+                                        child: Image.file(
+                                          _logoFile!,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.cloud_upload_outlined,
+                                            size: 36,
+                                            color: Colors.white.withOpacity(
+                                              0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Upload Logo',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white.withOpacity(
+                                                0.7,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            'PNG / JPG (5MB)',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white.withOpacity(
+                                                0.4,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _pickLogo,
+                                icon: const Icon(
+                                  Icons.cloud_upload_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('Upload Logo'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: accent,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Color Theme Card
+                      _buildCard(
+                        icon: Icons.palette_rounded,
+                        iconBgColor: const Color(0xFFEA580C).withOpacity(0.2),
+                        iconColor: const Color(0xFFEA580C),
+                        title: 'Color Theme',
+                        subtitle:
+                            'Primary Color  #${_selectedColor.value.toRadixString(16).toUpperCase().substring(2)}',
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _colorOptions.map((opt) {
+                            final isCustom = opt['isCustom'] == true;
+                            final c = isCustom ? _customColor : opt['color'] as Color;
+                            final sel = isCustom
+                                ? (!_colorOptions.any((o) =>
+                                    o['isCustom'] != true && o['color'] == _selectedColor))
+                                : _selectedColor.value == c.value;
+
+                            return GestureDetector(
+                              onTap: isCustom
+                                  ? _showColorPicker
+                                  : () {
+                                      setState(() {
+                                        _selectedColor = c;
+                                        _customColor = c;
+                                      });
+                                    },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: sel
+                                      ? c.withOpacity(0.25)
+                                      : Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: sel
+                                        ? c
+                                        : Colors.white.withOpacity(0.15),
+                                    width: sel ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (sel)
+                                      Icon(
+                                        Icons.check_circle_rounded,
+                                        color: c,
+                                        size: 16,
+                                      )
+                                    else if (isCustom)
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: const BoxDecoration(
+                                          gradient: SweepGradient(
+                                            colors: [
+                                              Colors.red,
+                                              Colors.orange,
+                                              Colors.yellow,
+                                              Colors.green,
+                                              Colors.blue,
+                                              Colors.purple,
+                                              Colors.red,
+                                            ],
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: c,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      opt['label'] as String,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: sel ? c : Colors.white70,
+                                        fontWeight: sel
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Next (Register) button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _goToNextStep,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: accent,
+                            foregroundColor: Colors.white,
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  'NEXT',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    const steps = ['Details', 'Branding', 'Pricing'];
+    const activeStep = 1; // Always on step 2 here
+
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (i) {
+        if (i.isOdd) {
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: activeStep > i ~/ 2
+                  ? const Color(0xFF017FDF)
+                  : Colors.white.withOpacity(0.2),
+            ),
+          );
+        }
+        final idx = i ~/ 2;
+        final done = idx < activeStep;
+        final active = idx == activeStep;
+
+        return Column(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: done || active
+                    ? const Color(0xFF017FDF)
+                    : Colors.white.withOpacity(0.15),
+                border: Border.all(
+                  color: done || active
+                      ? const Color(0xFF017FDF)
+                      : Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: done
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      )
+                    : Text(
+                        '${idx + 1}',
+                        style: TextStyle(
+                          color: active ? Colors.white : Colors.white60,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              steps[idx],
+              style: TextStyle(
+                fontSize: 11,
+                color: active || done ? Colors.white : Colors.white54,
+                fontWeight: active ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}

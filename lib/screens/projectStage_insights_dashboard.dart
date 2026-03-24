@@ -4,6 +4,7 @@ import 'package:demo_cst/screens/projectStage_expenses_reportpage.dart';
 import 'package:demo_cst/screens/projectStage_site_summary_report.dart';
 import 'package:demo_cst/screens/projectstage_daily_site_report.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 
 // --- SupervisorEntry Model ---
@@ -83,7 +84,7 @@ class SiteSupervisorMapEntry {
 
 Future<List<SiteSupervisorMapEntry>> fetchAllSiteSupervisorMapEntries() async {
   final snapshot =
-      await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
+      await FirestoreService.getCollection('siteSupervisorMap').get();
   return snapshot.docs
       .map((doc) => SiteSupervisorMapEntry.fromFirestore(doc))
       .toList();

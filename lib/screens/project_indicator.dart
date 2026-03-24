@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/animation.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectIndicatorPage extends StatefulWidget {
   final String? siteId;
@@ -61,7 +62,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage>
         return;
       }
 
-      final col = FirebaseFirestore.instance.collection('projects');
+      final col = FirestoreService.getCollection('projects');
       QuerySnapshot<Map<String, dynamic>> query =
           await col.where('siteId', isEqualTo: widget.siteId).limit(1).get();
       if (query.docs.isEmpty) {

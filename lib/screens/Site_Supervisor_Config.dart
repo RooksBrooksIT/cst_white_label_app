@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteSupervisorConfig extends StatefulWidget {
   const SiteSupervisorConfig({super.key});
@@ -992,7 +993,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         ),
         Expanded(
           child: FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance.collection('supervisor').get(),
+            future: FirestoreService.getCollection('supervisor').get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/screens/financial_status_report.dart';
 import 'package:demo_cst/screens/project_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class customerProjectFinancialStatusReportPage extends StatefulWidget {
   @override
@@ -53,7 +54,7 @@ class _customerProjectFinancialStatusReportPageState
 
   Future<void> _fetchSiteIds() async {
     try {
-      Query query = FirebaseFirestore.instance.collection('projects');
+      Query query = FirestoreService.getCollection('projects');
 
       // If user has a siteId from login, filter by it
       if (_userSiteId != null && _userSiteId!.isNotEmpty) {

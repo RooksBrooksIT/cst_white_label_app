@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class MatlsSubCat extends StatefulWidget {
   const MatlsSubCat({super.key});
@@ -18,10 +19,10 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
 
   // Firestore references
   final _categoriesRef =
-      FirebaseFirestore.instance.collection('materialCategories');
-  final _unitsRef = FirebaseFirestore.instance.collection('materialUnits');
+      FirestoreService.getCollection('materialCategories');
+  final _unitsRef = FirestoreService.getCollection('materialUnits');
   final _subCatRef =
-      FirebaseFirestore.instance.collection('materialSubCategories');
+      FirestoreService.getCollection('materialSubCategories');
 
   // Dropdown data
   List<DocumentSnapshot> _categories = [];

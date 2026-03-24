@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "firebase use prod": "cst-whitelabel-app",
+    "firebase use --add": "cst-whitelabel-app"
+  },
+  "targets": {},
+  "etags": {}
+}

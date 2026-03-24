@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class MaterialRequestForm extends StatefulWidget {
   final String supervisorId;
@@ -59,7 +60,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   Future<void> _fetchUnitsFromFirestore() async {
     try {
       final snapshot =
-          await FirebaseFirestore.instance.collection('materialUnits').get();
+          await FirestoreService.getCollection('materialUnits').get();
       final units = snapshot.docs
           .map((doc) => doc.data()['matUnit']?.toString() ?? '')
           .where((unit) => unit.isNotEmpty)
@@ -117,7 +118,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   Future<void> _fetchMaterialsFromFirestore() async {
     try {
       final snapshot =
-          await FirebaseFirestore.instance.collection('materials').get();
+          await FirestoreService.getCollection('materials').get();
       materialDocs = snapshot.docs.map((doc) => doc.data()).toList();
       materialDescriptions = materialDocs
           .map((m) => m['materialName']?.toString() ?? '')
@@ -289,7 +290,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               .format(now)} UTC${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs()}:${(now.timeZoneOffset.inMinutes % 60).toString().padLeft(2, '0')}';
 
       final reqCollection =
-          FirebaseFirestore.instance.collection('siteMaterialsRequest');
+          FirestoreService.getCollection('siteMaterialsRequest');
       final querySnapshot = await reqCollection
           .orderBy('matReqId', descending: true)
           .limit(1)

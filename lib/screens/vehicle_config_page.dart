@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class AddVehicleLogPage extends StatefulWidget {
   const AddVehicleLogPage({super.key});
@@ -94,7 +95,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadSites() async {
     try {
-      final snapshot = await _firestore.collection('projects').get();
+      final snapshot = await FirestoreService.getCollection('projects').get();
 
       setState(() {
         _siteNames = snapshot.docs
@@ -119,7 +120,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadVehicles() async {
     try {
-      final snapshot = await _firestore.collection('vehicleDetails').get();
+      final snapshot = await FirestoreService.getCollection('vehicleDetails').get();
 
       List<Map<String, dynamic>> vehicles = [];
 
@@ -150,7 +151,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadMaterials() async {
     try {
-      final snapshot = await _firestore.collection('materials').get();
+      final snapshot = await FirestoreService.getCollection('materials').get();
 
       List<Map<String, dynamic>> materialsWithUnits = [];
 

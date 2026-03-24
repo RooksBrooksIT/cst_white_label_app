@@ -48,10 +48,9 @@ class _MainDashboardState extends State<MainDashboard>
     final primary = theme.primaryColor;
     
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        Navigator.pushReplacementNamed(context, '/letsStart');
       },
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -77,35 +76,8 @@ class _MainDashboardState extends State<MainDashboard>
                           // Top bar
                           Row(
                             children: [
-                              GestureDetector(
-                                onTap: () => Navigator.pushReplacementNamed(context, '/letsStart'),
-                                child: Container(
-                                  width: Responsive.scaleH(context, 0.11),
-                                  height: Responsive.scaleH(context, 0.11),
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 48,
-                                    maxHeight: 48,
-                                    minWidth: 40,
-                                    minHeight: 40,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.cardColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Icons.arrow_back_rounded,
-                                    size: 22,
-                                    color: primary,
-                                  ),
-                                ),
-                              ),
+                              // Removed redundant back button to /letsStart
+                              const SizedBox(width: 48, height: 48),
                               const Spacer(),
                               Container(
                                 padding: const EdgeInsets.all(10),

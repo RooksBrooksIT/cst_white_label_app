@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     await Future.delayed(const Duration(milliseconds: 4800));
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/letsStart');
+      Navigator.pushReplacementNamed(context, '/welcome');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 // Responsive padding helper (matches material approval)
 EdgeInsets getSymmetricPadding(BuildContext context, {double fraction = 0.06}) {
@@ -54,7 +55,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
   Future<List<Map<String, dynamic>>> fetchAllLabours() async {
     final QuerySnapshot snapshot =
-        await FirebaseFirestore.instance.collection('labours').get();
+        await FirestoreService.getCollection('labours').get();
     return snapshot.docs
         .map((doc) => doc.data() as Map<String, dynamic>)
         .toList();

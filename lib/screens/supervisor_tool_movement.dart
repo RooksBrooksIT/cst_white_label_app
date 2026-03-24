@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import '../utils/app_theme.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteToCompanyReturn extends StatefulWidget {
   final String supervisorId;
@@ -74,7 +75,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }
 
   Future<void> _fetchTools() async {
-    final snapshot = await FirebaseFirestore.instance.collection('tools').get();
+    final snapshot = await FirestoreService.getCollection('tools').get();
     setState(() {
       _tools = snapshot.docs.map((doc) {
         final data = doc.data();

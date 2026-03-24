@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectStageConfig extends StatefulWidget {
   const ProjectStageConfig({super.key});
@@ -265,7 +266,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
 
   Future<bool> _isDuplicateStage(String stage) async {
     final snapshot =
-        await FirebaseFirestore.instance.collection('projectStages').get();
+        await FirestoreService.getCollection('projectStages').get();
     final existingStages = snapshot.docs
         .map((doc) => (doc['projectStage'] as String).toLowerCase())
         .toList();

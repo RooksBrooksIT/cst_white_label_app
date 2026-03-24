@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ToolsMovementPage extends StatefulWidget {
   const ToolsMovementPage({super.key});
@@ -118,7 +119,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   }
 
   Future<void> _fetchTools() async {
-    final snapshot = await FirebaseFirestore.instance.collection('tools').get();
+    final snapshot = await FirestoreService.getCollection('tools').get();
     setState(() {
       _tools = snapshot.docs.map((doc) {
         final data = doc.data();
