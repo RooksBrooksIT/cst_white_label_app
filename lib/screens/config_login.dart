@@ -136,9 +136,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_orgPathKey, orgId); // Store the ID for FirestoreService
-        if (fullConfigPath != null) {
-          await prefs.setString('config_org_doc_path', fullConfigPath);
-        }
+        final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
+        await prefs.setString('config_org_doc_path', resolvedPath);
+
         
         // Refresh FirestoreService cache
         await FirestoreService.initialize();

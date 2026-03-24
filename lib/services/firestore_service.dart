@@ -20,7 +20,7 @@ class FirestoreService {
   }
 
   /// Gets a collection that is nested under the organization's data root.
-  /// Resulting Path: /organisations/{OrgName_Date}/dynamic_data/data/{collectionName}
+  /// Resulting Path: /organisation/{OrgID}/data/{collectionName}
   /// This method is synchronous to support UI StreamBuilders.
   static CollectionReference<Map<String, dynamic>> getCollection(String collectionName) {
     if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
@@ -34,11 +34,10 @@ class FirestoreService {
     final String orgId = pathParts[0];
 
     return FirebaseFirestore.instance
-        .collection('organisations')
+        .collection('organisation')
         .doc(orgId)
-        .collection('dynamic_data')
-        .doc('data')
-        .collection(collectionName);
+        .collection(collectionName); // Synchronous business collection access
+
   }
 
   /// Gets a specific document reference inside an organization collection.
@@ -56,10 +55,11 @@ class FirestoreService {
     final String orgId = pathParts[0];
 
     return FirebaseFirestore.instance
-        .collection('organisations')
+        .collection('organisation')
         .doc(orgId)
-        .collection('dynamic_data')
-        .doc('data');
+        .collection('admin') // Using 'admin' as a parent collection for org-level metadata
+        .doc('data'); // 'data' is the document containing organization details
+
   }
 
   static Future<CollectionReference<Map<String, dynamic>>> getOrgCollection(String name) async {

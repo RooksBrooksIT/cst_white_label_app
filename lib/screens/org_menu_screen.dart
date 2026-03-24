@@ -39,19 +39,20 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       if (dynamicPath != null && dynamicPath.isNotEmpty) {
         final orgId = dynamicPath.split('/')[0];
         final subDoc = await FirebaseFirestore.instance
-            .collection(orgId)
-            .doc('data')
+            .collection('organisation')
+            .doc(orgId)
             .collection('admin')
-            .doc('User')
+            .doc('data')
             .get();
+
 
         if (subDoc.exists) {
           final subData = subDoc.data()!;
           setState(() {
             // Handle potentially different field names for referral code
             _referralCode =
-                subData['refferal Code'] ??
                 subData['referralCode'] ??
+                subData['refferal Code'] ??
                 'Not Set';
 
             _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';

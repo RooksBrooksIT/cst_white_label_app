@@ -91,9 +91,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_orgPathKey, orgId);
-        if (fullConfigPath != null) {
-          await prefs.setString('cust_org_doc_path', fullConfigPath);
-        }
+        final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
+        await prefs.setString('cust_org_doc_path', resolvedPath);
+
         
         await FirestoreService.initialize();
 

@@ -461,9 +461,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_orgPathKey, orgId);
-        if (fullConfigPath != null) {
-          await prefs.setString('sup_org_doc_path', fullConfigPath);
-        }
+        final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
+        await prefs.setString('sup_org_doc_path', resolvedPath);
+
         
         // Refresh FirestoreService cache
         await FirestoreService.initialize();

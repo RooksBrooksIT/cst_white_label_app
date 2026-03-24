@@ -88,15 +88,15 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        final userData = querySnapshot.docs.first.data();
         final docSnapshot = querySnapshot.docs.first;
+        final userData = docSnapshot.data();
         
         // Write organization info to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         final String? storedOrgName = userData['orgName'] as String?;
         // New Path Logic: dynamicPath is the OrgID, fullConfigPath is the doc path
         final String dynamicPath = userData['dynamicPath'] ?? ''; 
-        final String fullConfigPath = userData['fullConfigPath'] ?? docSnapshot.reference.path;
+        final String fullConfigPath = userData['fullConfigPath'] ?? 'organisation/$dynamicPath/admin/data';
 
         await prefs.setBool(_isLoggedInKey, true);
         await prefs.setString(_usernameKey, username);

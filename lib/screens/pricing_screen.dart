@@ -49,8 +49,9 @@ class _PricingScreenState extends State<PricingScreen> {
       final String orgId =
           '${widget.orgName.replaceAll(' ', '_')}_${widget.dateStr}';
       
-      // New structured path for organization details
-      final String orgConfigPath = 'organisations/$orgId/dynamic_data/data';
+      // Simplified path for organization details
+      final String orgConfigDocPath = 'organisation/$orgId/admin/data';
+
 
       // Upload logo
       String? logoUrl;
@@ -68,7 +69,8 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        transaction.set(FirebaseFirestore.instance.doc(orgConfigPath), {
+        transaction.set(FirebaseFirestore.instance.doc(orgConfigDocPath), {
+
           'orgName': widget.orgName,
           'appName': widget.appName,
           'email': widget.email,
@@ -95,8 +97,9 @@ class _PricingScreenState extends State<PricingScreen> {
             'dynamicPath': orgId, // Store only the ID for FirestoreService
             'username': widget.username,
             'password': widget.password,
-            'fullConfigPath': orgConfigPath,
+            'fullConfigPath': orgConfigDocPath,
           },
+
         );
 
         transaction.set(
@@ -107,8 +110,9 @@ class _PricingScreenState extends State<PricingScreen> {
             'orgName': widget.orgName,
             'dynamicPath': orgId, // Store only the ID for FirestoreService
             'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigPath,
+            'fullConfigPath': orgConfigDocPath,
           },
+
         );
       });
 
@@ -118,7 +122,8 @@ class _PricingScreenState extends State<PricingScreen> {
       await prefs.setString('org_username', widget.username);
       await prefs.setString('org_dynamic_path', orgId);
       await prefs.setString('org_name', widget.orgName);
-      await prefs.setString('org_doc_path', orgConfigPath);
+      await prefs.setString('org_doc_path', orgConfigDocPath);
+
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
