@@ -22,8 +22,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
 
   // Generate next ID like PC001, PC002, ...
   Future<String> _getNextCategoryId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('projectCategories')
+    final snapshot = await FirestoreService.getCollection('projectCategories')
         .orderBy('projectCategoryId', descending: true)
         .limit(1)
         .get();
@@ -168,8 +167,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                                   if (newCategory.isEmpty) return;
 
                                   final newId = await _getNextCategoryId();
-                                  await FirebaseFirestore.instance
-                                      .collection('projectCategories')
+                                  await FirestoreService.getCollection('projectCategories')
                                       .doc(newId)
                                       .set({
                                     'projectCategoryId': newId,
@@ -210,15 +208,13 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
   Future<void> _deleteSelectedCategory() async {
     if (_selectedCategory == null) return;
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('projectCategories')
+    final snapshot = await FirestoreService.getCollection('projectCategories')
         .where('projectCategory', isEqualTo: _selectedCategory)
         .get();
 
     if (snapshot.docs.isNotEmpty) {
       final docId = snapshot.docs.first.id;
-      await FirebaseFirestore.instance
-          .collection('projectCategories')
+      await FirestoreService.getCollection('projectCategories')
           .doc(docId)
           .delete();
 
@@ -337,8 +333,7 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                               children: [
                                 Expanded(
                                   child: StreamBuilder<QuerySnapshot>(
-                                    stream: FirebaseFirestore.instance
-                                        .collection('projectCategories')
+                                    stream: FirestoreService.getCollection('projectCategories')
                                         .orderBy('projectCategoryId')
                                         .snapshots(),
                                     builder: (context, snapshot) {

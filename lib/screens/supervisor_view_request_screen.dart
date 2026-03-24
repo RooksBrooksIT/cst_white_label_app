@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ViewApprovalScreen extends StatefulWidget {
   final String supervisorId;
@@ -120,8 +121,8 @@ class _ApprovalListState extends State<ApprovalList> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('siteSupervisorProjectStageSchedule')
+            stream: FirestoreService
+                .getCollection('siteSupervisorProjectStageSchedule')
                 .where('approvalStatus', isEqualTo: widget.status)
                 .where('supervisorName', isEqualTo: widget.supervisorName)
                 .snapshots(),
@@ -540,8 +541,8 @@ class _ApprovalCardState extends State<ApprovalCard>
   void _updateStatus(
       BuildContext context, String docId, String newStatus) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorProjectStageSchedule')
+      await FirestoreService
+          .getCollection('siteSupervisorProjectStageSchedule')
           .doc(docId)
           .update({'approvalStatus': newStatus});
       ScaffoldMessenger.of(context).showSnackBar(

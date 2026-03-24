@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class VehicleDriverConfigPage extends StatefulWidget {
   const VehicleDriverConfigPage({super.key});
@@ -41,8 +42,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
   }
 
   Future<String> _getNextDriverId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('drivers')
+    final snapshot = await FirestoreService
+        .getCollection('drivers')
         .orderBy('driverId', descending: true)
         .limit(1)
         .get();
@@ -76,8 +77,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
       data['createdAt'] = FieldValue.serverTimestamp();
     }
 
-    await FirebaseFirestore.instance
-        .collection('drivers')
+    await FirestoreService
+        .getCollection('drivers')
         .doc(driverId)
         .set(data);
 
@@ -141,8 +142,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     );
 
     if (result == true) {
-      await FirebaseFirestore.instance
-          .collection('drivers')
+      await FirestoreService
+          .getCollection('drivers')
           .doc(driverId)
           .delete();
 
@@ -350,8 +351,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
 
             // Existing Drivers Tab
             StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('drivers')
+              stream: FirestoreService
+                  .getCollection('drivers')
                   .orderBy('driverId')
                   .snapshots(),
               builder: (context, snapshot) {

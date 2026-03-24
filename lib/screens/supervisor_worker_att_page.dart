@@ -12,7 +12,7 @@ class AttendanceManagementPage extends StatefulWidget {
 }
 
 class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused _firestore field
 
   // Selected values
   String? _selectedSite;
@@ -232,8 +232,8 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     Map<String, dynamic> dailyAttendance,
   ) async {
     try {
-      final doc = await _firestore
-          .collection('workersSummary')
+      final doc = await FirestoreService
+          .getCollection('workersSummary')
           .doc(docId)
           .get();
 

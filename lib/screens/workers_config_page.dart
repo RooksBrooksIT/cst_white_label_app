@@ -13,8 +13,7 @@ class WorkersConfigPage extends StatefulWidget {
 class _WorkersConfigPageState extends State<WorkersConfigPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  // Removed _firestore field
   // Form controllers for Create New Worker tab
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -74,8 +73,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Future<String> _getNextWorkerId() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('workersConfig')
+      final querySnapshot = await FirestoreService
+          .getCollection('workersConfig')
           .orderBy('workerId', descending: true)
           .limit(1)
           .get();
@@ -151,8 +150,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     Map<String, dynamic> updatedData,
   ) async {
     try {
-      await _firestore
-          .collection('workersConfig')
+      await FirestoreService
+          .getCollection('workersConfig')
           .doc(docId)
           .update(updatedData);
       ScaffoldMessenger.of(
@@ -520,8 +519,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Widget _buildWorkersListTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
-          .collection('workersConfig')
+      stream: FirestoreService
+          .getCollection('workersConfig')
           .orderBy('workerId')
           .snapshots(),
       builder: (context, snapshot) {

@@ -11,6 +11,8 @@ import 'package:demo_cst/screens/customer_login_page.dart';
 import 'package:demo_cst/screens/Organization_Dashboard.dart';
 import 'package:demo_cst/screens/Organisation_RegistrationPage.dart';
 import 'package:demo_cst/screens/welcome_screen.dart';
+import 'package:demo_cst/screens/org_menu_screen.dart';
+import 'package:demo_cst/screens/branding_edit_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,11 +59,13 @@ class MyApp extends StatelessWidget {
                     '/orgLogin': (context) => const Organisation_LoginPage(),
                     '/managerLogin': (context) => const ConfigLoginPage(),
                     '/supervisorLogin': (context) =>
-                        const Supervisor_LoginPage(),
+                        const SupervisorLoginPage(),
                     '/customerLogin': (context) => const CustomerLoginPage(),
                     '/orgDashboard': (context) => const OrganizationDashboard(),
                     '/orgRegistration': (context) =>
                         const OrganisationRegistrationPage(),
+                    '/orgMenu': (context) => const OrgMenuScreen(),
+                    '/branding': (context) => const BrandingEditScreen(),
                   },
                 );
               },

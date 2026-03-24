@@ -51,8 +51,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchExpenseTotals() async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final query = await FirestoreService
+          .getCollection('siteSupervisorEntries')
           .get();
 
       final List<String> expenseFields = ['food', 'fuel', 'transport'];
@@ -149,8 +149,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<num> fetchOrganizationExpenses() async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('organizationEntries')
+      final query = await FirestoreService
+          .getCollection('organizationEntries')
           .get();
       num total = 0;
       for (var doc in query.docs) {
@@ -177,8 +177,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchContractorAndIncentiveExpenses() async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('totalSiteExpensesPerDay')
+      final query = await FirestoreService
+          .getCollection('totalSiteExpensesPerDay')
           .where('siteId', isEqualTo: widget.siteId)
           .get();
 
@@ -221,8 +221,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, dynamic>?> fetchProjectInfo() async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
+      final query = await FirestoreService
+          .getCollection('projects')
           .where('siteId', isEqualTo: widget.siteId)
           .limit(1)
           .get();

@@ -57,8 +57,8 @@ class _VehicleInventoryReportPageState
   Future<void> _loadSites() async {
     setState(() => _isLoadingSites = true);
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('projects')
+      final snap = await FirestoreService
+          .getCollection('projects')
           .get();
       final names = <String>{};
       for (final d in snap.docs) {

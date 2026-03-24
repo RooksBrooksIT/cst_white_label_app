@@ -103,8 +103,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                   if (newStage.isEmpty) return;
 
                                   final nextId = await _getNextStageId();
-                                  await FirebaseFirestore.instance
-                                      .collection('projectStages')
+                                  await FirestoreService.getCollection('projectStages')
                                       .doc(nextId)
                                       .set({
                                     'projectStageId': nextId,
@@ -247,8 +246,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   }
 
   Future<String> _getNextStageId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('projectStages')
+    final snapshot = await FirestoreService.getCollection('projectStages')
         .orderBy('projectStageId', descending: true)
         .limit(1)
         .get();
@@ -309,8 +307,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
     if (confirm != true) return;
 
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStages')
+      final snapshot = await FirestoreService.getCollection('projectStages')
           .where('projectStage', isEqualTo: _selectedStage)
           .get();
 
@@ -421,8 +418,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                           children: [
                             Expanded(
                               child: StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectStages')
+                                stream: FirestoreService.getCollection('projectStages')
                                     .snapshots(),
                                 builder: (context, snapshot) {
                                   if (!snapshot.hasData) {

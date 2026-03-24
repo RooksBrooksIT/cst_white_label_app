@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
@@ -10,7 +11,7 @@ class MaterialInfoScreen extends StatefulWidget {
 }
 
 class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused _firestore field
 
   // Form controllers
   final TextEditingController _managerNameController = TextEditingController();
@@ -109,8 +110,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // Load site data from siteSupervisorMap collection
   Future<void> _loadSiteData() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('siteSupervisorMap')
+      final querySnapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .get();
 
       if (mounted) {
@@ -171,8 +172,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // Load material data from materialsavailablity collection
   Future<void> _loadMaterialData() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('materialsavailablity')
+      final querySnapshot = await FirestoreService
+          .getCollection('materialsavailablity')
           .get();
 
       // Group by materialname and pick the latest entry (by lastupdated) for each
@@ -246,8 +247,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
 
     try {
-      final querySnapshot = await _firestore
-          .collection('materialatsite')
+      final querySnapshot = await FirestoreService
+          .getCollection('materialatsite')
           .where('siteid', isEqualTo: siteId)
           .get();
 
@@ -640,12 +641,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Save to materialmovementhistory collection
       final movementHistoryDocId = '${_selectedSiteId}_$date';
-      final movementHistoryRef = _firestore
-          .collection('materialmovementhistory')
+      final movementHistoryRef = FirestoreService
+          .getCollection('materialmovementhistory')
           .doc(movementHistoryDocId);
 
       Map<String, dynamic> movementHistoryData = {};
@@ -679,16 +680,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final newAvailableCount =
             currentAvailableCount - material['neededCount'];
 
-        final materialAvailabilityRef = _firestore
-            .collection('materialsavailablity')
+        final materialAvailabilityRef = FirestoreService
+            .getCollection('materialsavailablity')
             .doc(docId);
         batch.update(materialAvailabilityRef, {"count": newAvailableCount});
 
         // Update materialatsite collection
         final materialAtSiteDocId =
             '${_selectedSiteId}_${material['materialName']}';
-        final materialAtSiteRef = _firestore
-            .collection('materialatsite')
+        final materialAtSiteRef = FirestoreService
+            .getCollection('materialatsite')
             .doc(materialAtSiteDocId);
 
         // Check if we need to create or update
@@ -780,7 +781,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Process each material for materialatsite collection
       for (final material in materialsToTransfer) {
@@ -788,11 +789,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final int moveCount = material['neededCount'];
 
         // Document references
-        final fromDocRef = _firestore
-            .collection('materialatsite')
+        final fromDocRef = FirestoreService
+            .getCollection('materialatsite')
             .doc('${_fromSiteId}_$matName');
-        final toDocRef = _firestore
-            .collection('materialatsite')
+        final toDocRef = FirestoreService
+            .getCollection('materialatsite')
             .doc('${_toSiteId}_$matName');
 
         // Get current counts
@@ -830,8 +831,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // 2. Save to materialmovementhistory collection
       final movementId =
           '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = _firestore
-          .collection('materialmovementhistory')
+      final movementRef = FirestoreService
+          .getCollection('materialmovementhistory')
           .doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
@@ -912,13 +913,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Save to materialmovementhistory collection
       final movementId =
           '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = _firestore
-          .collection('materialmovementhistory')
+      final movementRef = FirestoreService
+          .getCollection('materialmovementhistory')
           .doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
@@ -955,8 +956,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final currentAvailableCount = (latestEntry['count'] ?? 0).toInt();
         final newAvailableCount = currentAvailableCount + moveCount;
 
-        final materialAvailabilityRef = _firestore
-            .collection('materialsavailablity')
+        final materialAvailabilityRef = FirestoreService
+            .getCollection('materialsavailablity')
             .doc(docId);
         batch.set(materialAvailabilityRef, {
           "count": newAvailableCount,
@@ -966,8 +967,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
         // Update materialatsite collection (decrease count at site)
         final materialAtSiteDocId = '${_selectedSiteId}_$matName';
-        final materialAtSiteRef = _firestore
-            .collection('materialatsite')
+        final materialAtSiteRef = FirestoreService
+            .getCollection('materialatsite')
             .doc(materialAtSiteDocId);
 
         final existingDoc = await materialAtSiteRef.get();

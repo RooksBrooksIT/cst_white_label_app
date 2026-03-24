@@ -10,7 +10,7 @@ class MaterialAvailability extends StatefulWidget {
 }
 
 class _MaterialAvailabilityState extends State<MaterialAvailability> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused _firestore field
 
   String? _selectedMaterial;
   int _count = 0;
@@ -68,8 +68,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _isLoadingAvailability = true;
     });
     try {
-      final querySnapshot = await _firestore
-          .collection('materialsavailablity')
+      final querySnapshot = await FirestoreService
+          .getCollection('materialsavailablity')
           .orderBy('lastupdated', descending: true)
           .get();
 
@@ -121,8 +121,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
     try {
       final documentId = _generateDocumentId(_selectedMaterial!);
-      final todayDocRef = _firestore
-          .collection('materialsavailablity')
+      final todayDocRef = FirestoreService
+          .getCollection('materialsavailablity')
           .doc(documentId);
 
       // Check if document exists for today
@@ -180,8 +180,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       // Find the existing document for today
       final documentId = _generateDocumentId(_selectedMaterialToUpdate!);
-      final todayDocRef = _firestore
-          .collection('materialsavailablity')
+      final todayDocRef = FirestoreService
+          .getCollection('materialsavailablity')
           .doc(documentId);
 
       // Check if document exists for today
@@ -204,8 +204,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         );
       } else {
         // If no document exists for today, check if there's any existing document for this material
-        final existingDocs = await _firestore
-            .collection('materialsavailablity')
+        final existingDocs = await FirestoreService
+            .getCollection('materialsavailablity')
             .where('materialName', isEqualTo: _selectedMaterialToUpdate)
             .orderBy('lastupdated', descending: true)
             .limit(1)
@@ -217,8 +217,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           final currentCount = existingDoc.data()['count'] as int;
           final newCount = _addToExisting ? currentCount + _count : _count;
 
-          await _firestore
-              .collection('materialsavailablity')
+          await FirestoreService
+              .getCollection('materialsavailablity')
               .doc(existingDoc.id)
               .update({
                 'count': newCount,
@@ -269,8 +269,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       // First try to get today's document
       final documentId = _generateDocumentId(materialName);
-      final todayDoc = await _firestore
-          .collection('materialsavailablity')
+      final todayDoc = await FirestoreService
+          .getCollection('materialsavailablity')
           .doc(documentId)
           .get();
 
@@ -284,8 +284,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       }
 
       // If no today's document, get the most recent one
-      final existingDocs = await _firestore
-          .collection('materialsavailablity')
+      final existingDocs = await FirestoreService
+          .getCollection('materialsavailablity')
           .where('materialName', isEqualTo: materialName)
           .orderBy('lastupdated', descending: true)
           .limit(1)
@@ -389,8 +389,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
     if (newCount != null && newCount > 0) {
       try {
-        await _firestore
-            .collection('materialsavailablity')
+        await FirestoreService
+            .getCollection('materialsavailablity')
             .doc(documentId)
             .update({
               'count': newCount,

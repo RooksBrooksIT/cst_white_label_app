@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
@@ -104,8 +103,8 @@ class _SupervisorWorkSchedulePageState
       _supervisorSiteError = null;
     });
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final querySnapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .where('Supervisor ID', isEqualTo: widget.supervisorId)
           .get();
 
@@ -114,8 +113,8 @@ class _SupervisorWorkSchedulePageState
         for (var d in querySnapshot.docs) {
           final data = d.data();
           data['id'] = d['site'];
-          final siteDoc = await FirebaseFirestore.instance
-              .collection('sites')
+          final siteDoc = await FirestoreService
+              .getCollection('sites')
               .doc(d['site'])
               .get();
           final siteName =
@@ -251,8 +250,8 @@ class _SupervisorWorkSchedulePageState
 
       String wsReqId = 'WSR001';
       try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection('siteSupervisorProjectStageSchedule')
+        final querySnapshot = await FirestoreService
+            .getCollection('siteSupervisorProjectStageSchedule')
             .orderBy('wsReqId', descending: true)
             .limit(1)
             .get();
@@ -275,8 +274,8 @@ class _SupervisorWorkSchedulePageState
 
       final docId = '${siteId}_${supervisorName}_$projectStage';
 
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorProjectStageSchedule')
+      await FirestoreService
+          .getCollection('siteSupervisorProjectStageSchedule')
           .doc(docId)
           .set({
         'wsReqId': wsReqId,

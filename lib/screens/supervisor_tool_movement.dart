@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
@@ -58,8 +57,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }
 
   Future<void> _fetchSiteIds() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .get();
     final siteSet = <String>{};
     for (var doc in snapshot.docs) {
@@ -122,8 +121,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   Future<void> _fetchAndSetProjectName(String? siteId) async {
     if (siteId == null || siteId.trim().isEmpty) return;
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .where('site', isEqualTo: siteId)
         .limit(1)
         .get();
@@ -158,8 +157,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       return;
     }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('toolsAtSite')
+    final snapshot = await FirestoreService
+        .getCollection('toolsMovement')
         .where('toolCode', isEqualTo: toolCode)
         .limit(1)
         .get();
@@ -244,8 +243,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
     String trId = 'TR001';
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      final snapshot = await FirestoreService
+        .getCollection('toolsReturn')
           .orderBy('trId', descending: true)
           .limit(1)
           .get();
@@ -276,8 +275,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         final count = tool['count'] as int;
 
         // Update toolsAtSite
-        final siteQuery = await FirebaseFirestore.instance
-            .collection('toolsAtSite')
+        final siteQuery = await FirestoreService
+            .getCollection('toolsAtSite')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
@@ -289,8 +288,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         }
 
         // Update toolsAtCompany
-        final companyQuery = await FirebaseFirestore.instance
-            .collection('toolsAtCompany')
+        final companyQuery = await FirestoreService
+            .getCollection('toolsAtCompany')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
@@ -302,8 +301,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         }
       }
 
-      await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      await FirestoreService
+          .getCollection('toolsMovement')
           .doc(docId)
           .set(data);
 

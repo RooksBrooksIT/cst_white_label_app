@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'dart:async';
 import 'site_weekly_financial_report2.dart';
 
@@ -54,8 +54,8 @@ class _SiteWeeklyFinancialReportState
 
   Future<void> fetchSupervisorData() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -481,8 +481,8 @@ class _SiteWeeklyFinancialReportState
                                 final paymentPeriod =
                                     "${_selectedYear}_${monthName}_Week$_selectedWeek";
 
-                                final query = await FirebaseFirestore.instance
-                                    .collection('siteSupervisorPayments')
+                                final query = await FirestoreService
+                                    .getCollection('siteSupervisorPayments')
                                     .where(
                                       'paymentPeriod',
                                       isEqualTo: paymentPeriod,

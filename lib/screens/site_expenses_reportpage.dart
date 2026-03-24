@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -51,15 +52,13 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       final docId = '${widget.siteId}_${docIdDateFormat.format(current)}';
 
       // Supervisor entry
-      final supervisorDoc = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final supervisorDoc = await FirestoreService.getCollection('siteSupervisorEntries')
           .doc(docId)
           .get();
       final supervisorData = supervisorDoc.exists ? supervisorDoc.data() : null;
 
       // Manager bills for this date
-      final managerQuery = await FirebaseFirestore.instance
-          .collection('managerEntries')
+      final managerQuery = await FirestoreService.getCollection('managerEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .get();
       List<Map<String, dynamic>> managerBills = [];
@@ -84,8 +83,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // Organization bills for this date
-      final orgQuery = await FirebaseFirestore.instance
-          .collection('organizationEntries')
+      final orgQuery = await FirestoreService.getCollection('organizationEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .get();
       List<Map<String, dynamic>> orgBills = [];
@@ -110,8 +108,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // Contractor expenses for this date
-      final contractorQuery = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      final contractorQuery = await FirestoreService.getCollection('contractorEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(current))
           .get();

@@ -20,21 +20,23 @@ class FirestoreService {
   }
 
   /// Gets a collection that is nested under the organization's data root.
-  /// Resulting Path: /{OrgName_Date}/data/{collectionName}
+  /// Resulting Path: /organisations/{OrgName_Date}/dynamic_data/data/{collectionName}
   /// This method is synchronous to support UI StreamBuilders.
   static CollectionReference<Map<String, dynamic>> getCollection(String collectionName) {
     if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
       // Fallback if not initialized or logged out
       return FirebaseFirestore.instance.collection(collectionName);
     }
+    
+    // The _cachedDynamicPath will now be just the OrgID (e.g. Rooks_18-03-2026)
+    // or the full legacy path which we handle for backward compatibility.
     final pathParts = _cachedDynamicPath!.split('/');
-    if (pathParts.isEmpty) {
-      return FirebaseFirestore.instance.collection(collectionName);
-    }
+    final String orgId = pathParts[0];
 
-    final rootCollection = pathParts[0];
     return FirebaseFirestore.instance
-        .collection(rootCollection)
+        .collection('organisations')
+        .doc(orgId)
+        .collection('dynamic_data')
         .doc('data')
         .collection(collectionName);
   }
@@ -51,7 +53,13 @@ class FirestoreService {
       throw Exception('Organization not logged in');
     }
     final pathParts = _cachedDynamicPath!.split('/');
-    return FirebaseFirestore.instance.collection(pathParts[0]).doc('data');
+    final String orgId = pathParts[0];
+
+    return FirebaseFirestore.instance
+        .collection('organisations')
+        .doc(orgId)
+        .collection('dynamic_data')
+        .doc('data');
   }
 
   static Future<CollectionReference<Map<String, dynamic>>> getOrgCollection(String name) async {

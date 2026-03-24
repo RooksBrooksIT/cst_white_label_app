@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/site_status_reportPage.dart';
 
 class SiteStatusReportScreen extends StatefulWidget {
@@ -40,13 +40,11 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
   Future<void> _fetchProjectData() async {
     try {
       // Fetch status options
-      final statusSnapshot = await FirebaseFirestore.instance
-          .collection('projectStatus')
+      final statusSnapshot = await FirestoreService.getCollection('projectStatus')
           .get();
 
       // Fetch financial data
-      final financialSnapshot = await FirebaseFirestore.instance
-          .collection('projectFinances')
+      final financialSnapshot = await FirestoreService.getCollection('projectFinances')
           .doc('currentProject')
           .get();
 

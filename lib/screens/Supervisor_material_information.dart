@@ -14,7 +14,7 @@ class SupervisorMaterialInfoScreen extends StatefulWidget {
 }
 
 class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused _firestore field
 
   // Selected values
   String? _selectedSiteId;
@@ -238,8 +238,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
 
     try {
-      final querySnapshot = await _firestore
-          .collection('materialatsite')
+      final querySnapshot = await FirestoreService
+          .getCollection('materialatsite')
           .where('siteid', isEqualTo: siteId)
           .get();
 
@@ -504,7 +504,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Process each material for materialatsite collection
       for (final material in materialsToTransfer) {
@@ -512,11 +512,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         final int moveCount = material['neededCount'];
 
         // Document references
-        final fromDocRef = _firestore
-            .collection('materialatsite')
+        final fromDocRef = FirestoreService
+            .getCollection('materialatsite')
             .doc('${_fromSiteId}_$matName');
-        final toDocRef = _firestore
-            .collection('materialatsite')
+        final toDocRef = FirestoreService
+            .getCollection('materialatsite')
             .doc('${_toSiteId}_$matName');
 
         // Get current counts
@@ -642,7 +642,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Save to materialmovementhistory collection
       final movementId =

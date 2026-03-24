@@ -18,8 +18,7 @@ class WorkerAttendanceSalaryPage extends StatefulWidget {
 
 class _WorkerAttendanceSalaryPageState
     extends State<WorkerAttendanceSalaryPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  // Removed _firestore field
   // Data lists
   List<Map<String, dynamic>> _allWorkers = [];
   List<Map<String, dynamic>> _filteredWorkers = [];
@@ -140,14 +139,14 @@ class _WorkerAttendanceSalaryPageState
       QuerySnapshot summaryQuery;
 
       if (_selectedSite != null && _selectedMonth != null) {
-        summaryQuery = await _firestore
-            .collection('workersSummary')
+        summaryQuery = await FirestoreService
+            .getCollection('workersSummary')
             .where('site', isEqualTo: _selectedSite)
             .where('month', isEqualTo: _selectedMonth)
             .get();
       } else if (_selectedMonth != null) {
-        summaryQuery = await _firestore
-            .collection('workersSummary')
+        summaryQuery = await FirestoreService
+            .getCollection('workersSummary')
             .where('month', isEqualTo: _selectedMonth)
             .get();
       } else {
@@ -617,8 +616,8 @@ class _WorkerAttendanceSalaryPageState
       final workerName = worker['name'] as String;
 
       // Get all attendance records for the specific site and month
-      final attendanceQuery = await _firestore
-          .collection('workersAttendance')
+      final attendanceQuery = await FirestoreService
+          .getCollection('workersAttendance')
           .where('site', isEqualTo: site)
           .where('month', isEqualTo: month)
           .orderBy('Day')
@@ -792,8 +791,8 @@ class _WorkerAttendanceSalaryPageState
           };
 
           // Save to WorkerAllDetails collection
-          await _firestore
-              .collection('WorkerAllDetails')
+          await FirestoreService
+              .getCollection('WorkerAllDetails')
               .doc(reportData['reportId'])
               .set(reportData);
 

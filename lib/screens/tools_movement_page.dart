@@ -102,8 +102,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   }
 
   Future<void> _fetchSiteIds() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .get();
     final siteSet = <String>{};
     for (var doc in snapshot.docs) {
@@ -259,8 +259,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     required String siteId,
     required int count,
   }) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('toolsInventory')
+    final docRef = FirestoreService
+        .getCollection('toolsInventory')
         .doc(toolCode);
 
     final now = DateTime.now();
@@ -310,8 +310,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       });
       return;
     }
-    final snapshot = await FirebaseFirestore.instance
-        .collection('toolsAtCompany')
+    final snapshot = await FirestoreService
+        .getCollection('toolsAtCompany')
         .where('toolCode', isEqualTo: toolCode)
         .limit(1)
         .get();
@@ -342,8 +342,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       });
       return;
     }
-    final docSnap = await FirebaseFirestore.instance
-        .collection('toolsInventory')
+    final docSnap = await FirestoreService
+        .getCollection('toolsInventory')
         .doc(toolCode)
         .get();
     int? count;
@@ -427,8 +427,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     String projectName = '';
     String supervisorName = '';
     if (siteId != null && siteId.trim().isNotEmpty) {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .where('site', isEqualTo: siteId)
           .limit(1)
           .get();
@@ -1008,8 +1008,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final docId = '${_returnSelectedSiteId}_$dateStr';
     String trId = 'TR001';
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      final snapshot = await FirestoreService
+          .getCollection('toolsReturn')
           .orderBy('trId', descending: true)
           .limit(1)
           .get();
@@ -1052,8 +1052,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final enteredCount = tool['count'] as int;
 
         // Site: DECREMENT
-        final siteQuery = await FirebaseFirestore.instance
-            .collection('toolsAtSite')
+        final siteQuery = await FirestoreService
+            .getCollection('toolsAtSite')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
@@ -1065,8 +1065,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         }
 
         // Company: INCREMENT
-        final companyQuery = await FirebaseFirestore.instance
-            .collection('toolsAtCompany')
+        final companyQuery = await FirestoreService
+            .getCollection('toolsAtCompany')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
@@ -1082,8 +1082,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           count: -enteredCount,
         );
       }
-      await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      await FirestoreService
+          .getCollection('toolsReturn')
           .doc(docId)
           .set(data);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1117,8 +1117,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final docId = '${_selectedSiteId}_$dateStr';
     String tmId = 'TM001';
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('toolsMovement')
+      final snapshot = await FirestoreService
+          .getCollection('toolsMovement')
           .orderBy('tmId', descending: true)
           .limit(1)
           .get();
@@ -1161,8 +1161,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final enteredCount = tool['count'] as int;
 
         // Company: DECREMENT
-        final companyQuery = await FirebaseFirestore.instance
-            .collection('toolsAtCompany')
+        final companyQuery = await FirestoreService
+            .getCollection('toolsAtCompany')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
@@ -1174,8 +1174,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         }
 
         // Site: INCREMENT, create if not exist
-        final siteDocRef = FirebaseFirestore.instance
-            .collection('toolsAtSite')
+        final siteDocRef = FirestoreService
+            .getCollection('toolsAtSite')
             .doc(toolCode);
         await siteDocRef.set({'toolCode': toolCode}, SetOptions(merge: true));
         await siteDocRef.update({
@@ -1189,8 +1189,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         );
       }
 
-      await FirebaseFirestore.instance
-          .collection('toolsMovement')
+      await FirestoreService
+          .getCollection('toolsMovement')
           .doc(docId)
           .set(data);
       ScaffoldMessenger.of(context).showSnackBar(

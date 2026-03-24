@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectContractScreen extends StatefulWidget {
@@ -60,8 +59,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
   /// Get Firestore Doc ID from contract type
   Future<String?> _getContractTypeDocId(String contractType) async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('projectContracts')
+      final querySnapshot = await FirestoreService.getCollection('projectContracts')
           .where('projectContract', isEqualTo: contractType)
           .limit(1)
           .get();
@@ -121,8 +119,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
         return;
       }
 
-      await FirebaseFirestore.instance
-          .collection('projectContracts')
+      await FirestoreService.getCollection('projectContracts')
           .doc(docId)
           .delete();
 
@@ -262,8 +259,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
 
                                     try {
                                       final querySnapshot =
-                                          await FirebaseFirestore.instance
-                                              .collection('projectContracts')
+                                          await FirestoreService.getCollection('projectContracts')
                                               .get();
 
                                       if (!mounted) return;
@@ -285,8 +281,7 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                                       final newDocId =
                                           'CT${(maxId + 1).toString().padLeft(3, '0')}';
 
-                                      await FirebaseFirestore.instance
-                                          .collection('projectContracts')
+                                      await FirestoreService.getCollection('projectContracts')
                                           .doc(newDocId)
                                           .set({'projectContract': newType});
 

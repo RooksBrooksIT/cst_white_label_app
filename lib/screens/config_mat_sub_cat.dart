@@ -100,8 +100,8 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
       await _subCatRef.doc(subCatId).set({
         // Store as Firestore reference
         'matCategory':
-            FirebaseFirestore.instance.doc('materialCategories/${category.id}'),
-        'matUnit': FirebaseFirestore.instance.doc('materialUnits/${unit.id}'),
+            FirestoreService.getCollection('materialCategories').doc(category.id),
+        'matUnit': FirestoreService.getCollection('materialUnits').doc(unit.id),
         'matSubCategory': subCategory,
         'created_at': FieldValue.serverTimestamp(),
       });

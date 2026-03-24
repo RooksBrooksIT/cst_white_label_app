@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 
 class SiteWeeklyFinancialReport2 extends StatelessWidget {
@@ -56,8 +57,8 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                   Center(child: CircularProgressIndicator(color: primaryColor))
                 else
                   StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('siteSupervisorPayments')
+                    stream: FirestoreService
+                        .getCollection('siteSupervisorPayments')
                         .where('siteId', isEqualTo: siteId)
                         .where('paymentPeriod', isEqualTo: paymentPeriod)
                         .snapshots()
@@ -635,8 +636,8 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     if (netCache.containsKey(paymentPeriod)) return netCache[paymentPeriod]!;
 
     // Fetch payments for this period
-    final snap = await FirebaseFirestore.instance
-        .collection('siteSupervisorPayments')
+    final snap = await FirestoreService
+        .getCollection('siteSupervisorPayments')
         .where('siteId', isEqualTo: siteId)
         .where('paymentPeriod', isEqualTo: paymentPeriod)
         .limit(1)
@@ -704,8 +705,8 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     Map<String, num> result = {};
 
     try {
-      QuerySnapshot entrySnap = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      QuerySnapshot entrySnap = await FirestoreService
+          .getCollection('siteSupervisorEntries')
           .where('siteId', isEqualTo: siteId)
           .get();
 

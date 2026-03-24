@@ -10,8 +10,7 @@ class WorkerMappingPage extends StatefulWidget {
 }
 
 class _WorkerMappingPageState extends State<WorkerMappingPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  // Removed _firestore field
   // Selected values
   String? _selectedSite;
   String? _selectedSupervisor;
@@ -47,8 +46,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await _firestore
-          .collection('siteSupervisorMap')
+      final querySnapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .get();
       setState(() {
         _sites = querySnapshot.docs.map((doc) {

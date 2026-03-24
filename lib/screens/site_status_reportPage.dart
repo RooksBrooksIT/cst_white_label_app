@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class SiteStatusReportPage extends StatelessWidget {
   final String status;
@@ -38,10 +39,7 @@ class SiteStatusReportPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           '$status Sites',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: statusColor,
         elevation: 0,
@@ -50,10 +48,9 @@ class SiteStatusReportPage extends StatelessWidget {
       body: Container(
         color: const Color(0xFFF8F9FA), // Light background
         child: FutureBuilder<QuerySnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('projects')
-              .where('currentStatus', isEqualTo: status)
-              .get(),
+          future: FirestoreService.getCollection(
+            'projects',
+          ).where('currentStatus', isEqualTo: status).get(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
@@ -226,15 +223,8 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: [BoxShadow(blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         children: [
@@ -273,7 +263,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
                   decoration: BoxDecoration(
                     color: balanceColor,
                     shape: BoxShape.circle,
-                    border: Border.all( width: 2),
+                    border: Border.all(width: 2),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -486,9 +476,7 @@ Future<void> updateProjectAmounts(
   double receivedIncrement,
   double spentIncrement,
 ) {
-  final docRef = FirebaseFirestore.instance
-      .collection('projects')
-      .doc(projectId);
+  final docRef = FirestoreService.getCollection('projects').doc(projectId);
   return docRef.update({
     'amountPaid': FieldValue.increment(receivedIncrement),
     'amountSpent': FieldValue.increment(spentIncrement),

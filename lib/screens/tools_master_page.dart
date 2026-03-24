@@ -67,8 +67,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       _isLoadingTools = true;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('tools')
+      final snapshot = await FirestoreService
+          .getCollection('tools')
           .get();
       setState(() {
         _toolsList = snapshot.docs;
@@ -504,8 +504,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     }
 
     try {
-      await FirebaseFirestore.instance
-          .collection('tools')
+      await FirestoreService
+          .getCollection('tools')
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
@@ -570,8 +570,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       //   return;
       // }
 
-      final codeDuplicateQuery = await FirebaseFirestore.instance
-          .collection('tools')
+      final codeDuplicateQuery = await FirestoreService
+          .getCollection('tools')
           .where('toolCode', isEqualTo: toolCode)
           .get();
 
@@ -590,8 +590,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       }
 
       // Get the latest toolId
-      final toolsSnapshot = await FirebaseFirestore.instance
-          .collection('tools')
+      final toolsSnapshot = await FirestoreService
+          .getCollection('tools')
           .orderBy('toolId', descending: true)
           .limit(1)
           .get();
@@ -616,8 +616,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       });
 
       // Save to toolsAtCompany collection
-      await FirebaseFirestore.instance
-          .collection('toolsAtCompany')
+      await FirestoreService
+          .getCollection('toolsAtCompany')
           .doc(toolCode)
           .set({'toolCode': toolCode, 'availableCount': toolCount});
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -35,8 +35,8 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
       errorMessage = null;
     });
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('toolsInventory')
+      final query = await FirestoreService
+          .getCollection('toolsInventory')
           .where('toolCode', isEqualTo: widget.toolCode)
           .get();
 

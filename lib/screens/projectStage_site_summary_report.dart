@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -56,8 +57,7 @@ class _ProjectstageSiteSummaryReportState
     }
 
     try {
-      final siteDoc = await FirebaseFirestore.instance
-          .collection('projects')
+      final siteDoc = await FirestoreService.getCollection('projects')
           .where('siteId', isEqualTo: widget.siteId)
           .limit(1)
           .get();
@@ -95,8 +95,7 @@ class _ProjectstageSiteSummaryReportState
     if (!_isValid) return {};
 
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final query = await FirestoreService.getCollection('siteSupervisorEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .where('projectStage', isEqualTo: widget.projectStage)
           .get();
@@ -172,8 +171,7 @@ class _ProjectstageSiteSummaryReportState
     if (!_isValid) return 0;
 
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('managerEntries')
+      final query = await FirestoreService.getCollection('managerEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .where('projectStage', isEqualTo: widget.projectStage)
           .get();
@@ -206,8 +204,7 @@ class _ProjectstageSiteSummaryReportState
     if (!_isValid) return 0;
 
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('organizationEntries')
+      final query = await FirestoreService.getCollection('organizationEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .where('projectStage', isEqualTo: widget.projectStage)
           .get();
@@ -240,8 +237,7 @@ class _ProjectstageSiteSummaryReportState
     if (!_isValid) return null;
 
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
+      final query = await FirestoreService.getCollection('projects')
           .where('siteId', isEqualTo: widget.siteId.trim())
           .get();
 
@@ -267,8 +263,7 @@ class _ProjectstageSiteSummaryReportState
   Future<List<Map<String, dynamic>>> fetchContractorExpenses() async {
     if (!_isValid) return [];
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      final query = await FirestoreService.getCollection('contractorEntries')
           .where('siteId', isEqualTo: widget.siteId)
           .where('projectField', isEqualTo: widget.projectStage)
           .get();
@@ -282,8 +277,7 @@ class _ProjectstageSiteSummaryReportState
   Future<List<Map<String, dynamic>>> fetchIncentiveExpenses() async {
     if (!_isValid) return [];
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorIncentives')
+      final query = await FirestoreService.getCollection('siteSupervisorIncentives')
           .where('siteId', isEqualTo: widget.siteId)
           .where('projectStage', isEqualTo: widget.projectStage)
           .get();

@@ -113,8 +113,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
   Future<void> _fetchSupervisorData() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
           .where('supervisor', isEqualTo: widget.userName)
           .get();
       if (snapshot.docs.isNotEmpty) {
@@ -443,8 +442,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         'siteId': siteIdForEntry,
       };
 
-      await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      await FirestoreService.getCollection('contractorEntries')
           .doc(docId)
           .set(data);
 
@@ -719,8 +717,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
                     // Contractor Name Dropdown
                     StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('contractors')
+                      stream: FirestoreService.getCollection('contractors')
                           .orderBy('contractorName')
                           .snapshots(),
                       builder: (context, snapshot) {

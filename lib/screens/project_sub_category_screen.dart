@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 extension StringExtension on String? {
   bool get isNullOrEmpty => this == null || this!.isEmpty;
@@ -26,8 +27,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
 
   Future<String> _getNextSubCategoryId() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
+      final snapshot = await FirestoreService.getCollection('projectSubCategories')
           .orderBy('subCategoryId', descending: true)
           .limit(1)
           .get();
@@ -138,8 +138,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                   if (newSubCategory.isEmpty) return;
 
                                   final newId = await _getNextSubCategoryId();
-                                  await FirebaseFirestore.instance
-                                      .collection('projectSubCategories')
+                                  await FirestoreService.getCollection('projectSubCategories')
                                       .doc(newId)
                                       .set({
                                     'subCategoryId': newId,
@@ -192,8 +191,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
 
   Future<bool> _isDuplicateSubCategory(String subCategoryName) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
+      final snapshot = await FirestoreService.getCollection('projectSubCategories')
           .where('projectSubCategory', isEqualTo: subCategoryName)
           .limit(1)
           .get();
@@ -241,8 +239,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
     if (confirm != true) return;
 
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
+      final snapshot = await FirestoreService.getCollection('projectSubCategories')
           .where('projectSubCategory', isEqualTo: _selectedSubCategory)
           .get();
 
@@ -358,8 +355,7 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                         children: [
                           Expanded(
                             child: StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('projectSubCategories')
+                              stream: FirestoreService.getCollection('projectSubCategories')
                                   .orderBy('subCategoryId')
                                   .snapshots(),
                               builder: (context, snapshot) {

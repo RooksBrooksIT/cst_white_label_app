@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 import 'pricing_screen.dart';
 
 class BrandingScreen extends StatefulWidget {
@@ -64,7 +68,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
           ),
           actions: [
             TextButton(
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white70)),
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(color: Colors.white70),
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
@@ -157,52 +164,21 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFF017FDF);
+    final accent = Theme.of(context).primaryColor;
 
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF001D3D), Color(0xFF003768), Color(0xFF005A9E)],
-            stops: [0.0, 0.5, 1.0],
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
+      body: Column(
+        children: [
+          // Step Indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 4,
+            ),
+            child: _buildStepIndicator(),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top bar
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-
-              // Step Indicator
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 40,
-                  vertical: 4,
-                ),
-                child: _buildStepIndicator(),
-              ),
-              const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
               // Scrollable content
               Expanded(
@@ -235,42 +211,13 @@ class _BrandingScreenState extends State<BrandingScreen> {
                         iconBgColor: accent.withOpacity(0.2),
                         iconColor: accent,
                         title: 'App Information',
-                        child: TextField(
+                        child: GlassTextField(
                           controller: _appNameController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Enter App Name',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white.withOpacity(0.07),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.15),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.15),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: accent,
-                                width: 1.5,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
+                          label: 'App Name',
+                          icon: Icons.edit_rounded,
                         ),
                       ),
+
                       const SizedBox(height: 16),
 
                       // Company Logo Card
@@ -338,24 +285,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
                             const SizedBox(height: 12),
                             SizedBox(
                               width: double.infinity,
-                              child: ElevatedButton.icon(
+                              child: GlassButton(
+                                label: 'UPLOAD LOGO',
                                 onPressed: _pickLogo,
-                                icon: const Icon(
-                                  Icons.cloud_upload_rounded,
-                                  size: 18,
-                                ),
-                                label: const Text('Upload Logo'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: accent,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
                               ),
                             ),
                           ],
@@ -376,10 +308,15 @@ class _BrandingScreenState extends State<BrandingScreen> {
                           runSpacing: 10,
                           children: _colorOptions.map((opt) {
                             final isCustom = opt['isCustom'] == true;
-                            final c = isCustom ? _customColor : opt['color'] as Color;
+                            final c = isCustom
+                                ? _customColor
+                                : opt['color'] as Color;
                             final sel = isCustom
-                                ? (!_colorOptions.any((o) =>
-                                    o['isCustom'] != true && o['color'] == _selectedColor))
+                                ? (!_colorOptions.any(
+                                    (o) =>
+                                        o['isCustom'] != true &&
+                                        o['color'] == _selectedColor,
+                                  ))
                                 : _selectedColor.value == c.value;
 
                             return GestureDetector(
@@ -467,46 +404,16 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       const SizedBox(height: 28),
 
                       // Next (Register) button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _goToNextStep,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accent,
-                            foregroundColor: Colors.white,
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                              : const Text(
-                                  'NEXT',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                        ),
+                      GlassButton(
+                        label: 'NEXT',
+                        isLoading: _isLoading,
+                        onPressed: _goToNextStep,
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -522,7 +429,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
             child: Container(
               height: 2,
               color: activeStep > i ~/ 2
-                  ? const Color(0xFF017FDF)
+                  ? Theme.of(context).primaryColor
                   : Colors.white.withOpacity(0.2),
             ),
           );
@@ -539,11 +446,11 @@ class _BrandingScreenState extends State<BrandingScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: done || active
-                    ? const Color(0xFF017FDF)
+                    ? Theme.of(context).primaryColor
                     : Colors.white.withOpacity(0.15),
                 border: Border.all(
                   color: done || active
-                      ? const Color(0xFF017FDF)
+                      ? Theme.of(context).primaryColor
                       : Colors.white.withOpacity(0.3),
                   width: 1.5,
                 ),
@@ -588,14 +495,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
     String? subtitle,
     required Widget child,
   }) {
-    return Container(
-      width: double.infinity,
+    return GlassCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

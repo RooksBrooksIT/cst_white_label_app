@@ -33,8 +33,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   Future<void> _fetchDesignations() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('supervisorDesignation')
+      final snapshot = await FirestoreService
+          .getCollection('supervisorDesignation')
           .get();
       final designations = snapshot.docs
           .map((doc) => doc['Designation'] as String)
@@ -61,8 +61,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   // Function to check if username already exists
   Future<bool> _isUsernameUnique(String username) async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('supervisor')
+      final querySnapshot = await FirestoreService
+          .getCollection('supervisor')
           .where('UserName', isEqualTo: username.trim())
           .get();
 
@@ -75,8 +75,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   // Function to check if contact number already exists
   Future<bool> _isContactNoUnique(String contactNo) async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('supervisor')
+      final querySnapshot = await FirestoreService
+          .getCollection('supervisor')
           .where('ContactNo', isEqualTo: contactNo.trim())
           .get();
 
@@ -270,8 +270,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           );
 
           // Update the Password field in Firestore
-          await FirebaseFirestore.instance
-              .collection('supervisor')
+          await FirestoreService
+              .getCollection('supervisor')
               .doc(documentId)
               .update({'Password': newPassword});
 
@@ -315,8 +315,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   // Function to create supervisor account
   Future<void> _createSupervisorAccount() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('supervisor')
+      final snapshot = await FirestoreService
+          .getCollection('supervisor')
           .get();
       int maxNumber = 0;
       for (var doc in snapshot.docs) {
@@ -347,8 +347,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         'CreatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance
-          .collection('supervisor')
+      await FirestoreService
+          .getCollection('supervisor')
           .doc(documentId)
           .set(supervisorData);
 
@@ -972,8 +972,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: FutureBuilder<QuerySnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('supervisor')
+                  future: FirestoreService
+                      .getCollection('supervisor')
                       .get(),
                   builder: (context, snapshot) {
                     final count = snapshot.data?.docs.length ?? 0;

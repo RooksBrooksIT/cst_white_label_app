@@ -43,8 +43,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   void fetchSiteList() async {
     try {
-      QuerySnapshot siteSnapshot = await FirebaseFirestore.instance
-          .collection('Site')
+      QuerySnapshot siteSnapshot = await FirestoreService
+          .getCollection('Site')
           .get();
       if (!mounted) return;
       setState(() {
@@ -61,8 +61,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   void fetchSupervisorList() async {
     try {
-      QuerySnapshot supervisorSnapshot = await FirebaseFirestore.instance
-          .collection('supervisor')
+      QuerySnapshot supervisorSnapshot = await FirestoreService
+          .getCollection('supervisor')
           .get();
       if (!mounted) return;
       setState(() {
@@ -84,8 +84,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   void fetchProjectStageList() async {
     try {
-      QuerySnapshot projectStageSnapshot = await FirebaseFirestore.instance
-          .collection('projectStages')
+      QuerySnapshot projectStageSnapshot = await FirestoreService
+          .getCollection('projectStages')
           .get();
       if (!mounted) return;
       setState(() {
@@ -105,8 +105,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   void fetchSiteData(String siteId) async {
     try {
-      DocumentSnapshot siteSnapshot = await FirebaseFirestore.instance
-          .collection('Site')
+      DocumentSnapshot siteSnapshot = await FirestoreService
+          .getCollection('Site')
           .doc(siteId)
           .get();
       if (!mounted) return;
@@ -132,8 +132,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         });
 
         try {
-          final projQuery = await FirebaseFirestore.instance
-              .collection('projects')
+          final projQuery = await FirestoreService
+              .getCollection('projects')
               .where('siteId', isEqualTo: siteId)
               .limit(1)
               .get();
@@ -198,8 +198,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   }
 
   Future<String?> findDocIdBySiteId(String siteId) async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final querySnapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .get();
     for (var doc in querySnapshot.docs) {
       if (doc.id.startsWith(siteId)) {
@@ -252,8 +252,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         "supervisor": selectedSupervisor,
         "Supervisor ID": selectedSupervisorId,
       };
-      DocumentReference docRef = FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      DocumentReference docRef = FirestoreService
+          .getCollection('siteSupervisorMap')
           .doc(docId);
       DocumentSnapshot docSnapshot = await docRef.get();
       if (!mounted) return;

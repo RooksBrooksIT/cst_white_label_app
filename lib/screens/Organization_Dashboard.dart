@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/incentive_calculation.dart';
-import 'package:demo_cst/screens/insights_dashboard.dart';
-import 'package:demo_cst/screens/manager_expenses.dart';
-import 'package:demo_cst/screens/manager_material_approval_screen.dart';
-import 'package:demo_cst/screens/material_report.dart';
-import 'package:demo_cst/screens/org_site_supervisor_dailyWeek_report.dart';
-import 'package:demo_cst/screens/organization_expenses.dart';
-import 'package:demo_cst/screens/organization_site_entry.dart';
-import 'package:demo_cst/screens/site_weekly_financial_report.dart';
-import 'package:demo_cst/screens/tools_inventory_report.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import 'organisation_loginPage.dart';
 import 'config_account_dashboard.dart';
 import 'org_site_payment_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
+import 'incentive_calculation.dart';
+import 'insights_dashboard.dart';
+import 'manager_expenses.dart';
+import 'manager_material_approval_screen.dart';
+import 'material_report.dart';
+import 'org_site_supervisor_dailyWeek_report.dart';
+import 'organization_expenses.dart';
+import 'organization_site_entry.dart';
+import 'site_weekly_financial_report.dart';
+import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
-import '../utils/responsive.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import 'org_menu_screen.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -26,7 +27,6 @@ class OrganizationDashboard extends StatefulWidget {
 }
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
-  String _referralCode = 'Loading...';
   String _orgName = 'Organization User';
 
   @override
@@ -38,71 +38,32 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Future<void> _fetchOrgData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? docPath = prefs.getString('org_doc_path');
       final String? name = prefs.getString('org_name');
 
       if (name != null) setState(() => _orgName = name);
-
-      if (docPath != null) {
-        final doc = await FirebaseFirestore.instance.doc(docPath).get();
-        if (doc.exists) {
-          setState(() {
-            _referralCode = doc.data()?['referralCode'] ?? 'Not Set';
-          });
-        }
-      }
     } catch (e) {
       debugPrint('Error fetching org data: $e');
-      setState(() => _referralCode = 'Error');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: _buildAppBar(context),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF003768), Color(0xFF003768)],
-            stops: [0.0, 0.6],
+    return GlassScaffold(
+      onBack: () => _showLogoutConfirmation(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const OrgMenuScreen()),
           ),
         ),
-        child: _buildBody(context),
-      ),
+      ],
+      body: _buildBody(context),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      title: Text(
-        "Organization Dashboard",
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-          color: Colors.white,
-          fontSize: Responsive.fontSize(context, 20),
-        ),
-      ),
-      centerTitle: true,
-      elevation: 0,
-      backgroundColor: const Color(0xFF003768),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => _showLogoutConfirmation(context),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout, color: Colors.white),
-          onPressed: () => _showLogoutConfirmation(context),
-        ),
-        SizedBox(width: Responsive.scaleH(context, 8)),
-      ],
-    );
-  }
+  // _buildAppBar removed - GlassScaffold handles header
 
   void _showLogoutConfirmation(BuildContext context) async {
     final result = await showDialog<bool>(
@@ -151,73 +112,21 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     }
   }
 
-
   Widget _buildWelcomeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           "Welcome back,",
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 18),
-            color: Colors.white.withOpacity(0.9),
-          ),
+          style: TextStyle(fontSize: 18, color: Colors.white70),
         ),
-        SizedBox(height: Responsive.scaleV(context, 4)),
+        const SizedBox(height: 4),
         Text(
           _orgName,
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 28),
+          style: const TextStyle(
+            fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Colors.white,
-          ),
-        ),
-        SizedBox(height: Responsive.scaleV(context, 12)),
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.scaleH(context, 16),
-            vertical: Responsive.scaleV(context, 8),
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Referral Code: ',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontSize: Responsive.fontSize(context, 14),
-                ),
-              ),
-              Text(
-                _referralCode,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 18),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              SizedBox(width: Responsive.scaleH(context, 8)),
-              IconButton(
-                icon: Icon(
-                  Icons.copy,
-                  size: Responsive.scaleH(context, 20),
-                  color: Colors.white70,
-                ),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: _referralCode));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Referral code copied to clipboard')),
-                  );
-                },
-              ),
-            ],
           ),
         ),
       ],
@@ -226,16 +135,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildBody(BuildContext context) {
     return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWelcomeSection(),
-            SizedBox(height: Responsive.scaleV(context, 24)),
-            _buildDashboardSections(context),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeSection(),
+          const SizedBox(height: 32),
+          _buildDashboardSections(context),
+        ],
       ),
     );
   }
@@ -371,14 +278,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: EdgeInsets.only(
-        top: Responsive.scaleV(context, 24),
-        bottom: Responsive.scaleV(context, 12),
-      ),
+      padding: const EdgeInsets.only(top: 32, bottom: 16),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: Responsive.fontSize(context, 20),
+        style: const TextStyle(
+          fontSize: 22,
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
@@ -393,45 +297,37 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required Color iconColor,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: EdgeInsets.only(bottom: Responsive.scaleV(context, 12)),
-      color: Colors.white.withOpacity(0.95),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
         onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
+        child: GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(Responsive.scaleH(context, 10)),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: iconColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: Responsive.scaleH(context, 28),
-                ),
+                child: Icon(icon, color: iconColor, size: 24),
               ),
-              SizedBox(width: Responsive.scaleH(context, 16)),
+              const SizedBox(width: 20),
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 16),
+                  style: const TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
+                    color: Colors.white,
                   ),
                 ),
               ),
               Icon(
                 Icons.chevron_right,
-                color: iconColor,
-                size: Responsive.scaleH(context, 24),
+                color: Colors.white.withOpacity(0.3),
+                size: 24,
               ),
             ],
           ),
@@ -453,8 +349,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
     );
   }
-
-
 
   void _navigateToInsights(BuildContext context) {
     Navigator.push(

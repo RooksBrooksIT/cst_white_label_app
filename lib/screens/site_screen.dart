@@ -52,8 +52,8 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectCategories() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectCategories')
+      final snapshot = await FirestoreService
+          .getCollection('projectCategories')
           .get();
       final categories = snapshot.docs
           .map((doc) => doc['projectCategory']?.toString().trim())
@@ -68,8 +68,8 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectStatus() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStatus')
+      final snapshot = await FirestoreService
+          .getCollection('projectStatus')
           .get();
       final statusList = snapshot.docs
           .map((doc) => doc['projectState']?.toString().trim())
@@ -743,8 +743,8 @@ class _SiteScreenState extends State<SiteScreen>
 
     try {
       // Deduplication: check if a Site with same siteName and location already exists
-      final dupQuery = await FirebaseFirestore.instance
-          .collection('Site')
+      final dupQuery = await FirestoreService
+          .getCollection('Site')
           .where('siteName', isEqualTo: siteName)
           .where('location', isEqualTo: location)
           .limit(1)
@@ -780,14 +780,14 @@ class _SiteScreenState extends State<SiteScreen>
       };
 
       final siteDocId = '${nextId}_${siteName.replaceAll(' ', '')}';
-      await FirebaseFirestore.instance
-          .collection('Site')
+      await FirestoreService
+          .getCollection('Site')
           .doc(siteDocId)
           .set(siteData);
 
       // Create project with dedupe on name+siteId combination as well
-      final projectsSnapshot = await FirebaseFirestore.instance
-          .collection('projects')
+      final projectsSnapshot = await FirestoreService
+          .getCollection('projects')
           .get();
       int maxPRNum = 0;
       for (final doc in projectsSnapshot.docs) {
@@ -819,8 +819,8 @@ class _SiteScreenState extends State<SiteScreen>
         'siteLocation': location,
       };
 
-      await FirebaseFirestore.instance
-          .collection('projects')
+      await FirestoreService
+          .getCollection('projects')
           .doc(nextPrDocId)
           .set(projectData);
 

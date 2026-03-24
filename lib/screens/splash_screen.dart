@@ -90,14 +90,21 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.primaryColor;
+    
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF001D3D), Color(0xFF003768), Color(0xFF005A9E)],
-            stops: [0.0, 0.5, 1.0],
+            colors: [
+              Color.lerp(primary, Colors.black, 0.6)!,
+              primary,
+              Color.lerp(primary, Colors.white, 0.2)!
+            ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
@@ -158,9 +165,7 @@ class _SplashScreenState extends State<SplashScreen>
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color:
-                                              const Color(0xFF017FDF)
-                                                  .withOpacity(0.5),
+                                          color: primary.withOpacity(0.5),
                                           blurRadius: 30,
                                           spreadRadius: 8,
                                         ),

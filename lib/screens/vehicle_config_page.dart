@@ -12,7 +12,7 @@ class AddVehicleLogPage extends StatefulWidget {
 
 class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   final _formKey = GlobalKey<FormState>();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed _firestore field
 
   final TextEditingController _vehicleIdController = TextEditingController();
   final TextEditingController _driverNameController = TextEditingController();
@@ -76,8 +76,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadDrivers() async {
     try {
-      final snapshot = await _firestore
-          .collection('drivers')
+      final snapshot = await FirestoreService
+          .getCollection('drivers')
           .where('status', isEqualTo: 'Active')
           .get();
 
@@ -191,8 +191,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<String> _getNextMovementId() async {
     try {
-      final snapshot = await _firestore
-          .collection('vehicleMovements')
+      final snapshot = await FirestoreService
+          .getCollection('vehicleMovements')
           .orderBy('movementId', descending: true)
           .limit(1)
           .get();
@@ -335,8 +335,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       };
 
       // Save to Firestore
-      await _firestore
-          .collection('vehicleMovements')
+      await FirestoreService
+          .getCollection('vehicleMovements')
           .doc(docId)
           .set(movementData);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 
 class ProjectStageExpensesReportPage extends StatefulWidget {
@@ -138,8 +139,7 @@ class _ProjectStageExpensesReportPageState
     required String dateField,
     required String amountField,
   }) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection(collection)
+    final snapshot = await FirestoreService.getCollection(collection)
         .where("siteId", isEqualTo: widget.siteId)
         .where("projectStage", isEqualTo: widget.projectStage)
         .get();

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 // Custom input formatter for number plate
 class NumberPlateFormatter extends TextInputFormatter {
@@ -92,9 +93,8 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
   final _modelNameController = TextEditingController();
   final _numberPlateController = TextEditingController();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final CollectionReference _vehiclesCollection = FirebaseFirestore.instance
-      .collection('vehicleDetails');
+  final CollectionReference _vehiclesCollection = FirestoreService
+      .getCollection('vehicleDetails');
 
   String _generatedId = '';
   Vehicle? _submittedVehicle;

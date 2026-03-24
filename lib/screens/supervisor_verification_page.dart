@@ -62,15 +62,15 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
 
   Future<void> _fetchAssignedSites() async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final query = await FirestoreService
+          .getCollection('siteSupervisorMap')
           .where('supervisor', isEqualTo: widget.supervisorName)
           .get();
       List<Map<String, dynamic>> sites = [];
       for (var doc in query.docs) {
         final siteId = doc['site'];
-        final siteDoc = await FirebaseFirestore.instance
-            .collection('Site')
+        final siteDoc = await FirestoreService
+            .getCollection('Site')
             .doc(siteId)
             .get();
         if (siteDoc.exists) {

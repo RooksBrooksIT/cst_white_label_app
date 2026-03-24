@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 import 'branding_screen.dart';
 
 class OrganisationRegistrationPage extends StatefulWidget {
@@ -87,83 +91,42 @@ class _OrganisationRegistrationPageState
       SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
     );
   }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF001D3D), Color(0xFF003768), Color(0xFF005A9E)],
-            stops: [0.0, 0.5, 1.0],
+    final primaryColor = Theme.of(context).primaryColor;
+    return GlassScaffold(
+      onBack: _goBack,
+      title: 'Register Organization',
+      body: Column(
+        children: [
+          // Step Indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 32,
+              vertical: 8,
+            ),
+            child: _buildStepIndicator(primaryColor),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+          // Page Content
+          Expanded(
+            child: FadeTransition(
+              opacity: _opacityAnimation,
+              child: AnimatedBuilder(
+                animation: _translateAnimation,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, _translateAnimation.value),
+                  child: child,
                 ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: _goBack,
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      'Register Organization',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+                child: _buildStep1(primaryColor),
               ),
-              // Step Indicator
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 8,
-                ),
-                child: _buildStepIndicator(),
-              ),
-              // Page Content
-              Expanded(
-                child: FadeTransition(
-                  opacity: _opacityAnimation,
-                  child: AnimatedBuilder(
-                    animation: _translateAnimation,
-                    builder: (context, child) => Transform.translate(
-                      offset: Offset(0, _translateAnimation.value),
-                      child: child,
-                    ),
-                    child: _buildStep1(),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildStepIndicator() {
+  Widget _buildStepIndicator(Color primaryColor) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0; // Always on step 1 here
     
@@ -189,11 +152,11 @@ class _OrganisationRegistrationPageState
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isDone || isActive
-                    ? const Color(0xFF017FDF)
+                    ? primaryColor
                     : Colors.white.withOpacity(0.15),
                 border: Border.all(
                   color: isDone || isActive
-                      ? const Color(0xFF017FDF)
+                      ? primaryColor
                       : Colors.white.withOpacity(0.3),
                   width: 1.5,
                 ),
@@ -230,7 +193,7 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildStep1() {
+  Widget _buildStep1(Color primaryColor) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
       child: Column(
@@ -247,7 +210,7 @@ class _OrganisationRegistrationPageState
               ),
               boxShadow: [
                  BoxShadow(
-                  color: const Color(0xFF017FDF).withOpacity(0.3),
+                  color: primaryColor.withOpacity(0.3),
                   blurRadius: 20,
                   spreadRadius: 3,
                 ),
@@ -278,25 +241,20 @@ class _OrganisationRegistrationPageState
             ),
           ),
           const SizedBox(height: 24),
-          Container(
+          GlassCard(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
-            ),
             child: Form(
               key: _formKey,
               child: Column(
                 children: [
-                  _buildField(
+                  GlassTextField(
                     controller: _orgNameController,
                     label: 'Organization Name',
                     icon: Icons.apartment_rounded,
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-                  _buildField(
+                  GlassTextField(
                     controller: _emailController,
                     label: 'Corporate Email',
                     icon: Icons.email_rounded,
@@ -304,7 +262,7 @@ class _OrganisationRegistrationPageState
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-                  _buildField(
+                  GlassTextField(
                     controller: _phoneController,
                     label: 'Phone Number',
                     icon: Icons.phone_rounded,
@@ -312,14 +270,14 @@ class _OrganisationRegistrationPageState
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-                  _buildField(
+                  GlassTextField(
                     controller: _usernameController,
                     label: 'Admin Username',
                     icon: Icons.person_rounded,
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-                  _buildField(
+                  GlassTextField(
                     controller: _passwordController,
                     label: 'Secure Password',
                     icon: Icons.lock_rounded,
@@ -330,7 +288,7 @@ class _OrganisationRegistrationPageState
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-                  _buildField(
+                  GlassTextField(
                     controller: _confirmPasswordController,
                     label: 'Confirm Password',
                     icon: Icons.lock_outline_rounded,
@@ -343,10 +301,11 @@ class _OrganisationRegistrationPageState
             ),
           ),
           const SizedBox(height: 20),
-          _buildPrimaryButton(label: 'NEXT', onPressed: _goToNextStep),
+          GlassButton(label: 'NEXT', onPressed: _goToNextStep),
           const SizedBox(height: 12),
-          _buildSecondaryButton(
+          GlassButton(
             label: 'CANCEL',
+            isSecondary: true,
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -354,126 +313,5 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildPrimaryButton({
-    required String label,
-    VoidCallback? onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF017FDF),
-          foregroundColor: Colors.white,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildSecondaryButton({
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    bool isPassword = false,
-    bool showPassword = false,
-    VoidCallback? onTogglePassword,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: isPassword && !showPassword,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.65),
-          fontSize: 14,
-        ),
-        prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.65), size: 20),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  showPassword
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded,
-                  color: Colors.white.withOpacity(0.65),
-                  size: 20,
-                ),
-                onPressed: onTogglePassword,
-              )
-            : null,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.07),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF017FDF), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-        ),
-        errorStyle: const TextStyle(color: Colors.redAccent),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      validator: validator,
-    );
-  }
 }

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -53,8 +54,7 @@ class _ProjectStageDailySiteExpensesReportPageState
       _siteNameLoading = true;
     });
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('Site')
+      final doc = await FirestoreService.getCollection('Site')
           .doc(widget.siteId)
           .get();
       if (doc.exists) {
@@ -91,24 +91,20 @@ class _ProjectStageDailySiteExpensesReportPageState
   }
 
   Future<Map<String, dynamic>> _fetchAllReports() async {
-    final supervisorDoc = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
+    final supervisorDoc = await FirestoreService.getCollection('siteSupervisorEntries')
         .doc(_documentId)
         .get();
-    final managerQuery = await FirebaseFirestore.instance
-        .collection('managerEntries')
+    final managerQuery = await FirestoreService.getCollection('managerEntries')
         .where('siteId', isEqualTo: widget.siteId)
         .get();
     final allManagerDocs = managerQuery.docs;
-    final orgQuery = await FirebaseFirestore.instance
-        .collection('organizationEntries')
+    final orgQuery = await FirestoreService.getCollection('organizationEntries')
         .where('siteId', isEqualTo: widget.siteId)
         .get();
     final allOrgDocs = orgQuery.docs;
 
     // Fetch contract expenses filtered by siteId, date, and projectStage
-    final contractQuery = await FirebaseFirestore.instance
-        .collection('contractorEntries')
+    final contractQuery = await FirestoreService.getCollection('contractorEntries')
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .get();

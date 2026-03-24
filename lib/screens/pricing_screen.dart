@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 import 'Organization_Dashboard.dart';
 
 class PricingScreen extends StatefulWidget {
@@ -43,15 +46,17 @@ class _PricingScreenState extends State<PricingScreen> {
       final String referralCode =
           await FirestoreService.generateUniqueReferralCode();
 
-      final String rootCollection =
+      final String orgId =
           '${widget.orgName.replaceAll(' ', '_')}_${widget.dateStr}';
-      final String dynamicPath = '$rootCollection/data/admin/User';
+      
+      // New structured path for organization details
+      final String orgConfigPath = 'organisations/$orgId/dynamic_data/data';
 
       // Upload logo
       String? logoUrl;
       if (widget.logoFile != null) {
         final ref = FirebaseStorage.instance.ref().child(
-          'org_logos/$rootCollection.jpg',
+          'org_logos/$orgId.jpg',
         );
         await ref.putFile(widget.logoFile!);
         logoUrl = await ref.getDownloadURL();
@@ -63,7 +68,7 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        transaction.set(FirebaseFirestore.instance.doc(dynamicPath), {
+        transaction.set(FirebaseFirestore.instance.doc(orgConfigPath), {
           'orgName': widget.orgName,
           'appName': widget.appName,
           'email': widget.email,
@@ -87,9 +92,10 @@ class _PricingScreenState extends State<PricingScreen> {
               .doc(widget.username),
           {
             'orgName': widget.orgName,
-            'dynamicPath': dynamicPath,
+            'dynamicPath': orgId, // Store only the ID for FirestoreService
             'username': widget.username,
             'password': widget.password,
+            'fullConfigPath': orgConfigPath,
           },
         );
 
@@ -99,8 +105,9 @@ class _PricingScreenState extends State<PricingScreen> {
               .doc(referralCode),
           {
             'orgName': widget.orgName,
-            'dynamicPath': dynamicPath,
+            'dynamicPath': orgId, // Store only the ID for FirestoreService
             'createdAt': FieldValue.serverTimestamp(),
+            'fullConfigPath': orgConfigPath,
           },
         );
       });
@@ -109,9 +116,9 @@ class _PricingScreenState extends State<PricingScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('org_isLoggedIn', true);
       await prefs.setString('org_username', widget.username);
-      await prefs.setString('org_dynamic_path', dynamicPath);
+      await prefs.setString('org_dynamic_path', orgId);
       await prefs.setString('org_name', widget.orgName);
-      await prefs.setString('org_doc_path', dynamicPath);
+      await prefs.setString('org_doc_path', orgConfigPath);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -145,50 +152,19 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF001D3D), Color(0xFF003768), Color(0xFF005A9E)],
-            stops: [0.0, 0.5, 1.0],
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
+      body: Column(
+        children: [
+          // Step Indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 4,
+            ),
+            child: _buildStepIndicator(),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top bar
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-
-              // Step Indicator
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 40,
-                  vertical: 4,
-                ),
-                child: _buildStepIndicator(),
-              ),
-              const SizedBox(height: 24),
+          const SizedBox(height: 24),
 
               Expanded(
                 child: SingleChildScrollView(
@@ -215,24 +191,8 @@ class _PricingScreenState extends State<PricingScreen> {
                       const SizedBox(height: 40),
 
                       // Transparent Subscription Card
-                      Container(
-                        width: double.infinity,
+                      GlassCard(
                         padding: const EdgeInsets.all(28),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: const Color(0xFF00A86B).withOpacity(0.5),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00A86B).withOpacity(0.1),
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
                         child: Column(
                           children: [
                             Container(
@@ -284,50 +244,20 @@ class _PricingScreenState extends State<PricingScreen> {
                             const SizedBox(height: 32),
                             
                             // Register Final Actions
-                            SizedBox(
-                              width: double.infinity,
-                              height: 54,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _register,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00A86B),
-                                  foregroundColor: Colors.white,
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.5,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'START FREE TRIAL',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                              ),
+                            GlassButton(
+                              label: 'START FREE TRIAL',
+                              isLoading: _isLoading,
+                              onPressed: _register,
                             ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 30),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
+              ],
+            ),
     );
   }
 
@@ -360,7 +290,7 @@ class _PricingScreenState extends State<PricingScreen> {
             child: Container(
               height: 2,
               color: activeStep > i ~/ 2
-                  ? const Color(0xFF017FDF)
+                  ? Theme.of(context).primaryColor
                   : Colors.white.withOpacity(0.2),
             ),
           );
@@ -377,11 +307,11 @@ class _PricingScreenState extends State<PricingScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: done || active
-                    ? const Color(0xFF017FDF)
+                    ? Theme.of(context).primaryColor
                     : Colors.white.withOpacity(0.15),
                 border: Border.all(
                   color: done || active
-                      ? const Color(0xFF017FDF)
+                      ? Theme.of(context).primaryColor
                       : Colors.white.withOpacity(0.3),
                   width: 1.5,
                 ),

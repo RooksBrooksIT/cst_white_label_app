@@ -172,8 +172,7 @@ class _ProjectstageInsightsDashboardState
       Set<String> stageSet = {};
 
       final futures = collections.map((collection) async {
-        final snapshot = await FirebaseFirestore.instance
-            .collection(collection)
+        final snapshot = await FirestoreService.getCollection(collection)
             .where('siteId', isEqualTo: siteId)
             .get();
         for (var doc in snapshot.docs) {
@@ -206,8 +205,7 @@ class _ProjectstageInsightsDashboardState
   }
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
+    final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries')
         .get();
     final entries = querySnapshot.docs
         .map((doc) => SupervisorEntry.fromFirestore(doc))

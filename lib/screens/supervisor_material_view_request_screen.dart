@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -36,8 +37,8 @@ class _SupervisorMaterialViewRequestScreenState
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _queryStream() {
-    final col = FirebaseFirestore.instance
-        .collection('siteMaterialsRequest')
+    final col = FirestoreService
+        .getCollection('siteMaterialsRequest')
         .withConverter<Map<String, dynamic>>(
           fromFirestore: (snap, _) => snap.data() ?? <String, dynamic>{},
           toFirestore: (data, _) => data,

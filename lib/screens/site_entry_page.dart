@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 // ignore: depend_on_referenced_packages
 import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/services/expense_service.dart';
@@ -87,8 +87,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       projectPhaseError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStages')
+      final snapshot = await FirestoreService.getCollection('projectStages')
           .get();
       final phases = <String>[];
       for (var doc in snapshot.docs) {
@@ -117,8 +116,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
   Future<void> _fetchSupervisorData() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
           .where('supervisor', isEqualTo: widget.userName)
           .get();
       if (snapshot.docs.isNotEmpty) {
@@ -185,8 +183,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       materialError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('materials')
+      final snapshot = await FirestoreService.getCollection('materials')
           .get();
       final options = <String>[];
       final prices = <String, num>{};
@@ -230,8 +227,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       labourError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('labours')
+      final snapshot = await FirestoreService.getCollection('labours')
           .get();
       final options = <String>[];
       final salaries = <String, num>{};
@@ -411,8 +407,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     };
     try {
       // Check for existing entry for this site and date
-      final existing = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final existing = await FirestoreService.getCollection('siteSupervisorEntries')
           .doc(docId)
           .get();
       if (existing.exists) {
@@ -436,14 +431,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         });
         return;
       }
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      await FirestoreService.getCollection('siteSupervisorEntries')
           .doc(docId)
           .set(data);
       // Update total site expense aggregation
       await ExpenseService.updateTotalSiteExpense(siteCode);
       // --- Update siteSupervisorProjectStageActual collection ---
-      final actualColl = FirebaseFirestore.instance.collection(
+      final actualColl = FirestoreService.getCollection(
         'siteSupervisorProjectStageActual',
       );
       final actualDocId =
