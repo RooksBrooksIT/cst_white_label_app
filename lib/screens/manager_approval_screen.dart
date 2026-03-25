@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 // Responsive padding helper (matches material approval)
 EdgeInsets getSymmetricPadding(BuildContext context, {double fraction = 0.06}) {
@@ -760,103 +762,69 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       );
     }
     return ListView.builder(
-      padding: EdgeInsets.only(bottom: 28, top: 8),
+      padding: const EdgeInsets.all(16),
       itemCount: filteredRequests.length,
       itemBuilder: (context, index) {
         final request = filteredRequests[index];
-        return GestureDetector(
-          onTap: () => isApprovedTab
-              ? _showApprovedRequestDetails(request)
-              : _showRequestDetails(request),
-          child: Card(
-            margin: getSymmetricPadding(context, fraction: 0.04)
-                .copyWith(top: 12, bottom: 10),
-            
-            elevation: 7,
-            shadowColor: Colors.black12,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            child: Padding(
-              padding: const EdgeInsets.all(18.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.assignment,
-                          color: Color(0xFF003768), size: 28),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          request['wsReqId'] ?? "",
-                          style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF003768)),
-                        ),
+        final status = request['approvalStatus'] ?? '';
+        final isApproved = status == 'Approved';
+        
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: GlassCard(
+            title: 'Req ID: ${request['wsReqId'] ?? ""}',
+            subtitle: 'Project: ${request['projectName'] ?? ""}',
+            onTap: () => isApprovedTab
+                ? _showApprovedRequestDetails(request)
+                : _showRequestDetails(request),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: Theme.of(context).colorScheme.primary, size: 16),
+                    const SizedBox(width: 4),
+                    Text(request['siteId'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isApproved ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isApproved ? Colors.green : Colors.orange, width: 0.5),
                       ),
-                      Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [
-                            isApprovedTab ? Colors.green[100]! : Colors.orange,
-                            Colors.white
-                          ]),
-                          borderRadius: BorderRadius.circular(40),
-                        ),
-                        child: Text(
-                          request['approvalStatus'] ?? '',
-                          style: TextStyle(
-                            color: isApprovedTab
-                                ? Colors.green[800]
-                                : Colors.orange,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 14),
-                  Text("Project: ${request['projectName'] ?? ''}",
-                      style: TextStyle(fontSize: 16)),
-                  Text("Site: ${request['siteId'] ?? ''}",
-                      style: TextStyle(fontSize: 16)),
-                  Text("Supervisor: ${request['supervisorName'] ?? ''}",
-                      style: TextStyle(fontSize: 16)),
-                  Text("Stage: ${request['projectStage'] ?? ''}",
-                      style: TextStyle(fontSize: 16)),
-                  SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.inventory_2,
-                          color: Color(0xFF003768), size: 22),
-                      SizedBox(width: 8),
-                      Text(
-                        "${(request['reqLabours'] ?? []).length} Labours",
+                      child: Text(
+                        status,
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15),
-                      ),
-                      Spacer(),
-                      Icon(
-                        isApprovedTab ? Icons.verified : Icons.pending_actions,
-                        size: 20,
-                        color:
-                            isApprovedTab ? Colors.green[700] : Colors.orange,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        "Status: ${request['approvalStatus']}",
-                        style: TextStyle(
-                          color: isApprovedTab ? Colors.green : Colors.orange,
-                          fontWeight: FontWeight.w600,
+                          color: isApproved ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Supervisor', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        Text(request['supervisorName'] ?? '-', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text('Labours', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        Text('${(request['reqLabours'] ?? []).length}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
@@ -866,71 +834,57 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: Text("Work Schedule Requests",
-            style: TextStyle( fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        elevation: 3,
-        backgroundColor: Color(0xFF003768),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(100),
-          child: Column(
-            children: [
-              Material(
-                
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: Color(0xFF003768),
-                  unselectedLabelColor: Colors.grey[500],
-                  indicatorColor: Color(0xFF003768),
-                  indicatorWeight: 4,
-                  tabs: [
-                    Tab(text: "Pending"),
-                    Tab(text: "Approved"),
-                  ],
-                ),
-              ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search by Request ID',
-                    prefixIcon: Icon(Icons.search, color: Color(0xFF772323)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Color(0xFF772323)),
-                    ),
-                    filled: true,
-                    
-                    contentPadding:
-                        EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchText = value.trim();
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: TabBarView(
-          controller: _tabController,
+    return GlassScaffold(
+      title: 'Work Schedule Requests',
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(100),
+        child: Column(
           children: [
-            _buildRequestList(pendingRequests, isApprovedTab: false),
-            _buildRequestList(approvedRequests, isApprovedTab: true),
+            TabBar(
+              controller: _tabController,
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Colors.white60,
+              indicatorColor: Theme.of(context).colorScheme.primary,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              tabs: const [
+                Tab(text: "Pending"),
+                Tab(text: "Approved"),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by Request ID',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchText = value.trim();
+                  });
+                },
+              ),
+            ),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildRequestList(pendingRequests, isApprovedTab: false),
+          _buildRequestList(approvedRequests, isApprovedTab: true),
+        ],
       ),
     );
   }

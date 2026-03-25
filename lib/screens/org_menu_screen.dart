@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 import '../utils/app_theme.dart';
 import 'organisation_loginPage.dart';
 
@@ -32,7 +33,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? name = prefs.getString('org_name');
-      if (name != null) setState(() => _orgName = name);
+      if (name != null && mounted) setState(() => _orgName = name);
 
       // Fetch dynamic organization and subscription data
       final String? dynamicPath = prefs.getString('org_dynamic_path');
@@ -46,7 +47,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             .get();
 
 
-        if (subDoc.exists) {
+        if (subDoc.exists && mounted) {
           final subData = subDoc.data()!;
           setState(() {
             // Handle potentially different field names for referral code
@@ -71,38 +72,41 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       }
     } catch (e) {
       debugPrint('Error fetching org data: $e');
-      setState(() {
-        _referralCode = 'Error';
-        _subscriptionPlan = 'Error';
-      });
+      if (mounted) {
+        setState(() {
+          _referralCode = 'Error';
+          _subscriptionPlan = 'Error';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GlassScaffold(
       title: 'Menu',
       onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
         child: Column(
           children: [
-            _buildProfileSection(),
+            _buildProfileSection(colorScheme),
             const SizedBox(height: 32),
-            _buildReferralSection(),
+            _buildReferralSection(colorScheme),
             const SizedBox(height: 16),
-            _buildSettingsSection(),
+            _buildSettingsSection(colorScheme),
             const SizedBox(height: 16),
-            _buildSubscriptionSection(),
+            _buildSubscriptionSection(colorScheme),
             const SizedBox(height: 32),
-            _buildLogoutSection(),
+            _buildLogoutSection(colorScheme),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileSection() {
+  Widget _buildProfileSection(ColorScheme colorScheme) {
     return Column(
       children: [
         Container(
@@ -110,17 +114,21 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           height: 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.2),
-            border: Border.all(color: Colors.white30, width: 2),
+            color: colorScheme.primary.withValues(alpha: 0.2),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.3),
+              width: 2,
+            ),
           ),
-          child: const Icon(Icons.business, color: Colors.white, size: 40),
+          child: Icon(Icons.business, color: colorScheme.primary, size: 40),
         ),
         const SizedBox(height: 16),
         Text(
           _orgName,
-          style: const TextStyle(
+          textAlign: TextAlign.center,
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
+            fontSize: Responsive.fontSize(context, 24),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -128,7 +136,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
   }
 
-  Widget _buildReferralSection() {
+  Widget _buildReferralSection(ColorScheme colorScheme) {
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -136,13 +144,13 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.share_rounded, color: Colors.blue[300], size: 24),
+              Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Referral Program',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -157,18 +165,18 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   _referralCode,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: Responsive.fontSize(context, 20),
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
@@ -190,7 +198,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
   }
 
-  Widget _buildSettingsSection() {
+  Widget _buildSettingsSection(ColorScheme colorScheme) {
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -200,15 +208,15 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             children: [
               Icon(
                 Icons.settings_suggest_rounded,
-                color: Colors.purple[300],
+                color: colorScheme.secondary,
                 size: 24,
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Settings',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -253,7 +261,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
   }
 
-  Widget _buildSubscriptionSection() {
+  Widget _buildSubscriptionSection(ColorScheme colorScheme) {
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -261,13 +269,13 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.stars_rounded, color: Colors.amber[400], size: 24),
+              Icon(Icons.stars_rounded, color: colorScheme.tertiary, size: 24),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Subscription',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -297,7 +305,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
   }
 
-  Widget _buildLogoutSection() {
+  Widget _buildLogoutSection(ColorScheme colorScheme) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(

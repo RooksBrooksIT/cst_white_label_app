@@ -8,6 +8,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -136,7 +137,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 32,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -154,20 +157,22 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Organization Login',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Colors.white, // Standard for dark glass backgrounds
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter your credentials to continue',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: Responsive.fontSize(context, 16),
+                  color: Colors.white.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 40),

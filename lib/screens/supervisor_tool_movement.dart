@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
-import '../utils/app_theme.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 
 class SiteToCompanyReturn extends StatefulWidget {
   final String supervisorId;
@@ -19,9 +22,6 @@ class SiteToCompanyReturn extends StatefulWidget {
 }
 
 class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
-  // Standardized colors based on AppTheme or role-specific palette
-  final Color _primaryColor = const Color(0xFF003768); // Premium Dark Navy
-  final Color _backgroundColor = const Color(0xFFF8F9FA);
 
   // Form controllers
   final TextEditingController _managerNameController = TextEditingController();
@@ -98,13 +98,11 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: _primaryColor,
+            colorScheme: ColorScheme.dark(
+              primary: Theme.of(context).primaryColor,
               onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(foregroundColor: _primaryColor),
+              surface: const Color(0xFF1A1A1A),
+              onSurface: Colors.white,
             ),
           ),
           child: child!,
@@ -319,249 +317,149 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Site to Company Tool Return',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 20),
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: _primaryColor,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(Responsive.scaleH(context, 20)),
-          ),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Site to Company Return',
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Responsive.scaleH(context, 15)),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Return Details',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 18),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    _buildInputField(
-                      controller: _managerNameController,
-                      label: 'Manager Name',
-                      icon: Icons.person,
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    _buildDatePicker(),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    _buildDropdownField(
-                      value: _selectedSiteId,
-                      label: 'Site ID',
-                      items: _siteIds,
-                      onChanged: (newValue) {
-                        setState(() {
-                          _selectedSiteId = newValue;
-                        });
-                        _fetchAndSetProjectName(newValue);
-                      },
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    _buildInputField(
-                      controller: _projectNameController,
-                      label: 'Project Name',
-                      icon: Icons.business,
-                      readOnly: true,
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    _buildInputField(
-                      controller: _supervisorNameController,
-                      label: 'Supervisor Name',
-                      icon: Icons.badge,
-                    ),
-                  ],
-                ),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader('Return Details'),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _managerNameController,
+                    label: 'Manager Name',
+                    icon: Icons.person,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildDatePicker(),
+                  const SizedBox(height: 16),
+                  _buildDropdownField(
+                    value: _selectedSiteId,
+                    label: 'Site ID',
+                    items: _siteIds,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedSiteId = newValue;
+                      });
+                      _fetchAndSetProjectName(newValue);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _projectNameController,
+                    label: 'Project Name',
+                    icon: Icons.business,
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _supervisorNameController,
+                    label: 'Supervisor Name',
+                    icon: Icons.badge,
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: Responsive.scaleV(context, 20)),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Responsive.scaleH(context, 15)),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tools Selection',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 18),
-                        fontWeight: FontWeight.bold,
+            const SizedBox(height: 20),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader('Tools Selection'),
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildDropdownField(
+                        value: _selectedTool,
+                        label: 'Select Tool',
+                        items: _tools.map((t) => t['name'] as String).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            _selectedTool = newValue;
+                            _toolCountController.clear();
+                            _toolCount = null;
+                          });
+                          _fetchAvailableCountForSelectedTool(newValue);
+                        },
                       ),
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildDropdownField(
-                          value: _selectedTool,
-                          label: 'Select Tool',
-                          items: _tools.map((t) => t['name'] as String).toList(),
-                          onChanged: (newValue) {
-                            setState(() {
-                              _selectedTool = newValue;
-                              _toolCountController.clear();
-                              _toolCount = null;
-                            });
-                            _fetchAvailableCountForSelectedTool(newValue);
-                          },
-                        ),
-                        SizedBox(height: Responsive.scaleV(context, 4)),
-                        _AvailableCountWithWarning(
-                          availableCount: _selectedToolAvailableCount,
-                        ),
-                        SizedBox(height: Responsive.scaleV(context, 8)),
-                        _buildInputField(
-                          controller: _toolCountController,
-                          label: 'Count',
-                          icon: Icons.onetwothree,
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) {
-                            setState(() {
-                              _toolCount = int.tryParse(value);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: Responsive.scaleV(context, 16)),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _addTool,
-                        icon: Icon(Icons.add, size: Responsive.scaleH(context, 20)),
-                        label: Text(
-                          'Add Tool',
-                          style: TextStyle(
-                            fontSize: Responsive.fontSize(context, 16),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                            vertical: Responsive.scaleV(context, 12),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-                          ),
-                        ),
+                      const SizedBox(height: 4),
+                      _AvailableCountWithWarning(
+                        availableCount: _selectedToolAvailableCount,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 12),
+                      _buildInputField(
+                        controller: _toolCountController,
+                        label: 'Count',
+                        icon: Icons.onetwothree,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            _toolCount = int.tryParse(value);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  GlassButton(
+                    label: 'Add Tool',
+                    onPressed: _addTool,
+                  ),
+                ],
               ),
             ),
             if (_addedTools.isNotEmpty) ...[
-              SizedBox(height: Responsive.scaleV(context, 20)),
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 15)),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Selected Tools',
-                        style: TextStyle(
-                          fontSize: Responsive.fontSize(context, 18),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: Responsive.scaleV(context, 16)),
-                      _buildToolsTable(),
-                    ],
-                  ),
+              const SizedBox(height: 20),
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('Selected Tools'),
+                    const SizedBox(height: 16),
+                    _buildToolsTable(),
+                  ],
                 ),
               ),
             ],
-            SizedBox(height: Responsive.scaleV(context, 24)),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: GlassButton(
+                    label: 'Cancel',
+                    isSecondary: true,
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, size: Responsive.scaleH(context, 20)),
-                    label: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 16),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      foregroundColor: Colors.black87,
-                      padding: EdgeInsets.symmetric(
-                        vertical: Responsive.scaleV(context, 15),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-                        side: BorderSide(color: Colors.grey.shade300),
-                      ),
-                    ),
                   ),
                 ),
-                SizedBox(width: Responsive.scaleH(context, 16)),
+                const SizedBox(width: 16),
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: GlassButton(
+                    label: 'Save Return',
                     onPressed: _saveReturn,
-                    icon: Icon(Icons.check, size: Responsive.scaleH(context, 20)),
-                    label: Text(
-                      'Save Return',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 16),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        vertical: Responsive.scaleV(context, 15),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-                      ),
-                    ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: Responsive.scaleV(context, 24)),
+            const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
       ),
     );
   }
@@ -572,38 +470,15 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     bool readOnly = false,
-    VoidCallback? onTap,
     Function(String)? onChanged,
   }) {
-    return TextField(
+    return GlassTextField(
       controller: controller,
+      label: label,
+      icon: icon,
       keyboardType: keyboardType,
       readOnly: readOnly,
-      onTap: onTap,
       onChanged: onChanged,
-      style: TextStyle(fontSize: Responsive.fontSize(context, 16)),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: _primaryColor, size: Responsive.scaleH(context, 20)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: _primaryColor, width: 2),
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: Responsive.scaleH(context, 16),
-          vertical: Responsive.scaleV(context, 12),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-      ),
     );
   }
 
@@ -616,75 +491,49 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     return DropdownButtonFormField<String>(
       value: value,
       onChanged: onChanged,
-      style: TextStyle(
-        fontSize: Responsive.fontSize(context, 16),
-        color: Colors.black,
-      ),
+      isExpanded: true,
+      dropdownColor: Colors.blueGrey[900],
+      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          borderSide: BorderSide(color: _primaryColor, width: 2),
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: Responsive.scaleH(context, 16),
-          vertical: Responsive.scaleV(context, 12),
-        ),
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+        prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, color: Theme.of(context).primaryColor),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Colors.white.withOpacity(0.05),
       ),
       items: items.map((String item) {
         return DropdownMenuItem<String>(
           value: item,
           child: Text(
             item,
-            style: TextStyle(fontSize: Responsive.fontSize(context, 16)),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white),
           ),
         );
       }).toList(),
-      borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-      icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
     );
   }
 
   Widget _buildDatePicker() {
     return InkWell(
       onTap: () => _selectDate(context),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Date',
-          prefixIcon: Icon(Icons.calendar_today, color: _primaryColor, size: Responsive.scaleH(context, 20)),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: Responsive.scaleH(context, 16),
-            vertical: Responsive.scaleV(context, 12),
-          ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Icon(Icons.calendar_today, color: Theme.of(context).primaryColor, size: 20),
+            const SizedBox(width: 12),
             Text(
               _selectedDate == null
-                  ? 'Select date'
+                  ? 'Select Date'
                   : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-              style: TextStyle(fontSize: Responsive.fontSize(context, 16)),
+              style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
           ],
         ),
@@ -801,7 +650,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 class _AvailableCountWithWarning extends StatelessWidget {
   final int? availableCount;
 
-  const _AvailableCountWithWarning({super.key, required this.availableCount});
+  const _AvailableCountWithWarning({required this.availableCount});
 
   @override
   Widget build(BuildContext context) {

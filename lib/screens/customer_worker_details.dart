@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class CustomerWorkerDetails extends StatefulWidget {
   final String siteId;
@@ -29,18 +32,9 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Worker Details - ${widget.siteId}'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20.0),
-            bottomRight: Radius.circular(20.0),
-          ),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Worker Details',
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
           // Filter Section
@@ -57,14 +51,14 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: Colors.white));
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No worker data found for this site',
-                      style: TextStyle(fontSize: 16),
+                      'No worker data found',
+                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
                     ),
                   );
                 }
@@ -75,10 +69,10 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 final filteredDocs = _filterDocuments(documents);
 
                 if (filteredDocs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No data found for selected filter',
-                      style: TextStyle(fontSize: 16),
+                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
                     ),
                   );
                 }
@@ -104,22 +98,19 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
   }
 
   Widget _buildFilterSection() {
-    return Card(
-      margin: const EdgeInsets.all(12),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Filter by:',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF003768),
-              ),
+    return GlassCard(
+      margin: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Filter attendance records:',
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 16),
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
+          ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -133,13 +124,17 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                           : 'Select Date',
                     ),
                     onPressed: _showDatePicker,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 // Clear Date Filter
                 if (_selectedDate != null)
                   IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
+                    icon: const Icon(Icons.clear, size: 20, color: Colors.white60),
                     onPressed: _clearDateFilter,
                     tooltip: 'Clear date filter',
                   ),
@@ -198,11 +193,13 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _clearAllFilters,
-                  child: const Text('Clear All Filters'),
+                  child: Text(
+                    'Clear All Filters',
+                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                  ),
                 ),
               ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -324,27 +321,36 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
   }
 
   Widget _buildDayCard(String day, Map<String, dynamic> workers) {
-    return Card(
-      margin: const EdgeInsets.all(12),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Date: $day',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF003768),
+    return GlassCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Date: $day',
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 18),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Workers:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${workers.length} Workers',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+            const Divider(color: Colors.white12, height: 24),
             const SizedBox(height: 8),
             ...workers.entries.map((workerEntry) {
               final workerName = workerEntry.key;
@@ -354,7 +360,6 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             }).toList(),
           ],
         ),
-      ),
     );
   }
 
@@ -371,20 +376,21 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           // Worker avatar/icon
           CircleAvatar(
-            backgroundColor: Colors.blue[100],
+            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: const TextStyle(color: Color(0xFF003768)),
+              style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 12),
@@ -397,13 +403,14 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   name,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   designation,
-                  style: TextStyle(fontSize: 14, ),
+                  style: const TextStyle(fontSize: 14, color: Colors.white60),
                 ),
               ],
             ),
@@ -433,8 +440,8 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 '₹$salary',
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.greenAccent,
                 ),
               ),
             ],

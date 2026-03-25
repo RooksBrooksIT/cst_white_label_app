@@ -74,6 +74,16 @@ class AppTheme {
     return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }
 
+  /// Returns a translucent version of the primary color for glass effects.
+  static Color getGlassColor(BuildContext context, {double opacity = 0.1}) {
+    return primaryColor.value.withOpacity(opacity);
+  }
+
+  /// Returns a white or black overlay color based on brightness.
+  static Color getOverlayColor(BuildContext context, {double opacity = 0.1}) {
+    return isDark(context) ? Colors.white.withOpacity(opacity) : Colors.black.withOpacity(opacity);
+  }
+
   /// Generates a ThemeData based on the current primary color and mode.
   static ThemeData getTheme(Color primary, {bool isDark = false}) {
     if (isDark) {
@@ -84,12 +94,15 @@ class AppTheme {
           seedColor: primary,
           primary: primary,
           onPrimary: getForegroundFor(primary),
+          secondary: Color.lerp(primary, Colors.white, 0.2)!,
+          onSecondary: Colors.white,
           brightness: Brightness.dark,
-          surface: const Color(0xFF1E293B),
+          surface: const Color(0xFF0F172A),
           onSurface: Colors.white,
-          surfaceContainerHighest: const Color(0xFF334155),
+          surfaceContainerHighest: const Color(0xFF1E293B),
           onSurfaceVariant: Colors.white70,
           outline: Colors.white24,
+          error: Colors.redAccent,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
@@ -97,7 +110,7 @@ class AppTheme {
         appBarTheme: AppBarTheme(
           elevation: 0,
           centerTitle: true,
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: Colors.transparent,
           iconTheme: const IconThemeData(color: Colors.white),
           titleTextStyle: const TextStyle(
             color: Colors.white,
@@ -108,13 +121,13 @@ class AppTheme {
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: primary,
-            foregroundColor: Colors.white,
+            foregroundColor: getForegroundFor(primary),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: primary,
-          foregroundColor: Colors.white,
+          foregroundColor: getForegroundFor(primary),
         ),
         cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
@@ -123,12 +136,19 @@ class AppTheme {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFF1E293B),
+          fillColor: Colors.white.withOpacity(0.05),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white10)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
           prefixIconColor: Colors.white70,
           suffixIconColor: Colors.white70,
           labelStyle: const TextStyle(color: Colors.white70),
           hintStyle: const TextStyle(color: Colors.white38),
+        ),
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: primary,
+          selectionColor: primary.withOpacity(0.3),
+          selectionHandleColor: primary,
         ),
       );
     }
@@ -140,12 +160,15 @@ class AppTheme {
         seedColor: primary,
         primary: primary,
         onPrimary: getForegroundFor(primary),
+        secondary: Color.lerp(primary, Colors.black, 0.2)!,
+        onSecondary: Colors.white,
         brightness: Brightness.light,
-        surface: Colors.white,
-        onSurface: const Color(0xFF1E293B),
-        surfaceContainerHighest: const Color(0xFFF1F5F9),
+        surface: const Color(0xFFF8FAFC),
+        onSurface: const Color(0xFF0F172A),
+        surfaceContainerHighest: Colors.white,
         onSurfaceVariant: const Color(0xFF64748B),
-        outline: const Color(0xFFCBD5E1),
+        outline: const Color(0xFFE2E8F0),
+        error: Colors.red[700],
       ),
       scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       cardColor: Colors.white,
@@ -153,10 +176,10 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: primary,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         titleTextStyle: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF0F172A),
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
@@ -164,13 +187,13 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
-          foregroundColor: Colors.white,
+          foregroundColor: getForegroundFor(primary),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
-        foregroundColor: Colors.white,
+        foregroundColor: getForegroundFor(primary),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -179,11 +202,18 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Colors.black.withOpacity(0.03),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
         prefixIconColor: const Color(0xFF64748B),
         suffixIconColor: const Color(0xFF64748B),
         labelStyle: const TextStyle(color: Color(0xFF64748B)),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: primary,
+        selectionColor: primary.withOpacity(0.3),
+        selectionHandleColor: primary,
       ),
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );

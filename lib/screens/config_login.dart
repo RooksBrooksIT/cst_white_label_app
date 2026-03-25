@@ -7,6 +7,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 class ConfigLoginPage extends StatefulWidget {
   const ConfigLoginPage({super.key});
@@ -180,13 +181,15 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 32,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -194,7 +197,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -204,10 +207,11 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Manager Login',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -215,8 +219,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
               const SizedBox(height: 8),
               Text(
                 'Sign in to your account',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: Responsive.fontSize(context, 16),
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
@@ -291,27 +296,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
           child: StatefulBuilder(
             builder: (context, setState) {
               final theme = Theme.of(context);
-              final primary = theme.primaryColor;
-              return Container(
+              final colorScheme = theme.colorScheme;
+              return GlassCard(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      primary,
-                      primary.withValues(alpha: 0.85),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -462,7 +449,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: primary,
+                            backgroundColor: colorScheme.primary,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 12,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
 import 'organisation_loginPage.dart';
 import 'config_account_dashboard.dart';
 import 'org_site_payment_screen.dart';
@@ -18,6 +17,7 @@ import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import 'org_menu_screen.dart';
+import '../utils/responsive.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -63,12 +63,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // _buildAppBar removed - GlassScaffold handles header
-
   void _showLogoutConfirmation(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
@@ -99,11 +97,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
 
     if (result == true) {
-      // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Navigate to login and clear all routes
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const Organisation_LoginPage()),
@@ -116,15 +112,18 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Welcome back,",
-          style: TextStyle(fontSize: 18, color: Colors.white70),
+          style: TextStyle(
+            fontSize: Responsive.fontSize(context, 18), 
+            color: Colors.white.withOpacity(0.7)
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           _orgName,
-          style: const TextStyle(
-            fontSize: 32,
+          style: TextStyle(
+            fontSize: Responsive.fontSize(context, 32),
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -135,7 +134,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildBody(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.isMobile(context) ? 16 : 32,
+        vertical: 24,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -150,127 +152,115 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Widget _buildDashboardSections(BuildContext context) {
     return Column(
       children: [
-        // Configuration Section
         _buildSectionHeader("Configuration"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Manager Account",
           icon: Icons.settings,
-          iconColor: Colors.blue[800]!,
+          iconColor: Colors.blue[400]!,
           onTap: () => _navigateToConfiguration(context),
         ),
 
-        // Weekly Financial Balance Sheet Section
         _buildSectionHeader("Weekly Financial Balance Sheet"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Site Payment Entry",
           icon: Icons.payments,
-          iconColor: Colors.green[800]!,
+          iconColor: Colors.green[400]!,
           onTap: () => _navigateToSitePaymentEntry(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Site Payment Entry Report",
           icon: Icons.receipt,
-          iconColor: Colors.purple[800]!,
+          iconColor: Colors.purple[400]!,
           onTap: () => _navigateToDailyReport(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Weekly Site Finance Report",
           icon: Icons.bar_chart,
-          iconColor: Colors.orange[800]!,
+          iconColor: Colors.orange[400]!,
           onTap: () => _navigateToSiteWeeklyFinancialReport(context),
         ),
 
-        // Expenses Section
         _buildSectionHeader("Expenses"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Organization Expenses",
           icon: Icons.account_balance_wallet,
-          iconColor: Colors.red[800]!,
+          iconColor: Colors.red[400]!,
           onTap: () => _navigateToOrganizationExpenses(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Manager Expenses",
           icon: Icons.attach_money,
-          iconColor: Colors.teal[800]!,
-          onTap: () => _navigateToManagerExpenses(
-            context,
-          ), // Add navigation for Manager Expenses
+          iconColor: Colors.teal[400]!,
+          onTap: () => _navigateToManagerExpenses(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Supervisor Expenses",
           icon: Icons.money,
-          iconColor: Colors.indigo[800]!,
-          onTap: () => _navigateToSiteExpenses(
-            context,
-          ), // Add navigation for Supervisor Expenses
+          iconColor: Colors.indigo[400]!,
+          onTap: () => _navigateToSiteExpenses(context),
         ),
 
-        // Approvals Section
         _buildSectionHeader("Approvals"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Supervisor Work Schedule Request Approval",
           icon: Icons.work,
-          iconColor: Colors.deepPurple[800]!,
+          iconColor: Colors.deepPurple[400]!,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => ManagerApprovalScreen()),
+            MaterialPageRoute(builder: (context) => const ManagerApprovalScreen()),
           ),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Supervisor Material Request Approval",
           icon: Icons.inventory,
-          iconColor: Colors.blueGrey[800]!,
+          iconColor: Colors.blueGrey[400]!,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ManagerMaterialApprovalScreen(),
+              builder: (context) => const ManagerMaterialApprovalScreen(),
             ),
           ),
         ),
 
-        // Incentive Calculator
         _buildSectionHeader("Supervisor Incentive Calculator"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Incentive Calculation",
           icon: Icons.calculate,
-          iconColor: Colors.amber[800]!,
+          iconColor: Colors.amber[400]!,
           onTap: () => _navigateToIncentiveCaliculation(context),
         ),
 
-        // Insights Section
         _buildSectionHeader("Insights"),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Project Financial Reports",
           icon: Icons.analytics,
-          iconColor: Colors.pink[800]!,
+          iconColor: Colors.pink[400]!,
           onTap: () => _navigateToInsights(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Materials Inventory",
           icon: Icons.inventory_2,
-          iconColor: Colors.deepOrange[800]!,
+          iconColor: Colors.deepOrange[400]!,
           onTap: () => _navigateToMaterialReport(context),
         ),
-        _buildColorfulCard(
+        _buildMenuCard(
           context,
           title: "Tools Inventory",
           icon: Icons.build,
-          iconColor: Colors.cyan[800]!,
-          onTap: () => _navigateToToolsInventory(
-            context,
-          ), // Add navigation for Tools Inventory
+          iconColor: Colors.cyan[400]!,
+          onTap: () => _navigateToToolsInventory(context),
         ),
       ],
     );
@@ -279,18 +269,32 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 32, bottom: 16),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 14),
+              fontWeight: FontWeight.bold,
+              color: Colors.white.withOpacity(0.9),
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildColorfulCard(
+  Widget _buildMenuCard(
     BuildContext context, {
     required String title,
     required IconData icon,
@@ -299,38 +303,36 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
+      child: GlassCard(
         onTap: onTap,
-        child: GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 15),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withOpacity(0.3),
-                size: 24,
-              ),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
@@ -413,49 +415,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         builder: (context) =>
             const OrganizationSiteEntry(userName: '', userDetails: {}),
       ),
-    );
-  }
-}
-
-class DrawerMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  const DrawerMenuItem({
-    required this.icon,
-    required this.title,
-    this.isSelected = false,
-    this.onTap,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF2A5C8A).withOpacity(0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: isSelected ? const Color(0xFF2A5C8A) : Colors.grey[700],
-          size: 24,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? const Color(0xFF2A5C8A) : Colors.grey[700],
-        ),
-      ),
-      onTap: onTap,
     );
   }
 }

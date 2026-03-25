@@ -90,8 +90,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
     
     return Scaffold(
       body: Container(
@@ -137,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.4),
+                                        color: Colors.white.withValues(alpha: 0.4),
                                         width: 2,
                                       ),
                                     ),
@@ -158,14 +158,14 @@ class _SplashScreenState extends State<SplashScreen>
                                     ),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Colors.white.withOpacity(0.15),
+                                      color: Colors.white.withValues(alpha: 0.15),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Colors.white.withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: primary.withOpacity(0.5),
+                                          color: primary.withValues(alpha: 0.5),
                                           blurRadius: 30,
                                           spreadRadius: 8,
                                         ),
@@ -213,7 +213,7 @@ class _SplashScreenState extends State<SplashScreen>
                                     'Build smarter. Manage better.',
                                     style: TextStyle(
                                       fontSize: Responsive.fontSize(context, 15),
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: Colors.white.withValues(alpha: 0.7),
                                       letterSpacing: 0.3,
                                     ),
                                   ),
@@ -256,7 +256,7 @@ class _SplashScreenState extends State<SplashScreen>
                       'Loading...',
                       style: TextStyle(
                         fontSize: Responsive.fontSize(context, 12),
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         letterSpacing: 0.5,
                       ),
                     ),

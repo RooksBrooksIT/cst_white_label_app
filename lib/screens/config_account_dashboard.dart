@@ -30,8 +30,11 @@ import 'package:demo_cst/screens/vehicle_inventory_page.dart';
 import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
 
@@ -42,80 +45,86 @@ class ConfigAccountDashboard extends StatefulWidget {
 }
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
-  final Color primaryColor = const Color(0xFF003768);
-  // Color(0xFF003768),
 
   // 🟢 Dashboard Items with colors
   final Map<String, List<DashboardItem>> groupedItems = {
     "Project Configuration": [
-      DashboardItem('Project Category', Icons.category_rounded, Colors.orange),
+      DashboardItem('Project Category', Icons.category_rounded, Colors.orange, 'Manage project categories'),
       DashboardItem(
         'Project Sub Category',
         Icons.subtitles_rounded,
         Colors.purple,
+        'Define project sub-categories',
       ),
-      DashboardItem('Project Stage', Icons.flag_rounded, Colors.red),
-      DashboardItem('Project Contract', Icons.assignment_rounded, Colors.teal),
+      DashboardItem('Project Stage', Icons.flag_rounded, Colors.red, 'Configure project stages'),
+      DashboardItem('Project Contract', Icons.assignment_rounded, Colors.teal, 'Manage project contracts'),
     ],
     "Material Configuration": [
-      DashboardItem('Material Master', Icons.upload_file_rounded, Colors.green),
+      DashboardItem('Material Master', Icons.upload_file_rounded, Colors.green, 'Master list of materials'),
       DashboardItem(
         'Material Sub Category',
         Icons.category_rounded,
         Colors.blue,
+        'Categorize materials further',
       ),
-      DashboardItem('Material Config', Icons.build_rounded, Colors.deepOrange),
+      DashboardItem('Material Config', Icons.build_rounded, Colors.deepOrange, 'Configure material properties'),
       DashboardItem(
         'Material Movements',
         Icons.toggle_on_outlined,
         Colors.deepPurple,
+        'Track material transfers',
       ),
 
       DashboardItem(
         'Material Availability',
         Icons.build_circle_outlined,
         Colors.deepPurple,
+        'Check material stock',
       ),
     ],
     "Tools Configuration": [
-      DashboardItem('Tools', Icons.handyman_rounded, Colors.indigo),
+      DashboardItem('Tools', Icons.handyman_rounded, Colors.indigo, 'Manage tools inventory'),
     ],
     "Labour Configuration": [
-      DashboardItem('Labour', Icons.engineering_rounded, Colors.brown),
+      DashboardItem('Labour', Icons.engineering_rounded, Colors.brown, 'Configure labour details'),
     ],
     "Contractor Configuration": [
-      DashboardItem('Contractor', Icons.person_4_rounded, Colors.deepPurple),
+      DashboardItem('Contractor', Icons.person_4_rounded, Colors.deepPurple, 'Manage contractor information'),
     ],
     "Diagrams Configuration": [
       DashboardItem(
         'Layout and Drawings',
         Icons.upload_file_rounded,
         Colors.cyan,
+        'Manage project layouts and drawings',
       ),
     ],
     "Site Configuration": [
-      DashboardItem('Site', Icons.place_rounded, Colors.green),
-      DashboardItem('Project', Icons.work_rounded, Colors.orangeAccent),
+      DashboardItem('Site', Icons.place_rounded, Colors.green, 'Configure site details'),
+      DashboardItem('Project', Icons.work_rounded, Colors.orangeAccent, 'Manage projects'),
       DashboardItem(
         'Supervisor',
         Icons.supervisor_account_rounded,
         Colors.blueGrey,
+        'Configure supervisor accounts',
       ),
-      DashboardItem('Site-Supervisor Map', Icons.map_rounded, Colors.redAccent),
+      DashboardItem('Site-Supervisor Map', Icons.map_rounded, Colors.redAccent, 'Map supervisors to sites'),
     ],
     "Tools Tracking": [
       DashboardItem(
         'Tools Movement',
         Icons.directions_walk_rounded,
         Colors.deepOrangeAccent,
+        'Track tool movements',
       ),
-      DashboardItem('Tools Inventory', Icons.inventory_rounded, Colors.pink),
+      DashboardItem('Tools Inventory', Icons.inventory_rounded, Colors.pink, 'View tools inventory'),
     ],
     "Expenses": [
       DashboardItem(
         'Manager Expenses',
         Icons.account_balance_wallet_rounded,
         Colors.blue,
+        'Manage manager expenses',
       ),
     ],
     "Workers Management": [
@@ -123,16 +132,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Workers Configuration',
         Icons.work_rounded,
         const Color.fromARGB(255, 130, 57, 179),
+        'Configure worker details',
       ),
       DashboardItem(
         'Workers Site Mapping',
         Icons.work_history,
         const Color.fromARGB(255, 243, 145, 33),
+        'Map workers to sites',
       ),
       DashboardItem(
         'Workers Attendance',
         Icons.supervisor_account_rounded,
         Colors.blueGrey,
+        'Manage worker attendance',
       ),
     ],
     "Vehicle Management": [
@@ -140,76 +152,38 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Vehicle Configuration',
         Icons.fire_truck_sharp,
         Colors.red,
+        'Configure vehicle details',
       ),
       DashboardItem(
         'Vehicle Driver Configuration',
         Icons.fire_truck_outlined,
         Colors.blue,
+        'Configure vehicle driver details',
       ),
       DashboardItem(
         'Vehicle Details',
         Icons.directions_car_rounded,
         Colors.green,
+        'View vehicle details',
       ),
       DashboardItem(
         'Vehicle Inventory',
         Icons.inventory_rounded,
         const Color.fromARGB(255, 185, 62, 223),
+        'Manage vehicle inventory',
       ),
     ],
   };
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color.fromARGB(255, 1, 127, 223), Color(0xFF003768)],
-            stops: [0.0, 0.6],
-          ),
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: _buildAppBar(context),
-          body: _buildBody(context),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Management Console',
+      onBack: () => Navigator.pop(context),
+      body: _buildBody(context),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      title: const Text(
-        "Configuration Dashboard",
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-          color: Colors.white,
-        ),
-      ),
-      backgroundColor: primaryColor,
-      centerTitle: true,
-      elevation: 0,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-      ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-        onPressed: () {
-          Navigator.pop(context);
-        },
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () => _showLogoutConfirmation(context),
-        ),
-      ],
-    );
-  }
 
   // 🟢 Show logout confirmation modal
   void _showLogoutConfirmation(BuildContext context) {
@@ -218,22 +192,34 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           title: Row(
             children: [
-              Icon(Icons.logout_rounded, color: primaryColor, size: 28),
+              Icon(
+                Icons.logout_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 28,
+              ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Logout',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: Responsive.fontSize(context, 20),
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
-          content: const Text(
+          content: Text(
             'Are you sure you want to logout?',
-            style: TextStyle(fontSize: 16, color: Colors.black87),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 16),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           actionsPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -270,17 +256,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Navigator.of(context).pop(); // Close the dialog first
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.clear(); // Clear all stored preferences for logout
-
-                // Navigate to ConfigLoginPage, replacing current routes
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ConfigLoginPage(),
-                  ),
-                );
+                if (mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ConfigLoginPage(),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 10,
@@ -306,52 +292,73 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Widget _buildBody(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        _buildWelcomeSection(),
-        const SizedBox(height: 24),
-        ...groupedItems.entries.map((entry) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionHeader(entry.key),
-              _buildItemList(context, entry.value),
-            ],
-          );
-        }),
-      ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoSection(context),
+          const SizedBox(height: 32),
+          _buildManagementSection(context),
+        ],
+      ),
     );
   }
 
-  Widget _buildWelcomeSection() {
+  Widget _buildInfoSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
-          "Configuration Dashboard",
-          style: TextStyle(fontSize: 18, color: Colors.white70),
-        ),
-        SizedBox(height: 4),
-        Text(
-          "Manage All Settings",
+          "Welcome to",
           style: TextStyle(
-            fontSize: 28,
+            fontSize: Responsive.fontSize(context, 18),
+            color: Colors.white70,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          "Management Console",
+          style: TextStyle(
+            fontSize: Responsive.fontSize(context, 28),
             fontWeight: FontWeight.bold,
             color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Configure and manage various aspects of your projects.",
+          style: TextStyle(
+            fontSize: Responsive.fontSize(context, 14),
+            color: Colors.white54,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildManagementSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedItems.entries.map((entry) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(context, entry.key),
+            _buildItemList(context, entry.value),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 12),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 20,
+        style: TextStyle(
+          fontSize: Responsive.fontSize(context, 20),
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
@@ -368,46 +375,76 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           duration: const Duration(milliseconds: 375),
           child: SlideAnimation(
             verticalOffset: 50.0,
-            child: FadeInAnimation(child: _buildColorfulCard(context, item)),
+            child: FadeInAnimation(
+              child: _buildColorfulCard(
+                context,
+                title: item.title,
+                subtitle: item.subtitle,
+                icon: item.icon,
+                iconColor: item.color,
+                onTap: () => _navigateToScreen(context, item.title),
+              ),
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildColorfulCard(BuildContext context, DashboardItem item) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _navigateToScreen(context, item.title),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+  Widget _buildColorfulCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: item.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(item.icon, color: item.color, size: 28),
+                child: Icon(icon, color: iconColor, size: 28),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 20),
               Expanded(
-                child: Text(
-                  item.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 16),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 13),
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: item.color),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withOpacity(0.3),
+                size: 24,
+              ),
             ],
           ),
         ),
@@ -459,7 +496,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
 class DashboardItem {
   final String title;
+  final String subtitle;
   final IconData icon;
   final Color color;
-  const DashboardItem(this.title, this.icon, this.color);
+
+  const DashboardItem(this.title, this.icon, this.color, this.subtitle);
 }

@@ -12,6 +12,7 @@ import 'supervisor_worker_att_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
@@ -29,19 +30,18 @@ class SupervisorDashboard extends StatefulWidget {
 }
 
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
-  final Color primaryColor = const Color(0xFF0b3470);
-
-  late final Map<String, List<DashboardItem>> groupedItems;
+  late Map<String, List<DashboardItem>> groupedItems;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final colorScheme = Theme.of(context).colorScheme;
     groupedItems = {
       "Expenses": [
         DashboardItem(
           'Site Supervisor Expenses',
           Icons.monetization_on_outlined,
-          primaryColor,
+          colorScheme.primary,
           () => _navigate(
             context,
             SupervisorVerificationPage(
@@ -55,7 +55,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         DashboardItem(
           'Materials Request Form',
           Icons.inventory_2_outlined,
-          primaryColor,
+          colorScheme.secondary,
           () => _navigate(
             context,
             MaterialRequestForm(
@@ -65,9 +65,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ),
         ),
         DashboardItem(
-          'Work Schedule Request Form',
+          'Work Schedule Request',
           Icons.schedule_outlined,
-          primaryColor,
+          colorScheme.tertiary,
           () => _navigate(
             context,
             SupervisorWorkSchedulePage(
@@ -81,7 +81,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         DashboardItem(
           'Materials',
           Icons.warehouse_outlined,
-          primaryColor,
+          colorScheme.primary,
           () => _navigate(
             context,
             MaterialAtSiteEntryPage(
@@ -92,14 +92,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ),
         DashboardItem(
           'Materials information',
-          Icons.warehouse_outlined,
-          primaryColor,
+          Icons.info_outline,
+          colorScheme.primary,
           () => _navigate(context, SupervisorMaterialInfoScreen()),
         ),
         DashboardItem(
           'Tools Movement',
           Icons.handyman_outlined,
-          primaryColor,
+          colorScheme.secondary,
           () => _navigate(
             context,
             SiteToCompanyReturn(
@@ -113,7 +113,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         DashboardItem(
           'Site Approvals',
           Icons.check_circle_outline,
-          primaryColor,
+          colorScheme.primary,
           () => _navigate(
             context,
             ViewApprovalScreen(
@@ -124,10 +124,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ),
         DashboardItem(
           'Materials Approvals',
-          Icons.check_box_sharp,
-          primaryColor,
+          Icons.fact_check_outlined,
+          colorScheme.secondary,
           () {
-            print('Navigating with supervisor: ${widget.supervisorName}');
             _navigate(
               context,
               SupervisorMaterialViewRequestScreen(
@@ -139,10 +138,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ),
         DashboardItem(
           'Workers Attendance',
-          Icons.check_box_sharp,
-          primaryColor,
+          Icons.people_alt_rounded,
+          colorScheme.tertiary,
           () {
-            print('Navigating with supervisor: ${widget.supervisorName}');
             _navigate(context, AttendanceManagementPage());
           },
         ),
@@ -159,37 +157,30 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Logout"),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text(
+          "Logout",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: const Text("Are you sure you want to logout?"),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("No", style: TextStyle(color: Colors.grey)),
+            child: Text("No", style: TextStyle(color: Colors.grey[600])),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          TextButton(
             onPressed: () async {
-              // Close dialog
               Navigator.pop(context);
-
-              // Clear SharedPreferences
               final prefs = await SharedPreferences.getInstance();
-              await prefs.clear(); // Or remove specific keys
-
-              // Navigate to login and clear all routes
+              await prefs.clear();
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const SupervisorLoginPage()),
                 (route) => false,
               );
             },
-            child: const Text("Yes", style: TextStyle()),
+            child: const Text("Yes", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -199,40 +190,66 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
+      title: 'Supervisor Dashboard',
       onBack: () => _showLogoutDialog(context),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.isMobile(context) ? 16 : 32,
+          vertical: 24,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildProfileSection(),
+            const SizedBox(height: 32),
+            ...groupedItems.entries.map((entry) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(entry.key),
+                  ...entry.value.map((item) => _buildMenuCard(item)),
+                ],
+              );
+            }),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileSection() {
+    return GlassCard(
+      padding: const EdgeInsets.all(24),
+      child: Row(
         children: [
-          // Profile Card
-          GlassCard(
-            padding: const EdgeInsets.symmetric(vertical: 32),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: Colors.white,
-                    size: 48,
-                  ),
-                ),
-                const SizedBox(height: 16),
                 Text(
                   widget.supervisorName,
-                  style: const TextStyle(
-                    fontSize: 28,
+                  style: TextStyle(
+                    fontSize: Responsive.fontSize(context, 24),
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 Text(
-                  'Site Supervisor',
+                  'Site Supervisor • ID: ${widget.supervisorId}',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.6),
@@ -241,17 +258,6 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          ...groupedItems.entries.map((entry) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader(entry.key),
-                _buildItemList(entry.value),
-              ],
-            );
-          }),
-          const SizedBox(height: 40),
         ],
       ),
     );
@@ -260,60 +266,64 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 32, bottom: 16),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-          letterSpacing: 0.4,
-        ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 14),
+              fontWeight: FontWeight.bold,
+              color: Colors.white.withOpacity(0.9),
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildItemList(List<DashboardItem> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: items.map((item) => _buildColorfulCard(item)).toList(),
-    );
-  }
-
-  Widget _buildColorfulCard(DashboardItem item) {
+  Widget _buildMenuCard(DashboardItem item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
+      child: GlassCard(
         onTap: item.onTap,
-        child: GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: item.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(item.icon, color: Colors.white, size: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: item.color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+              child: Icon(item.icon, color: item.color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 15),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withOpacity(0.3),
-                size: 24,
-              ),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

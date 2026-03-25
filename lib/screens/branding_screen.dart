@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../utils/responsive.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -53,8 +54,11 @@ class _BrandingScreenState extends State<BrandingScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Pick a color'),
-          backgroundColor: const Color(0xFF003768),
-          titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          titleTextStyle: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 18,
+          ),
           content: SingleChildScrollView(
             child: ColorPicker(
               pickerColor: _customColor,
@@ -68,14 +72,14 @@ class _BrandingScreenState extends State<BrandingScreen> {
           ),
           actions: [
             TextButton(
-              child: const Text(
+              child: Text(
                 'CANCEL',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
               ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('OK', style: TextStyle(color: Colors.white)),
+              child: Text('OK', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
               onPressed: () {
                 setState(() => _selectedColor = _customColor);
                 Navigator.of(context).pop();
@@ -164,7 +168,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => Navigator.pop(context),
@@ -172,8 +176,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
         children: [
           // Step Indicator
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 40,
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.isMobile(context) ? 20 : 40,
               vertical: 4,
             ),
             child: _buildStepIndicator(),
@@ -187,10 +191,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Customize Branding',
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: Responsive.fontSize(context, 26),
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -199,8 +203,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       Text(
                         'Make your app unique with logo & colors',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.65),
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: Colors.white.withValues(alpha: 0.65),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -208,8 +212,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       // App Information Card
                       _buildCard(
                         icon: Icons.grid_view_rounded,
-                        iconBgColor: accent.withOpacity(0.2),
-                        iconColor: accent,
+                        iconBgColor: colorScheme.primary.withValues(alpha: 0.2),
+                        iconColor: colorScheme.primary,
                         title: 'App Information',
                         child: GlassTextField(
                           controller: _appNameController,
@@ -223,8 +227,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       // Company Logo Card
                       _buildCard(
                         icon: Icons.upload_rounded,
-                        iconBgColor: const Color(0xFF7C3AED).withOpacity(0.2),
-                        iconColor: const Color(0xFF7C3AED),
+                        iconBgColor: colorScheme.secondary.withValues(alpha: 0.2),
+                        iconColor: colorScheme.secondary,
                         title: 'Company Logo',
                         child: Column(
                           children: [
@@ -234,10 +238,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 width: double.infinity,
                                 height: 110,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
+                                  color: Colors.white.withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.15),
+                                    color: Colors.white.withValues(alpha: 0.15),
                                   ),
                                 ),
                                 child: _logoFile != null
@@ -255,8 +259,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                           Icon(
                                             Icons.cloud_upload_outlined,
                                             size: 36,
-                                            color: Colors.white.withOpacity(
-                                              0.5,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.5,
                                             ),
                                           ),
                                           const SizedBox(height: 6),
@@ -264,8 +268,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                             'Upload Logo',
                                             style: TextStyle(
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.white.withOpacity(
-                                                0.7,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.7,
                                               ),
                                             ),
                                           ),
@@ -273,8 +277,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                             'PNG / JPG (5MB)',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.white.withOpacity(
-                                                0.4,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.4,
                                               ),
                                             ),
                                           ),
@@ -298,8 +302,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       // Color Theme Card
                       _buildCard(
                         icon: Icons.palette_rounded,
-                        iconBgColor: const Color(0xFFEA580C).withOpacity(0.2),
-                        iconColor: const Color(0xFFEA580C),
+                        iconBgColor: colorScheme.tertiary.withValues(alpha: 0.2),
+                        iconColor: colorScheme.tertiary,
                         title: 'Color Theme',
                         subtitle:
                             'Primary Color  #${_selectedColor.value.toRadixString(16).toUpperCase().substring(2)}',
@@ -336,13 +340,13 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: sel
-                                      ? c.withOpacity(0.25)
-                                      : Colors.white.withOpacity(0.1),
+                                      ? c.withValues(alpha: 0.25)
+                                      : Colors.white.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: sel
                                         ? c
-                                        : Colors.white.withOpacity(0.15),
+                                        : Colors.white.withValues(alpha: 0.15),
                                     width: sel ? 2 : 1,
                                   ),
                                 ),

@@ -4,6 +4,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 import 'branding_screen.dart';
 
 class OrganisationRegistrationPage extends StatefulWidget {
@@ -93,7 +94,7 @@ class _OrganisationRegistrationPageState
   }
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
     return GlassScaffold(
       onBack: _goBack,
       title: 'Register Organization',
@@ -101,11 +102,11 @@ class _OrganisationRegistrationPageState
         children: [
           // Step Indicator
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 32,
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.isMobile(context) ? 20 : 40,
               vertical: 8,
             ),
-            child: _buildStepIndicator(primaryColor),
+            child: _buildStepIndicator(colorScheme.primary),
           ),
           // Page Content
           Expanded(
@@ -117,7 +118,7 @@ class _OrganisationRegistrationPageState
                   offset: Offset(0, _translateAnimation.value),
                   child: child,
                 ),
-                child: _buildStep1(primaryColor),
+                child: _buildStep1(colorScheme.primary),
               ),
             ),
           ),
@@ -152,12 +153,12 @@ class _OrganisationRegistrationPageState
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isDone || isActive
-                    ? primaryColor
-                    : Colors.white.withOpacity(0.15),
+                      ? primaryColor
+                      : Colors.white.withValues(alpha: 0.15),
                 border: Border.all(
                   color: isDone || isActive
                       ? primaryColor
-                      : Colors.white.withOpacity(0.3),
+                      : Colors.white.withValues(alpha: 0.3),
                   width: 1.5,
                 ),
               ),
@@ -203,14 +204,14 @@ class _OrganisationRegistrationPageState
             height: 72,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1.5,
               ),
               boxShadow: [
                  BoxShadow(
-                  color: primaryColor.withOpacity(0.3),
+                  color: primaryColor.withValues(alpha: 0.3),
                   blurRadius: 20,
                   spreadRadius: 3,
                 ),
@@ -223,10 +224,11 @@ class _OrganisationRegistrationPageState
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Organization Details',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: Responsive.fontSize(context, 22),
               fontWeight: FontWeight.bold,
               color: Colors.white,
               letterSpacing: 0.3,
@@ -235,9 +237,10 @@ class _OrganisationRegistrationPageState
           const SizedBox(height: 4),
           Text(
             'Fill in your organization information',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 13,
-              color: Colors.white.withOpacity(0.65),
+              fontSize: Responsive.fontSize(context, 13),
+              color: Colors.white.withValues(alpha: 0.65),
             ),
           ),
           const SizedBox(height: 24),

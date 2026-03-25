@@ -9,6 +9,7 @@ import 'customer_workers_summary.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class CustomerDashboardPage extends StatefulWidget {
   final String ownerName;
@@ -124,7 +125,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: Colors.white, size: 24),
@@ -136,9 +137,9 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: Responsive.fontSize(context, 18),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -146,8 +147,8 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
                   ],
@@ -170,10 +171,16 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          content: const Text('Are you sure you want to logout?', style: TextStyle(color: Colors.white70)),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Logout',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold)),
+          content: Text('Are you sure you want to logout?',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -238,7 +245,9 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
     return GlassScaffold(
       onBack: () => _showLogoutDialog(context),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: EdgeInsets.symmetric(
+            vertical: 24,
+            horizontal: Responsive.isMobile(context) ? 0.0 : 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -247,18 +256,18 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Welcome Back!',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white.withOpacity(0.7),
+                    Text(
+                      'Welcome Back!',
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 18),
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 4),
                   Text(
                     _displayOwnerName,
-                    style: const TextStyle(
-                      fontSize: 32,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 32),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),

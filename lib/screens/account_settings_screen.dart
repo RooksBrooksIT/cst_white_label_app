@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -11,78 +14,140 @@ class AccountSettingsScreen extends StatefulWidget {
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Account Settings')),
+    return GlassScaffold(
+      title: 'Settings',
+      onBack: () => Navigator.pop(context),
       body: ListView(
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
         children: [
-          const SizedBox(height: 16),
           _buildSectionHeader('Branding & UI'),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: AppTheme.themeMode,
-            builder: (context, themeMode, _) {
-              return SwitchListTile(
-                title: const Text('Dark Mode'),
-                subtitle: const Text('Toggle between light and dark themes'),
-                secondary: const Icon(Icons.dark_mode_rounded),
-                value: themeMode == ThemeMode.dark,
-                onChanged: (bool value) {
-                  AppTheme.updateThemeMode(
-                    value ? ThemeMode.dark : ThemeMode.light,
-                  );
-                },
-              );
-            },
-          ),
-          ListTile(
-            title: const Text('Brand Color'),
-            subtitle: const Text('Customize the primary app color'),
-            leading: const Icon(Icons.color_lens_rounded),
-            trailing: ValueListenableBuilder<Color>(
-              valueListenable: AppTheme.primaryColor,
-              builder: (context, color, _) {
-                return Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
+          GlassCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ValueListenableBuilder<ThemeMode>(
+                  valueListenable: AppTheme.themeMode,
+                  builder: (context, themeMode, _) {
+                    return SwitchListTile(
+                      title: Text(
+                        'Dark Mode',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: Responsive.fontSize(context, 16),
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Toggle theme',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: Responsive.fontSize(context, 12),
+                        ),
+                      ),
+                      secondary: const Icon(Icons.dark_mode_rounded,
+                          color: Colors.white70),
+                      value: themeMode == ThemeMode.dark,
+                      onChanged: (bool value) {
+                        AppTheme.updateThemeMode(
+                          value ? ThemeMode.dark : ThemeMode.light,
+                        );
+                      },
+                    );
+                  },
+                ),
+                ListTile(
+                  title: Text(
+                    'Brand Color',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: Responsive.fontSize(context, 16),
+                    ),
                   ),
-                );
-              },
+                  subtitle: Text(
+                    'Customize app colors',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: Responsive.fontSize(context, 12),
+                    ),
+                  ),
+                  leading: const Icon(Icons.color_lens_rounded,
+                      color: Colors.white70),
+                  trailing: ValueListenableBuilder<Color>(
+                    valueListenable: AppTheme.primaryColor,
+                    builder: (context, color, _) {
+                      return Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  onTap: () {
+                    // This will be linked to BrandingEditScreen if applicable
+                    Navigator.pushNamed(context, '/branding');
+                  },
+                ),
+              ],
             ),
-            onTap: () {
-              // TODO: Implement color picker or link to AppThemeSettingsScreen
-            },
           ),
-          const Divider(),
+          const SizedBox(height: 24),
           _buildSectionHeader('General'),
-          ListTile(
-            title: const Text('Edit Profile'),
-            leading: const Icon(Icons.person_rounded),
-            onTap: () {},
-          ),
-          ListTile(
-            title: const Text('Notifications'),
-            leading: const Icon(Icons.notifications_rounded),
-            onTap: () {},
-          ),
-          ListTile(
-            title: const Text('Help & Support'),
-            leading: const Icon(Icons.help_rounded),
-            onTap: () {},
+          GlassCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _buildSettingsTile(
+                  title: 'Edit Profile',
+                  icon: Icons.person_rounded,
+                  onTap: () {},
+                ),
+                _buildSettingsTile(
+                  title: 'Notifications',
+                  icon: Icons.notifications_rounded,
+                  onTap: () {},
+                ),
+                _buildSettingsTile(
+                  title: 'Help & Support',
+                  icon: Icons.help_rounded,
+                  onTap: () {},
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildSettingsTile({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      title: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: Responsive.fontSize(context, 16),
+        ),
+      ),
+      leading: Icon(icon, color: Colors.white70),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+      onTap: onTap,
+    );
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          fontSize: 12,
+          fontSize: Responsive.fontSize(context, 12),
           fontWeight: FontWeight.bold,
           color: Theme.of(context).colorScheme.primary,
           letterSpacing: 1.2,

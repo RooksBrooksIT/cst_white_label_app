@@ -4,6 +4,10 @@ import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import '../utils/app_theme.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 
 class SupervisorMaterialInfoScreen extends StatefulWidget {
   const SupervisorMaterialInfoScreen({super.key});
@@ -780,30 +784,18 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.isDark(context) ? Colors.grey[900] : Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'Material Information',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 20),
-            color: Colors.white,
-          ),
+    return GlassScaffold(
+      title: 'Material Information',
+      onBack: () => Navigator.of(context).pop(),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.help_outline, size: Responsive.scaleH(context, 22)),
+          onPressed: () => _showHelpDialog(context),
         ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF772323),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.help_outline, size: Responsive.scaleH(context, 22)),
-            onPressed: () => _showHelpDialog(context),
-          ),
-          SizedBox(width: Responsive.scaleH(context, 8)),
-        ],
-      ),
+        SizedBox(width: Responsive.scaleH(context, 8)),
+      ],
       body: _isLoadingSites || _isLoadingMaterials
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF772323)))
+          ? Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor))
           : Column(
               children: [
                 _buildModeToggle(),
@@ -825,21 +817,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildModeToggle() {
-    return Card(
-      color: AppTheme.isDark(context) ? Colors.grey[850] : Colors.white,
-      margin: EdgeInsets.zero, // Remove default card margin
-      elevation: AppTheme.isDark(context) ? 0 : 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-        side: BorderSide(
-          color: AppTheme.isDark(context) ? Colors.grey[800]! : Colors.grey[200]!,
-        ),
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.scaleH(context, 16),
+        vertical: Responsive.scaleV(context, 8),
       ),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.scaleH(context, 16),
-          vertical: Responsive.scaleV(context, 12),
-        ),
+      child: GlassCard(
+        padding: EdgeInsets.all(Responsive.scaleH(context, 4)),
         child: Row(
           children: [
             Expanded(
@@ -854,7 +838,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 }),
               ),
             ),
-            SizedBox(width: Responsive.scaleH(context, 12)),
+            SizedBox(width: Responsive.scaleH(context, 8)),
             Expanded(
               child: _buildToggleButton(
                 title: 'Return to Company',
@@ -878,26 +862,26 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final primaryColor = Theme.of(context).primaryColor;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 10)),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF772323) : Colors.transparent,
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-          border: Border.all(
-            color: const Color(0xFF772323),
-            width: 1.5,
-          ),
+          color: isSelected ? primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
+          border: isSelected 
+              ? null 
+              : Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
         ),
         child: Center(
           child: Text(
             title,
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF772323),
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.6),
               fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 14),
+              fontSize: Responsive.fontSize(context, 13),
             ),
           ),
         ),
@@ -907,7 +891,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
   List<Widget> _buildSiteToSiteUI() {
     return [
-      // SiteToSite UI
       _buildSectionHeader('From Site'),
       SizedBox(height: Responsive.scaleV(context, 16)),
       _buildTextField(
@@ -930,7 +913,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             _fromSiteId = v;
             _fromSiteNameController.text = site['siteName']?.toString() ?? '';
             _fromSupervisorController.text = site['supervisorName']?.toString() ?? '';
-            // Reset material selection for SiteToSite
             _selectedMaterialName = null;
             availableCount = 0;
             _neededCountController.clear();
@@ -1049,45 +1031,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       Row(
         children: [
           Expanded(
-            child: ElevatedButton.icon(
+            child: GlassButton(
               onPressed: _addMaterial,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 12)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              icon: Icon(Icons.add_circle_outline, size: Responsive.scaleH(context, 20)),
-              label: Text(
-                'Add Material',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              label: 'Add Material',
             ),
           ),
           SizedBox(width: Responsive.scaleH(context, 16)),
           Expanded(
-            child: OutlinedButton.icon(
+            child: GlassButton(
               onPressed: _clearMaterial,
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 12)),
-                side: BorderSide(color: Colors.grey.shade400),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              icon: Icon(Icons.clear, size: Responsive.scaleH(context, 20)),
-              label: Text(
-                'Clear Material',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.grey[700],
-                ),
-              ),
+              label: 'Clear',
+              isSecondary: true,
             ),
           ),
         ],
@@ -1106,48 +1060,21 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: GlassButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 16)),
-                side: BorderSide(color: Colors.grey.shade400),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.grey[700],
-                ),
-              ),
+              label: 'Cancel',
+              isSecondary: true,
             ),
           ),
           SizedBox(width: Responsive.scaleH(context, 16)),
           Expanded(
-            child: ElevatedButton(
+            child: GlassButton(
               onPressed: () {
                 if (_validateSiteToSiteForm()) {
                   _saveSiteToSiteTransfer();
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 16)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-                elevation: 2,
-              ),
-              child: Text(
-                'Transfer Materials',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              label: 'Transfer',
             ),
           ),
         ],
@@ -1161,7 +1088,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
   List<Widget> _buildSiteToCompanyUI() {
     return [
-      // SiteToCompany UI
       _buildSectionHeader('Site Information'),
       SizedBox(height: Responsive.scaleV(context, 16)),
 
@@ -1260,45 +1186,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       Row(
         children: [
           Expanded(
-            child: ElevatedButton.icon(
+            child: GlassButton(
               onPressed: _addMaterial,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 12)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              icon: Icon(Icons.add_circle_outline, size: Responsive.scaleH(context, 20)),
-              label: Text(
-                'Add Material',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              label: 'Add Material',
             ),
           ),
           SizedBox(width: Responsive.scaleH(context, 16)),
           Expanded(
-            child: OutlinedButton.icon(
+            child: GlassButton(
               onPressed: _clearMaterial,
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 12)),
-                side: BorderSide(color: Colors.grey.shade400),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              icon: Icon(Icons.clear, size: Responsive.scaleH(context, 20)),
-              label: Text(
-                'Clear Material',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.grey[700],
-                ),
-              ),
+              label: 'Clear',
+              isSecondary: true,
             ),
           ),
         ],
@@ -1318,48 +1216,21 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: GlassButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 16)),
-                side: BorderSide(color: Colors.grey.shade400),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.grey[700],
-                ),
-              ),
+              label: 'Cancel',
+              isSecondary: true,
             ),
           ),
           SizedBox(width: Responsive.scaleH(context, 16)),
           Expanded(
-            child: ElevatedButton(
+            child: GlassButton(
               onPressed: () {
                 if (_validateSiteToCompanyForm()) {
                   _saveSiteToCompanyTransfer();
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 16)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                ),
-                elevation: 2,
-              ),
-              child: Text(
-                'Return to Company',
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              label: 'Return',
             ),
           ),
         ],
@@ -1376,85 +1247,44 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12))),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: Responsive.scaleH(context, 28)),
-              SizedBox(width: Responsive.scaleH(context, 12)),
-              Text(
-                'Transfer Successful!',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 20),
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: ListBody(
+          backgroundColor: Colors.transparent,
+          contentPadding: EdgeInsets.zero,
+          content: GlassCard(
+            padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Materials have been transferred successfully between sites.',
-                  style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
-                ),
+                Icon(Icons.check_circle_outline, color: Colors.green, size: Responsive.scaleH(context, 64)),
                 SizedBox(height: Responsive.scaleV(context, 16)),
-                _buildInfoItem('From Site: ${_fromSiteNameController.text}'),
-                _buildInfoItem('To Site: ${_toSiteNameController.text}'),
-                _buildInfoItem('Date: ${_fromDateController.text}'),
-                SizedBox(height: Responsive.scaleV(context, 12)),
                 Text(
-                  'Transferred Materials:',
+                  'Transfer Successful!',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: const Color(0xFF772323),
+                    fontSize: Responsive.fontSize(context, 20),
+                    color: Colors.white,
                   ),
                 ),
-                SizedBox(height: Responsive.scaleV(context, 8)),
-                ...materialsToTransfer.map((material) => Padding(
-                      padding: EdgeInsets.only(bottom: Responsive.scaleV(context, 4)),
-                      child: Text(
-                        '• ${material['displayName']}: ${material['neededCount']} units',
-                        style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
-                      ),
-                    )),
-                SizedBox(height: Responsive.scaleV(context, 16)),
-                Container(
-                  padding: EdgeInsets.all(Responsive.scaleH(context, 12)),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                    border: Border.all(color: Colors.green.withOpacity(0.1)),
-                  ),
-                  child: Text(
-                    '✓ Inventories Updated\n✓ History Saved',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 12),
-                      color: Colors.green[800],
-                      height: 1.5,
-                    ),
-                  ),
+                SizedBox(height: Responsive.scaleV(context, 12)),
+                Text(
+                  'Materials have been transferred successfully between sites.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: Responsive.fontSize(context, 14), color: Colors.white.withOpacity(0.7)),
+                ),
+                SizedBox(height: Responsive.scaleV(context, 24)),
+                _buildInfoItem('From: ${_fromSiteNameController.text}'),
+                _buildInfoItem('To: ${_toSiteNameController.text}'),
+                _buildInfoItem('Date: ${_fromDateController.text}'),
+                SizedBox(height: Responsive.scaleV(context, 24)),
+                GlassButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _clearSiteToSiteFields();
+                  },
+                  label: 'OK',
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _clearSiteToSiteFields();
-              },
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: const Color(0xFF772323),
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -1465,84 +1295,43 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12))),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: Responsive.scaleH(context, 28)),
-              SizedBox(width: Responsive.scaleH(context, 12)),
-              Text(
-                'Transfer Successful!',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 20),
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: ListBody(
+          backgroundColor: Colors.transparent,
+          contentPadding: EdgeInsets.zero,
+          content: GlassCard(
+            padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Materials have been returned to company successfully.',
-                  style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
-                ),
+                Icon(Icons.check_circle_outline, color: Colors.green, size: Responsive.scaleH(context, 64)),
                 SizedBox(height: Responsive.scaleV(context, 16)),
-                _buildInfoItem('From Site: ${_siteToCompanySiteNameController.text}'),
-                _buildInfoItem('Date: ${_siteToCompanyDateController.text}'),
-                SizedBox(height: Responsive.scaleV(context, 12)),
                 Text(
-                  'Returned Materials:',
+                  'Return Successful!',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: const Color(0xFF772323),
+                    fontSize: Responsive.fontSize(context, 20),
+                    color: Colors.white,
                   ),
                 ),
-                SizedBox(height: Responsive.scaleV(context, 8)),
-                ...materialsToTransfer.map((material) => Padding(
-                      padding: EdgeInsets.only(bottom: Responsive.scaleV(context, 4)),
-                      child: Text(
-                        '• ${material['displayName']}: ${material['neededCount']} units',
-                        style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
-                      ),
-                    )),
-                SizedBox(height: Responsive.scaleV(context, 16)),
-                Container(
-                  padding: EdgeInsets.all(Responsive.scaleH(context, 12)),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-                    border: Border.all(color: Colors.green.withOpacity(0.1)),
-                  ),
-                  child: Text(
-                    '✓ Company Inventory Increased\n✓ History Saved',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 12),
-                      color: Colors.green[800],
-                      height: 1.5,
-                    ),
-                  ),
+                SizedBox(height: Responsive.scaleV(context, 12)),
+                Text(
+                  'Materials have been returned to company successfully.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: Responsive.fontSize(context, 14), color: Colors.white.withOpacity(0.7)),
+                ),
+                SizedBox(height: Responsive.scaleV(context, 24)),
+                _buildInfoItem('Site: ${_siteToCompanySiteNameController.text}'),
+                _buildInfoItem('Date: ${_siteToCompanyDateController.text}'),
+                SizedBox(height: Responsive.scaleV(context, 24)),
+                GlassButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _clearSiteToCompanyFields();
+                  },
+                  label: 'OK',
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _clearSiteToCompanyFields();
-              },
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: const Color(0xFF772323),
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -1553,11 +1342,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       SnackBar(
         content: Text(
           message,
-          style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
+          style: TextStyle(fontSize: Responsive.fontSize(context, 14), color: Colors.white),
         ),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF772323),
+        backgroundColor: Colors.black.withOpacity(0.8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8))),
         margin: EdgeInsets.all(Responsive.scaleH(context, 16)),
       ),
@@ -1568,39 +1357,39 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12))),
-        title: Text(
-          'About Material Transfer',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 18),
-            color: const Color(0xFF772323),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: ListBody(
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        content: GlassCard(
+          padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'About Material Transfer',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: Responsive.fontSize(context, 18),
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: Responsive.scaleV(context, 16)),
               _buildHelpItem(Icons.sync_alt, 'Site to Site', 'Transfer materials between two different project sites.'),
               SizedBox(height: Responsive.scaleV(context, 12)),
               _buildHelpItem(Icons.business, 'Return to Company', 'Send materials from a site back to the central company inventory.'),
               SizedBox(height: Responsive.scaleV(context, 12)),
               _buildHelpItem(Icons.inventory, 'Real-time Tracking', 'Inventory levels for all sites are updated automatically upon transfer confirmation.'),
+              SizedBox(height: Responsive.scaleV(context, 24)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GlassButton(
+                  onPressed: () => Navigator.pop(context),
+                  label: 'Got it',
+                ),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Got it',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: Responsive.fontSize(context, 16),
-                color: const Color(0xFF772323),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1609,7 +1398,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF772323), size: Responsive.scaleH(context, 20)),
+        Icon(icon, color: Theme.of(context).primaryColor, size: Responsive.scaleH(context, 20)),
         SizedBox(width: Responsive.scaleH(context, 12)),
         Expanded(
           child: Column(
@@ -1620,6 +1409,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: Responsive.fontSize(context, 14),
+                  color: Colors.white,
                 ),
               ),
               SizedBox(height: Responsive.scaleV(context, 2)),
@@ -1627,7 +1417,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 description,
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 12),
-                  color: Colors.grey[600],
+                  color: Colors.white.withOpacity(0.6),
                 ),
               ),
             ],
@@ -1648,64 +1438,31 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onTap,
   }) {
-    final bool isDark = AppTheme.isDark(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 14),
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.grey[300] : Colors.grey[700],
+        if (onTap != null)
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: IgnorePointer(
+              child: GlassTextField(
+                controller: controller,
+                label: label,
+                icon: icon ?? Icons.text_fields,
+                keyboardType: keyboardType,
+                readOnly: true,
+              ),
+            ),
+          )
+        else
+          GlassTextField(
+            controller: controller,
+            label: label,
+            icon: icon ?? Icons.text_fields,
+            keyboardType: keyboardType,
+            readOnly: !enabled,
           ),
-        ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          onTap: onTap,
-          readOnly: onTap != null || !enabled,
-          keyboardType: keyboardType,
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 16),
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: isDark ? Colors.grey[600] : Colors.grey[400],
-              fontSize: Responsive.fontSize(context, 14),
-            ),
-            prefixIcon: icon != null
-                ? Icon(icon, color: const Color(0xFF772323), size: Responsive.scaleH(context, 20))
-                : null,
-            filled: true,
-            fillColor: isDark 
-                ? (enabled ? Colors.grey[850] : Colors.grey[900])
-                : (enabled ? Colors.white : Colors.grey[100]),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: Responsive.scaleH(context, 16),
-              vertical: Responsive.scaleV(context, 12),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Responsive.scaleH(context, 10)),
-              borderSide: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Responsive.scaleH(context, 10)),
-              borderSide: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Responsive.scaleH(context, 10)),
-              borderSide: const BorderSide(color: Color(0xFF772323), width: 1.5),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Responsive.scaleH(context, 10)),
-              borderSide: BorderSide(color: isDark ? Colors.grey[900]! : Colors.grey[200]!),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -1717,10 +1474,10 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         vertical: Responsive.scaleV(context, 8),
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF772323).withOpacity(0.1),
+        color: Theme.of(context).primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
         border: Border(
-          left: BorderSide(color: const Color(0xFF772323), width: Responsive.scaleH(context, 4)),
+          left: BorderSide(color: Theme.of(context).primaryColor, width: Responsive.scaleH(context, 4)),
         ),
       ),
       child: Text(
@@ -1728,7 +1485,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         style: TextStyle(
           fontSize: Responsive.fontSize(context, 16),
           fontWeight: FontWeight.bold,
-          color: const Color(0xFF772323),
+          color: Theme.of(context).primaryColor,
           letterSpacing: 0.5,
         ),
       ),
@@ -1736,27 +1493,22 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildCountBox(String title, String value, Color color, IconData icon) {
-    final bool isDark = AppTheme.isDark(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 14),
-            color: isDark ? Colors.grey[300] : Colors.grey[700],
+        Padding(
+          padding: EdgeInsets.only(left: Responsive.scaleH(context, 4), bottom: Responsive.scaleV(context, 8)),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: Responsive.fontSize(context, 14),
+              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+            ),
           ),
         ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        Container(
-          width: double.infinity,
+        GlassCard(
           padding: EdgeInsets.all(Responsive.scaleH(context, 14)),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 10)),
-            border: Border.all(color: color.withOpacity(0.2)),
-          ),
           child: Row(
             children: [
               Container(
@@ -1784,24 +1536,19 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildTransferInfoBox(String text) {
-    return Container(
+    return GlassCard(
       padding: EdgeInsets.all(Responsive.scaleH(context, 12)),
-      decoration: BoxDecoration(
-        color: const Color(0xFF772323).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-        border: Border.all(color: const Color(0xFF772323).withOpacity(0.1)),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: const Color(0xFF772323), size: Responsive.scaleH(context, 20)),
+          Icon(Icons.info_outline, color: Theme.of(context).primaryColor, size: Responsive.scaleH(context, 20)),
           SizedBox(width: Responsive.scaleH(context, 12)),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 12),
-                color: AppTheme.isDark(context) ? Colors.grey[400] : Colors.grey[700],
+                color: Theme.of(context).textTheme.bodySmall?.color,
                 height: 1.5,
               ),
             ),
@@ -1812,25 +1559,21 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildMaterialsList() {
-    final isDark = AppTheme.isDark(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Materials to Transfer:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 16),
-            color: isDark ? Colors.white : Colors.black,
+        Padding(
+          padding: EdgeInsets.only(left: Responsive.scaleH(context, 4), bottom: Responsive.scaleV(context, 12)),
+          child: Text(
+            'Materials to Transfer:',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: Responsive.fontSize(context, 16),
+              color: Theme.of(context).textTheme.titleLarge?.color,
+            ),
           ),
         ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-            color: isDark ? Colors.grey[850] : Colors.white,
-          ),
+        GlassCard(
           child: Column(
             children: [
               ...materialsToTransfer.asMap().entries.map((entry) {
@@ -1839,34 +1582,40 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 return Container(
                   decoration: BoxDecoration(
                     border: index < materialsToTransfer.length - 1
-                        ? Border(bottom: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[200]!))
+                        ? Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1)))
                         : null,
                   ),
                   child: ListTile(
-                    leading: Icon(
-                      Icons.inventory,
-                      color: const Color(0xFF772323),
-                      size: Responsive.scaleH(context, 24),
+                    leading: Container(
+                      padding: EdgeInsets.all(Responsive.scaleH(context, 8)),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.inventory,
+                        color: Theme.of(context).primaryColor,
+                        size: Responsive.scaleH(context, 20),
+                      ),
                     ),
                     title: Text(
                       material['displayName'],
                       style: TextStyle(
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         fontSize: Responsive.fontSize(context, 14),
-                        color: isDark ? Colors.white : Colors.black,
                       ),
                     ),
                     subtitle: Text(
                       'Quantity: ${material['neededCount']} units',
                       style: TextStyle(
                         fontSize: Responsive.fontSize(context, 12),
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                     ),
                     trailing: IconButton(
                       icon: Icon(
-                        Icons.delete,
-                        color: Colors.red,
+                        Icons.delete_outline,
+                        color: Colors.red.shade400,
                         size: Responsive.scaleH(context, 20),
                       ),
                       onPressed: () => _removeMaterial(index),
@@ -1882,7 +1631,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           'Total Materials: ${materialsToTransfer.length}',
           style: TextStyle(
             fontSize: Responsive.fontSize(context, 12),
-            color: Colors.grey,
+            color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -1896,13 +1645,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('• ', style: TextStyle(fontSize: Responsive.fontSize(context, 14), color: const Color(0xFF772323))),
+          Text('• ', style: TextStyle(fontSize: Responsive.fontSize(context, 14), color: Theme.of(context).primaryColor)),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 14),
-                color: AppTheme.isDark(context) ? Colors.grey[300] : Colors.grey[800],
+                color: Colors.white.withOpacity(0.8),
               ),
             ),
           ),
@@ -1920,79 +1669,65 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 14),
-            color: isDark ? Colors.grey[300] : Colors.grey[700],
+        Padding(
+          padding: EdgeInsets.only(left: Responsive.scaleH(context, 4), bottom: Responsive.scaleV(context, 8)),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: Responsive.fontSize(context, 14),
+              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+            ),
           ),
         ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[400]!),
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-            color: isDark ? Colors.grey[850] : Colors.white,
+        GlassCard(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.scaleH(context, 12),
+            vertical: Responsive.scaleV(context, 4),
           ),
           child: _isLoadingSites
-              ? Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: Responsive.scaleH(context, 12),
-                    vertical: Responsive.scaleV(context, 16),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: Responsive.scaleH(context, 16),
-                        height: Responsive.scaleH(context, 16),
-                        child: const CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF772323)),
+              ? Row(
+                  children: [
+                    SizedBox(
+                      width: Responsive.scaleH(context, 16),
+                      height: Responsive.scaleH(context, 16),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).primaryColor),
+                    ),
+                    SizedBox(width: Responsive.scaleH(context, 12)),
+                    Text(
+                      'Loading sites...',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: Responsive.fontSize(context, 14),
                       ),
-                      SizedBox(width: Responsive.scaleH(context, 12)),
-                      Text(
-                        'Loading sites...',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: Responsive.fontSize(context, 14),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 )
-              : InputDecorator(
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: Responsive.scaleH(context, 12),
-                      vertical: Responsive.scaleV(context, 4),
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedId,
-                      isExpanded: true,
-                      dropdownColor: isDark ? Colors.grey[900] : Colors.white,
-                      hint: Text(
-                        'Select Site',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: Responsive.fontSize(context, 14),
-                        ),
+              : DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedId,
+                    isExpanded: true,
+                    dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+                    hint: Text(
+                      'Select Site',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: Responsive.fontSize(context, 14),
                       ),
-                      items: sitesList.map((site) {
-                        return DropdownMenuItem<String>(
-                          value: site['siteId'],
-                          child: Text(
-                            site['siteName'] ?? site['siteId'],
-                            style: TextStyle(
-                              fontSize: Responsive.fontSize(context, 14),
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: onChanged,
                     ),
+                    items: sitesList.map((site) {
+                      return DropdownMenuItem<String>(
+                        value: site['siteId'],
+                        child: Text(
+                          site['siteName'] ?? site['siteId'],
+                          style: TextStyle(
+                            fontSize: Responsive.fontSize(context, 14),
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: onChanged,
                   ),
                 ),
         ),
@@ -2001,100 +1736,86 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildMaterialDropdown() {
-    final isDark = AppTheme.isDark(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Material Name *',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.fontSize(context, 14),
-            color: isDark ? Colors.grey[300] : Colors.grey[700],
+        Padding(
+          padding: EdgeInsets.only(left: Responsive.scaleH(context, 4), bottom: Responsive.scaleV(context, 8)),
+          child: Text(
+            'Material Name *',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: Responsive.fontSize(context, 14),
+              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+            ),
           ),
         ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[400]!),
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
-            color: isDark ? Colors.grey[850] : Colors.white,
+        GlassCard(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.scaleH(context, 12),
+            vertical: Responsive.scaleV(context, 4),
           ),
           child: _isLoadingMaterials
-              ? Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: Responsive.scaleH(context, 12),
-                    vertical: Responsive.scaleV(context, 16),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: Responsive.scaleH(context, 16),
-                        height: Responsive.scaleH(context, 16),
-                        child: const CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF772323)),
+              ? Row(
+                  children: [
+                    SizedBox(
+                      width: Responsive.scaleH(context, 16),
+                      height: Responsive.scaleH(context, 16),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).primaryColor),
+                    ),
+                    SizedBox(width: Responsive.scaleH(context, 12)),
+                    Text(
+                      'Loading materials...',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: Responsive.fontSize(context, 14),
                       ),
-                      SizedBox(width: Responsive.scaleH(context, 12)),
-                      Text(
-                        'Loading materials...',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: Responsive.fontSize(context, 14),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 )
-              : InputDecorator(
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: Responsive.scaleH(context, 12),
-                      vertical: Responsive.scaleV(context, 4),
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedMaterialName,
-                      isExpanded: true,
-                      dropdownColor: isDark ? Colors.grey[900] : Colors.white,
-                      hint: Text(
-                        'Select Material',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: Responsive.fontSize(context, 14),
-                        ),
+              : DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedMaterialName,
+                    isExpanded: true,
+                    dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+                    hint: Text(
+                      'Select Material',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: Responsive.fontSize(context, 14),
                       ),
-                      items: siteMaterialsList.map((material) {
-                        final materialName = material['materialName'];
-                        final displayName = material['displayName'];
-                        final count = material['count'] ?? 0;
-
-                        return DropdownMenuItem<String>(
-                          value: materialName,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                displayName ?? materialName,
-                                style: TextStyle(
-                                  fontSize: Responsive.fontSize(context, 14),
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              Text(
-                                'Available: $count',
-                                style: TextStyle(
-                                  fontSize: Responsive.fontSize(context, 12),
-                                  color: count > 0 ? Colors.green : Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: _onMaterialChanged,
                     ),
+                    items: siteMaterialsList.map((material) {
+                      final materialName = material['materialName'];
+                      final displayName = material['displayName'];
+                      final count = material['count'] ?? 0;
+
+                      return DropdownMenuItem<String>(
+                        value: materialName,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              displayName ?? materialName,
+                              style: TextStyle(
+                                fontSize: Responsive.fontSize(context, 14),
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            Text(
+                              'Available: $count',
+                              style: TextStyle(
+                                fontSize: Responsive.fontSize(context, 12),
+                                color: count > 0 ? Colors.green : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: _onMaterialChanged,
                   ),
                 ),
         ),

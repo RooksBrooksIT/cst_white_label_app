@@ -5,6 +5,7 @@ import 'customer_login_page.dart';
 import 'supervisor_login_page.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -26,13 +27,15 @@ class _MainDashboardState extends State<MainDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => Navigator.of(context).pop(),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 32,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -41,7 +44,7 @@ class _MainDashboardState extends State<MainDashboard> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -51,11 +54,11 @@ class _MainDashboardState extends State<MainDashboard> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Select Your Role',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   letterSpacing: -0.5,
@@ -66,7 +69,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 'Choose how you\'d like to sign in',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: Responsive.fontSize(context, 16),
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
@@ -78,7 +81,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 title: 'Organization',
                 subtitle: 'Manage org details & data',
                 icon: Icons.account_balance_rounded,
-                accentColor: primary,
+                accentColor: colorScheme.primary,
                 destination: const Organisation_LoginPage(),
               ),
               const SizedBox(height: 16),
@@ -87,7 +90,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 title: 'Manager',
                 subtitle: 'Configure settings & control',
                 icon: Icons.manage_accounts_rounded,
-                accentColor: const Color(0xFF5C6BC0),
+                accentColor: colorScheme.secondary,
                 destination: const ConfigLoginPage(),
               ),
               const SizedBox(height: 16),
@@ -96,7 +99,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 title: 'Supervisor',
                 subtitle: 'Manage site activities',
                 icon: Icons.supervisor_account_rounded,
-                accentColor: const Color(0xFF00897B),
+                accentColor: colorScheme.tertiary,
                 destination: const SupervisorLoginPage(),
               ),
               const SizedBox(height: 16),
@@ -105,7 +108,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 title: 'Customer',
                 subtitle: 'View your project status',
                 icon: Icons.person_rounded,
-                accentColor: const Color(0xFFF59E0B),
+                accentColor: colorScheme.outline,
                 destination: const CustomerLoginPage(),
               ),
               const SizedBox(height: 40),
@@ -151,8 +154,8 @@ class _MainDashboardState extends State<MainDashboard> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 18,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 18),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -161,7 +164,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: Responsive.fontSize(context, 14),
                       color: Colors.white.withValues(alpha: 0.65),
                     ),
                   ),

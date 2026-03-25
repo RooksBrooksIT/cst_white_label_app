@@ -7,6 +7,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
@@ -160,13 +161,15 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 32,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -174,7 +177,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -184,10 +187,11 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Customer Login',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -195,8 +199,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
               const SizedBox(height: 8),
               Text(
                 'Access your project details',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: Responsive.fontSize(context, 16),
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),

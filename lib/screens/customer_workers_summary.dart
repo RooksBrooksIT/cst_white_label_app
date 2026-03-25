@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class CustomerWorkersSummary extends StatefulWidget {
   final String siteId;
@@ -9,36 +12,27 @@ class CustomerWorkersSummary extends StatefulWidget {
     : super(key: key);
 
   @override
-  State<CustomerWorkersSummary> createState() => _CustomerWorkersSummaryState();
+  _CustomerWorkersSummaryState createState() => _CustomerWorkersSummaryState();
 }
 
 class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _filterType = 'all';
   DateTime? _selectedDate;
   DateTime? _selectedMonth;
   DateTime? _selectedYear;
-  String _filterType = 'all'; // 'all', 'date', 'month', 'year'
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Worker Summary - ${widget.siteId}'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20.0),
-            bottomRight: Radius.circular(20.0),
-          ),
+    return GlassScaffold(
+      title: 'Worker Summary',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.filter_alt, color: Colors.white),
+          onPressed: _showFilterDialog,
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_alt),
-            onPressed: _showFilterDialog,
-          ),
-        ],
-      ),
+      ],
       body: Column(
         children: [
           // Filter Summary
@@ -57,14 +51,14 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: Colors.white));
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No worker data found for selected filter',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                      'No worker data found',
+                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
                     ),
                   );
                 }
@@ -122,14 +116,15 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
         children: [
           Text(
             filterText,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF003768),
+              color: Colors.white,
+              fontSize: Responsive.fontSize(context, 14),
             ),
           ),
           if (_filterType != 'all')
             IconButton(
-              icon: const Icon(Icons.clear, size: 20),
+              icon: const Icon(Icons.clear, size: 20, color: Colors.white60),
               onPressed: _clearFilters,
               tooltip: 'Clear filter',
             ),
@@ -148,19 +143,18 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
 
         final stats = _calculateOverallStatistics(snapshot.data!.docs);
 
-        return Card(
+        return GlassCard(
           margin: const EdgeInsets.all(12),
-          elevation: 2,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                const Text(
+                Text(
                   'Overview',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: Responsive.fontSize(context, 18),
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF003768),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -238,7 +232,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: const TextStyle(fontSize: 12, color: Colors.white60),
           textAlign: TextAlign.center,
         ),
       ],
@@ -323,9 +317,9 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(
+        title: Text(
           'Filter Reports',
-          style: TextStyle(color: Color(0xFF003768)),
+          style: TextStyle(color: Theme.of(context).colorScheme.primary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -377,12 +371,12 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
     VoidCallback onTap,
   ) {
     return ListTile(
-      leading: Icon(icon, color: Color(0xFF003768)),
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
       trailing: value != null
           ? Chip(
               label: Text(value, style: const TextStyle(fontSize: 12)),
-              backgroundColor: Color(0xFF003768).withOpacity(0.1),
+              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
             )
           : null,
       onTap: onTap,
@@ -576,10 +570,8 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
     // Alternate background color for cards
     final backgroundColor = index % 2 == 0 ? Colors.white : Colors.grey[50];
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      elevation: 2,
-      color: backgroundColor,
+    return GlassCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -588,10 +580,10 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Color(0xFF003768).withOpacity(0.1),
+                  backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                   child: Text(
                     worker.name.isNotEmpty ? worker.name[0].toUpperCase() : '?',
-                    style: TextStyle(color: Color(0xFF003768)),
+                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -604,11 +596,12 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
                       Text(
                         worker.designation,
-                        style: TextStyle(fontSize: 14, ),
+                        style: const TextStyle(fontSize: 14, color: Colors.white60),
                       ),
                     ],
                   ),
@@ -621,7 +614,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                        color: Colors.greenAccent,
                       ),
                     ),
                     Text(

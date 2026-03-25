@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../utils/responsive.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -32,20 +33,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text(
+          title: Text(
             'Join Organization',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Enter the referral code provided by your organization administrator.',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: Responsive.fontSize(context, 13),
+                ),
               ),
               const SizedBox(height: 20),
               GlassTextField(
@@ -114,30 +121,32 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => {}, // Disable back on welcome if needed, or just let it pop
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 40,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Logo Area
               Container(
-                width: 100,
-                height: 100,
+                width: Responsive.isMobile(context) ? 100 : 120,
+                height: Responsive.isMobile(context) ? 100 : 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withOpacity(0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                       blurRadius: 30,
                       spreadRadius: 5,
                     ),
@@ -151,8 +160,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 builder: (context, name, _) {
                   return Text(
                     name,
-                    style: const TextStyle(
-                      fontSize: 32,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 32),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       letterSpacing: 1.5,
@@ -163,9 +173,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const SizedBox(height: 8),
               Text(
                 'Streamlining Construction Excellence',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withOpacity(0.7),
+                  fontSize: Responsive.fontSize(context, 16),
+                  color: colorScheme.onSurfaceVariant,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -199,7 +210,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const SizedBox(height: 40),
               Text(
                 'v1.0.0',
-                style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.3)),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
               ),
             ],
           ),

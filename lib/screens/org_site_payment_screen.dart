@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 class SitePaymentScreen extends StatefulWidget {
   const SitePaymentScreen({super.key});
@@ -308,365 +312,184 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final isSmallScreen = mediaQuery.size.width < 600;
-    final isVerySmallScreen = mediaQuery.size.width < 400;
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: mainColor,
-        title: const Text(
-          'Site Payment',
-          style: TextStyle(),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        iconTheme: IconThemeData(),
-      ),
-      
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-          child: Container(
-            width: double.infinity,
-            constraints: BoxConstraints(maxWidth: 600),
-            padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
-            margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8.0 : 0.0),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [mainColor.withOpacity(0.10), Colors.white],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: mainColor.withOpacity(0.10),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header with icon and title
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: mainColor,
-                      radius: isSmallScreen ? 20 : 28,
-                      child: Icon(
-                        Icons.payments,
-                        
-                        size: isSmallScreen ? 24 : 32,
-                      ),
-                    ),
-                    SizedBox(width: isSmallScreen ? 12 : 16),
-                    Expanded(
-                      child: Text(
-                        'Site Payment Entry',
-                        style: TextStyle(
-                          color: mainColor,
-                          fontSize: isSmallScreen ? 20 : 24,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isSmallScreen ? 24 : 32),
-
-                // Site ID Dropdown
-                _buildSectionTitle('Site ID *'),
-                SizedBox(height: 8),
-                _buildDropdownContainer(
-                  child: DropdownButtonFormField<String>(
-                    value: selectedSiteId,
-                    isExpanded: true,
-                    decoration: _inputDecoration(),
-                    items: siteList.map((site) {
-                      return DropdownMenuItem<String>(
-                        value: site['id'],
-                        child: Text(
-                          site['display'] ?? '',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) async {
-                      setState(() {
-                        selectedSiteId = value;
-                        supervisor = '';
-                        amount = 0;
-                        amountController.text = '';
-                      });
-                      if (value != null) {
-                        await _fetchSupervisorForSite(value);
-                      }
-                    },
-                    hint: Text(
-                      'Select Site ID',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                SizedBox(height: isSmallScreen ? 20 : 24),
-
-                // Supervisor (auto-filled)
-                _buildSectionTitle('Supervisor *'),
-                SizedBox(height: 8),
-                _buildTextFieldContainer(
-                  child: TextFormField(
-                    readOnly: true,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: mainColor,
-                    ),
-                    decoration: _inputDecoration(),
-                    controller: TextEditingController(text: supervisor),
-                    key: ValueKey(supervisor),
-                  ),
-                ),
-                SizedBox(height: isSmallScreen ? 20 : 24),
-
-                // Amount (editable, with rupee icon and only numbers allowed)
-                _buildSectionTitle('Amount *'),
-                SizedBox(height: 8),
-                _buildTextFieldContainer(
-                  child: TextFormField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: mainColor,
-                    ),
-                    decoration: _inputDecoration().copyWith(
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.only(left: 12, right: 8),
-                        child: Text(
-                          '₹',
-                          style: TextStyle(fontSize: 20, color: mainColor),
-                        ),
-                      ),
-                      prefixIconConstraints: BoxConstraints(
-                        minWidth: 0,
-                        minHeight: 0,
-                      ),
-                      hintText: 'Enter amount',
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        amount = int.tryParse(value) ?? 0;
-                      });
-                    },
-                  ),
-                ),
-                SizedBox(height: isSmallScreen ? 20 : 24),
-
-                // Project Stage Dropdown
-                _buildSectionTitle('Project Stage *'),
-                SizedBox(height: 8),
-                _buildDropdownContainer(
-                  child: DropdownButtonFormField<String>(
-                    value: selectedProjectStage,
-                    isExpanded: true,
-                    decoration: _inputDecoration(),
-                    items: projectStages.map((stage) {
-                      return DropdownMenuItem<String>(
-                        value: stage,
-                        child: Text(
-                          stage,
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedProjectStage = value;
-                      });
-                    },
-                    hint: Text(
-                      'Select Project Stage',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                SizedBox(height: isSmallScreen ? 20 : 24),
-
-                // Year and Month
-                _buildSectionTitle('Year and Month *'),
-                SizedBox(height: 8),
-                isSmallScreen ? _buildYearMonthColumn() : _buildYearMonthRow(),
-                SizedBox(height: isSmallScreen ? 16 : 24),
-
-                // Weeks Selection
-                _buildWeeksSection(),
-                SizedBox(height: isSmallScreen ? 20 : 24),
-
-                // Date Picker (only show if week is selected)
-                if (selectedPaymentWeekIndex != null) _buildDatePickerSection(),
-
-                SizedBox(height: isSmallScreen ? 28 : 36),
-
-                // Buttons
-                _buildActionButtons(isSmallScreen, isVerySmallScreen),
-
-                // Required fields note
-                SizedBox(height: 16),
-                Text(
-                  '* indicates required fields',
-                  style: TextStyle(
-                    
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Site Payment',
+      onBack: () => Navigator.pop(context),
+      body: _buildBody(context),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        color: mainColor,
-        fontSize: 16,
-      ),
-    );
-  }
-
-  Widget _buildDropdownContainer({required Widget child}) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: mainColor.withOpacity(0.07),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+  Widget _buildBody(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(context),
+          const SizedBox(height: 32),
+          _buildForm(context),
         ],
       ),
-      child: child,
     );
   }
 
-  Widget _buildTextFieldContainer({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: mainColor.withOpacity(0.07),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
-  InputDecoration _inputDecoration() {
-    return InputDecoration(
-      filled: true,
-      
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: mainColor.withOpacity(0.1)),
-      ),
-    );
-  }
-
-  Widget _buildYearMonthRow() {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: _buildDropdownContainer(
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentYear,
-              isExpanded: true,
-              decoration: _inputDecoration(),
-              items: paymentYears.map((y) {
-                return DropdownMenuItem<int>(
-                  value: y,
-                  child: Text(
-                    y.toString(),
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentYear = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.payments_rounded,
+            color: Colors.white,
+            size: Responsive.fontSize(context, 32),
           ),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
-          child: _buildDropdownContainer(
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentMonth,
-              isExpanded: true,
-              decoration: _inputDecoration(),
-              items: List.generate(12, (i) => i + 1).map((m) {
-                return DropdownMenuItem<int>(
-                  value: m,
-                  child: Text(
-                    DateFormat.MMMM().format(DateTime(0, m)),
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentMonth = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Payment Entry',
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 24),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                'Record site supervisor payments',
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 14),
+                  color: Colors.white70,
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildYearMonthColumn() {
-    return Column(
+  Widget _buildForm(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSectionTitle('Site Details'),
+          const SizedBox(height: 16),
+          _buildSiteDropdown(),
+          const SizedBox(height: 20),
+          _buildSupervisorField(),
+          const SizedBox(height: 20),
+          _buildAmountField(),
+          const SizedBox(height: 20),
+          _buildProjectStageDropdown(),
+          const SizedBox(height: 32),
+          _buildSectionTitle('Payment Period'),
+          const SizedBox(height: 16),
+          _buildPeriodSelection(),
+          const SizedBox(height: 20),
+          _buildWeeksSelection(),
+          const SizedBox(height: 20),
+          if (selectedPaymentWeekIndex != null) _buildDatePickerSection(),
+          const SizedBox(height: 40),
+          _buildActionButtons(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteDropdown() {
+    return DropdownButtonFormField<String>(
+      value: selectedSiteId,
+      isExpanded: true,
+      dropdownColor: const Color(0xFF1A1F2E),
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration('Select Site ID', Icons.place_rounded),
+      items: siteList.map((site) {
+        return DropdownMenuItem<String>(
+          value: site['id'],
+          child: Text(site['display'] ?? ''),
+        );
+      }).toList(),
+      onChanged: (value) async {
+        setState(() {
+          selectedSiteId = value;
+          supervisor = '';
+          amount = 0;
+          amountController.text = '';
+        });
+        if (value != null) {
+          await _fetchSupervisorForSite(value);
+        }
+      },
+    );
+  }
+
+  Widget _buildSupervisorField() {
+    return TextFormField(
+      readOnly: true,
+      controller: TextEditingController(text: supervisor),
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration('Supervisor', Icons.person_rounded),
+    );
+  }
+
+  Widget _buildAmountField() {
+    return TextFormField(
+      controller: amountController,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration('Amount', Icons.currency_rupee_rounded),
+      onChanged: (value) {
+        setState(() {
+          amount = int.tryParse(value) ?? 0;
+        });
+      },
+    );
+  }
+
+  Widget _buildProjectStageDropdown() {
+    return DropdownButtonFormField<String>(
+      value: selectedProjectStage,
+      isExpanded: true,
+      dropdownColor: const Color(0xFF1A1F2E),
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration('Project Stage', Icons.flag_rounded),
+      items: projectStages.map((stage) {
+        return DropdownMenuItem<String>(
+          value: stage,
+          child: Text(stage),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedProjectStage = value;
+        });
+      },
+    );
+  }
+
+  Widget _buildPeriodSelection() {
+    return Row(
       children: [
-        _buildDropdownContainer(
+        Expanded(
           child: DropdownButtonFormField<int>(
             value: selectedPaymentYear,
-            isExpanded: true,
-            decoration: _inputDecoration(),
+            dropdownColor: const Color(0xFF1A1F2E),
+            style: const TextStyle(color: Colors.white),
+            decoration: _inputDecoration('Year', Icons.calendar_today_rounded),
             items: paymentYears.map((y) {
               return DropdownMenuItem<int>(
                 value: y,
-                child: Text(
-                  y.toString(),
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
+                child: Text(y.toString()),
               );
             }).toList(),
             onChanged: (value) {
@@ -677,19 +500,17 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             },
           ),
         ),
-        SizedBox(height: 12),
-        _buildDropdownContainer(
+        const SizedBox(width: 12),
+        Expanded(
           child: DropdownButtonFormField<int>(
             value: selectedPaymentMonth,
-            isExpanded: true,
-            decoration: _inputDecoration(),
+            dropdownColor: const Color(0xFF1A1F2E),
+            style: const TextStyle(color: Colors.white),
+            decoration: _inputDecoration('Month', Icons.calendar_month_rounded),
             items: List.generate(12, (i) => i + 1).map((m) {
               return DropdownMenuItem<int>(
                 value: m,
-                child: Text(
-                  DateFormat.MMMM().format(DateTime(0, m)),
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
+                child: Text(DateFormat.MMMM().format(DateTime(0, m))),
               );
             }).toList(),
             onChanged: (value) {
@@ -704,24 +525,99 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildWeeksSection() {
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: resetForm,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Reset'),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: _submitPayment,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Submit Payment',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white54),
+      prefixIcon: Icon(icon, color: Colors.white70, size: 20),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.05),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.white10),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+
+  Widget _buildWeeksSelection() {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Select Week *'),
-        SizedBox(height: 8),
+        const SizedBox(height: 12),
         weeks.isEmpty
             ? Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  
+                  color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
+                child: const Text(
                   'No weeks available for selected month',
-                  style: TextStyle(),
+                  style: TextStyle(color: Colors.white70),
                 ),
               )
             : Wrap(
@@ -739,16 +635,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                         fontSize: 12,
                         color: selectedPaymentWeekIndex == i
                             ? Colors.white
-                            : mainColor,
+                            : Colors.white70,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     selected: selectedPaymentWeekIndex == i,
-                    selectedColor: mainColor,
-                    backgroundColor: Color(0xFFF2EAEA),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
                     onSelected: (selected) {
                       setState(() {
                         selectedPaymentWeekIndex = i;
@@ -756,6 +647,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                         selectedDate = week.first;
                       });
                     },
+                    selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    backgroundColor: Colors.white.withOpacity(0.05),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   );
                 }),
               ),
@@ -771,57 +667,31 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Select Date within Week'),
-        SizedBox(height: 8),
+        const SizedBox(height: 12),
         GestureDetector(
           onTap: () async {
             final weekStart = weekDays.first;
             final weekEnd = weekDays.last;
             final picked = await showDatePicker(
               context: context,
-              initialDate:
-                  selectedDate != null &&
-                      selectedDate!.isAfter(
-                        weekStart.subtract(const Duration(days: 1)),
-                      ) &&
-                      selectedDate!.isBefore(
-                        weekEnd.add(const Duration(days: 1)),
-                      )
+              initialDate: selectedDate != null &&
+                      selectedDate!.isAfter(weekStart.subtract(const Duration(days: 1))) &&
+                      selectedDate!.isBefore(weekEnd.add(const Duration(days: 1)))
                   ? selectedDate!
                   : weekStart,
               firstDate: weekStart,
               lastDate: weekEnd,
-              builder: (context, child) {
-                return Theme(
-                  data: ThemeData.light().copyWith(
-                    primaryColor: mainColor,
-                    colorScheme: ColorScheme.light(primary: mainColor),
-                    buttonTheme: ButtonThemeData(
-                      textTheme: ButtonTextTheme.primary,
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
             );
             if (picked != null) {
-              setState(() {
-                selectedDate = picked;
-              });
+              setState(() => selectedDate = picked);
             }
           },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
-              
-              border: Border.all(color: mainColor.withOpacity(0.2)),
+              color: Colors.white.withOpacity(0.05),
+              border: Border.all(color: Colors.white10),
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: mainColor.withOpacity(0.07),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -830,115 +700,23 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   selectedDate != null
                       ? DateFormat('EEE, MMM dd, yyyy').format(selectedDate!)
                       : 'Select Date',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
-                    color: mainColor,
+                    color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                Icon(Icons.calendar_today, color: mainColor, size: 20),
+                const Icon(Icons.calendar_today, color: Colors.white70, size: 20),
               ],
             ),
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           'Available dates: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
-          style: TextStyle( fontSize: 12),
+          style: const TextStyle(fontSize: 12, color: Colors.white54),
         ),
       ],
-    );
-  }
-
-  Widget _buildActionButtons(bool isSmallScreen, bool isVerySmallScreen) {
-    if (isVerySmallScreen) {
-      return Column(
-        children: [
-          _buildAddButton(),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _buildResetButton()),
-              SizedBox(width: 12),
-              Expanded(child: _buildCancelButton()),
-            ],
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(child: _buildAddButton()),
-        SizedBox(width: isSmallScreen ? 8 : 12),
-        Expanded(child: _buildResetButton()),
-        SizedBox(width: isSmallScreen ? 8 : 12),
-        Expanded(child: _buildCancelButton()),
-      ],
-    );
-  }
-
-  Widget _buildAddButton() {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: mainColor,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 4,
-        shadowColor: mainColor.withOpacity(0.2),
-      ),
-      onPressed: _submitPayment,
-      child: Text(
-        'ADD PAYMENT',
-        style: TextStyle(
-          fontSize: 16,
-          
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResetButton() {
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: mainColor, width: 2),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      onPressed: resetForm,
-      child: Text(
-        'RESET',
-        style: TextStyle(
-          fontSize: 16,
-          color: mainColor,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCancelButton() {
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: Colors.grey, width: 2),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      onPressed: () {
-        Navigator.pop(context);
-      },
-      child: Text(
-        'CANCEL',
-        style: TextStyle(
-          fontSize: 16,
-          
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
-        ),
-      ),
     );
   }
 }

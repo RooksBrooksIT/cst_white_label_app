@@ -1,205 +1,90 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/manager_expenses.dart';
-import 'package:demo_cst/screens/manager_site_entry_page.dart';
-
+import 'manager_expenses.dart';
+import 'manager_site_entry_page.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class ManagerExpensesHomeScreen extends StatelessWidget {
   const ManagerExpensesHomeScreen({super.key});
 
-  static const Color baseColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF4d79c2);
-  static const Color backgroundColor = Color(0xFFF5F7FA);
-  static const Color cardColor = Colors.white;
-  static const Color textColor = Color(0xFF2c3e50);
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        backgroundColor: baseColor,
-        elevation: 4,
-        title: const Text(
-          'Manager Expenses',
-          style: TextStyle(
-            fontWeight: FontWeight.bold, 
-            
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(16),
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+    final bool isSmallScreen = Responsive.isMobile(context);
+
+    return GlassScaffold(
+      title: 'Manager Expenses',
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _SectionCard(
-              icon: Icons.supervisor_account,
+            GlassCard(
               title: 'Site Supervisor Entry',
-              description:
-                  'Add, view, and manage site supervisor expenses and entries.',
-              color: baseColor,
-              accentColor: accentColor,
-              cardColor: cardColor,
-              textColor: textColor,
+              subtitle: 'Add, view, and manage site supervisor expenses and entries.',
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) =>
-                          ManagerSiteEntryPage(userName: '', userDetails: {})),
+                    builder: (context) => const ManagerSiteEntryPage(
+                      userName: '',
+                      userDetails: {},
+                    ),
+                  ),
                 );
               },
-              buttonText: 'Go to Site Supervisor Entry',
+              child: _buildCardContent(
+                context,
+                icon: Icons.supervisor_account,
+                label: 'Go to Supervisor Entry',
+              ),
             ),
-            const SizedBox(height: 28),
-            _SectionCard(
-              icon: Icons.account_balance_wallet,
+            const SizedBox(height: 20),
+            GlassCard(
               title: 'Manager Entry',
-              description:
-                  'Add, view, and manage manager-level expenses and approvals.',
-              color: baseColor,
-              accentColor: accentColor,
-              cardColor: cardColor,
-              textColor: textColor,
+              subtitle: 'Add, view, and manage manager-level expenses and approvals.',
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => ManagerExpenses()),
+                  MaterialPageRoute(builder: (context) => const ManagerExpenses()),
                 );
               },
-              buttonText: 'Go to Manager Entry',
+              child: _buildCardContent(
+                context,
+                icon: Icons.account_balance_wallet,
+                label: 'Go to Manager Entry',
+              ),
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class _SectionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final Color color;
-  final Color accentColor;
-  final Color cardColor;
-  final Color textColor;
-  final VoidCallback onTap;
-  final String buttonText;
-
-  const _SectionCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.color,
-    required this.accentColor,
-    required this.cardColor,
-    required this.textColor,
-    required this.onTap,
-    required this.buttonText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      shadowColor: color.withOpacity(0.2),
-      color: cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [color, accentColor],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Icon(icon,  size: 32),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: Text(
-                description,
-                style: TextStyle(
-                  fontSize: 15, 
-                  color: textColor.withOpacity(0.8),
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 16, 
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                  elevation: 2,
-                  shadowColor: color.withOpacity(0.3),
-                ),
-                onPressed: onTap,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(buttonText),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward, size: 18),
-                  ],
-                ),
-              ),
-            ),
-          ],
+  Widget _buildCardContent(BuildContext context, {required IconData icon, required String label}) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: Colors.white, size: 24),
         ),
-      ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        const Icon(Icons.chevron_right, color: Colors.white70),
+      ],
     );
   }
 }

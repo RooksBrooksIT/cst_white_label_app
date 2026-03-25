@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/screens/customer_dashboard.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/responsive.dart';
 
 class Project {
   final String projectName;
@@ -153,43 +157,9 @@ class ProjectDetailsPage extends StatelessWidget {
     print('ownerPhoneNumber: "$ownerPhoneNumber"');
     print('================================');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('projects')
-              .where('siteId', isEqualTo: siteId)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-              final project = Project.fromFirestore(snapshot.data!.docs.first);
-              return Text(
-                project.projectName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  
-                ),
-              );
-            }
-            return const Text(
-              'Project Details',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                
-              ),
-            );
-          },
-        ),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20.0),
-            bottomRight: Radius.circular(20.0),
-          ),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Project Details',
+      onBack: () => Navigator.pop(context),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('projects')
@@ -197,26 +167,19 @@ class ProjectDetailsPage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Colors.white));
           }
 
           if (snapshot.hasError) {
-            print('Error: ${snapshot.error}');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error, color: Colors.red[300], size: 64),
+                  const Icon(Icons.error_outline_rounded, color: Colors.white70, size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'Error loading project',
-                    style: TextStyle(fontSize: 18, ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    snapshot.error.toString(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, ),
+                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: Colors.white),
                   ),
                 ],
               ),
@@ -224,155 +187,94 @@ class ProjectDetailsPage extends StatelessWidget {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            print('Project document not found for siteId: $siteId');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.find_in_page,
-                    color: Color.fromARGB(255, 7, 108, 196),
-                    size: 64,
-                  ),
+                  const Icon(Icons.find_in_page_rounded, color: Colors.white70, size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'Project not found',
-                    style: TextStyle(fontSize: 18, ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'siteId: $siteId',
-                    style: TextStyle(fontSize: 12, ),
+                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: Colors.white),
                   ),
                 ],
               ),
             );
           }
 
-          // Get the first document from the query
           final project = Project.fromFirestore(snapshot.data!.docs.first);
 
-          return Container(
-            
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Project Status Banner
-                  _buildStatusBanner(project.status),
-
-                  const SizedBox(height: 16),
-
-                  // Project Overview Card
-                  _buildSectionCard(
-                    title: 'Project Overview',
-                    icon: Icons.business_center,
-                    children: [
-                      _buildDetailRow('Project Name', project.projectName),
-                      _buildDetailRow('Category', project.projectCategory),
-                      _buildDetailRow(
-                        'Sub Category',
-                        project.projectSubCategory,
-                      ),
-                      _buildDetailRow('Type', project.projectType),
-                      _buildDetailRow('Stage', project.projectStage),
-                      _buildDetailRow('Contract Type', project.projectContract),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Stakeholders Card
-                  _buildSectionCard(
-                    title: 'Stakeholders',
-                    icon: Icons.people,
-                    children: [
-                      _buildDetailRow('Owner', project.ownerName),
-                      _buildDetailRow('Contractor', project.contractorName),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Site Information Card
-                  _buildSectionCard(
-                    title: 'Site Information',
-                    icon: Icons.location_on,
-                    children: [
-                      _buildDetailRow('Site ID', project.siteId),
-                      _buildDetailRow('Site Name', project.siteName),
-                      _buildDetailRow(
-                        'Location',
-                        project.siteLocation,
-                        isMultiLine: true,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Dates Card
-                  _buildSectionCard(
-                    title: 'Project Timeline',
-                    icon: Icons.calendar_today,
-                    children: [
-                      _buildDateRow('Planned Start', project.plannedStartDate),
-                      _buildDateRow('Planned End', project.plannedEndDate),
-                      _buildDateRow('Actual Start', project.actualStartDate),
-                      _buildDateRow('Actual End', project.actualEndDate),
-                      _buildDateRow(
-                        'Contract Start',
-                        project.contractStartDate,
-                      ),
-                      _buildDateRow('Contract End', project.contractEndDate),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Budget & Finance Card
-                  _buildSectionCard(
-                    title: 'Budget & Finance',
-                    icon: Icons.attach_money,
-                    children: [
-                      _buildCurrencyRow(
-                        'Project Budget',
-                        project.projectBudget,
-                      ),
-                      _buildCurrencyRow(
-                        'Contractor Budget',
-                        project.contractorBudget,
-                      ),
-                      _buildCurrencyRow('Amount Spent', project.amountSpent),
-                      _buildCurrencyRow('Amount Paid', project.amountPaid),
-                      _buildCurrencyRow(
-                        'Balance',
-                        project.amountBalance,
-                        color: project.amountBalance >= 0
-                            ? Colors.green
-                            : Colors.red,
-                      ),
-                      _buildDetailRow(
-                        'Contract Work',
-                        project.isContractWork ? 'Yes' : 'No',
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Metadata Card
-                  _buildSectionCard(
-                    title: 'Project Metadata',
-                    icon: Icons.info,
-                    children: [
-                      _buildDateRow('Created', project.createdAt),
-                      _buildDateRow('Last Updated', project.updatedAt),
-                    ],
-                  ),
-                ],
-              ),
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusBanner(context, project.status),
+                const SizedBox(height: 24),
+                _buildSection(
+                  context,
+                  title: 'Project Overview',
+                  icon: Icons.business_center_rounded,
+                  children: [
+                    _buildDetailRow(context, 'Project Name', project.projectName),
+                    _buildDetailRow(context, 'Category', project.projectCategory),
+                    _buildDetailRow(context, 'Sub Category', project.projectSubCategory),
+                    _buildDetailRow(context, 'Type', project.projectType),
+                    _buildDetailRow(context, 'Stage', project.projectStage),
+                    _buildDetailRow(context, 'Contract Type', project.projectContract),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSection(
+                  context,
+                  title: 'Stakeholders',
+                  icon: Icons.people_rounded,
+                  children: [
+                    _buildDetailRow(context, 'Owner', project.ownerName),
+                    _buildDetailRow(context, 'Contractor', project.contractorName),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSection(
+                  context,
+                  title: 'Site Information',
+                  icon: Icons.location_on_rounded,
+                  children: [
+                    _buildDetailRow(context, 'Site ID', project.siteId),
+                    _buildDetailRow(context, 'Site Name', project.siteName),
+                    _buildDetailRow(context, 'Location', project.siteLocation, isMultiLine: true),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSection(
+                  context,
+                  title: 'Timeline',
+                  icon: Icons.calendar_today_rounded,
+                  children: [
+                    _buildDateRow(context, 'Planned Start', project.plannedStartDate),
+                    _buildDateRow(context, 'Planned End', project.plannedEndDate),
+                    _buildDateRow(context, 'Actual Start', project.actualStartDate),
+                    _buildDateRow(context, 'Actual End', project.actualEndDate),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSection(
+                  context,
+                  title: 'Financials',
+                  icon: Icons.payments_rounded,
+                  children: [
+                    _buildCurrencyRow(context, 'Budget', project.projectBudget),
+                    _buildCurrencyRow(context, 'Spent', project.amountSpent),
+                    _buildCurrencyRow(context, 'Paid', project.amountPaid),
+                    _buildCurrencyRow(
+                      context,
+                      'Balance',
+                      project.amountBalance,
+                      color: project.amountBalance >= 0 ? Colors.greenAccent : Colors.redAccent,
+                    ),
+                  ],
+                ),
+              ],
             ),
           );
         },
@@ -380,59 +282,42 @@ class ProjectDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBanner(String status) {
-    Color backgroundColor;
-    Color textColor;
+  Widget _buildStatusBanner(BuildContext context, String status) {
+    Color color;
     IconData icon;
 
     switch (status.toLowerCase()) {
       case 'completed':
-        backgroundColor = Colors.green;
-        textColor = Colors.white;
-        icon = Icons.check_circle;
+        color = Colors.greenAccent;
+        icon = Icons.check_circle_rounded;
         break;
       case 'in progress':
       case 'in_progress':
-        backgroundColor = Color(0xFF003768);
-        textColor = Colors.white;
-        icon = Icons.refresh;
+        color = Colors.blueAccent;
+        icon = Icons.sync_rounded;
         break;
       case 'pending':
-        backgroundColor = Colors.orange;
-        textColor = Colors.white;
-        icon = Icons.schedule;
+        color = Colors.orangeAccent;
+        icon = Icons.schedule_rounded;
         break;
       default:
-        backgroundColor = Colors.grey;
-        textColor = Colors.white;
-        icon = Icons.help;
+        color = Colors.white70;
+        icon = Icons.help_outline_rounded;
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: backgroundColor.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          Icon(icon, color: textColor, size: 24),
-          const SizedBox(width: 12),
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 16),
           Expanded(
             child: Text(
               'Status: ${status.toUpperCase()}',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: Responsive.fontSize(context, 18),
                 fontWeight: FontWeight.bold,
-                color: textColor,
+                color: Colors.white,
               ),
             ),
           ),
@@ -441,61 +326,61 @@ class ProjectDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionCard({
+  Widget _buildSection(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: Color.fromARGB(255, 2, 81, 150), size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromARGB(255, 2, 81, 150),
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white70, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  fontSize: Responsive.fontSize(context, 12),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70,
+                  letterSpacing: 1.2,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
+        GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            children: children,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildDetailRow(
+    BuildContext context,
     String label,
     String value, {
     bool isMultiLine = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
-        crossAxisAlignment: isMultiLine
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.center,
+        crossAxisAlignment: isMultiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 130,
+            width: 120,
             child: Text(
-              '$label:',
+              label,
               style: TextStyle(
-                fontWeight: FontWeight.w500,
-                
-                fontSize: 14,
+                fontSize: Responsive.fontSize(context, 14),
+                color: Colors.white60,
               ),
             ),
           ),
@@ -503,12 +388,11 @@ class ProjectDetailsPage extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                
+              style: TextStyle(
+                fontSize: Responsive.fontSize(context, 15),
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
               ),
-              softWrap: true,
             ),
           ),
         ],
@@ -516,76 +400,12 @@ class ProjectDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDateRow(String label, DateTime date) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _formatDate(date),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    
-                  ),
-                ),
-                Text(
-                  _formatTime(date),
-                  style: TextStyle(fontSize: 13, ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _buildDateRow(BuildContext context, String label, DateTime date) {
+    return _buildDetailRow(context, label, _formatDate(date));
   }
 
-  Widget _buildCurrencyRow(String label, double amount, {Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '₹${_formatCurrency(amount)}',
-            style: TextStyle(
-              fontSize: 15,
-              color: color ?? Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _buildCurrencyRow(BuildContext context, String label, double amount, {Color? color}) {
+    return _buildDetailRow(context, label, '₹${_formatCurrency(amount)}');
   }
 
   String _formatDate(DateTime date) {
@@ -617,7 +437,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const ProjectListPage(),
+      home: const CustomerDashboardPage(ownerName: '', ownerPhoneNumber: '', siteId: ''),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -629,60 +449,71 @@ class ProjectListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Projects'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-      ),
+    return GlassScaffold(
+      title: 'Projects',
+      onBack: () => Navigator.pop(context),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirestoreService.getCollection('projects').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Colors.white));
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No projects found'));
+            return const Center(child: Text('No projects found', style: TextStyle(color: Colors.white)));
           }
 
           final projects = snapshot.data!.docs;
 
           return ListView.builder(
+            padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
             itemCount: projects.length,
             itemBuilder: (context, index) {
               final project = projects[index];
               final projectData = project.data() as Map<String, dynamic>;
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.business_center,
-                    color: Color(0xFF003768),
-                  ),
-                  title: Text(projectData['projectName'] ?? 'Unnamed Project'),
-                  subtitle: Text(
-                    projectData['projectCategory'] ?? 'No Category',
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProjectDetailsPage(
-                          siteId: projectData['siteId'] ?? '',
-                          ownerName: projectData['ownerName'] ?? '',
-                          ownerPhoneNumber:
-                              projectData['ownerPhoneNumber'] ?? '',
-                        ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    );
-                  },
+                      child: const Icon(
+                        Icons.business_center_rounded,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                    title: Text(
+                      projectData['projectName'] ?? 'Unnamed Project',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      projectData['projectCategory'] ?? 'No Category',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProjectDetailsPage(
+                            siteId: projectData['siteId'] ?? '',
+                            ownerName: projectData['ownerName'] ?? '',
+                            ownerPhoneNumber: projectData['ownerPhoneNumber'] ?? '',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               );
             },

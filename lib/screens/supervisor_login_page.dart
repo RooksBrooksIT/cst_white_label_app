@@ -8,6 +8,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
@@ -215,32 +216,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         elevation: 0,
         child: StatefulBuilder(
           builder: (context, setState) {
-            final theme = Theme.of(context);
-            final primary = theme.primaryColor;
-
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 24,
-                horizontal: 24,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    primary,
-                    primary.withValues(alpha: 0.85),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
+            return GlassCard(
+              padding: const EdgeInsets.all(24),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -254,96 +231,41 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16.0),
-                    TextField(
+                    GlassTextField(
                       controller: usernameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.person,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
+                      label: 'Username',
+                      icon: Icons.person,
                     ),
                     const SizedBox(height: 16.0),
-                    TextField(
+                    GlassTextField(
                       controller: newPasswordController,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'New Password',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
+                      label: 'New Password',
+                      icon: Icons.lock_outline,
+                      isPassword: true,
                     ),
                     const SizedBox(height: 16.0),
-                    TextField(
+                    GlassTextField(
                       controller: confirmPasswordController,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.lock_reset,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
+                      label: 'Confirm New Password',
+                      icon: Icons.lock_reset,
+                      isPassword: true,
                     ),
                     const SizedBox(height: 16.0),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         Flexible(
-                          child: TextButton(
+                          child: GlassButton(
+                            label: 'Cancel',
+                            isSecondary: true,
                             onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24.0,
-                                vertical: 12.0,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                                side: const BorderSide(color: Colors.white54),
-                              ),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(color: Colors.white),
-                            ),
                           ),
                         ),
                         const SizedBox(width: 12.0),
                         Flexible(
-                          child: ElevatedButton(
+                          child: GlassButton(
+                            label: 'Update',
+                            isLoading: isUpdating,
                             onPressed: isUpdating
                                 ? null
                                 : () async {
@@ -396,29 +318,6 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                       if (context.mounted) setState(() => isUpdating = false);
                                     }
                                   },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primary,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24.0,
-                                vertical: 12.0,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                            ),
-                            child: isUpdating
-                                ? const SizedBox(
-                                    width: 20.0,
-                                    height: 20.0,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.0,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Update',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
                           ),
                         ),
                       ],
@@ -561,13 +460,15 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 20 : 32,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -575,7 +476,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -585,10 +486,11 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Supervisor Login',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -596,8 +498,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               const SizedBox(height: 8),
               Text(
                 'Sign in to your dashboard',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: Responsive.fontSize(context, 16),
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
@@ -651,7 +554,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                             style: TextStyle(color: Colors.white),
                           ),
                           value: _isContractor,
-                          activeColor: primary,
+                          activeColor: colorScheme.primary,
                           checkColor: Colors.white,
                           onChanged: (val) {
                             setState(() {
@@ -669,27 +572,22 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       if (_isContractor) ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          dropdownColor: Colors.grey[900],
+                          isExpanded: true,
+                          dropdownColor: Colors.blueGrey[900],
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Contractor Name',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(
-                              Icons.supervisor_account,
-                              color: Colors.white70,
-                            ),
+                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                            prefixIcon: Icon(Icons.supervisor_account, color: Theme.of(context).primaryColor),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
+                            fillColor: Colors.white.withOpacity(0.05),
                           ),
                           value: _selectedSupervisorName,
                           items: _supervisorNames.map((name) {
                             return DropdownMenuItem<String>(
                               value: name,
-                              child: Text(name),
+                              child: Text(name, overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: (val) {
