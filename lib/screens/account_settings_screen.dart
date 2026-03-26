@@ -25,52 +25,23 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                ValueListenableBuilder<ThemeMode>(
-                  valueListenable: AppTheme.themeMode,
-                  builder: (context, themeMode, _) {
-                    return SwitchListTile(
-                      title: Text(
-                        'Dark Mode',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: Responsive.fontSize(context, 16),
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Toggle theme',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: Responsive.fontSize(context, 12),
-                        ),
-                      ),
-                      secondary: const Icon(Icons.dark_mode_rounded,
-                          color: Colors.white70),
-                      value: themeMode == ThemeMode.dark,
-                      onChanged: (bool value) {
-                        AppTheme.updateThemeMode(
-                          value ? ThemeMode.dark : ThemeMode.light,
-                        );
-                      },
-                    );
-                  },
-                ),
                 ListTile(
                   title: Text(
                     'Brand Color',
                     style: TextStyle(
-                      color: Colors.white,
                       fontSize: Responsive.fontSize(context, 16),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   subtitle: Text(
                     'Customize app colors',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: const Color(0xFF64748B),
                       fontSize: Responsive.fontSize(context, 12),
                     ),
                   ),
                   leading: const Icon(Icons.color_lens_rounded,
-                      color: Colors.white70),
+                      color: Color(0xFF64748B)),
                   trailing: ValueListenableBuilder<Color>(
                     valueListenable: AppTheme.primaryColor,
                     builder: (context, color, _) {
@@ -80,7 +51,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                         ),
                       );
                     },
@@ -131,12 +102,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       title: Text(
         title,
         style: TextStyle(
-          color: Colors.white,
           fontSize: Responsive.fontSize(context, 16),
+          fontWeight: FontWeight.w500,
         ),
       ),
-      leading: Icon(icon, color: Colors.white70),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+      leading: Icon(icon, color: const Color(0xFF64748B)),
+      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
       onTap: onTap,
     );
   }

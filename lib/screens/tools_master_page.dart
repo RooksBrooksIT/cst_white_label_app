@@ -105,31 +105,32 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Color(0xFF0b3470),
-        title: const Text(
-          "Tool Master",
-          style: TextStyle( fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
+        title: const Text('Tool Master'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorWeight: 4,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: const Color(0xFF94A3B8),
+          indicatorColor: theme.colorScheme.primary,
+          indicatorWeight: 3,
+          indicatorSize: TabBarIndicatorSize.label,
           labelStyle: TextStyle(
-            fontSize: isSmallScreen ? 14 : 16,
+            fontSize: isSmallScreen ? 14 : 15,
             fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontSize: isSmallScreen ? 14 : 15,
+            fontWeight: FontWeight.w500,
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.add_circle_outline), text: 'Add Tool'),
-            Tab(icon: Icon(Icons.edit_outlined), text: 'Update Tool'),
+            Tab(text: 'ADD TOOL'),
+            Tab(text: 'UPDATE COUNT'),
           ],
         ),
       ),
@@ -165,7 +166,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                       "Add New Tool",
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0b3470),
+                        color: const Color(0xFF1E293B),
                       ),
                     ),
                   ),
@@ -245,7 +246,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                       "Update Tool Count",
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0b3470),
+                        color: const Color(0xFF1E293B),
                       ),
                     ),
                   ),
@@ -326,9 +327,10 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       children: [
         Text(
           label,
-          style: theme?.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0b3470),
+          style: theme?.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF64748B),
+            letterSpacing: 0.5,
           ),
         ),
         SizedBox(height: 8),
@@ -341,15 +343,19 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                 hintText: hint,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF0b3470)),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF0b3470), width: 2),
+                  borderSide: BorderSide(color: theme?.primaryColor ?? Colors.blue, width: 2),
                 ),
-                contentPadding: EdgeInsets.symmetric(
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 14,
+                  vertical: 16,
                 ),
               ),
             ),
@@ -393,45 +399,36 @@ class _ToolMasterPageState extends State<ToolMasterPage>
   }
 
   Widget _buildActionButtons(ThemeData theme, bool isSmallScreen) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
+        SizedBox(
+          width: double.infinity,
           child: ElevatedButton.icon(
             icon: _isSaving
-                ? SizedBox(
-                    width: 24,
-                    height: 24,
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      
+                      color: Colors.white,
                     ),
                   )
-                : Icon(Icons.save, size: 20),
-            label: Text(_isSaving ? 'Saving...' : 'Save'),
+                : const Icon(Icons.add_rounded, size: 20),
+            label: Text(_isSaving ? 'ADDING...' : 'ADD TOOL'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0b3470),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: _isSaving ? null : _saveToolWithCompany,
           ),
         ),
-        SizedBox(width: isSmallScreen ? 8 : 16),
-        Expanded(
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
           child: OutlinedButton.icon(
-            icon: Icon(Icons.clear, size: 20),
-            label: Text('Clear'),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
+            label: const Text('CLEAR FORM'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Color(0xFF0b3470),
-              side: BorderSide(color: Color(0xFF0b3470)),
-              
-              padding: EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: () {
               _toolNameController.clear();

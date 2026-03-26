@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'package:demo_cst/screens/projectStage_expenses_reportpage.dart';
 import 'package:demo_cst/screens/projectStage_site_summary_report.dart';
 import 'package:demo_cst/screens/projectstage_daily_site_report.dart';
@@ -82,8 +83,7 @@ class SiteSupervisorMapEntry {
 }
 
 Future<List<SiteSupervisorMapEntry>> fetchAllSiteSupervisorMapEntries() async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('siteSupervisorMap')
+  final snapshot = await FirestoreService.siteSupervisorMap
       .get();
   return snapshot.docs
       .map((doc) => SiteSupervisorMapEntry.fromFirestore(doc))
@@ -185,8 +185,7 @@ class _ProjectstageInsightsDashboardState
       Set<String> stageSet = {};
 
       final futures = collections.map((collection) async {
-        final snapshot = await FirebaseFirestore.instance
-            .collection(collection)
+        final snapshot = await FirestoreService.getCollection(collection)
             .where('siteId', isEqualTo: siteId)
             .get();
         for (var doc in snapshot.docs) {
@@ -221,9 +220,7 @@ class _ProjectstageInsightsDashboardState
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
     try {
-      Query query = FirebaseFirestore.instance.collection(
-        'siteSupervisorEntries',
-      );
+      Query query = FirestoreService.siteSupervisorEntries;
 
       // If user has a siteId from login, filter by it
       if (_userSiteId != null && _userSiteId!.isNotEmpty) {

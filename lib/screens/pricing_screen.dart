@@ -4,9 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
 import 'Organization_Dashboard.dart';
 
 class PricingScreen extends StatefulWidget {
@@ -157,17 +154,25 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      onBack: () => Navigator.pop(context),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pricing'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Column(
         children: [
           // Step Indicator
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 40,
-              vertical: 4,
+              vertical: 8,
             ),
-            child: _buildStepIndicator(),
+            child: _buildStepIndicator(colorScheme),
           ),
           const SizedBox(height: 24),
 
@@ -176,12 +181,12 @@ class _PricingScreenState extends State<PricingScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         'Choose a Plan',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -190,73 +195,92 @@ class _PricingScreenState extends State<PricingScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.white.withOpacity(0.65),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 40),
 
                       // Transparent Subscription Card
-                      GlassCard(
-                        padding: const EdgeInsets.all(28),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF00A86B).withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'RECOMMENDED',
-                                style: TextStyle(
-                                  color: Color(0xFF00A86B),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
+                      Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00A86B).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'RECOMMENDED',
+                                  style: TextStyle(
+                                    color: Color(0xFF00A86B),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 20),
-                            const Text(
-                              '30 Days Free Trial',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                              const SizedBox(height: 20),
+                              Text(
+                                '30 Days Free Trial',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white.withOpacity(0.7),
-                                height: 1.5,
+                              const SizedBox(height: 12),
+                              Text(
+                                'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.5,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 28),
-                            _buildFeatureRow('Unlimited user seats'),
-                            const SizedBox(height: 12),
-                            _buildFeatureRow('Advanced reporting & analytics'),
-                            const SizedBox(height: 12),
-                            _buildFeatureRow('Custom branding tools'),
-                            const SizedBox(height: 12),
-                            _buildFeatureRow('Priority 24/7 support'),
-                            const SizedBox(height: 32),
-                            
-                            // Register Final Actions
-                            GlassButton(
-                              label: 'START FREE TRIAL',
-                              isLoading: _isLoading,
-                              onPressed: _register,
-                            ),
+                              const SizedBox(height: 28),
+                              _buildFeatureRow(
+                                  'Unlimited user seats', colorScheme),
+                              const SizedBox(height: 12),
+                              _buildFeatureRow(
+                                  'Advanced reporting & analytics', colorScheme),
+                              const SizedBox(height: 12),
+                              _buildFeatureRow(
+                                  'Custom branding tools', colorScheme),
+                              const SizedBox(height: 12),
+                              _buildFeatureRow(
+                                  'Priority 24/7 support', colorScheme),
+                              const SizedBox(height: 32),
+
+                              // Register Final Actions
+                              ElevatedButton(
+                                onPressed: _register,
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 50),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : const Text('START FREE TRIAL'),
+                              ),
                             ],
                           ),
                         ),
+                      ),
                       ],
                     ),
                   ),
@@ -266,16 +290,17 @@ class _PricingScreenState extends State<PricingScreen> {
     );
   }
 
-  Widget _buildFeatureRow(String text) {
+  Widget _buildFeatureRow(String text, ColorScheme colorScheme) {
     return Row(
       children: [
-        const Icon(Icons.check_circle_rounded, color: Color(0xFF00A86B), size: 20),
+        const Icon(Icons.check_circle_rounded,
+            color: Color(0xFF00A86B), size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colorScheme.onSurface,
               fontSize: 14,
             ),
           ),
@@ -284,7 +309,7 @@ class _PricingScreenState extends State<PricingScreen> {
     );
   }
 
-  Widget _buildStepIndicator() {
+  Widget _buildStepIndicator(ColorScheme colorScheme) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 2; // Step 3
 
@@ -295,8 +320,8 @@ class _PricingScreenState extends State<PricingScreen> {
             child: Container(
               height: 2,
               color: activeStep > i ~/ 2
-                  ? Theme.of(context).primaryColor
-                  : Colors.white.withOpacity(0.2),
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
             ),
           );
         }
@@ -312,26 +337,24 @@ class _PricingScreenState extends State<PricingScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: done || active
-                    ? Theme.of(context).primaryColor
-                    : Colors.white.withOpacity(0.15),
+                    ? colorScheme.primary
+                    : colorScheme.surfaceContainerHighest,
                 border: Border.all(
                   color: done || active
-                      ? Theme.of(context).primaryColor
-                      : Colors.white.withOpacity(0.3),
+                      ? colorScheme.primary
+                      : colorScheme.outline,
                   width: 1.5,
                 ),
               ),
               child: Center(
                 child: done
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      )
+                    ? Icon(Icons.check, color: colorScheme.onPrimary, size: 18)
                     : Text(
                         '${idx + 1}',
                         style: TextStyle(
-                          color: active ? Colors.white : Colors.white60,
+                          color: active
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -343,7 +366,9 @@ class _PricingScreenState extends State<PricingScreen> {
               steps[idx],
               style: TextStyle(
                 fontSize: 11,
-                color: active || done ? Colors.white : Colors.white54,
+                color: active || done
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurfaceVariant,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
               ),
             ),

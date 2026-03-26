@@ -28,15 +28,23 @@ class FirestoreService {
       return FirebaseFirestore.instance.collection(collectionName);
     }
     
-    // The _cachedDynamicPath will now be just the OrgID (e.g. Rooks_18-03-2026)
-    // or the full legacy path which we handle for backward compatibility.
-    final pathParts = _cachedDynamicPath!.split('/');
-    final String orgId = pathParts[0];
+    // Extract OrgID robustly from cached path
+    // Handles: "Hero_25-03-2026" or "organisation/Hero_25-03-2026/data"
+    String orgId = _cachedDynamicPath!;
+    if (orgId.contains('/')) {
+      final parts = orgId.split('/');
+      // If path is "organisation/ID/...", ID is at index 1
+      if (parts[0] == 'organisation' && parts.length > 1) {
+        orgId = parts[1];
+      } else {
+        orgId = parts[0];
+      }
+    }
 
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection(collectionName); // Synchronous business collection access
+        .collection(collectionName);
 
   }
 
@@ -83,7 +91,19 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>> get materialUnits => getCollection('materialUnits');
   static CollectionReference<Map<String, dynamic>> get materialSubCategories => getCollection('materialSubCategories');
   static CollectionReference<Map<String, dynamic>> get projectSubCategories => getCollection('projectSubCategories');
-  static CollectionReference<Map<String, dynamic>> get configUsers => getCollection('configUser');
+  static CollectionReference<Map<String, dynamic>> get configUsers => getCollection('manager');
+
+  // Additional business collections
+  static CollectionReference<Map<String, dynamic>> get siteSupervisorEntries => getCollection('siteSupervisorEntries');
+  static CollectionReference<Map<String, dynamic>> get managerExpenses => getCollection('managerExpenses');
+  static CollectionReference<Map<String, dynamic>> get managerExpenseSummary => getCollection('managerExpenseSummary');
+  static CollectionReference<Map<String, dynamic>> get organizationExpenseSummary => getCollection('organizationExpenseSummary');
+  static CollectionReference<Map<String, dynamic>> get organizationEntries => getCollection('organizationEntries');
+  static CollectionReference<Map<String, dynamic>> get contractorEntries => getCollection('contractorEntries');
+  static CollectionReference<Map<String, dynamic>> get siteSupervisorIncentives => getCollection('siteSupervisorIncentives');
+  static CollectionReference<Map<String, dynamic>> get siteDrawings => getCollection('siteDrawings');
+  static CollectionReference<Map<String, dynamic>> get siteMaterialsRequest => getCollection('siteMaterialsRequest');
+  static CollectionReference<Map<String, dynamic>> get projectStages => getCollection('projectStages');
 
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {

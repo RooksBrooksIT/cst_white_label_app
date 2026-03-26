@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../utils/responsive.dart';
 
 class WorkerAttendanceSalaryPage extends StatefulWidget {
   const WorkerAttendanceSalaryPage({super.key});
@@ -74,7 +75,9 @@ class _WorkerAttendanceSalaryPageState
 
   Future<void> _loadSites() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('workersSummary').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersSummary',
+      ).get();
       final sites = querySnapshot.docs
           .map((doc) {
             final data = doc.data();
@@ -95,7 +98,9 @@ class _WorkerAttendanceSalaryPageState
 
   Future<void> _loadMonths() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('workersSummary').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersSummary',
+      ).get();
 
       // Use a Set to ensure uniqueness from the start
       final Set<String> uniqueMonths = <String>{};
@@ -139,18 +144,18 @@ class _WorkerAttendanceSalaryPageState
       QuerySnapshot summaryQuery;
 
       if (_selectedSite != null && _selectedMonth != null) {
-        summaryQuery = await FirestoreService
-            .getCollection('workersSummary')
+        summaryQuery = await FirestoreService.getCollection('workersSummary')
             .where('site', isEqualTo: _selectedSite)
             .where('month', isEqualTo: _selectedMonth)
             .get();
       } else if (_selectedMonth != null) {
-        summaryQuery = await FirestoreService
-            .getCollection('workersSummary')
-            .where('month', isEqualTo: _selectedMonth)
-            .get();
+        summaryQuery = await FirestoreService.getCollection(
+          'workersSummary',
+        ).where('month', isEqualTo: _selectedMonth).get();
       } else {
-        summaryQuery = await FirestoreService.getCollection('workersSummary').get();
+        summaryQuery = await FirestoreService.getCollection(
+          'workersSummary',
+        ).get();
       }
 
       final List<Map<String, dynamic>> workers = [];
@@ -616,12 +621,12 @@ class _WorkerAttendanceSalaryPageState
       final workerName = worker['name'] as String;
 
       // Get all attendance records for the specific site and month
-      final attendanceQuery = await FirestoreService
-          .getCollection('workersAttendance')
-          .where('site', isEqualTo: site)
-          .where('month', isEqualTo: month)
-          .orderBy('Day')
-          .get();
+      final attendanceQuery =
+          await FirestoreService.getCollection('workersAttendance')
+              .where('site', isEqualTo: site)
+              .where('month', isEqualTo: month)
+              .orderBy('Day')
+              .get();
 
       final List<Map<String, dynamic>> dailyAttendance = [];
 
@@ -791,10 +796,9 @@ class _WorkerAttendanceSalaryPageState
           };
 
           // Save to WorkerAllDetails collection
-          await FirestoreService
-              .getCollection('WorkerAllDetails')
-              .doc(reportData['reportId'])
-              .set(reportData);
+          await FirestoreService.getCollection(
+            'WorkerAllDetails',
+          ).doc(reportData['reportId']).set(reportData);
 
           successCount++;
 
@@ -844,13 +848,27 @@ class _WorkerAttendanceSalaryPageState
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Text(
-              'Filters',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[800],
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'FILTERS',
+                  style: TextStyle(
+                    fontSize: Responsive.fontSize(context, 12),
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF94A3B8),
+                    letterSpacing: 2.0,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16),
             LayoutBuilder(
@@ -959,11 +977,7 @@ class _WorkerAttendanceSalaryPageState
             SizedBox(height: 8),
             Text(
               'Current Month: ${DateFormat('MMMM yyyy').format(DateTime.now())}',
-              style: TextStyle(
-                fontSize: 12,
-                
-                fontStyle: FontStyle.italic,
-              ),
+              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -996,19 +1010,19 @@ class _WorkerAttendanceSalaryPageState
                     children: [
                       Text(
                         worker['name'],
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue[800],
+                          color: Color(0xFF1E293B),
                         ),
                       ),
                       Text(
                         '${worker['designation']} • ${worker['site']}',
-                        style: TextStyle( fontSize: 12),
+                        style: TextStyle(fontSize: 12),
                       ),
                       Text(
                         'Site ID: ${worker['siteId'] ?? 'N/A'}',
-                        style: TextStyle( fontSize: 10),
+                        style: TextStyle(fontSize: 10),
                       ),
                     ],
                   ),
@@ -1056,10 +1070,7 @@ class _WorkerAttendanceSalaryPageState
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Base Salary',
-                      style: TextStyle( fontSize: 10),
-                    ),
+                    Text('Base Salary', style: TextStyle(fontSize: 10)),
                     Text(
                       '₹${worker['baseSalary']}/day',
                       style: TextStyle(
@@ -1072,10 +1083,7 @@ class _WorkerAttendanceSalaryPageState
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      'Total Salary',
-                      style: TextStyle( fontSize: 10),
-                    ),
+                    Text('Total Salary', style: TextStyle(fontSize: 10)),
                     Text(
                       '₹${worker['calculatedSalary'].toStringAsFixed(2)}',
                       style: TextStyle(
@@ -1091,7 +1099,7 @@ class _WorkerAttendanceSalaryPageState
             SizedBox(height: 4),
             Text(
               'Month: ${DateFormat('MMM yyyy').format(DateTime.parse('${worker['month']}-01'))}',
-              style: TextStyle( fontSize: 10),
+              style: TextStyle(fontSize: 10),
             ),
           ],
         ),
@@ -1122,29 +1130,40 @@ class _WorkerAttendanceSalaryPageState
     if (_selectedWorkerIds.isEmpty) return SizedBox.shrink();
 
     return Container(
-      padding: EdgeInsets.all(16),
-      
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               '${_selectedWorkerIds.length} worker(s) selected',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
+              ),
             ),
           ),
           ElevatedButton.icon(
             onPressed: _isSubmitting ? null : _submitSelectedReports,
             icon: _isSubmitting
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(Icons.cloud_upload),
-            label: Text(_isSubmitting ? 'Submitting...' : 'Submit Reports'),
+                : const Icon(Icons.cloud_upload_rounded),
+            label: Text(_isSubmitting ? 'Submitting...' : 'SUBMIT REPORTS'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
           ),
         ],
@@ -1156,18 +1175,20 @@ class _WorkerAttendanceSalaryPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Worker Attendance & Salary'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
+        title: const Text('Worker Summary Report'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           if (_filteredWorkers.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.select_all),
+              icon: const Icon(Icons.select_all_rounded),
               onPressed: _selectAllWorkers,
               tooltip: 'Select/Deselect All',
             ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _isLoading ? null : _loadInitialData,
             tooltip: 'Refresh Data',
           ),

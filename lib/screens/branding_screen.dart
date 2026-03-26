@@ -4,10 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../utils/responsive.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_text_field.dart';
-import '../widgets/glass_button.dart';
 import 'pricing_screen.dart';
 
 class BrandingScreen extends StatefulWidget {
@@ -170,19 +166,24 @@ class _BrandingScreenState extends State<BrandingScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return GlassScaffold(
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Branding'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Column(
         children: [
           // Step Indicator
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.isMobile(context) ? 20 : 40,
-              vertical: 4,
+              vertical: 8,
             ),
-            child: _buildStepIndicator(),
+            child: _buildStepIndicator(colorScheme),
           ),
-          const SizedBox(height: 16),
 
               // Scrollable content
               Expanded(
@@ -196,7 +197,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                         style: TextStyle(
                           fontSize: Responsive.fontSize(context, 26),
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -204,21 +205,24 @@ class _BrandingScreenState extends State<BrandingScreen> {
                         'Make your app unique with logo & colors',
                         style: TextStyle(
                           fontSize: Responsive.fontSize(context, 14),
-                          color: Colors.white.withValues(alpha: 0.65),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 20),
 
                       // App Information Card
                       _buildCard(
+                        colorScheme: colorScheme,
                         icon: Icons.grid_view_rounded,
-                        iconBgColor: colorScheme.primary.withValues(alpha: 0.2),
+                        iconBgColor: colorScheme.primary.withOpacity(0.1),
                         iconColor: colorScheme.primary,
                         title: 'App Information',
-                        child: GlassTextField(
+                        child: TextFormField(
                           controller: _appNameController,
-                          label: 'App Name',
-                          icon: Icons.edit_rounded,
+                          decoration: const InputDecoration(
+                            labelText: 'App Name',
+                            prefixIcon: Icon(Icons.edit_rounded),
+                          ),
                         ),
                       ),
 
@@ -226,8 +230,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
                       // Company Logo Card
                       _buildCard(
+                        colorScheme: colorScheme,
                         icon: Icons.upload_rounded,
-                        iconBgColor: colorScheme.secondary.withValues(alpha: 0.2),
+                        iconBgColor: colorScheme.secondary.withOpacity(0.1),
                         iconColor: colorScheme.secondary,
                         title: 'Company Logo',
                         child: Column(
@@ -238,10 +243,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 width: double.infinity,
                                 height: 110,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
+                                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.15),
+                                    color: colorScheme.outlineVariant,
                                   ),
                                 ),
                                 child: _logoFile != null
@@ -259,27 +264,21 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                           Icon(
                                             Icons.cloud_upload_outlined,
                                             size: 36,
-                                            color: Colors.white.withValues(
-                                              alpha: 0.5,
-                                            ),
+                                            color: colorScheme.primary.withOpacity(0.5),
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
                                             'Upload Logo',
                                             style: TextStyle(
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.white.withValues(
-                                                alpha: 0.7,
-                                              ),
+                                              color: colorScheme.onSurface,
                                             ),
                                           ),
                                           Text(
                                             'PNG / JPG (5MB)',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.white.withValues(
-                                                alpha: 0.4,
-                                              ),
+                                              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
                                             ),
                                           ),
                                         ],
@@ -289,9 +288,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
                             const SizedBox(height: 12),
                             SizedBox(
                               width: double.infinity,
-                              child: GlassButton(
-                                label: 'UPLOAD LOGO',
+                              child: OutlinedButton(
                                 onPressed: _pickLogo,
+                                child: const Text('UPLOAD LOGO'),
                               ),
                             ),
                           ],
@@ -301,8 +300,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
                       // Color Theme Card
                       _buildCard(
+                        colorScheme: colorScheme,
                         icon: Icons.palette_rounded,
-                        iconBgColor: colorScheme.tertiary.withValues(alpha: 0.2),
+                        iconBgColor: colorScheme.tertiary.withOpacity(0.1),
                         iconColor: colorScheme.tertiary,
                         title: 'Color Theme',
                         subtitle:
@@ -340,13 +340,11 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: sel
-                                      ? c.withValues(alpha: 0.25)
-                                      : Colors.white.withValues(alpha: 0.1),
+                                      ? c.withOpacity(0.15)
+                                      : colorScheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: sel
-                                        ? c
-                                        : Colors.white.withValues(alpha: 0.15),
+                                    color: sel ? c : colorScheme.outlineVariant,
                                     width: sel ? 2 : 1,
                                   ),
                                 ),
@@ -392,7 +390,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                       opt['label'] as String,
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: sel ? c : Colors.white70,
+                                        color: sel ? c : colorScheme.onSurfaceVariant,
                                         fontWeight: sel
                                             ? FontWeight.bold
                                             : FontWeight.normal,
@@ -408,10 +406,18 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       const SizedBox(height: 28),
 
                       // Next (Register) button
-                      GlassButton(
-                        label: 'NEXT',
-                        isLoading: _isLoading,
+                      ElevatedButton(
                         onPressed: _goToNextStep,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('NEXT'),
                       ),
                 ],
               ),
@@ -422,7 +428,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
     );
   }
 
-  Widget _buildStepIndicator() {
+  Widget _buildStepIndicator(ColorScheme colorScheme) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 1; // Always on step 2 here
 
@@ -433,8 +439,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
             child: Container(
               height: 2,
               color: activeStep > i ~/ 2
-                  ? Theme.of(context).primaryColor
-                  : Colors.white.withOpacity(0.2),
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
             ),
           );
         }
@@ -450,26 +456,22 @@ class _BrandingScreenState extends State<BrandingScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: done || active
-                    ? Theme.of(context).primaryColor
-                    : Colors.white.withOpacity(0.15),
+                    ? colorScheme.primary
+                    : colorScheme.surfaceContainerHighest,
                 border: Border.all(
                   color: done || active
-                      ? Theme.of(context).primaryColor
-                      : Colors.white.withOpacity(0.3),
+                      ? colorScheme.primary
+                      : colorScheme.outline,
                   width: 1.5,
                 ),
               ),
               child: Center(
                 child: done
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      )
+                    ? Icon(Icons.check, color: colorScheme.onPrimary, size: 18)
                     : Text(
                         '${idx + 1}',
                         style: TextStyle(
-                          color: active ? Colors.white : Colors.white60,
+                          color: active ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -481,7 +483,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
               steps[idx],
               style: TextStyle(
                 fontSize: 11,
-                color: active || done ? Colors.white : Colors.white54,
+                color: active || done ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -492,6 +494,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
   }
 
   Widget _buildCard({
+    required ColorScheme colorScheme,
     required IconData icon,
     required Color iconBgColor,
     required Color iconColor,
@@ -499,48 +502,52 @@ class _BrandingScreenState extends State<BrandingScreen> {
     String? subtitle,
     required Widget child,
   }) {
-    return GlassCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Colors.white,
-                    ),
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  if (subtitle != null)
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      subtitle,
+                      title,
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withOpacity(0.5),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
                       ),
                     ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          child,
-        ],
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
       ),
     );
   }

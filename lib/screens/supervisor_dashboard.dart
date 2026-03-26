@@ -219,20 +219,42 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   }
 
   Widget _buildProfileSection() {
-    return GlassCard(
+    return Container(
       padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).primaryColor,
+            Theme.of(context).primaryColor.withOpacity(0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.white24,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 40,
+            child: CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.person_rounded,
+                color: Theme.of(context).primaryColor,
+                size: 32,
+              ),
             ),
           ),
           const SizedBox(width: 20),
@@ -246,13 +268,16 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     fontSize: Responsive.fontSize(context, 24),
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   'Site Supervisor • ID: ${widget.supervisorId}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -265,7 +290,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 32, bottom: 16),
+      padding: const EdgeInsets.only(top: 40, bottom: 16),
       child: Row(
         children: [
           Container(
@@ -276,14 +301,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              fontSize: Responsive.fontSize(context, 14),
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
-              letterSpacing: 1.2,
+              fontSize: Responsive.fontSize(context, 12),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 2.0,
             ),
           ),
         ],
@@ -296,14 +321,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
         onTap: item.onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: item.color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
+                color: item.color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(item.icon, color: item.color, size: 24),
             ),
@@ -312,16 +337,16 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               child: Text(
                 item.title,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 15),
+                  fontSize: Responsive.fontSize(context, 16),
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: const Color(0xFF334155),
                 ),
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withOpacity(0.3),
-              size: 20,
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFFCBD5E1),
+              size: 24,
             ),
           ],
         ),

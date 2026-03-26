@@ -85,8 +85,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     setState(() {
       isLoadingCategories = true;
     });
-    final snapshot = await FirebaseFirestore.instance
-        .collection('materialCategories')
+    final snapshot = await FirestoreService.materialCategories
         .get();
     categories = snapshot.docs
         .map(
@@ -118,8 +117,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     setState(() {
       isLoadingSubCategories = true;
     });
-    final snapshot = await FirebaseFirestore.instance
-        .collection('materialSubCategories')
+    final snapshot = await FirestoreService.materialSubCategories
         .where('matCategory', isEqualTo: selectedCategoryRef)
         .get();
     subCategories = snapshot.docs
@@ -168,8 +166,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     setState(() {
       isLoadingMaterialId = true;
     });
-    final snapshot = await FirebaseFirestore.instance
-        .collection('materials')
+    final snapshot = await FirestoreService.materials
         .orderBy('materialId', descending: true)
         .limit(1)
         .get();
@@ -270,8 +267,7 @@ class _MaterialScreenState extends State<MaterialScreen>
         return;
       }
 
-      final counterRef = FirebaseFirestore.instance
-          .collection('counters')
+      final counterRef = FirestoreService.getCollection('counters')
           .doc('materials');
       String newMaterialId = materialIdController.text;
 
@@ -341,8 +337,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     setState(() {
       isLoadingMaterials = true;
     });
-    final snapshot = await FirebaseFirestore.instance
-        .collection('materials')
+    final snapshot = await FirestoreService.materials
         .orderBy('materialId')
         .get();
     materials = snapshot.docs.map((doc) {

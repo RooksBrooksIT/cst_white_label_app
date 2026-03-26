@@ -65,7 +65,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white60)),
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(color: Colors.white60),
+              ),
             ),
             SizedBox(
               width: 100,
@@ -98,14 +101,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     } else {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invalid referral code')),
+                          const SnackBar(
+                            content: Text('Invalid referral code'),
+                          ),
                         );
                       }
                     }
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e')));
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
                     }
                   } finally {
                     setDialogState(() => isLoading = false);
@@ -139,22 +145,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 height: Responsive.isMobile(context) ? 100 : 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.1),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    width: 1.5,
-                  ),
+                  color: colorScheme.primary.withOpacity(0.1),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 30,
+                      color: colorScheme.primary.withOpacity(0.15),
+                      blurRadius: 40,
                       spreadRadius: 5,
                     ),
                   ],
                 ),
-                child: const Icon(Icons.construction_rounded, size: 48, color: Colors.white),
+                child: Icon(
+                  Icons.construction_rounded,
+                  size: 48,
+                  color: colorScheme.primary,
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               ValueListenableBuilder<String>(
                 valueListenable: AppTheme.appName,
                 builder: (context, name, _) {
@@ -162,10 +168,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     name,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 32),
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1.5,
+                      fontSize: Responsive.fontSize(context, 36),
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF1E293B),
+                      letterSpacing: -1.0,
                     ),
                   );
                 },
@@ -176,8 +182,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 16),
-                  color: colorScheme.onSurfaceVariant,
-                  letterSpacing: 0.5,
+                  color: const Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
                 ),
               ),
               const SizedBox(height: 64),
@@ -191,18 +198,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               GlassButton(
                 label: 'REGISTER ORGANIZATION',
                 isSecondary: true,
-                onPressed: () => Navigator.pushNamed(context, '/orgRegistration'),
+                onPressed: () =>
+                    Navigator.pushNamed(context, '/orgRegistration'),
               ),
               const SizedBox(height: 32),
 
               TextButton.icon(
                 onPressed: _showReferralDialog,
-                icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white70, size: 18),
-                label: const Text(
+                icon: Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
+                label: Text(
                   'Join using referral code',
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: colorScheme.primary,
                     fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     decoration: TextDecoration.underline,
                   ),
                 ),
@@ -211,8 +224,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               Text(
                 'v1.0.0',
                 style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 12,
+                  color: const Color(0xFFCBD5E1),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

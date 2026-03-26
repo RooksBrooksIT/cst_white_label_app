@@ -30,10 +30,18 @@ class GlassScaffold extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: hasAppBar
           ? AppBar(
-              title: title != null ? Text(title!) : null,
+              title: title != null 
+                ? Text(
+                    title!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ) 
+                : null,
               leading: onBack != null
                   ? IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
                       onPressed: onBack,
                     )
                   : null,
@@ -41,7 +49,8 @@ class GlassScaffold extends StatelessWidget {
               bottom: bottom,
               centerTitle: true,
               elevation: 0,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
               foregroundColor: Theme.of(context).colorScheme.onSurface,
             )
           : null,
@@ -50,6 +59,7 @@ class GlassScaffold extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: Responsive.isMobile(context) ? 16 : 24,
+            vertical: 16,
           ),
           child: body,
         ),

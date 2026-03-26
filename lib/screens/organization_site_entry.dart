@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/services/expense_service.dart';
 import 'package:intl/intl.dart';
@@ -90,9 +91,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       isLoadingSites = true;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
-          .get();
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
 
       siteList = snapshot.docs
           .map((doc) {
@@ -148,9 +147,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       materialError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('materials')
-          .get();
+      final snapshot = await FirestoreService.materials.get();
       final options = <String>[];
       final prices = <String, num>{};
 
@@ -210,9 +207,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       labourError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('labours')
-          .get();
+      final snapshot = await FirestoreService.labours.get();
       final options = <String>[];
       final salaries = <String, num>{};
 
@@ -514,8 +509,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       "projectStage": projectStage,
     };
     try {
-      final existing = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final existing = await FirestoreService.siteSupervisorEntries
           .doc(docId)
           .get();
       if (existing.exists) {
@@ -537,10 +531,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         });
         return;
       }
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
-          .doc(docId)
-          .set(data);
+      await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       // Update total site expense aggregation
       await ExpenseService.updateTotalSiteExpense(siteCode);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -920,7 +911,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           },
           child: const Text(
             'Organiser Daily Site Entry',
-            style: TextStyle( fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
         centerTitle: true,
@@ -1852,7 +1843,6 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        
                                       ),
                                     )
                                   : const Text(

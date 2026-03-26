@@ -4,10 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
 import '../services/firestore_service.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_text_field.dart';
-import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
@@ -180,6 +176,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
     builder: (context) => AlertDialog(
       title: const Text('Login Failed'),
       content: Text(message),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -194,6 +191,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
     builder: (context) => AlertDialog(
       title: const Text('Success'),
       content: Text(message),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -216,8 +214,20 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         elevation: 0,
         child: StatefulBuilder(
           builder: (context, setState) {
-            return GlassCard(
-              padding: const EdgeInsets.all(24),
+            final colorScheme = Theme.of(context).colorScheme;
+            return Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 30,
+                    offset: const Offset(0, 15),
+                  ),
+                ],
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -225,55 +235,81 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                     const Text(
                       'Reset Password',
                       style: TextStyle(
-                        fontSize: 22.0,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 16.0),
-                    GlassTextField(
+                    const SizedBox(height: 24),
+                    TextFormField(
                       controller: usernameController,
-                      label: 'Username',
-                      icon: Icons.person,
+                      decoration: InputDecoration(
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
                     ),
-                    const SizedBox(height: 16.0),
-                    GlassTextField(
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: newPasswordController,
-                      label: 'New Password',
-                      icon: Icons.lock_outline,
-                      isPassword: true,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'New Password',
+                        prefixIcon: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
                     ),
-                    const SizedBox(height: 16.0),
-                    GlassTextField(
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: confirmPasswordController,
-                      label: 'Confirm New Password',
-                      icon: Icons.lock_reset,
-                      isPassword: true,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm New Password',
+                        prefixIcon: Icon(Icons.lock_reset_rounded, color: colorScheme.primary),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: 32),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Flexible(
-                          child: GlassButton(
-                            label: 'Cancel',
-                            isSecondary: true,
+                        Expanded(
+                          child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
                           ),
                         ),
-                        const SizedBox(width: 12.0),
-                        Flexible(
-                          child: GlassButton(
-                            label: 'Update',
-                            isLoading: isUpdating,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
                             onPressed: isUpdating
                                 ? null
                                 : () async {
                                     if (newPasswordController.text !=
                                         confirmPasswordController.text) {
-                                      if (context.mounted) _showErrorDialog(
-                                        'Passwords do not match',
-                                      );
+                                      if (context.mounted) _showErrorDialog('Passwords do not match');
                                       return;
                                     }
                                     setState(() => isUpdating = true);
@@ -292,8 +328,6 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                       if (querySnapshot.docs.isNotEmpty) {
                                         final docId =
                                             querySnapshot.docs.first.id;
-                                        final supervisorCollection =
-                                            await FirestoreService.supervisors;
                                         await supervisorCollection
                                             .doc(docId)
                                             .update({
@@ -318,6 +352,23 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                       if (context.mounted) setState(() => isUpdating = false);
                                     }
                                   },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: isUpdating
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Update'),
                           ),
                         ),
                       ],
@@ -462,8 +513,17 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return GlassScaffold(
-      onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B), size: 20),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -474,88 +534,132 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
             children: [
               // Icon Header
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.supervisor_account_rounded,
                   size: 64,
-                  color: Colors.white,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 'Supervisor Login',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 28),
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Sign in to your dashboard',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 40),
 
-              GlassCard(
-                padding: const EdgeInsets.all(24),
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      GlassTextField(
+                      TextFormField(
                         controller: _referralController,
-                        label: 'Referral Code',
-                        icon: Icons.business_rounded,
+                        decoration: InputDecoration(
+                          labelText: 'Referral Code',
+                          prefixIcon: Icon(Icons.business_outlined, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (value) =>
                             (value == null || value.isEmpty)
                             ? 'Referral Code is required'
                             : null,
                       ),
                       const SizedBox(height: 16),
-                      GlassTextField(
+                      TextFormField(
                         controller: _usernameController,
-                        label: 'Username',
-                        icon: Icons.person_rounded,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (value) =>
                             (value == null || value.isEmpty)
                             ? 'UserName is required'
                             : null,
                       ),
                       const SizedBox(height: 16),
-                      GlassTextField(
+                      TextFormField(
                         controller: _passwordController,
-                        label: 'Password',
-                        icon: Icons.lock_rounded,
-                        isPassword: true,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (value) =>
                             (value == null || value.isEmpty)
                             ? 'Password is required'
                             : null,
                       ),
                       const SizedBox(height: 16),
-                      
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          unselectedWidgetColor: Colors.white70,
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: CheckboxListTile(
                           title: const Text(
                             'Is Contractor',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           value: _isContractor,
                           activeColor: colorScheme.primary,
-                          checkColor: Colors.white,
                           onChanged: (val) {
                             setState(() {
                               _isContractor = val ?? false;
@@ -565,29 +669,29 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                             });
                           },
                           controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
-
                       if (_isContractor) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
                           isExpanded: true,
-                          dropdownColor: Colors.blueGrey[900],
-                          style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Contractor Name',
-                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                            prefixIcon: Icon(Icons.supervisor_account, color: Theme.of(context).primaryColor),
+                            prefixIcon: Icon(Icons.supervisor_account_outlined, color: colorScheme.primary),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
                             filled: true,
-                            fillColor: Colors.white.withOpacity(0.05),
+                            fillColor: const Color(0xFFF8FAFC),
                           ),
                           value: _selectedSupervisorName,
                           items: _supervisorNames.map((name) {
                             return DropdownMenuItem<String>(
                               value: name,
-                              child: Text(name, overflow: TextOverflow.ellipsis),
+                              child: Text(name),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -597,25 +701,40 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                               _isContractor && value == null ? 'Required' : null,
                         ),
                       ],
-
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: _showForgotPasswordDialog,
-                          child: Text(
+                          child: const Text(
                             'Forgot Password?',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      GlassButton(
-                        label: 'LOGIN',
-                        isLoading: _isLoading,
-                        onPressed: _isLoading ? null : _login,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
                       ),
                     ],
                   ),

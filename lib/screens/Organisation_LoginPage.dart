@@ -4,10 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
 import '../services/firestore_service.dart';
 import 'Organization_Dashboard.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_text_field.dart';
-import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
@@ -91,13 +87,15 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       if (querySnapshot.docs.isNotEmpty) {
         final docSnapshot = querySnapshot.docs.first;
         final userData = docSnapshot.data();
-        
+
         // Write organization info to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         final String? storedOrgName = userData['orgName'] as String?;
         // New Path Logic: dynamicPath is the OrgID, fullConfigPath is the doc path
-        final String dynamicPath = userData['dynamicPath'] ?? ''; 
-        final String fullConfigPath = userData['fullConfigPath'] ?? 'organisation/$dynamicPath/admin/data';
+        final String dynamicPath = userData['dynamicPath'] ?? '';
+        final String fullConfigPath =
+            userData['fullConfigPath'] ??
+            'organisation/$dynamicPath/admin/data';
 
         await prefs.setBool(_isLoggedInKey, true);
         await prefs.setString(_usernameKey, username);
@@ -133,8 +131,17 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
 
-    return GlassScaffold(
-      onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B), size: 20),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -145,15 +152,15 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
             children: [
               // Icon Header
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
+                  color: primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.business_center_rounded,
                   size: 64,
-                  color: Colors.white,
+                  color: primary,
                 ),
               ),
               const SizedBox(height: 24),
@@ -163,45 +170,117 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 28),
                   fontWeight: FontWeight.bold,
-                  color: Colors.white, // Standard for dark glass backgrounds
+                  color: const Color(0xFF1E293B),
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 'Enter your credentials to continue',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.white.withOpacity(0.7),
+                  color: const Color(0xFF64748B),
                 ),
               ),
               const SizedBox(height: 40),
 
-              GlassCard(
-                padding: const EdgeInsets.all(24),
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      GlassTextField(
+                      TextFormField(
                         controller: _usernameController,
-                        label: 'Username',
-                        icon: Icons.person_rounded,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(Icons.person_outline_rounded, color: primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: primary, width: 2),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
-                      GlassTextField(
+                      const SizedBox(height: 20),
+                      TextFormField(
                         controller: _passwordController,
-                        label: 'Password',
-                        icon: Icons.lock_rounded,
-                        isPassword: true,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock_outline_rounded, color: primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: primary, width: 2),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 32),
-                      GlassButton(
-                        label: 'LOGIN',
-                        isLoading: _isLoading,
-                        onPressed: _login,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'LOGIN',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                        ),
                       ),
                     ],
                   ),
@@ -214,14 +293,15 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 children: [
                   Text(
                     "Don't have an account? ",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    style: TextStyle(color: const Color(0xFF64748B)),
                   ),
                   TextButton(
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const OrganisationRegistrationPage(),
+                          builder: (context) =>
+                              const OrganisationRegistrationPage(),
                         ),
                       );
                     },

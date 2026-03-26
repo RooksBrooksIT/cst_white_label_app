@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'package:demo_cst/screens/daily_site_report.dart';
 import 'package:demo_cst/screens/site_expenses_reportpage.dart';
 import 'package:demo_cst/screens/site_summary_page.dart';
@@ -96,9 +97,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
         await _fetchUserSiteId();
       }
 
-      Query query = FirebaseFirestore.instance.collection(
-        'siteSupervisorEntries',
-      );
+      Query query = FirestoreService.siteSupervisorEntries;
 
       // If user has a siteId, filter by it
       if (_userSiteId != null && _userSiteId!.isNotEmpty) {
@@ -118,8 +117,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
 
   Future<void> _fetchUserSiteId() async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('projects')
+      final querySnapshot = await FirestoreService.projects
           .where('ownerName', isEqualTo: _ownerName)
           .where('ownerPhoneNumber', isEqualTo: _ownerPhoneNumber)
           .get();

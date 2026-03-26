@@ -52,7 +52,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       onBack: () => _showLogoutConfirmation(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
+          icon: Icon(Icons.menu, color: Theme.of(context).colorScheme.primary),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const OrgMenuScreen()),
@@ -115,17 +115,19 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         Text(
           "Welcome back,",
           style: TextStyle(
-            fontSize: Responsive.fontSize(context, 18), 
-            color: Colors.white.withOpacity(0.7)
+            fontSize: Responsive.fontSize(context, 16),
+            color: const Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
           _orgName,
           style: TextStyle(
             fontSize: Responsive.fontSize(context, 32),
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: const Color(0xFF1E293B),
+            letterSpacing: -0.5,
           ),
         ),
       ],
@@ -215,7 +217,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           iconColor: Colors.deepPurple[400]!,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ManagerApprovalScreen()),
+            MaterialPageRoute(
+              builder: (context) => const ManagerApprovalScreen(),
+            ),
           ),
         ),
         _buildMenuCard(
@@ -268,7 +272,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 32, bottom: 16),
+      padding: const EdgeInsets.only(top: 40, bottom: 16),
       child: Row(
         children: [
           Container(
@@ -279,14 +283,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              fontSize: Responsive.fontSize(context, 14),
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
-              letterSpacing: 1.2,
+              fontSize: Responsive.fontSize(context, 12),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 2.0,
             ),
           ),
         ],
@@ -305,14 +309,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, color: iconColor, size: 24),
             ),
@@ -321,16 +325,16 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 15),
+                  fontSize: Responsive.fontSize(context, 16),
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: const Color(0xFF334155),
                 ),
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withOpacity(0.3),
-              size: 20,
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFFCBD5E1),
+              size: 24,
             ),
           ],
         ),

@@ -459,19 +459,23 @@ class _DailySiteExpensesReportPageState
     final formattedDate = DateFormat('yyyy-MM-dd').format(widget.date);
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Daily Site Expenses Report',
           style: TextStyle(
-            
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(),
-        elevation: 2,
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B), size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _fetchAllReports(),

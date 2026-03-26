@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
-import '../utils/app_theme.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'organisation_loginPage.dart';
 
 class OrgMenuScreen extends StatefulWidget {
@@ -38,11 +38,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       // Fetch dynamic organization and subscription data
       final String? dynamicPath = prefs.getString('org_dynamic_path');
       if (dynamicPath != null && dynamicPath.isNotEmpty) {
-        final orgId = dynamicPath.split('/')[0];
-        final subDoc = await FirebaseFirestore.instance
-            .collection('organisation')
-            .doc(orgId)
-            .collection('admin')
+        final subDoc = await FirestoreService.getCollection('admin')
             .doc('data')
             .get();
 
@@ -114,9 +110,9 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           height: 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: colorScheme.primary.withValues(alpha: 0.2),
+            color: colorScheme.primary.withOpacity(0.12),
             border: Border.all(
-              color: colorScheme.primary.withValues(alpha: 0.3),
+              color: colorScheme.primary.withOpacity(0.2),
               width: 2,
             ),
           ),
@@ -127,7 +123,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           _orgName,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF1E293B),
             fontSize: Responsive.fontSize(context, 24),
             fontWeight: FontWeight.bold,
           ),
@@ -149,7 +145,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               Text(
                 'Referral Program',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
@@ -159,15 +155,15 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           const SizedBox(height: 16),
           const Text(
             'Share this code with your managers and supervisors to register them under your organization.',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,14 +171,14 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 Text(
                   _referralCode,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colorScheme.primary,
                     fontSize: Responsive.fontSize(context, 20),
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.copy_rounded, color: Colors.white70),
+                  icon: const Icon(Icons.copy_rounded, color: Color(0xFF64748B)),
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: _referralCode));
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -215,7 +211,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               Text(
                 'Settings',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
@@ -224,31 +220,13 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           ),
           const SizedBox(height: 16),
           _buildSettingsTile(
-            icon: Icons.dark_mode_outlined,
-            title: 'Dark Mode',
-            trailing: ValueListenableBuilder<ThemeMode>(
-              valueListenable: AppTheme.themeMode,
-              builder: (context, mode, _) {
-                return Switch(
-                  value: mode == ThemeMode.dark,
-                  activeColor: Colors.blue,
-                  onChanged: (value) {
-                    AppTheme.updateThemeMode(
-                      value ? ThemeMode.dark : ThemeMode.light,
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          const Divider(color: Colors.white10, height: 24),
-          _buildSettingsTile(
             icon: Icons.color_lens_outlined,
             title: 'Brand Color',
+            subtitle: 'Change app theme color',
             onTap: () => Navigator.pushNamed(context, '/branding'),
           ),
 
-          const Divider(color: Colors.white10, height: 24),
+          const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.info_outline_rounded,
             title: 'About App',
@@ -274,7 +252,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               Text(
                 'Subscription',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
                   fontWeight: FontWeight.bold,
                 ),
@@ -317,10 +295,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             fontSize: 16,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2,
+            color: Colors.white,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.redAccent.withOpacity(0.8),
+          backgroundColor: Colors.red[600],
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
@@ -390,23 +369,27 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: Colors.white70),
+      leading: Icon(icon, color: const Color(0xFF64748B)),
       title: Text(
         title,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: const TextStyle(
+          color: Color(0xFF1E293B),
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
                 fontSize: 12,
               ),
             )
           : null,
       trailing:
           trailing ??
-          const Icon(Icons.chevron_right_rounded, color: Colors.white30),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
       onTap: onTap,
     );
   }

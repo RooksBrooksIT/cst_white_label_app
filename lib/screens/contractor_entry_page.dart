@@ -20,10 +20,14 @@ class ContractorEntryPage extends StatefulWidget {
 
 class _ContractorEntryPageState extends State<ContractorEntryPage> {
   // --- Color Configuration and Utilities ---
+  // Professional slate colors
   final Color _primaryColor = const Color(0xFF0b3470);
-  final Color _sectionBgColor = const Color(0xfff7fafc); // main bg
-  final Color _actionTextColor = const Color(0xFF0b3470); // Save button text
-  final Color _secondaryColor = const Color(0xFF64748B);
+  final Color _textColor = const Color(0xFF1E293B);
+  final Color _labelColor = const Color(0xFF64748B);
+  final Color _borderColor = const Color(0xFFE2E8F0);
+  final Color _secondaryColor = const Color(0xFF94A3B8); // Standard secondary slate
+  final Color _sectionBgColor = const Color(0xFFF8FAFC); // Main background
+  final Color _actionTextColor = Colors.white; // Text on primary background
   final Color _successColor = const Color(0xFF10B981);
   final Color _errorColor = const Color(0xFFEF4444);
 
@@ -598,18 +602,22 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSectionHeader(String title, IconData icon, {Color? color}) {
     return Row(
       children: [
-        CircleAvatar(
-          backgroundColor: (color ?? _primaryColor).withOpacity(0.11),
-          radius: 16,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (color ?? _primaryColor).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Icon(icon, color: color ?? _primaryColor, size: 20),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 12),
         Text(
           title,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 17,
-            color: color ?? _primaryColor,
+            fontSize: 16,
+            color: _textColor,
+            letterSpacing: 0.3,
           ),
         ),
       ],
@@ -626,23 +634,25 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         Text(
           label,
           style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: _secondaryColor,
-            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _labelColor,
+            fontSize: 13,
+            letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey),
+            border: Border.all(color: _borderColor),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: child,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
       ],
     );
   }
@@ -667,32 +677,27 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSummaryTable() {
     return Container(
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey),
+        border: Border.all(color: _borderColor),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 16,
           horizontalMargin: 12,
-          headingRowHeight: 40,
-          dataRowHeight: 40,
+          headingRowHeight: 48,
+          dataRowHeight: 48,
+          headingTextStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: _labelColor,
+            fontSize: 12,
+          ),
           columns: const [
-            DataColumn(
-              label:
-                  Text('Type', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            DataColumn(
-              label:
-                  Text('Item', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            DataColumn(
-              label: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            DataColumn(
-              label:
-                  Text('Amount', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+            DataColumn(label: Text('Type')),
+            DataColumn(label: Text('Item')),
+            DataColumn(label: Text('Qty')),
+            DataColumn(label: Text('Amount')),
             DataColumn(label: SizedBox(width: 40)),
           ],
           rows: [
@@ -700,18 +705,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
               int idx = entry.key;
               var m = entry.value;
               return DataRow(cells: [
-                DataCell(Text('Material', style: TextStyle(fontSize: 12))),
-                DataCell(Text(m['type']?.toString() ?? '',
-                    style: TextStyle(fontSize: 12))),
-                DataCell(Text('${m['quantity'] ?? 0}',
-                    style: TextStyle(fontSize: 12))),
+                DataCell(Text('Material', style: TextStyle(fontSize: 12, color: _textColor))),
+                DataCell(Text(m['type']?.toString() ?? '', style: TextStyle(fontSize: 12, color: _textColor))),
+                DataCell(Text('${m['quantity'] ?? 0}', style: TextStyle(fontSize: 12, color: _textColor))),
                 DataCell(Text(
-                  _calculateMaterialAmount(
-                      m['type']?.toString() ?? '', m['quantity'] ?? 0),
-                  style: TextStyle(fontSize: 12),
+                  _calculateMaterialAmount(m['type']?.toString() ?? '', m['quantity'] ?? 0),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor),
                 )),
                 DataCell(IconButton(
-                  icon: Icon(Icons.delete, color: _errorColor, size: 18),
+                  icon: Icon(Icons.delete_outline_rounded, color: _errorColor, size: 20),
                   onPressed: () => _removeMaterial(idx),
                 )),
               ]);
@@ -720,60 +722,53 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
               int idx = entry.key;
               var l = entry.value;
               return DataRow(cells: [
-                DataCell(Text('Labour', style: TextStyle(fontSize: 12))),
-                DataCell(Text(l['type']?.toString() ?? '',
-                    style: TextStyle(fontSize: 12))),
-                DataCell(
-                    Text('${l['count'] ?? 0}', style: TextStyle(fontSize: 12))),
+                DataCell(Text('Labour', style: TextStyle(fontSize: 12, color: _textColor))),
+                DataCell(Text(l['type']?.toString() ?? '', style: TextStyle(fontSize: 12, color: _textColor))),
+                DataCell(Text('${l['count'] ?? 0}', style: TextStyle(fontSize: 12, color: _textColor))),
                 DataCell(Text(
-                  _calculateLabourAmount(
-                      l['type']?.toString() ?? '', l['count'] ?? 0),
-                  style: TextStyle(fontSize: 12),
+                  _calculateLabourAmount(l['type']?.toString() ?? '', l['count'] ?? 0),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor),
                 )),
                 DataCell(IconButton(
-                  icon: Icon(Icons.delete, color: _errorColor, size: 18),
+                  icon: Icon(Icons.delete_outline_rounded, color: _errorColor, size: 20),
                   onPressed: () => _removeLabour(idx),
                 )),
               ]);
             }),
             DataRow(cells: [
-              DataCell(Text('Food', style: TextStyle(fontSize: 12))),
+              DataCell(Text('Food', style: TextStyle(fontSize: 12, color: _labelColor))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(
-                  Text('₹${foodCost.text}', style: TextStyle(fontSize: 12))),
-              DataCell(SizedBox.shrink()),
+              DataCell(Text('₹${foodCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
+              DataCell(const SizedBox.shrink()),
             ]),
             DataRow(cells: [
-              DataCell(Text('Transport', style: TextStyle(fontSize: 12))),
+              DataCell(Text('Transport', style: TextStyle(fontSize: 12, color: _labelColor))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('₹${transportCost.text}',
-                  style: TextStyle(fontSize: 12))),
-              DataCell(SizedBox.shrink()),
+              DataCell(Text('₹${transportCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
+              DataCell(const SizedBox.shrink()),
             ]),
             DataRow(cells: [
-              DataCell(Text('Fuel', style: TextStyle(fontSize: 12))),
+              DataCell(Text('Fuel', style: TextStyle(fontSize: 12, color: _labelColor))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
               DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(
-                  Text('₹${fuelCost.text}', style: TextStyle(fontSize: 12))),
-              DataCell(SizedBox.shrink()),
+              DataCell(Text('₹${fuelCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
+              DataCell(const SizedBox.shrink()),
             ]),
-            DataRow(cells: [
-              DataCell(SizedBox.shrink()),
-              DataCell(SizedBox.shrink()),
-              DataCell(Text('Total',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-              DataCell(Text(
-                '₹${_getTotalAmount()}',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: _primaryColor),
-              )),
-              DataCell(SizedBox.shrink()),
-            ]),
+            DataRow(
+              color: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              cells: [
+                const DataCell(SizedBox.shrink()),
+                const DataCell(SizedBox.shrink()),
+                const DataCell(Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
+                DataCell(Text(
+                  '₹${_getTotalAmount()}',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _primaryColor),
+                )),
+                const DataCell(SizedBox.shrink()),
+              ],
+            ),
           ],
         ),
       ),
@@ -782,7 +777,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   Widget _buildHeaderSection(BuildContext context, bool isDark, double hPad) {
     return Container(
-      color: _actionTextColor, // Use the requested color
+      color: Colors.white,
       child: SafeArea(
         child: SizedBox(
           height: kToolbarHeight,
@@ -791,49 +786,24 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.arrow_back, ),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 20, color: Color(0xFF1E293B)),
                   onPressed: () => Navigator.pop(context),
-                  splashRadius: 24,
                 ),
-                const Expanded(
+                Expanded(
                   child: Center(
                     child: Text(
-                      'Contractor Entry',
+                      'CONTRACTOR ENTRY',
                       style: TextStyle(
-                        
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.1,
+                        color: _primaryColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.logout,  size: 22),
-                  onPressed: () async {
-                    final shouldLogout = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text('Confirm Logout'),
-                        content: Text('Are you sure you want to log out?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: Text('Logout'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (shouldLogout == true) {
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    }
-                  },
-                  splashRadius: 24,
-                ),
+                const SizedBox(width: 48), // Spacer for balance
               ],
             ),
           ),
@@ -1346,7 +1316,6 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final double width = MediaQuery.of(context).size.width;
     final double hPad = getPad(width);
     final double sectionSpacing = width < 400
@@ -1368,7 +1337,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       backgroundColor: _sectionBgColor,
       body: Column(
         children: [
-          _buildHeaderSection(context, isDark, hPad),
+          _buildHeaderSection(context, false, hPad),
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -1377,7 +1346,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 children: [
                   Padding(
                     padding: EdgeInsets.all(cardPadding),
-                    child: _buildContractorDetailsCard(isDark),
+                    child: _buildContractorDetailsCard(false),
                   ),
                   SizedBox(height: sectionSpacing),
                   Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import '../services/expense_service.dart';
 
 class OrganizationExpenses extends StatefulWidget {
@@ -223,8 +224,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       // Fetch projectName for selectedSiteId
       String projectName = '';
       try {
-        final projectSnap = await FirebaseFirestore.instance
-            .collection('siteSupervisorMap')
+        final projectSnap = await FirestoreService.siteSupervisorMap
             .where('site', isEqualTo: selectedSiteId)
             .limit(1)
             .get();
@@ -238,8 +238,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       final newDocId = '${selectedSiteId}_$dateStr';
 
       // 1. Save/merge to organizationEntries
-      final entryRef = FirebaseFirestore.instance
-          .collection('organizationEntries')
+      final entryRef = FirestoreService.organizationEntries
           .doc(newDocId);
       final entrySnap = await entryRef.get();
 
@@ -305,8 +304,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         'siteId': selectedSiteId ?? '',
       };
 
-      await FirebaseFirestore.instance
-          .collection('organizationExpenseSummary')
+      await FirestoreService.organizationExpenseSummary
           .doc(newDocId)
           .set(summary);
 
@@ -379,8 +377,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     setState(() {
       isLoadingSites = true;
     });
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService.siteSupervisorMap
         .get();
     siteIds = snapshot.docs
         .map((doc) => doc.data()['site'] as String?)
@@ -399,8 +396,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       isLoadingSiteDetails = true;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.siteSupervisorMap
           .where('site', isEqualTo: siteId)
           .limit(1)
           .get();

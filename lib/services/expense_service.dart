@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firestore_service.dart';
 
 class ExpenseService {
   // Recalculate all expense category totals and sync with project document
@@ -24,7 +25,7 @@ class ExpenseService {
       await firestore.runTransaction((txn) async {
         // Document reference for total site expenses
         final totalsRef =
-            firestore.collection('totalSiteExpensesPerDay').doc(siteId);
+            FirestoreService.getCollection('totalSiteExpensesPerDay').doc(siteId);
 
         // Read project document snapshot (if exists) first
         DocumentSnapshot<Map<String, dynamic>>? projectSnap;
@@ -108,8 +109,7 @@ class ExpenseService {
   static Future<DocumentReference<Map<String, dynamic>>?>
       _findExistingProjectDocBySiteId(String siteId) async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
+      final query = await FirestoreService.projects
           .where('siteId', isEqualTo: siteId)
           .limit(1)
           .get();
@@ -127,8 +127,7 @@ class ExpenseService {
   static Future<double> _sumSupervisorExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final snapshot = await FirestoreService.siteSupervisorEntries
           .where('siteId', isEqualTo: siteId)
           .get();
 
@@ -149,8 +148,7 @@ class ExpenseService {
   static Future<double> _sumManagerExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('managerExpenseSummary')
+      final snapshot = await FirestoreService.managerExpenseSummary
           // Document IDs assumed like: {siteId}_{something}
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
           .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
@@ -173,8 +171,7 @@ class ExpenseService {
   static Future<double> _sumOrganizationExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('organizationExpenseSummary')
+      final snapshot = await FirestoreService.organizationExpenseSummary
           // Document IDs assumed like: {siteId}_{something}
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
           .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
@@ -197,8 +194,7 @@ class ExpenseService {
   static Future<double> _sumContractorExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      final snapshot = await FirestoreService.contractorEntries
           .where('siteId', isEqualTo: siteId)
           .get();
 
@@ -219,8 +215,7 @@ class ExpenseService {
   static Future<double> _sumIncentiveExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorIncentives')
+      final snapshot = await FirestoreService.siteSupervisorIncentives
           .where('siteId', isEqualTo: siteId)
           .get();
 

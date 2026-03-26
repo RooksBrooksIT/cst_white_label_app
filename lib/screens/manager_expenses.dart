@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
@@ -39,7 +40,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
       setState(() {
         siteIds = snapshot.docs
             .map((doc) => doc.data()['site'] as String?)
@@ -57,8 +58,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   Future<void> _loadSiteDetails(String siteId) async {
     setState(() => isLoadingSiteDetails = true);
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.siteSupervisorMap
           .where('site', isEqualTo: siteId)
           .limit(1)
           .get();
@@ -308,7 +308,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     setState(() => isSubmitting = true);
     try {
       final docId = 'EXP-${DateTime.now().millisecondsSinceEpoch}';
-      await FirebaseFirestore.instance.collection('managerExpenses').doc(docId).set({
+      await FirestoreService.managerExpenses.doc(docId).set({
         'expenseId': docId,
         'managerId': 'TODO_MANAGER_ID',
         'siteId': selectedSiteId,

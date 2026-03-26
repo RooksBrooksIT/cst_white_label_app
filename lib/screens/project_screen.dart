@@ -55,13 +55,16 @@ class _ProjectScreenState extends State<ProjectScreen> {
   String? selectedProjectId;
 
   // Color scheme
-  final Color primaryColor = const Color(0xFF003768);
-  final Color secondaryColor = const Color(0xFFf5f7fa);
-  final Color accentColor = const Color(0xFF4a8cff);
-  final Color textColor = const Color(0xFF2c3e50);
-  final Color successColor = const Color(0xFF28a745);
-  final Color warningColor = const Color(0xFFffc107);
-  final Color errorColor = const Color(0xFFdc3545);
+  // Professional slate and theme-aware colors
+  Color get primaryColor => Theme.of(context).primaryColor;
+  final Color secondaryColor = const Color(0xFFF8FAFC);
+  final Color accentColor = const Color(0xFF6366F1);
+  final Color textColor = const Color(0xFF1E293B);
+  final Color labelColor = const Color(0xFF64748B);
+  final Color borderColor = const Color(0xFFE2E8F0);
+  final Color successColor = const Color(0xFF10B981);
+  final Color warningColor = const Color(0xFFF59E0B);
+  final Color errorColor = const Color(0xFFEF4444);
 
   @override
   void initState() {
@@ -523,16 +526,10 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Project Configuration",
-          style: TextStyle( fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.3),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+        title: const Text('Project Configuration'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Container(
@@ -543,18 +540,15 @@ class _ProjectScreenState extends State<ProjectScreen> {
             children: [
               // Toggle buttons for New/Update mode
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -571,30 +565,19 @@ class _ProjectScreenState extends State<ProjectScreen> {
                             });
                           }
                         },
-                        style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.all(
-                            !isUpdateMode ? primaryColor : Colors.grey[200],
-                          ),
-                          padding: WidgetStateProperty.all(
-                            const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          shape: WidgetStateProperty.all(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          elevation: WidgetStateProperty.all(0),
-                        ),
-                        child: Text(
-                          'New Project',
-                          style: TextStyle(
-                            color: !isUpdateMode ? Colors.white : textColor,
-                            fontWeight: FontWeight.w600,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: !isUpdateMode ? Theme.of(context).primaryColor : Colors.white,
+                          foregroundColor: !isUpdateMode ? Colors.white : const Color(0xFF64748B),
+                          elevation: !isUpdateMode ? 4 : 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        child: const Text('NEW PROJECT', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -605,27 +588,16 @@ class _ProjectScreenState extends State<ProjectScreen> {
                             });
                           }
                         },
-                        style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.all(
-                            isUpdateMode ? primaryColor : Colors.grey[200],
-                          ),
-                          padding: WidgetStateProperty.all(
-                            const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          shape: WidgetStateProperty.all(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          elevation: WidgetStateProperty.all(0),
-                        ),
-                        child: Text(
-                          'Update Project',
-                          style: TextStyle(
-                            color: isUpdateMode ? Colors.white : textColor,
-                            fontWeight: FontWeight.w600,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isUpdateMode ? Theme.of(context).primaryColor : Colors.white,
+                          foregroundColor: isUpdateMode ? Colors.white : const Color(0xFF64748B),
+                          elevation: isUpdateMode ? 4 : 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        child: const Text('UPDATE PROJECT', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                       ),
                     ),
                   ],
@@ -1665,31 +1637,43 @@ class _ProjectScreenState extends State<ProjectScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     bool readOnly = false,
-    List<TextInputFormatter>? inputFormatters, // <-- Add this parameter
+    List<TextInputFormatter>? inputFormatters,
   }) {
+    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: primaryColor),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        labelStyle: TextStyle(
+          color: labelColor,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(icon, color: labelColor, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: readOnly ? Colors.grey[100] : Colors.grey[50],
+        fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      style: TextStyle(color: textColor),
-      cursorColor: primaryColor,
+      style: TextStyle(
+        color: textColor,
+        fontWeight: FontWeight.w600,
+        fontSize: 15,
+      ),
+      cursorColor: theme.primaryColor,
       keyboardType: keyboardType,
       validator: validator,
-      inputFormatters: inputFormatters, // <-- Use it here
+      inputFormatters: inputFormatters,
       readOnly: readOnly,
     );
   }
@@ -1704,39 +1688,49 @@ class _ProjectScreenState extends State<ProjectScreen> {
     String? Function(String?)? validator,
     bool enabled = true,
   }) {
+    final theme = Theme.of(context);
     return DropdownButtonFormField<String>(
       value: (value != null && items.contains(value)) ? value : null,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: primaryColor),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        labelStyle: TextStyle(
+          color: labelColor,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(icon, color: labelColor, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       items: items.map((String item) {
         return DropdownMenuItem(
           value: item,
-          child: Text(item, style: TextStyle(color: textColor)),
+          child: Text(
+            item,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         );
       }).toList(),
       onChanged: enabled ? onChanged : null,
-      icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-      borderRadius: BorderRadius.circular(10),
+      icon: Icon(Icons.arrow_drop_down_rounded, color: labelColor),
+      borderRadius: BorderRadius.circular(12),
       dropdownColor: Colors.white,
-      style: TextStyle(color: textColor),
       validator: validator,
-      disabledHint: value != null
-          ? Text(value, style: TextStyle(color: textColor))
-          : null,
     );
   }
 
@@ -1822,21 +1816,24 @@ class _ProjectScreenState extends State<ProjectScreen> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            shape: BoxShape.circle,
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.2)),
           ),
           child: IconButton(
-            icon: Icon(icon, color: color),
+            icon: Icon(icon, color: color, size: 28),
             onPressed: onPressed,
+            tooltip: label,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
-          label,
+          label.toUpperCase(),
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: color,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.0,
           ),
         ),
       ],

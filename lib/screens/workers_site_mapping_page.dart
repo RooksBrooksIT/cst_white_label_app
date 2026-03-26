@@ -1,3 +1,4 @@
+import 'package:demo_cst/utils/responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
@@ -357,11 +358,15 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Worker Site Mapping'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
+        title: const Text('Worker Site Mapping'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -397,14 +402,28 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF003768),
-        ),
+      padding: const EdgeInsets.only(top: 16, bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 12),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 2.0,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -514,13 +533,14 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                 SizedBox(width: 12),
                 SizedBox(
                   height: 56, // Match the dropdown height
-                  child: ElevatedButton.icon(
+                  child: FilledButton.icon(
                     onPressed: _addWorkerToList,
-                    icon: Icon(Icons.add),
-                    label: Text('Add'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF22C55E), // Professional Emerald
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -674,17 +694,19 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 56,
       child: ElevatedButton(
         onPressed: _isFormComplete ? _submitMapping : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isFormComplete ? Color(0xFF003768) : Colors.grey,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
-        child: Text(
-          'Save Site Mapping',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        child: const Text(
+          'SAVE SITE MAPPING',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
         ),
       ),
     );

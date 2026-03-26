@@ -3,10 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'customer_dashboard.dart';
 import '../services/firestore_service.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_text_field.dart';
-import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 
 class CustomerLoginPage extends StatefulWidget {
@@ -163,8 +159,17 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return GlassScaffold(
-      onBack: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B), size: 20),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -175,62 +180,103 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
             children: [
               // Icon Header
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.account_balance_rounded,
                   size: 64,
-                  color: Colors.white,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 'Customer Login',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 28),
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Access your project details',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 40),
 
-              GlassCard(
-                padding: const EdgeInsets.all(24),
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      GlassTextField(
+                      TextFormField(
                         controller: _referralController,
-                        label: 'Referral Code',
-                        icon: Icons.business_rounded,
+                        decoration: InputDecoration(
+                          labelText: 'Referral Code',
+                          prefixIcon: Icon(Icons.business_outlined, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      GlassTextField(
+                      TextFormField(
                         controller: _usernameController,
-                        label: 'Username',
-                        icon: Icons.person_rounded,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      GlassTextField(
+                      TextFormField(
                         controller: _passwordController,
-                        label: 'Phone Number',
-                        icon: Icons.phone_rounded,
-                        isPassword: true,
+                        obscureText: true,
                         keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: Icon(Icons.phone_outlined, color: colorScheme.primary),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'Required';
                           if (v.length < 10) return 'Enter valid phone number';
@@ -238,10 +284,25 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                         },
                       ),
                       const SizedBox(height: 32),
-                      GlassButton(
-                        label: 'LOGIN',
-                        isLoading: _isLoading,
-                        onPressed: _login,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
                       ),
                     ],
                   ),

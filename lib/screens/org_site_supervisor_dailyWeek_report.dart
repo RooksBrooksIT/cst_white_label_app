@@ -339,506 +339,437 @@ class _DailySitePaymentReportScreenState
 
   @override
   Widget build(BuildContext context) {
-    List<List<DateTime>> weeks = _getWeeksOfMonth(selectedYear, selectedMonth);
-    final Color primaryColor = Color(0xFF003768);
-
     return Scaffold(
-      backgroundColor: Color(0xFFF8F6F6),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: LayoutBuilder(
-          builder: (context, constraints) {
-            double fontSizeBase = constraints.maxWidth / 25;
-            if (fontSizeBase < 16) fontSizeBase = 16;
-            return Text(
-              'Site Payment Report',
-              style: TextStyle(),
-            );
-          },
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'Site Payment Report',
+          style: TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        iconTheme: IconThemeData(),
-        elevation: 2,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF1E293B),
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          double screenWidth = constraints.maxWidth;
-          double horizontalPadding = screenWidth * 0.05;
-          if (horizontalPadding < 16) horizontalPadding = 16;
-          if (horizontalPadding > 40) horizontalPadding = 40;
+      body: _buildBody(context),
+    );
+  }
 
-          double fontSizeBase = screenWidth / 30;
-          if (fontSizeBase < 14) fontSizeBase = 14;
-          if (fontSizeBase > 22) fontSizeBase = 22;
+  Widget _buildBody(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double screenWidth = constraints.maxWidth;
+        double horizontalPadding = screenWidth * 0.05;
+        if (horizontalPadding < 16) horizontalPadding = 16;
+        if (horizontalPadding > 40) horizontalPadding = 40;
 
-          return Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: 16,
-            ),
-            child: SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 700),
-                  child: Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(horizontalPadding),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              labelText: 'Site ID',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            value: selectedSiteId,
-                            items: siteIds
-                                .map(
-                                  (id) => DropdownMenuItem(
-                                    value: id,
-                                    child: Text(
-                                      id,
-                                      style: TextStyle(fontSize: fontSizeBase),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedSiteId = value;
-                                _updateProjectAndSupervisor();
-                                selectedWeekIndex = null;
-                                weekDates = [];
-                                paymentRecords = [];
-                                totalAmount = 0.0;
-                              });
-                            },
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Project',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            readOnly: true,
-                            style: TextStyle(fontSize: fontSizeBase),
-                            controller: projectController,
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Supervisor',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            readOnly: true,
-                            style: TextStyle(fontSize: fontSizeBase),
-                            controller: supervisorController,
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
+        double fontSizeBase = screenWidth / 30;
+        if (fontSizeBase < 14) fontSizeBase = 14;
+        if (fontSizeBase > 22) fontSizeBase = 22;
 
-                          // Fixed Month and Year Row to prevent overflow
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(
-                                    labelText: 'Month',
-                                    labelStyle: TextStyle(
-                                      fontSize: fontSizeBase,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: primaryColor,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: fontSizeBase * 0.9,
-                                      horizontal: fontSizeBase * 0.7,
-                                    ),
-                                  ),
-                                  value: selectedMonth,
-                                  items: List.generate(12, (i) => i + 1)
-                                      .map(
-                                        (m) => DropdownMenuItem(
-                                          value: m,
-                                          child: Text(
-                                            DateFormat.MMMM().format(
-                                              DateTime(0, m),
-                                            ),
-                                            style: TextStyle(
-                                              fontSize: fontSizeBase,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedMonth = value!;
-                                      selectedWeekIndex = null;
-                                      weekDates = [];
-                                      paymentRecords = [];
-                                      totalAmount = 0.0;
-                                    });
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: fontSizeBase * 0.8),
-                              Expanded(
-                                child: DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(
-                                    labelText: 'Year',
-                                    labelStyle: TextStyle(
-                                      fontSize: fontSizeBase,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: primaryColor,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: fontSizeBase * 0.9,
-                                      horizontal: fontSizeBase * 0.7,
-                                    ),
-                                  ),
-                                  value: selectedYear,
-                                  items: years
-                                      .map(
-                                        (y) => DropdownMenuItem(
-                                          value: y,
-                                          child: Text(
-                                            y.toString(),
-                                            style: TextStyle(
-                                              fontSize: fontSizeBase,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedYear = value!;
-                                      selectedWeekIndex = null;
-                                      weekDates = [];
-                                      paymentRecords = [];
-                                      totalAmount = 0.0;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          SizedBox(height: fontSizeBase * 1.8),
-                          Text(
-                            'Weeks:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: primaryColor,
-                              fontSize: fontSizeBase,
-                            ),
-                          ),
-                          SizedBox(height: fontSizeBase),
-                          Wrap(
-                            spacing: fontSizeBase,
-                            children: List.generate(weeks.length, (i) {
-                              return ChoiceChip(
-                                label: Text(
-                                  'Week ${i + 1}',
-                                  style: TextStyle(
-                                    color: selectedWeekIndex == i
-                                        ? Colors.white
-                                        : primaryColor,
-                                    fontSize: fontSizeBase,
-                                  ),
-                                ),
-                                selected: selectedWeekIndex == i,
-                                selectedColor: primaryColor,
-                                backgroundColor: Color(0xFFF2EAEA),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                onSelected: (_) {
-                                  _onWeekSelected(i);
-                                },
-                              );
-                            }),
-                          ),
-                          SizedBox(height: fontSizeBase * 1.8),
-                          if (selectedWeekIndex != null && weekDates.isNotEmpty)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Payments for Week ${selectedWeekIndex! + 1}:',
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: fontSizeBase,
-                                  ),
-                                ),
-                                SizedBox(height: fontSizeBase),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: primaryColor.withOpacity(0.3),
-                                    ),
-                                    color: Color(0xFFF9EDED),
-                                  ),
-                                  child: Table(
-                                    border: TableBorder.symmetric(
-                                      inside: BorderSide(
-                                        color: primaryColor.withOpacity(0.15),
-                                      ),
-                                    ),
-                                    columnWidths: {
-                                      0: FlexColumnWidth(2),
-                                      1: FlexColumnWidth(2),
-                                    },
-                                    children: [
-                                      TableRow(
-                                        decoration: BoxDecoration(
-                                          color: primaryColor.withOpacity(0.9),
-                                        ),
-                                        children: [
-                                          Padding(
-                                            padding: EdgeInsets.all(
-                                              fontSizeBase,
-                                            ),
-                                            child: Text(
-                                              'Date',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                
-                                                fontSize: fontSizeBase,
-                                              ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: EdgeInsets.all(
-                                              fontSizeBase,
-                                            ),
-                                            child: Text(
-                                              'Payment',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                
-                                                fontSize: fontSizeBase,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      ...paymentRecords.map((rec) {
-                                        String dateStr = '';
-                                        if (rec['paymentDate'] != null) {
-                                          try {
-                                            DateTime dt =
-                                                (rec['paymentDate']
-                                                        as Timestamp)
-                                                    .toDate();
-                                            dateStr = DateFormat(
-                                              'EEE, MMM d, yyyy',
-                                            ).format(dt);
-                                          } catch (e) {
-                                            dateStr = rec['paymentDate']
-                                                .toString();
-                                          }
-                                        }
-                                        return TableRow(
-                                          children: [
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                dateStr,
-                                                style: TextStyle(
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                rec['paymentAmount']
-                                                        ?.toString() ??
-                                                    '',
-                                                style: TextStyle(
-                                                  color: primaryColor,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      }),
-                                      if (paymentRecords.isNotEmpty)
-                                        TableRow(
-                                          children: [
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                'Total',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                totalAmount.toStringAsFixed(2),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          SizedBox(height: fontSizeBase * 3),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF003768),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.cancel_outlined,
-                                  size: fontSizeBase * 1.5,
-                                  
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: _onCancel,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(
-                                    255,
-                                    250,
-                                    185,
-                                    88,
-                                  ),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.restart_alt,
-                                  size: fontSizeBase * 1.5,
-                                  
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed:
-                                    (selectedWeekIndex != null &&
-                                        paymentRecords.isNotEmpty)
-                                    ? _onPrint
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(
-                                    255,
-                                    244,
-                                    53,
-                                    53,
-                                  ),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.print,
-                                  size: fontSizeBase * 1.5,
-                                  
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+        return Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 700),
+                child: Container(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
                       ),
-                    ),
+                    ],
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
+                  child: _buildReportForm(context, fontSizeBase),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReportForm(BuildContext context, double fontSizeBase) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final weeks = _getWeeksOfMonth(selectedYear, selectedMonth);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdownField(
+          label: 'Site ID',
+          value: selectedSiteId,
+          items: siteIds,
+          fontSizeBase: fontSizeBase,
+          onChanged: (value) {
+            setState(() {
+              selectedSiteId = value;
+              _updateProjectAndSupervisor();
+              selectedWeekIndex = null;
+              weekDates = [];
+              paymentRecords = [];
+              totalAmount = 0.0;
+            });
+          },
+        ),
+        SizedBox(height: fontSizeBase * 1.5),
+        _buildTextField(
+          label: 'Project',
+          controller: projectController,
+          fontSizeBase: fontSizeBase,
+        ),
+        SizedBox(height: fontSizeBase * 1.5),
+        _buildTextField(
+          label: 'Supervisor',
+          controller: supervisorController,
+          fontSizeBase: fontSizeBase,
+        ),
+        SizedBox(height: fontSizeBase * 2),
+        Row(
+          children: [
+            Expanded(child: _buildMonthDropdown(fontSizeBase)),
+            SizedBox(width: fontSizeBase),
+            Expanded(child: _buildYearDropdown(fontSizeBase)),
+          ],
+        ),
+        SizedBox(height: fontSizeBase * 2.5),
+        const Text(
+          'Weeks:',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+            fontSize: 14,
+            letterSpacing: 0.5,
+          ),
+        ),
+        SizedBox(height: fontSizeBase),
+        _buildWeekChips(weeks, fontSizeBase, colorScheme),
+        SizedBox(height: fontSizeBase * 2.5),
+        if (selectedWeekIndex != null && weekDates.isNotEmpty)
+          _buildPaymentTable(fontSizeBase, colorScheme),
+        SizedBox(height: fontSizeBase * 3),
+        _buildActionButtons(fontSizeBase, colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required double fontSizeBase,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      decoration: _inputDecoration(label, fontSizeBase),
+      value: value,
+      dropdownColor: Colors.white,
+      items: items
+          .map(
+            (id) => DropdownMenuItem(
+              value: id,
+              child: Text(id, style: TextStyle(fontSize: fontSizeBase)),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required double fontSizeBase,
+  }) {
+    return TextFormField(
+      decoration: _inputDecoration(label, fontSizeBase),
+      readOnly: true,
+      style: TextStyle(fontSize: fontSizeBase, color: const Color(0xFF1E293B)),
+      controller: controller,
+    );
+  }
+
+  Widget _buildMonthDropdown(double fontSizeBase) {
+    return DropdownButtonFormField<int>(
+      decoration: _inputDecoration('Month', fontSizeBase * 0.9),
+      value: selectedMonth,
+      dropdownColor: Colors.white,
+      items: List.generate(12, (i) => i + 1)
+          .map(
+            (m) => DropdownMenuItem(
+              value: m,
+              child: Text(
+                DateFormat.MMMM().format(DateTime(0, m)),
+                style: TextStyle(fontSize: fontSizeBase),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedMonth = value!;
+          selectedWeekIndex = null;
+          weekDates = [];
+          paymentRecords = [];
+          totalAmount = 0.0;
+        });
+      },
+    );
+  }
+
+  Widget _buildYearDropdown(double fontSizeBase) {
+    return DropdownButtonFormField<int>(
+      decoration: _inputDecoration('Year', fontSizeBase * 0.9),
+      value: selectedYear,
+      dropdownColor: Colors.white,
+      items: years
+          .map(
+            (y) => DropdownMenuItem(
+              value: y,
+              child: Text(
+                y.toString(),
+                style: TextStyle(fontSize: fontSizeBase),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedYear = value!;
+          selectedWeekIndex = null;
+          weekDates = [];
+          paymentRecords = [];
+          totalAmount = 0.0;
+        });
+      },
+    );
+  }
+
+  Widget _buildWeekChips(
+    List<List<DateTime>> weeks,
+    double fontSizeBase,
+    ColorScheme colorScheme,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: List.generate(weeks.length, (i) {
+        final isSelected = selectedWeekIndex == i;
+        return ChoiceChip(
+          label: Text(
+            'Week ${i + 1}',
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: colorScheme.primary,
+          backgroundColor: const Color(0xFFF1F5F9),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          onSelected: (_) => _onWeekSelected(i),
+          showCheckmark: false,
+        );
+      }),
+    );
+  }
+
+  Widget _buildPaymentTable(double fontSizeBase, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Payments for Week ${selectedWeekIndex! + 1}:',
+          style: const TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(1.2),
+              1: FlexColumnWidth(0.8),
+            },
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.05),
+                ),
+                children: [
+                  _buildTableCell('Date', isHeader: true),
+                  _buildTableCell('Payment', isHeader: true),
+                ],
+              ),
+              ...paymentRecords.map((rec) {
+                String dateStr = '';
+                if (rec['paymentDate'] != null) {
+                  try {
+                    DateTime dt = (rec['paymentDate'] as Timestamp).toDate();
+                    dateStr = DateFormat('EEE, MMM d, y').format(dt);
+                  } catch (e) {
+                    dateStr = rec['paymentDate'].toString();
+                  }
+                }
+                return TableRow(
+                  children: [
+                    _buildTableCell(dateStr),
+                    _buildTableCell(rec['paymentAmount']?.toString() ?? '0'),
+                  ],
+                );
+              }),
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.02),
+                ),
+                children: [
+                  _buildTableCell('Total', isTotal: true),
+                  _buildTableCell(
+                    totalAmount.toStringAsFixed(2),
+                    isTotal: true,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableCell(
+    String text, {
+    bool isHeader = false,
+    bool isTotal = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: isHeader || isTotal ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? const Color(0xFF64748B) : const Color(0xFF1E293B),
+          fontSize: isHeader ? 12 : 14,
+        ),
       ),
+    );
+  }
+
+  Widget _buildActionButtons(double fontSizeBase, ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildActionButton(
+          onTap: _onCancel,
+          icon: Icons.refresh_rounded,
+          color: const Color(0xFFF59E0B), // Amber 500
+          label: 'Reset',
+        ),
+        _buildActionButton(
+          onTap: _onPrint,
+          icon: Icons.print_rounded,
+          color: colorScheme.primary,
+          label: 'Print',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback onTap,
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, double fontSize) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 2,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 }

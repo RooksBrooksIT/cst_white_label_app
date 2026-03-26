@@ -212,9 +212,7 @@ class _ProjectFinancialStatusReportPageState
                                 });
                                 if (value != null) {
                                   try {
-                                    final query = await FirebaseFirestore
-                                        .instance
-                                        .collection('projects')
+                                    final query = await FirestoreService.getCollection('projects')
                                         .where('siteId', isEqualTo: value)
                                         .limit(1)
                                         .get();

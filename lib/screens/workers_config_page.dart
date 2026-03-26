@@ -56,7 +56,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Future<void> _loadDesignations() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('labours').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'labours',
+      ).get();
       setState(() {
         _designations = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -73,11 +75,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Future<String> _getNextWorkerId() async {
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('workersConfig')
-          .orderBy('workerId', descending: true)
-          .limit(1)
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersConfig',
+      ).orderBy('workerId', descending: true).limit(1).get();
 
       if (querySnapshot.docs.isEmpty) {
         return 'WC001';
@@ -150,10 +150,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     Map<String, dynamic> updatedData,
   ) async {
     try {
-      await FirestoreService
-          .getCollection('workersConfig')
-          .doc(docId)
-          .update(updatedData);
+      await FirestoreService.getCollection(
+        'workersConfig',
+      ).doc(docId).update(updatedData);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Worker updated successfully')));
@@ -244,33 +243,37 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Workers Configuration'),
-        backgroundColor: const Color(0xFF0b3470),
-        foregroundColor: Colors.white,
+        title: const Text('Workers Configuration'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          labelStyle: TextStyle(
+          indicatorColor: colorScheme.primary,
+          indicatorWeight: 3,
+          labelColor: colorScheme.primary,
+          unselectedLabelColor: const Color(0xFF64748B),
+          labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
-            
+            fontSize: 14,
           ),
-          tabs: [
-            Tab(text: 'Create New Worker'),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+          tabs: const [
+            Tab(text: 'Create New'),
             Tab(text: 'Workers List'),
           ],
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.grey.shade100],
-          ),
-        ),
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: TabBarView(
           controller: _tabController,
           children: [
@@ -301,9 +304,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   Text(
                     'Add New Worker',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF0b3470),
+                      color: const Color(0xFF1E293B),
+                      letterSpacing: -0.5,
                     ),
                   ),
                   SizedBox(height: 20),
@@ -425,14 +429,15 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   }
 
   Widget _buildSalaryField() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
           color: _isSalaryEditable
-              ? Colors.blue.shade300
-              : Colors.grey.shade300,
+              ? colorScheme.primary
+              : const Color(0xFFE2E8F0),
         ),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
@@ -442,39 +447,40 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
               decoration: InputDecoration(
                 labelText: 'Salary *',
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 16,
                 ),
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(left: 12),
-                  child: Icon(Icons.attach_money, color: Colors.grey.shade600),
+                  child: Icon(
+                    Icons.attach_money_rounded,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ),
               keyboardType: TextInputType.number,
               readOnly: !_isSalaryEditable,
               style: TextStyle(
-                color: _isSalaryEditable ? Colors.black : Colors.grey.shade700,
+                color: _isSalaryEditable
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFF64748B),
+                fontWeight: _isSalaryEditable
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
           ),
           IconButton(
             icon: Icon(
-              _isSalaryEditable ? Icons.lock_open : Icons.edit,
-              color: _isSalaryEditable ? const Color(0xFF0b3470) : Colors.grey,
+              _isSalaryEditable ? Icons.lock_open_rounded : Icons.edit_rounded,
+              color: _isSalaryEditable
+                  ? colorScheme.primary
+                  : const Color(0xFF64748B),
             ),
             onPressed: () {
               setState(() {
                 _isSalaryEditable = !_isSalaryEditable;
-                if (_isSalaryEditable) {
-                  // When enabling edit, ensure the field is focused
-                  Future.delayed(Duration(milliseconds: 100), () {
-                    FocusScope.of(context).requestFocus(FocusNode());
-                    Future.delayed(Duration(milliseconds: 100), () {
-                      // You might want to show keyboard here if needed
-                    });
-                  });
-                }
               });
             },
             tooltip: _isSalaryEditable ? 'Lock salary field' : 'Edit salary',
@@ -495,8 +501,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   }) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: TextField(
         controller: controller,
@@ -505,8 +511,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           icon: Padding(
-            padding: EdgeInsets.only(left: 12),
-            child: Icon(icon, ),
+            padding: const EdgeInsets.only(left: 12),
+            child: Icon(icon, color: const Color(0xFF64748B), size: 20),
           ),
         ),
         readOnly: isReadOnly,
@@ -519,10 +525,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Widget _buildWorkersListTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirestoreService
-          .getCollection('workersConfig')
-          .orderBy('workerId')
-          .snapshots(),
+      stream: FirestoreService.getCollection(
+        'workersConfig',
+      ).orderBy('workerId').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
@@ -579,15 +584,16 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.blue.shade200),
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           'ID: $workerId',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: Theme.of(context).primaryColor,
                             fontSize: 12,
                           ),
                         ),
@@ -754,7 +760,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           ),
           child: Row(
             children: [
-              Icon(Icons.work, size: 16, ),
+              Icon(Icons.work, size: 16),
               SizedBox(width: 8),
               Text(
                 'Designation: ${data['designation'] ?? ''}',
@@ -780,7 +786,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       decoration: BoxDecoration(
         border: Border.all(color: const Color.fromARGB(255, 44, 88, 172)),
         borderRadius: BorderRadius.circular(6),
-        
       ),
       child: TextField(
         controller: controller,

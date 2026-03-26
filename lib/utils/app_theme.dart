@@ -14,7 +14,7 @@ class AppTheme {
   // ValueNotifier to broadcast app name changes
   static final ValueNotifier<String> appName = ValueNotifier(defaultAppName);
 
-  // ValueNotifier to broadcast theme mode changes (light/dark)
+  // Dummy ValueNotifier for backward compatibility
   static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.light);
 
   /// Initializes the theme by loading the stored brand color and app name from SharedPreferences.
@@ -29,9 +29,6 @@ class AppTheme {
     if (storedAppName != null && storedAppName.isNotEmpty) {
       appName.value = storedAppName;
     }
-
-    final isDarkMode = prefs.getBool('is_dark_mode') ?? false;
-    themeMode.value = isDarkMode ? ThemeMode.dark : ThemeMode.light;
   }
 
   /// Updates the global app name and persists it to SharedPreferences.
@@ -44,17 +41,6 @@ class AppTheme {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_name', newName);
-  }
-
-  /// Updates the theme mode and persists it to SharedPreferences.
-  static Future<void> updateThemeMode(ThemeMode mode) async {
-    themeMode.value = mode;
-    
-    // ignore: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
-    themeMode.notifyListeners();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_dark_mode', mode == ThemeMode.dark);
   }
 
   /// Updates the global primary color and persists it to SharedPreferences.
@@ -74,86 +60,10 @@ class AppTheme {
     return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }
 
-  /// Returns a translucent version of the primary color for glass effects.
-  static Color getGlassColor(BuildContext context, {double opacity = 0.1}) {
-    return primaryColor.value.withOpacity(opacity);
-  }
-
-  /// Returns a white or black overlay color based on brightness.
-  static Color getOverlayColor(BuildContext context, {double opacity = 0.1}) {
-    return isDark(context) ? Colors.white.withOpacity(opacity) : Colors.black.withOpacity(opacity);
-  }
-
-  /// Generates a ThemeData based on the current primary color and mode.
-  static ThemeData getTheme(Color primary, {bool isDark = false}) {
-    if (isDark) {
-      return ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: primary,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primary,
-          primary: primary,
-          onPrimary: getForegroundFor(primary),
-          secondary: Color.lerp(primary, Colors.white, 0.2)!,
-          onSecondary: Colors.white,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF0F172A),
-          onSurface: Colors.white,
-          surfaceContainerHighest: const Color(0xFF1E293B),
-          onSurfaceVariant: Colors.white70,
-          outline: Colors.white24,
-          error: Colors.redAccent,
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        cardColor: const Color(0xFF1E293B),
-        dividerColor: Colors.white12,
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          iconTheme: const IconThemeData(color: Colors.white),
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primary,
-            foregroundColor: getForegroundFor(primary),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: primary,
-          foregroundColor: getForegroundFor(primary),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF1E293B),
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white10)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
-          prefixIconColor: Colors.white70,
-          suffixIconColor: Colors.white70,
-          labelStyle: const TextStyle(color: Colors.white70),
-          hintStyle: const TextStyle(color: Colors.white38),
-        ),
-        textSelectionTheme: TextSelectionThemeData(
-          cursorColor: primary,
-          selectionColor: primary.withOpacity(0.3),
-          selectionHandleColor: primary,
-        ),
-      );
-    }
-
+  /// Generates a ThemeData based on the current primary color.
+  static ThemeData getTheme(Color primary) {
     return ThemeData(
+      useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: primary,
       colorScheme: ColorScheme.fromSeed(
@@ -162,10 +72,9 @@ class AppTheme {
         onPrimary: getForegroundFor(primary),
         secondary: Color.lerp(primary, Colors.black, 0.2)!,
         onSecondary: Colors.white,
-        brightness: Brightness.light,
-        surface: const Color(0xFFF8FAFC),
-        onSurface: const Color(0xFF0F172A),
-        surfaceContainerHighest: Colors.white,
+        surface: Colors.white,
+        onSurface: const Color(0xFF1E293B),
+        surfaceContainerHighest: const Color(0xFFF1F5F9),
         onSurfaceVariant: const Color(0xFF64748B),
         outline: const Color(0xFFE2E8F0),
         error: Colors.red[700],
@@ -176,16 +85,27 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
         titleTextStyle: const TextStyle(
-          color: Color(0xFF0F172A),
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+          color: Color(0xFF1E293B),
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: getForegroundFor(primary),
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: getForegroundFor(primary),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -194,21 +114,41 @@ class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
         foregroundColor: getForegroundFor(primary),
+        elevation: 4,
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.black.withOpacity(0.03),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
+        fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1),
+        ),
         prefixIconColor: const Color(0xFF64748B),
         suffixIconColor: const Color(0xFF64748B),
-        labelStyle: const TextStyle(color: Color(0xFF64748B)),
+        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: primary,
@@ -218,6 +158,10 @@ class AppTheme {
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );
   }
-  /// Returns true if the current theme is dark.
-  static bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
+
+  /// Dummy updateThemeMode for compatibility.
+  static Future<void> updateThemeMode(ThemeMode mode) async {}
+
+  /// Returns false as dark mode is now removed.
+  static bool isDark(BuildContext context) => false;
 }

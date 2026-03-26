@@ -25,59 +25,74 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defaultPadding = EdgeInsets.all(Responsive.isMobile(context) ? 20 : 28);
+    final isMobile = Responsive.isMobile(context);
+    final defaultPadding = EdgeInsets.all(isMobile ? 16 : 24);
     final currentPadding = padding ?? defaultPadding;
     
-    return Card(
-      margin: margin,
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(borderRadius ?? (Responsive.isMobile(context) ? 12 : 16)),
+    return Container(
+      width: width,
+      margin: margin ?? const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(borderRadius ?? 16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: width,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (title != null)
-                Padding(
-                  padding: currentPadding,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(borderRadius ?? 16),
+          child: Padding(
+            padding: currentPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (title != null) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        title!,
-                        style: TextStyle(
-                          fontSize: Responsive.isMobile(context) ? 18 : 22,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title!,
+                              style: TextStyle(
+                                fontSize: isMobile ? 18 : 20,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                subtitle!,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 15,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle!,
-                          style: TextStyle(
-                            fontSize: Responsive.isMobile(context) ? 14 : 16,
-                            color: Theme.of(context).textTheme.bodySmall?.color,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      const Divider(height: 1),
                     ],
                   ),
-                ),
-              Padding(
-                padding: (title != null) 
-                  ? currentPadding.copyWith(top: 16)
-                  : currentPadding,
-                child: child,
-              ),
-            ],
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFFF1F5F9), height: 1),
+                  const SizedBox(height: 16),
+                ],
+                child,
+              ],
+            ),
           ),
         ),
       ),

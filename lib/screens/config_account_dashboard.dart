@@ -11,6 +11,7 @@ import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
 import 'package:demo_cst/screens/main_dashboard.dart';
+import 'package:demo_cst/screens/manager_config_screen.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/material_screen.dart';
 import 'package:demo_cst/screens/project_category_screen.dart';
@@ -109,6 +110,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Configure supervisor accounts',
       ),
       DashboardItem('Site-Supervisor Map', Icons.map_rounded, Colors.redAccent, 'Map supervisors to sites'),
+      DashboardItem(
+        'Manager',
+        Icons.admin_panel_settings_rounded,
+        Colors.indigo,
+        'Configure manager accounts',
+      ),
     ],
     "Tools Tracking": [
       DashboardItem(
@@ -312,25 +319,28 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Text(
           "Welcome to",
           style: TextStyle(
-            fontSize: Responsive.fontSize(context, 18),
-            color: Colors.white70,
+            fontSize: Responsive.fontSize(context, 16),
+            color: const Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           "Management Console",
           style: TextStyle(
-            fontSize: Responsive.fontSize(context, 28),
+            fontSize: Responsive.fontSize(context, 32),
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: const Color(0xFF1E293B),
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           "Configure and manage various aspects of your projects.",
           style: TextStyle(
             fontSize: Responsive.fontSize(context, 14),
-            color: Colors.white54,
+            color: const Color(0xFF94A3B8),
+            height: 1.5,
           ),
         ),
       ],
@@ -354,14 +364,28 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 12),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: Responsive.fontSize(context, 20),
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+      padding: const EdgeInsets.only(top: 40, bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 12),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 2.0,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -400,53 +424,50 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
-        padding: const EdgeInsets.all(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 28),
+        onTap: onTap,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 16),
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 16),
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF334155),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 13),
-                        color: Colors.white70,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 13),
+                      color: const Color(0xFF64748B),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withOpacity(0.3),
-                size: 24,
-              ),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFFCBD5E1),
+              size: 24,
+            ),
+          ],
         ),
       ),
     );
@@ -461,6 +482,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Site': const SiteScreen(),
       'Supervisor': const SiteSupervisorConfig(),
       'Site-Supervisor Map': SiteSupervisorMapScreen(),
+      'Manager': const ManagerConfigScreen(),
       'Material': MaterialScreen(),
       'Project': ProjectScreen(),
       'Labour': LabourScreen(),

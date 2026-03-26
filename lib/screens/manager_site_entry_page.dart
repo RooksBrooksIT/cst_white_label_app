@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'package:intl/intl.dart';
 import '../services/expense_service.dart';
-import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -137,8 +137,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Future<void> _fetchSites() async {
     setState(() => isLoadingSites = true);
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.siteSupervisorMap
           .get();
 
       siteList = snapshot.docs
@@ -413,7 +412,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       "projectStage": projectStage,
     };
     try {
-      await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(docId).set(data);
+      await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       await ExpenseService.updateTotalSiteExpense(siteCode);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved successfully!'), backgroundColor: successColor));
       _resetForm();
@@ -436,7 +435,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       "totalAmount": _getTotalAmount(),
     };
     try {
-      await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(_updateDocId).update(data);
+      await FirestoreService.siteSupervisorEntries.doc(_updateDocId).update(data);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Updated successfully!'), backgroundColor: successColor));
       _resetForm();
     } catch (e) {
@@ -449,7 +448,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Future<void> _openUpdateEntrySelector() async {
     setState(() => isLoadingEntryDates = true);
     try {
-      final query = await FirebaseFirestore.instance.collection('siteSupervisorEntries').where('siteId', isEqualTo: siteCode).get();
+      final query = await FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: siteCode).get();
       final entries = query.docs.map((doc) => {'docId': doc.id, 'date': (doc.data()['date'] is Timestamp) ? (doc.data()['date'] as Timestamp).toDate() : DateTime.tryParse(doc.data()['date'] ?? '') ?? DateTime.now()}).toList();
       entries.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
       if (entries.isEmpty) return;
@@ -476,7 +475,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   }
 
   Future<void> _loadEntryByDocId(String docId) async {
-    final doc = await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(docId).get();
+    final doc = await FirestoreService.siteSupervisorEntries.doc(docId).get();
     if (!doc.exists) return;
     final data = doc.data()!;
     setState(() {

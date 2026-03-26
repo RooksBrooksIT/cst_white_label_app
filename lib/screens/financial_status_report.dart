@@ -221,15 +221,23 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Financial Status Report',
-          style: TextStyle(fontWeight: FontWeight.w600, ),
+          style: TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
-        backgroundColor: primaryColor,
+        backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B), size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: primaryColor))
