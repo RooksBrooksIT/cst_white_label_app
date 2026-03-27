@@ -17,7 +17,9 @@ class OrgMenuScreen extends StatefulWidget {
 }
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
-  String _referralCode = 'Loading...';
+  String _managerCode = 'Loading...';
+  String _supervisorCode = 'Loading...';
+  String _customerCode = 'Loading...';
   String _orgName = 'Organization User';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
@@ -38,19 +40,16 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       // Fetch dynamic organization and subscription data
       final String? dynamicPath = prefs.getString('org_dynamic_path');
       if (dynamicPath != null && dynamicPath.isNotEmpty) {
-        final subDoc = await FirestoreService.getCollection('admin')
-            .doc('data')
-            .get();
-
+        final subDoc = await FirestoreService.getCollection(
+          'admin',
+        ).doc('data').get();
 
         if (subDoc.exists && mounted) {
           final subData = subDoc.data()!;
           setState(() {
-            // Handle potentially different field names for referral code
-            _referralCode =
-                subData['referralCode'] ??
-                subData['refferal Code'] ??
-                'Not Set';
+            _managerCode = subData['managerReferralCode'] ?? 'Not Set';
+            _supervisorCode = subData['supervisorReferralCode'] ?? 'Not Set';
+            _customerCode = subData['customerReferralCode'] ?? 'Not Set';
 
             _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';
             _isSubscriptionActive = subData['isSubscriptionActive'] ?? false;
@@ -70,7 +69,9 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       debugPrint('Error fetching org data: $e');
       if (mounted) {
         setState(() {
-          _referralCode = 'Error';
+          _managerCode = 'Error';
+          _supervisorCode = 'Error';
+          _customerCode = 'Error';
           _subscriptionPlan = 'Error';
         });
       }
@@ -154,43 +155,72 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Share this code with your managers and supervisors to register them under your organization.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+            'Share these codes with your team members to register them under your organization.',
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
           ),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _referralCode,
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: Responsive.fontSize(context, 20),
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy_rounded, color: Color(0xFF64748B)),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _referralCode));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Referral code copied!')),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
+          _buildCodeRow('Manager', _managerCode, colorScheme),
+          const SizedBox(height: 12),
+          _buildCodeRow('Supervisor', _supervisorCode, colorScheme),
+          const SizedBox(height: 12),
+          _buildCodeRow('Customer', _customerCode, colorScheme),
         ],
       ),
+    );
+  }
+
+  Widget _buildCodeRow(String label, String code, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                code,
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.copy_rounded,
+                  color: Color(0xFF64748B),
+                  size: 20,
+                ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('$label code copied!')),
+                  );
+                },
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -381,10 +411,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
             )
           : null,
       trailing:

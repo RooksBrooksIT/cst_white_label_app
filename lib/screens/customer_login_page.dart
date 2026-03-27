@@ -18,6 +18,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _referralController = TextEditingController();
   bool _isLoading = false;
+  String? _tempOrgName;
+  String? _tempLogoUrl;
+  String? _actualReferralCode;
 
   // SharedPreferences keys - CUSTOMER specific
   static const String _isLoggedInKey = 'cust_isLoggedIn';
@@ -33,6 +36,20 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Fetch org details if available
+    setState(() {
+      _tempOrgName = prefs.getString('temp_org_name');
+      _tempLogoUrl = prefs.getString('temp_logo_url');
+      _actualReferralCode = prefs.getString('temp_referral_code');
+      
+      if (_tempOrgName != null) {
+        _referralController.text = _tempOrgName!;
+      } else if (_actualReferralCode != null) {
+        _referralController.text = _actualReferralCode!;
+      }
+    });
+
     final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
 
     if (isLoggedIn && mounted) {
@@ -67,7 +84,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       setState(() => _isLoading = true);
 
       try {
-        final referralCode = _referralController.text.trim();
+        final referralCode = _actualReferralCode ?? _referralController.text.trim();
         
         final referralDoc = await FirebaseFirestore.instance
             .collection('referralCodes')
@@ -167,7 +184,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Color(0xFF1E293B), size: 20),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Center(
@@ -178,30 +195,61 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
+              // Icon Header or Org Logo
+              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    image: DecorationImage(
+                      image: NetworkImage(_tempLogoUrl!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.account_balance_rounded,
+                    size: 64,
+                    color: colorScheme.primary,
+                  ),
                 ),
-                child: Icon(
-                  Icons.account_balance_rounded,
-                  size: 64,
-                  color: colorScheme.primary,
-                ),
-              ),
               const SizedBox(height: 24),
-              const Text(
-                'Customer Login',
+              Text(
+                _tempOrgName ?? 'Customer Login',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
                   letterSpacing: -0.5,
                 ),
               ),
+              if (_tempOrgName != null) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Customer Account',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text(
                 'Access your project details',
@@ -234,6 +282,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                     children: [
                       TextFormField(
                         controller: _referralController,
+                        readOnly: _referralController.text.isNotEmpty,
                         decoration: InputDecoration(
                           labelText: 'Referral Code',
                           prefixIcon: Icon(Icons.business_outlined, color: colorScheme.primary),

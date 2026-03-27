@@ -16,9 +16,10 @@ class MainDashboard extends StatefulWidget {
 
 class _MainDashboardState extends State<MainDashboard> {
   bool _isLoading = true;
-  bool _isFromReferral = false;
   String? _orgName;
   String? _logoUrl;
+  String? _referralRole;
+  bool _isFromReferral = false;
 
   @override
   void initState() {
@@ -30,11 +31,12 @@ class _MainDashboardState extends State<MainDashboard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final tempOrgPath = prefs.getString('temp_org_path');
+      final referralRole = prefs.getString('temp_referral_role');
 
       if (tempOrgPath != null && tempOrgPath.isNotEmpty) {
         _isFromReferral = true;
 
-        // Fetch org details from the canonical new path
+        // Fetch org details
         final doc = await FirebaseFirestore.instance
             .collection('organisation')
             .doc(tempOrgPath)
@@ -43,10 +45,18 @@ class _MainDashboardState extends State<MainDashboard> {
             .get();
 
         if (doc.exists && mounted) {
+          final orgName = doc.data()?['orgName'] as String?;
+          final logoUrl = doc.data()?['logoUrl'] as String?;
+
           setState(() {
-            _orgName = doc.data()?['orgName'] as String?;
-            _logoUrl = doc.data()?['logoUrl'] as String?;
+            _orgName = orgName;
+            _logoUrl = logoUrl;
+            _referralRole = referralRole;
           });
+
+          // Save org details for login pages to display
+          if (orgName != null) await prefs.setString('temp_org_name', orgName);
+          if (logoUrl != null) await prefs.setString('temp_logo_url', logoUrl);
         }
       }
     } catch (e) {
@@ -54,11 +64,6 @@ class _MainDashboardState extends State<MainDashboard> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override

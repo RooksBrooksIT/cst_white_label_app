@@ -40,7 +40,13 @@ class _PricingScreenState extends State<PricingScreen> {
   Future<void> _register() async {
     setState(() => _isLoading = true);
     try {
-      final String referralCode =
+      final String orgReferralCode =
+          await FirestoreService.generateUniqueReferralCode();
+      final String managerReferralCode =
+          await FirestoreService.generateUniqueReferralCode();
+      final String supervisorReferralCode =
+          await FirestoreService.generateUniqueReferralCode();
+      final String customerReferralCode =
           await FirestoreService.generateUniqueReferralCode();
 
       final String orgId =
@@ -74,7 +80,11 @@ class _PricingScreenState extends State<PricingScreen> {
           'phone': widget.phone,
           'username': widget.username,
           'password': widget.password,
-          'referralCode': referralCode,
+          'referralCode': orgReferralCode, // Legacy support
+          'orgReferralCode': orgReferralCode,
+          'managerReferralCode': managerReferralCode,
+          'supervisorReferralCode': supervisorReferralCode,
+          'customerReferralCode': customerReferralCode,
           'primaryColor': widget.selectedColor.value.toRadixString(16),
           if (logoUrl != null) 'logoUrl': logoUrl,
           'createdAt': FieldValue.serverTimestamp(),
@@ -102,14 +112,53 @@ class _PricingScreenState extends State<PricingScreen> {
         transaction.set(
           FirebaseFirestore.instance
               .collection('referralCodes')
-              .doc(referralCode),
+              .doc(orgReferralCode),
           {
             'orgName': widget.orgName,
-            'dynamicPath': orgId, // Store only the ID for FirestoreService
+            'dynamicPath': orgId,
+            'role': 'organization',
             'createdAt': FieldValue.serverTimestamp(),
             'fullConfigPath': orgConfigDocPath,
           },
+        );
 
+        transaction.set(
+          FirebaseFirestore.instance
+              .collection('referralCodes')
+              .doc(managerReferralCode),
+          {
+            'orgName': widget.orgName,
+            'dynamicPath': orgId,
+            'role': 'manager',
+            'createdAt': FieldValue.serverTimestamp(),
+            'fullConfigPath': orgConfigDocPath,
+          },
+        );
+
+        transaction.set(
+          FirebaseFirestore.instance
+              .collection('referralCodes')
+              .doc(supervisorReferralCode),
+          {
+            'orgName': widget.orgName,
+            'dynamicPath': orgId,
+            'role': 'supervisor',
+            'createdAt': FieldValue.serverTimestamp(),
+            'fullConfigPath': orgConfigDocPath,
+          },
+        );
+
+        transaction.set(
+          FirebaseFirestore.instance
+              .collection('referralCodes')
+              .doc(customerReferralCode),
+          {
+            'orgName': widget.orgName,
+            'dynamicPath': orgId,
+            'role': 'customer',
+            'createdAt': FieldValue.serverTimestamp(),
+            'fullConfigPath': orgConfigDocPath,
+          },
         );
       });
 
@@ -126,7 +175,7 @@ class _PricingScreenState extends State<PricingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Registration successful! Referral Code: $referralCode',
+              'Registration successful! Org Code: $orgReferralCode',
             ),
             backgroundColor: Colors.green,
           ),

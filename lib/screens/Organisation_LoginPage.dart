@@ -18,6 +18,8 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  String? _tempOrgName;
+  String? _tempLogoUrl;
 
   // SharedPreferences keys - ORGANIZATION specific
   static const String _isLoggedInKey = 'org_isLoggedIn';
@@ -27,7 +29,16 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   @override
   void initState() {
     super.initState();
+    _checkReferralInfo();
     _checkLoginStatus();
+  }
+
+  Future<void> _checkReferralInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _tempOrgName = prefs.getString('temp_org_name');
+      _tempLogoUrl = prefs.getString('temp_logo_url');
+    });
   }
 
   // Check if organization is already logged in
@@ -137,9 +148,12 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF1E293B), size: 20),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/authSelection'),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF1E293B),
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Center(
@@ -150,22 +164,43 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
+              // Icon Header or Org Logo
+              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    image: DecorationImage(
+                      image: NetworkImage(_tempLogoUrl!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.business_center_rounded,
+                    size: 64,
+                    color: primary,
+                  ),
                 ),
-                child: Icon(
-                  Icons.business_center_rounded,
-                  size: 64,
-                  color: primary,
-                ),
-              ),
               const SizedBox(height: 24),
               Text(
-                'Organization Login',
+                _tempOrgName ?? 'Organization Login',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 28),
@@ -174,6 +209,16 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                   letterSpacing: -0.5,
                 ),
               ),
+              if (_tempOrgName != null) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Organization Account',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 'Enter your credentials to continue',
@@ -207,14 +252,21 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                         controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline_rounded, color: primary),
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                            color: primary,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -231,14 +283,21 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline_rounded, color: primary),
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: primary,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

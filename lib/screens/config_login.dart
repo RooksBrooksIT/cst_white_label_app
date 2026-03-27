@@ -19,6 +19,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
   final TextEditingController _referralController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  String? _tempOrgName;
+  String? _tempLogoUrl;
+  String? _actualReferralCode;
 
   // SharedPreferences keys - MANAGER/CONFIG specific
   static const String _isLoggedInKey = 'config_is_logged_in';
@@ -40,6 +43,20 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
   // Check if user is already logged in
   void _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Fetch org details if available
+    setState(() {
+      _tempOrgName = prefs.getString('temp_org_name');
+      _tempLogoUrl = prefs.getString('temp_logo_url');
+      _actualReferralCode = prefs.getString('temp_referral_code');
+      
+      if (_tempOrgName != null) {
+        _referralController.text = _tempOrgName!;
+      } else if (_actualReferralCode != null) {
+        _referralController.text = _actualReferralCode!;
+      }
+    });
+
     final bool isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
 
     if (isLoggedIn && mounted) {
@@ -113,7 +130,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       setState(() => _isLoading = true);
 
       try {
-        final referralCode = _referralController.text.trim();
+        final referralCode = _actualReferralCode ?? _referralController.text.trim();
 
         // 1. Validate Referral Code
         final referralDoc = await FirebaseFirestore.instance
@@ -199,8 +216,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
             color: Color(0xFF1E293B),
             size: 20,
           ),
-          onPressed: () =>
-              Navigator.pushReplacementNamed(context, '/authSelection'),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Center(
@@ -211,30 +227,61 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
+              // Icon Header or Org Logo
+              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    image: DecorationImage(
+                      image: NetworkImage(_tempLogoUrl!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.settings_rounded,
+                    size: 64,
+                    color: colorScheme.primary,
+                  ),
                 ),
-                child: Icon(
-                  Icons.settings_rounded,
-                  size: 64,
-                  color: colorScheme.primary,
-                ),
-              ),
               const SizedBox(height: 24),
-              const Text(
-                'Manager Login',
+              Text(
+                _tempOrgName ?? 'Manager Login',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
                   letterSpacing: -0.5,
                 ),
               ),
+              if (_tempOrgName != null) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Manager Account',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text(
                 'Sign in to your account',
@@ -267,6 +314,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                     children: [
                       TextFormField(
                         controller: _referralController,
+                        readOnly: _referralController.text.isNotEmpty,
                         decoration: InputDecoration(
                           labelText: 'Referral Code',
                           prefixIcon: Icon(

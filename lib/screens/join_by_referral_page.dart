@@ -31,10 +31,14 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
           .get();
 
       if (referralDoc.exists) {
-        final dynamicPath = referralDoc.data()?['dynamicPath'] as String?;
-        if (dynamicPath != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('temp_org_path', dynamicPath);
+          final dynamicPath = referralDoc.data()?['dynamicPath'] as String?;
+          final role = referralDoc.data()?['role'] as String? ?? 'organization';
+          
+          if (dynamicPath != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('temp_org_path', dynamicPath);
+            await prefs.setString('temp_referral_role', role);
+            await prefs.setString('temp_referral_code', code);
 
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(

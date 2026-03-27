@@ -32,7 +32,7 @@ class OrganisationLandingPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                   const Spacer(flex: 3),
+                  const Spacer(flex: 3),
 
                   // Logo with soft glow
                   Container(
@@ -48,7 +48,7 @@ class OrganisationLandingPage extends StatelessWidget {
                       ],
                     ),
                     child: Image.asset(
-                      'assets/images/lOGO@3x (2).png',
+                      'assets/images/logo_main.png',
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) => const Icon(
                         Icons.business_rounded,
@@ -57,6 +57,7 @@ class OrganisationLandingPage extends StatelessWidget {
                       ),
                     ),
                   ),
+                  
                   const SizedBox(height: 24),
 
                   // App Name (Serif style for premium look)
@@ -118,7 +119,8 @@ class OrganisationLandingPage extends StatelessWidget {
                     width: double.infinity,
                     height: 56,
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pushNamed(context, '/orgRegistrationForm'),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/orgRegistrationForm'),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: const Color(0xFFE5E7EB),
                         side: const BorderSide(color: Colors.black, width: 1.2),
@@ -141,7 +143,8 @@ class OrganisationLandingPage extends StatelessWidget {
 
                   // Referral Link
                   GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/joinByReferral'),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/joinByReferral'),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -165,7 +168,7 @@ class OrganisationLandingPage extends StatelessWidget {
                   const Spacer(flex: 3),
 
                   // Version
-                   const Padding(
+                  const Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: Text(
                       'v1.0.0',

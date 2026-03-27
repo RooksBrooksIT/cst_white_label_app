@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
-import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
 import 'package:demo_cst/screens/config_materialavailability.dart';
 import 'package:demo_cst/screens/conflig_Materials.dart';
@@ -31,11 +30,11 @@ import 'package:demo_cst/screens/vehicle_inventory_page.dart';
 import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
+
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
 
@@ -46,29 +45,53 @@ class ConfigAccountDashboard extends StatefulWidget {
 }
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
-
   // 🟢 Dashboard Items with colors
   final Map<String, List<DashboardItem>> groupedItems = {
     "Project Configuration": [
-      DashboardItem('Project Category', Icons.category_rounded, Colors.orange, 'Manage project categories'),
+      DashboardItem(
+        'Project Category',
+        Icons.category_rounded,
+        Colors.orange,
+        'Manage project categories',
+      ),
       DashboardItem(
         'Project Sub Category',
         Icons.subtitles_rounded,
         Colors.purple,
         'Define project sub-categories',
       ),
-      DashboardItem('Project Stage', Icons.flag_rounded, Colors.red, 'Configure project stages'),
-      DashboardItem('Project Contract', Icons.assignment_rounded, Colors.teal, 'Manage project contracts'),
+      DashboardItem(
+        'Project Stage',
+        Icons.flag_rounded,
+        Colors.red,
+        'Configure project stages',
+      ),
+      DashboardItem(
+        'Project Contract',
+        Icons.assignment_rounded,
+        Colors.teal,
+        'Manage project contracts',
+      ),
     ],
     "Material Configuration": [
-      DashboardItem('Material Master', Icons.upload_file_rounded, Colors.green, 'Master list of materials'),
+      DashboardItem(
+        'Material Master',
+        Icons.upload_file_rounded,
+        Colors.green,
+        'Master list of materials',
+      ),
       DashboardItem(
         'Material Sub Category',
         Icons.category_rounded,
         Colors.blue,
         'Categorize materials further',
       ),
-      DashboardItem('Material Config', Icons.build_rounded, Colors.deepOrange, 'Configure material properties'),
+      DashboardItem(
+        'Material Config',
+        Icons.build_rounded,
+        Colors.deepOrange,
+        'Configure material properties',
+      ),
       DashboardItem(
         'Material Movements',
         Icons.toggle_on_outlined,
@@ -84,13 +107,28 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Tools Configuration": [
-      DashboardItem('Tools', Icons.handyman_rounded, Colors.indigo, 'Manage tools inventory'),
+      DashboardItem(
+        'Tools',
+        Icons.handyman_rounded,
+        Colors.indigo,
+        'Manage tools inventory',
+      ),
     ],
     "Labour Configuration": [
-      DashboardItem('Labour', Icons.engineering_rounded, Colors.brown, 'Configure labour details'),
+      DashboardItem(
+        'Labour',
+        Icons.engineering_rounded,
+        Colors.brown,
+        'Configure labour details',
+      ),
     ],
     "Contractor Configuration": [
-      DashboardItem('Contractor', Icons.person_4_rounded, Colors.deepPurple, 'Manage contractor information'),
+      DashboardItem(
+        'Contractor',
+        Icons.person_4_rounded,
+        Colors.deepPurple,
+        'Manage contractor information',
+      ),
     ],
     "Diagrams Configuration": [
       DashboardItem(
@@ -101,15 +139,30 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Site Configuration": [
-      DashboardItem('Site', Icons.place_rounded, Colors.green, 'Configure site details'),
-      DashboardItem('Project', Icons.work_rounded, Colors.orangeAccent, 'Manage projects'),
+      DashboardItem(
+        'Site',
+        Icons.place_rounded,
+        Colors.green,
+        'Configure site details',
+      ),
+      DashboardItem(
+        'Project',
+        Icons.work_rounded,
+        Colors.orangeAccent,
+        'Manage projects',
+      ),
       DashboardItem(
         'Supervisor',
         Icons.supervisor_account_rounded,
         Colors.blueGrey,
         'Configure supervisor accounts',
       ),
-      DashboardItem('Site-Supervisor Map', Icons.map_rounded, Colors.redAccent, 'Map supervisors to sites'),
+      DashboardItem(
+        'Site-Supervisor Map',
+        Icons.map_rounded,
+        Colors.redAccent,
+        'Map supervisors to sites',
+      ),
       DashboardItem(
         'Manager',
         Icons.admin_panel_settings_rounded,
@@ -124,7 +177,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.deepOrangeAccent,
         'Track tool movements',
       ),
-      DashboardItem('Tools Inventory', Icons.inventory_rounded, Colors.pink, 'View tools inventory'),
+      DashboardItem(
+        'Tools Inventory',
+        Icons.inventory_rounded,
+        Colors.pink,
+        'View tools inventory',
+      ),
     ],
     "Expenses": [
       DashboardItem(
@@ -187,10 +245,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return GlassScaffold(
       title: 'Management Console',
       onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+          onPressed: () => _showLogoutConfirmation(context),
+          tooltip: 'Logout',
+        ),
+      ],
       body: _buildBody(context),
     );
   }
-
 
   // 🟢 Show logout confirmation modal
   void _showLogoutConfirmation(BuildContext context) {
@@ -264,11 +328,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.clear(); // Clear all stored preferences for logout
                 if (mounted) {
-                  Navigator.pushReplacement(
+                  Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ConfigLoginPage(),
+                      builder: (context) => const MainDashboard(),
                     ),
+                    (route) => false,
                   );
                 }
               },
