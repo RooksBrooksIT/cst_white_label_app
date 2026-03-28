@@ -110,10 +110,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     }
   }
 
-  Widget _buildWelcomeSection(BuildContext context, ThemeData theme) {
+  Widget _buildWelcomeSection(ThemeData theme) {
     final colorScheme = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -127,12 +125,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         const SizedBox(height: 8),
         Text(
           _orgName,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: (isMobile
-                  ? theme.textTheme.headlineMedium
-                  : theme.textTheme.headlineLarge)
-              ?.copyWith(
+          style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurface,
             letterSpacing: -0.5,
@@ -144,15 +137,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildBody(BuildContext context) {
     final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final hPad = screenWidth < 400 ? 12.0 : (screenWidth < 600 ? 16.0 : 24.0);
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildWelcomeSection(context, theme),
-          const SizedBox(height: 24),
+          _buildWelcomeSection(theme),
+          const SizedBox(height: 32),
           _buildDashboardSections(context, theme),
         ],
       ),
@@ -160,29 +151,20 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }
 
   Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final int crossAxisCount = screenWidth > 1200
+    double screenWidth = MediaQuery.of(context).size.width;
+    int crossAxisCount = screenWidth > 1200
         ? 5
-        : (screenWidth > 900
-            ? 4
-            : (screenWidth > 600
-                ? 3
-                : (screenWidth > 380 ? 2 : 2)));
+        : (screenWidth > 800 ? 4 : (screenWidth > 600 ? 3 : 2));
 
-    // Taller aspect ratio on small screens so text never overflows the card.
-    final double childAspectRatio = screenWidth < 380
+    double childAspectRatio = screenWidth < 400
         ? 0.85
-        : (screenWidth < 600
-            ? 0.95
-            : (screenWidth < 900 ? 1.0 : 1.1));
-
-    final double spacing = screenWidth < 400 ? 10.0 : 16.0;
+        : (screenWidth < 600 ? 0.95 : 1.1);
 
     Widget buildGrid(List<Widget> children) {
       return GridView.count(
         crossAxisCount: crossAxisCount,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
         childAspectRatio: childAspectRatio,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -378,47 +360,34 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(24),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 120;
-              final iconSize = isCompact ? 28.0 : 36.0;
-              final iconPad = isCompact ? 10.0 : 14.0;
-              return Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isCompact ? 8 : 12,
-                  vertical: isCompact ? 10 : 14,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 32),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(iconPad),
-                      decoration: BoxDecoration(
-                        color: iconColor.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: iconColor, size: iconSize),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: (isCompact
-                              ? theme.textTheme.bodySmall
-                              : theme.textTheme.titleSmall)
-                          ?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                    height: 1.2,
+                  ),
                 ),
-              );
-            },
+                const SizedBox(height: 4),
+              ],
+            ),
           ),
         ),
       ),

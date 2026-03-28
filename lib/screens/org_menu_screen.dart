@@ -3,20 +3,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
-import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'organisation_loginPage.dart';
+import 'contact_support_screen.dart';
+import 'org_reset_password_screen.dart';
 
 class OrgMenuScreen extends StatefulWidget {
-  const OrgMenuScreen({super.key});
+  /// When [standalone] is true (default), the screen is shown as a separate
+  /// pushed route with its own AppBar. When false, it is embedded inside the
+  /// OrganizationDashboard as the Profile tab – no AppBar is rendered.
+  final bool standalone;
+  const OrgMenuScreen({super.key, this.standalone = true});
 
   @override
   State<OrgMenuScreen> createState() => _OrgMenuScreenState();
 }
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
+  String _orgCode = 'Loading...';
   String _managerCode = 'Loading...';
   String _supervisorCode = 'Loading...';
   String _customerCode = 'Loading...';
@@ -47,6 +53,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         if (subDoc.exists && mounted) {
           final subData = subDoc.data()!;
           setState(() {
+            _orgCode =
+                subData['orgReferralCode'] ??
+                subData['referralCode'] ??
+                'Not Set';
             _managerCode = subData['managerReferralCode'] ?? 'Not Set';
             _supervisorCode = subData['supervisorReferralCode'] ?? 'Not Set';
             _customerCode = subData['customerReferralCode'] ?? 'Not Set';
@@ -69,6 +79,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       debugPrint('Error fetching org data: $e');
       if (mounted) {
         setState(() {
+          _orgCode = 'Error';
           _managerCode = 'Error';
           _supervisorCode = 'Error';
           _customerCode = 'Error';
@@ -81,25 +92,59 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return GlassScaffold(
-      title: 'Menu',
-      onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
-        child: Column(
-          children: [
-            _buildProfileSection(colorScheme),
-            const SizedBox(height: 32),
-            _buildReferralSection(colorScheme),
-            const SizedBox(height: 16),
-            _buildSettingsSection(colorScheme),
-            const SizedBox(height: 16),
-            _buildSubscriptionSection(colorScheme),
-            const SizedBox(height: 32),
-            _buildLogoutSection(colorScheme),
-          ],
+    final content = SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
+      child: Column(
+        children: [
+          _buildProfileSection(colorScheme),
+          const SizedBox(height: 32),
+          _buildReferralSection(colorScheme),
+          const SizedBox(height: 16),
+          _buildSettingsSection(colorScheme),
+          const SizedBox(height: 16),
+          _buildSubscriptionSection(colorScheme),
+          const SizedBox(height: 32),
+          _buildLogoutSection(colorScheme),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+
+    // When embedded (standalone == false) just return the scrollable body.
+    if (!widget.standalone) {
+      return content;
+    }
+
+    // Standalone: wrap in a full Scaffold with AppBar.
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        toolbarHeight: 70,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shadowColor: Colors.black26,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(32),
+            bottomRight: Radius.circular(32),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Menu',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: Colors.white,
+          ),
         ),
       ),
+      body: SafeArea(child: content),
     );
   }
 
@@ -159,11 +204,13 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
           ),
           const SizedBox(height: 20),
-          _buildCodeRow('Manager', _managerCode, colorScheme),
+          _buildCodeRow('Organization', _orgCode, colorScheme),
           const SizedBox(height: 12),
-          _buildCodeRow('Supervisor', _supervisorCode, colorScheme),
-          const SizedBox(height: 12),
-          _buildCodeRow('Customer', _customerCode, colorScheme),
+          // _buildCodeRow('Manager', _managerCode, colorScheme),
+          // const SizedBox(height: 12),
+          // _buildCodeRow('Supervisor', _supervisorCode, colorScheme),
+          // const SizedBox(height: 12),
+          // _buildCodeRow('Customer', _customerCode, colorScheme),
         ],
       ),
     );
@@ -258,11 +305,28 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
-            icon: Icons.info_outline_rounded,
-            title: 'About App',
-            onTap: () {
-              // Future: About page
-            },
+            icon: Icons.lock_reset_rounded,
+            title: 'Reset Password',
+            subtitle: 'Update your account password',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrgResetPasswordScreen(),
+              ),
+            ),
+          ),
+
+          const Divider(color: Color(0xFFF1F5F9), height: 24),
+          _buildSettingsTile(
+            icon: Icons.headset_mic_rounded,
+            title: 'Contact Support',
+            subtitle: 'Get help from our team',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ContactSupportScreen(),
+              ),
+            ),
           ),
         ],
       ),
@@ -300,14 +364,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               // Future: Subscription management screen
             },
           ),
-          // const Divider(color: Colors.white10, height: 24),
-          // _buildSettingsTile(
-          //   icon: Icons.history_rounded,
-          //   title: 'Billing History',
-          //   onTap: () {
-          //     // Future: Billing history
-          //   },
-          // ),
         ],
       ),
     );
