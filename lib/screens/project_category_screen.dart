@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_text_field.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectCategoryScreen extends StatefulWidget {
   const ProjectCategoryScreen({super.key});
@@ -12,35 +16,23 @@ class ProjectCategoryScreen extends StatefulWidget {
 
 class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
   String? _selectedCategory;
-  final TextEditingController _customizationController =
-      TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _newCategoryController = TextEditingController();
-  final FocusNode _categoryFocusNode = FocusNode();
+  final _newCategoryController = TextEditingController();
 
-  final Color primaryColor = const Color(0xFF0B3470);
-
-  // Generate next ID like PC001, PC002, ...
   Future<String> _getNextCategoryId() async {
     final snapshot = await FirestoreService.getCollection('projectCategories')
         .orderBy('projectCategoryId', descending: true)
         .limit(1)
         .get();
-    if (snapshot.docs.isEmpty) {
-      return 'PC001';
-    } else {
-      final lastId = snapshot.docs.first['projectCategoryId'] as String;
-      final number = int.parse(lastId.replaceAll('PC', '')) + 1;
-      return 'PC${number.toString().padLeft(3, '0')}';
-    }
+    if (snapshot.docs.isEmpty) return 'PC001';
+    final lastId = snapshot.docs.first['projectCategoryId'] as String;
+    final number = int.parse(lastId.replaceAll('PC', '')) + 1;
+    return 'PC${number.toString().padLeft(3, '0')}';
   }
 
   Future<bool> _isDuplicateCategory(String category) async {
-    final snapshot =
-        await FirestoreService.getCollection('projectCategories').get();
-    final existingCategories = snapshot.docs
-        .map((doc) => (doc['projectCategory'] as String).toLowerCase())
-        .toList();
+    final snapshot = await FirestoreService.getCollection('projectCategories').get();
+    final existingCategories = snapshot.docs.map((doc) => (doc['projectCategory'] as String).toLowerCase()).toList();
     return existingCategories.contains(category.toLowerCase());
   }
 
@@ -54,16 +46,15 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
+            final theme = Theme.of(context);
             return Container(
               decoration: BoxDecoration(
-                
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
                 left: 24,
                 right: 24,
                 top: 24,
@@ -71,130 +62,49 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Add New Category',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                        ),
-                  ),
+                  Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2))),
+                  const SizedBox(height: 20),
+                  Text('Add New Category', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
-                  TextField(
+                  GlassTextField(
                     controller: _newCategoryController,
-                    focusNode: _categoryFocusNode,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Category Name',
-                      labelStyle: TextStyle(color: primaryColor),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: primaryColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: primaryColor, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: primaryColor.withOpacity(0.05),
-                      suffixIcon: IconButton(
-                        icon: Icon(Icons.close, color: primaryColor),
-                        onPressed: () => _newCategoryController.clear(),
-                      ),
-                    ),
-                    cursorColor: primaryColor,
+                    label: 'Category Name',
+                    icon: Icons.category_outlined,
                     onChanged: (value) async {
-                      final duplicate =
-                          await _isDuplicateCategory(value.trim());
-                      setState(() {
-                        isDuplicate = duplicate;
-                      });
+                      final duplicate = await _isDuplicateCategory(value.trim());
+                      setDialogState(() => isDuplicate = duplicate);
                     },
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(50),
-                    ],
                   ),
                   if (isDuplicate)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: primaryColor, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            'This category already exists',
-                            style: TextStyle(color: primaryColor, fontSize: 12),
-                          ),
-                        ],
-                      ),
+                      child: Text('This category already exists', style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
                     ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(color: primaryColor),
-                            foregroundColor: primaryColor,
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
+                      Expanded(child: GlassButton(label: 'CANCEL', onPressed: () => Navigator.pop(context), isSecondary: true)),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: isDuplicate
-                              ? null
-                              : () async {
-                                  final newCategory =
-                                      _newCategoryController.text.trim();
-                                  if (newCategory.isEmpty) return;
-
-                                  final newId = await _getNextCategoryId();
-                                  await FirestoreService.getCollection('projectCategories')
-                                      .doc(newId)
-                                      .set({
-                                    'projectCategoryId': newId,
-                                    'projectCategory': newCategory,
-                                  });
-
-                                  if (mounted) {
-                                    Navigator.of(context).pop();
-                                    setState(() {
-                                      _selectedCategory = newCategory;
-                                    });
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text('Save'),
+                        child: GlassButton(
+                          label: 'SAVE',
+                          onPressed: isDuplicate ? null : () async {
+                            final name = _newCategoryController.text.trim();
+                            if (name.isEmpty) return;
+                            final id = await _getNextCategoryId();
+                            await FirestoreService.getCollection('projectCategories').doc(id).set({
+                              'projectCategoryId': id,
+                              'projectCategory': name,
+                            });
+                            if (mounted) {
+                              Navigator.pop(context);
+                              setState(() => _selectedCategory = name);
+                            }
+                          },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
                 ],
               ),
             );
@@ -204,338 +114,115 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
     );
   }
 
-  // --- DELETE LOGIC ---
   Future<void> _deleteSelectedCategory() async {
     if (_selectedCategory == null) return;
-
-    final snapshot = await FirestoreService.getCollection('projectCategories')
-        .where('projectCategory', isEqualTo: _selectedCategory)
-        .get();
-
+    final snapshot = await FirestoreService.getCollection('projectCategories').where('projectCategory', isEqualTo: _selectedCategory).get();
     if (snapshot.docs.isNotEmpty) {
-      final docId = snapshot.docs.first.id;
-      await FirestoreService.getCollection('projectCategories')
-          .doc(docId)
-          .delete();
-
-      if (mounted) {
-        setState(() {
-          _selectedCategory = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Category deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Category not found'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      await FirestoreService.getCollection('projectCategories').doc(snapshot.docs.first.id).delete();
+      setState(() => _selectedCategory = null);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Category deleted')));
     }
   }
-  // --- END DELETE LOGIC ---
 
   @override
   void dispose() {
     _newCategoryController.dispose();
-    _customizationController.dispose();
-    _categoryFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            title: Text(
-              'Project Category Setup',
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                
+    final theme = Theme.of(context);
+    return GlassScaffold(
+      title: 'Project Categories',
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            GlassCard(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(backgroundColor: theme.primaryColor, child: const Icon(Icons.category, color: Colors.white)),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Categorization', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text('Manage project types and categories', style: theme.textTheme.bodySmall),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirestoreService.getCollection('projectCategories').orderBy('projectCategoryId').snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) return const LinearProgressIndicator();
+                              final items = snapshot.data!.docs.map((d) => d['projectCategory'].toString()).toList();
+                              return DropdownButtonFormField<String>(
+                                value: (_selectedCategory != null && items.contains(_selectedCategory)) ? _selectedCategory : null,
+                                decoration: InputDecoration(
+                                  labelText: 'Select Category',
+                                  prefixIcon: const Icon(Icons.search_rounded),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  filled: true,
+                                  fillColor: theme.cardColor,
+                                ),
+                                items: items.toSet().map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+                                onChanged: (v) => setState(() => _selectedCategory = v),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton.filledTonal(onPressed: _showAddCategoryDialog, icon: const Icon(Icons.add)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            centerTitle: true,
-            backgroundColor: primaryColor,
-            elevation: 3,
-            pinned: true,
-            floating: true,
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.all(24),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  Card(
-                    elevation: 5,
-                    shadowColor: primaryColor.withOpacity(0.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: primaryColor,
-                                  radius: 24,
-                                  child: const Icon(Icons.category,
-                                      size: 28, ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Project Category',
-                                        style: textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Select or create a project category',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 32),
-                            Text(
-                              'Select Category',
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: StreamBuilder<QuerySnapshot>(
-                                    stream: FirestoreService.getCollection('projectCategories')
-                                        .orderBy('projectCategoryId')
-                                        .snapshots(),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const LinearProgressIndicator();
-                                      }
-                                      if (snapshot.hasError) {
-                                        return Text('Error: ${snapshot.error}');
-                                      }
-                                      final categories =
-                                          snapshot.data?.docs ?? [];
-
-                                      final uniqueCategories = <String>{};
-                                      final dropdownItems =
-                                          <DropdownMenuItem<String>>[];
-                                      for (var doc in categories) {
-                                        final category =
-                                            doc['projectCategory'] as String;
-                                        if (uniqueCategories.add(category)) {
-                                          dropdownItems.add(
-                                            DropdownMenuItem<String>(
-                                              value: category,
-                                              child: Text(
-                                                category,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      }
-
-                                      String? safeSelectedCategory =
-                                          (_selectedCategory != null &&
-                                                  uniqueCategories.contains(
-                                                      _selectedCategory))
-                                              ? _selectedCategory
-                                              : null;
-
-                                      return DropdownButtonFormField<String>(
-                                        value: safeSelectedCategory,
-                                        isExpanded: true,
-                                        decoration: InputDecoration(
-                                          filled: true,
-                                          fillColor:
-                                              primaryColor.withOpacity(0.05),
-                                          border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            borderSide: BorderSide.none,
-                                          ),
-                                          hintText: 'Select project category',
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
-                                        ),
-                                        icon: Icon(Icons.arrow_drop_down,
-                                            ),
-                                        items: dropdownItems,
-                                        onChanged: (String? newValue) {
-                                          setState(() {
-                                            _selectedCategory = newValue;
-                                          });
-                                        },
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Please select a category';
-                                          }
-                                          return null;
-                                        },
-                                        borderRadius: BorderRadius.circular(12),
-                                        menuMaxHeight: 300,
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                FloatingActionButton.small(
-                                  heroTag: 'addCategory',
-                                  onPressed: _showAddCategoryDialog,
-                                  backgroundColor: primaryColor,
-                                  foregroundColor: Colors.white,
-                                  elevation: 2,
-                                  child: const Icon(Icons.add),
-                                ),
-                              ],
-                            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(child: GlassButton(label: 'BACK', onPressed: () => Navigator.pop(context), isSecondary: true)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: GlassButton(
+                    label: 'DELETE',
+                    onPressed: _selectedCategory == null ? null : () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Category'),
+                          content: Text('Are you sure you want to delete "$_selectedCategory"?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+                            TextButton(onPressed: () => Navigator.pop(context, true), child: Text('DELETE', style: TextStyle(color: theme.colorScheme.error))),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                      if (confirm == true) await _deleteSelectedCategory();
+                    },
+                    isSecondary: true,
                   ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildCircularActionButton(
-                        icon: Icons.arrow_back,
-                        label: 'Back',
-                        backgroundColor: Colors.green.shade100,
-                        iconColor: Colors.green.shade900,
-                        labelColor: Colors.green.shade900,
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 40),
-                      _buildCircularActionButton(
-                        icon: Icons.delete,
-                        label: 'Delete',
-                        backgroundColor: _selectedCategory != null
-                            ? Colors.red.shade100
-                            : Colors.grey.shade300,
-                        iconColor: _selectedCategory != null
-                            ? Colors.red.shade900
-                            : Colors.grey.shade600,
-                        labelColor: _selectedCategory != null
-                            ? Colors.red.shade900
-                            : Colors.grey.shade600,
-                        onPressed: _selectedCategory != null
-                            ? () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Delete Category'),
-                                    content: const Text(
-                                        'Are you sure you want to delete the selected category?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(true),
-                                        child: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  await _deleteSelectedCategory();
-                                }
-                              }
-                            : null,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildCircularActionButton({
-    required IconData icon,
-    required String label,
-    required Color backgroundColor,
-    required Color iconColor,
-    required Color labelColor,
-    required VoidCallback? onPressed,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 55,
-          height: 55,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: iconColor),
-            onPressed: onPressed,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-      ],
     );
   }
 }

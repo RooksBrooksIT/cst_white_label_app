@@ -5,6 +5,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
 import 'Organization_Dashboard.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class PricingScreen extends StatefulWidget {
   final String orgName;
@@ -203,164 +206,121 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pricing'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Pricing',
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
+          const SizedBox(height: 24),
           // Step Indicator
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 40,
-              vertical: 8,
-            ),
-            child: _buildStepIndicator(colorScheme),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: _buildStepIndicator(theme),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Choose a Plan',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start growing your business with zero upfront cost',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  Text(
+                    'Choose a Plan',
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start growing your business with zero upfront cost',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 40),
 
-                      // Transparent Subscription Card
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(28),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00A86B).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Text(
-                                  'RECOMMENDED',
-                                  style: TextStyle(
-                                    color: Color(0xFF00A86B),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                '30 Days Free Trial',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: colorScheme.onSurfaceVariant,
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-                              _buildFeatureRow(
-                                  'Unlimited user seats', colorScheme),
-                              const SizedBox(height: 12),
-                              _buildFeatureRow(
-                                  'Advanced reporting & analytics', colorScheme),
-                              const SizedBox(height: 12),
-                              _buildFeatureRow(
-                                  'Custom branding tools', colorScheme),
-                              const SizedBox(height: 12),
-                              _buildFeatureRow(
-                                  'Priority 24/7 support', colorScheme),
-                              const SizedBox(height: 32),
-
-                              // Register Final Actions
-                              ElevatedButton(
-                                onPressed: _register,
-                                style: ElevatedButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 50),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      )
-                                    : const Text('START FREE TRIAL'),
-                              ),
-                            ],
+                  // Pricing Card
+                  GlassCard(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00A86B).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: const Text(
+                            'RECOMMENDED',
+                            style: TextStyle(
+                              color: Color(0xFF00A86B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 24),
+                        Text(
+                          '30 Days Free Trial',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                        ),
+                        const SizedBox(height: 32),
+                        const Divider(),
+                        const SizedBox(height: 32),
+                        _buildFeatureRow('Unlimited user seats', theme),
+                        const SizedBox(height: 16),
+                        _buildFeatureRow('Advanced reporting & analytics', theme),
+                        const SizedBox(height: 16),
+                        _buildFeatureRow('Custom branding tools', theme),
+                        const SizedBox(height: 16),
+                        _buildFeatureRow('Priority 24/7 support', theme),
+                        const SizedBox(height: 40),
+
+                        // Register Final Actions
+                        GlassButton(
+                          label: 'START FREE TRIAL',
+                          isLoading: _isLoading,
+                          onPressed: _register,
+                        ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFeatureRow(String text, ColorScheme colorScheme) {
+  Widget _buildFeatureRow(String text, ThemeData theme) {
     return Row(
       children: [
-        const Icon(Icons.check_circle_rounded,
-            color: Color(0xFF00A86B), size: 20),
-        const SizedBox(width: 12),
+        const Icon(Icons.check_circle_rounded, color: Color(0xFF00A86B), size: 22),
+        const SizedBox(width: 16),
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 14,
-            ),
+            style: theme.textTheme.bodyLarge,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStepIndicator(ColorScheme colorScheme) {
+  Widget _buildStepIndicator(ThemeData theme) {
     const steps = ['Details', 'Branding', 'Pricing'];
-    const activeStep = 2; // Step 3
+    const activeStep = 2;
+    final primaryColor = theme.primaryColor;
+    final colorScheme = theme.colorScheme;
 
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
@@ -368,9 +328,11 @@ class _PricingScreenState extends State<PricingScreen> {
           return Expanded(
             child: Container(
               height: 2,
-              color: activeStep > i ~/ 2
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                color: activeStep >= i ~/ 2 + 1 ? primaryColor : colorScheme.outlineVariant,
+              ),
             ),
           );
         }
@@ -385,39 +347,30 @@ class _PricingScreenState extends State<PricingScreen> {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: done || active
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
+                color: done || active ? primaryColor : colorScheme.surface,
                 border: Border.all(
-                  color: done || active
-                      ? colorScheme.primary
-                      : colorScheme.outline,
-                  width: 1.5,
+                  color: done || active ? primaryColor : colorScheme.outline,
+                  width: 2,
                 ),
               ),
               child: Center(
                 child: done
-                    ? Icon(Icons.check, color: colorScheme.onPrimary, size: 18)
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
                     : Text(
                         '${idx + 1}',
                         style: TextStyle(
-                          color: active
-                              ? colorScheme.onPrimary
-                              : colorScheme.onSurfaceVariant,
+                          color: active ? Colors.white : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
               steps[idx],
-              style: TextStyle(
-                fontSize: 11,
-                color: active || done
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: active || done ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
               ),
             ),

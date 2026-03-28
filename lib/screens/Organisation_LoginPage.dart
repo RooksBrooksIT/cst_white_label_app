@@ -4,7 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
 import '../services/firestore_service.dart';
 import 'Organization_Dashboard.dart';
-import '../utils/responsive.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_text_field.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -140,45 +143,25 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF1E293B),
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
       body: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.isMobile(context) ? 20 : 32,
-          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Icon Header or Org Logo
               if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 110,
+                  height: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: colorScheme.outline, width: 2),
                     image: DecorationImage(
                       image: NetworkImage(_tempLogoUrl!),
                       fit: BoxFit.cover,
@@ -187,159 +170,56 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: primary.withOpacity(0.1),
+                    color: colorScheme.primary.withOpacity(0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.business_center_rounded,
                     size: 64,
-                    color: primary,
+                    color: colorScheme.primary,
                   ),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Text(
                 _tempOrgName ?? 'Organization Login',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 28),
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1E293B),
-                  letterSpacing: -0.5,
-                ),
+                style: theme.textTheme.headlineMedium,
               ),
-              if (_tempOrgName != null) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Organization Account',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
               const SizedBox(height: 12),
               Text(
                 'Enter your credentials to continue',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  color: const Color(0xFF64748B),
-                ),
+                style: theme.textTheme.bodyMedium,
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 48),
 
-              Container(
+              GlassCard(
                 padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      TextFormField(
+                      GlassTextField(
                         controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          prefixIcon: Icon(
-                            Icons.person_outline_rounded,
-                            color: primary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: primary, width: 2),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                        ),
+                        label: 'Username',
+                        icon: Icons.person_outline_rounded,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 20),
-                      TextFormField(
+                      const SizedBox(height: 24),
+                      GlassTextField(
                         controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(
-                            Icons.lock_outline_rounded,
-                            color: primary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: primary, width: 2),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                        ),
+                        label: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        isPassword: true,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'LOGIN',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    letterSpacing: 1.1,
-                                  ),
-                                ),
-                        ),
+                      GlassButton(
+                        label: 'LOGIN',
+                        isLoading: _isLoading,
+                        onPressed: _login,
                       ),
                     ],
                   ),
@@ -352,7 +232,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 children: [
                   Text(
                     "Don't have an account? ",
-                    style: TextStyle(color: const Color(0xFF64748B)),
+                    style: theme.textTheme.bodyMedium,
                   ),
                   TextButton(
                     onPressed: () {
@@ -367,13 +247,14 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                     child: Text(
                       'Register Now',
                       style: TextStyle(
-                        color: primary,
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

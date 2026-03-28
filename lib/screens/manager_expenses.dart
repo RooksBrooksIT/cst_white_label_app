@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 
 class ManagerExpenses extends StatefulWidget {
@@ -22,7 +25,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   List<String> siteIds = [];
   bool isLoadingSites = true;
-  bool isLoadingSiteDetails = false;
   bool isSubmitting = false;
 
   final billNoController = TextEditingController();
@@ -56,7 +58,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
-    setState(() => isLoadingSiteDetails = true);
     try {
       final snapshot = await FirestoreService.siteSupervisorMap
           .where('site', isEqualTo: siteId)
@@ -71,8 +72,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           selectedProjectName = data['projectName'] as String?;
         });
       }
-    } finally {
-      setState(() => isLoadingSiteDetails = false);
+    } catch (e) {
+      debugPrint('Error loading site details: $e');
     }
   }
 
@@ -108,195 +109,161 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
+
     return GlassScaffold(
       title: 'Manager Expenses',
-      onBack: () => Navigator.pop(context),
-      body: _buildBody(context),
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildInfoSection(context),
-          const SizedBox(height: 24),
-          _buildBillSection(context),
-          const SizedBox(height: 24),
-          _buildBillsListSection(context),
-          const SizedBox(height: 32),
-          _buildSubmitButton(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoSection(BuildContext context) {
-    return GlassCard(
-      title: 'Site & Project Info',
-      child: Column(
-        children: [
-          isLoadingSites
-              ? const Center(child: CircularProgressIndicator())
-              : _buildDropdown('Site ID', siteIds, selectedSiteId, (value) {
-                  setState(() => selectedSiteId = value);
-                  if (value != null) _loadSiteDetails(value);
-                }),
-          const SizedBox(height: 16),
-          _buildReadOnlyField('Supervisor ID', selectedSupervisorId ?? ''),
-          const SizedBox(height: 16),
-          _buildReadOnlyField('Project Phase', selectedProjectPhase ?? ''),
-          const SizedBox(height: 16),
-          _buildDatePicker(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillSection(BuildContext context) {
-    return GlassCard(
-      title: 'Add Bill',
-      child: Column(
-        children: [
-          _buildLabeledTextField('Bill No', billNoController),
-          _buildReadOnlyField('Bill Date', DateFormat('dd/MM/yy').format(selectedDate)),
-          _buildLabeledTextField('Bill Vendor', billVendorController),
-          _buildLabeledTextField('Bill Amount', billAmountController),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _addBill,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Bill'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillsListSection(BuildContext context) {
-    return GlassCard(
-      title: 'Bills List',
-      child: _buildBillTable(),
-    );
-  }
-
-  Widget _buildBillTable() {
-    if (bills.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No bills added yet.', style: TextStyle(color: Colors.white54)),
-      );
-    }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Bill No', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Bill Date', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Bill Vendor', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Amount', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Delete', style: TextStyle(color: Colors.white70))),
-        ],
-        rows: bills.asMap().entries.map((entry) => DataRow(
-          cells: [
-            DataCell(Text(entry.value['billNo']!, style: const TextStyle(color: Colors.white))),
-            DataCell(Text(entry.value['billDate']!, style: const TextStyle(color: Colors.white))),
-            DataCell(Text(entry.value['billVendor']!, style: const TextStyle(color: Colors.white))),
-            DataCell(Text(entry.value['billAmount']!, style: const TextStyle(color: Colors.white))),
-            DataCell(IconButton(
-              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-              onPressed: () => setState(() => bills.removeAt(entry.key)),
-            )),
-          ],
-        )).toList(),
-      ),
-    );
-  }
-
-  Widget _buildSubmitButton(BuildContext context) {
-    return ElevatedButton(
-      onPressed: isSubmitting ? null : _handleSubmit,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: isSubmitting
-          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : const Text('Submit Expenses', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildDropdown(String label, List<String> items, String? value, Function(String?) onChanged) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      dropdownColor: const Color(0xFF1A1F2E),
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(label),
-      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildReadOnlyField(String label, String value) {
-    return TextFormField(
-      readOnly: true,
-      controller: TextEditingController(text: value),
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  Widget _buildLabeledTextField(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextFormField(
-        controller: controller,
-        style: const TextStyle(color: Colors.white),
-        decoration: _inputDecoration(label),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker(BuildContext context) {
-    return InkWell(
-      onTap: () => _selectDate(context),
-      child: InputDecorator(
-        decoration: _inputDecoration('Date'),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(DateFormat('dd/MM/yy').format(selectedDate), style: const TextStyle(color: Colors.white)),
-            const Icon(Icons.calendar_today, color: Colors.white70, size: 20),
+            _buildInfoSection(theme),
+            const SizedBox(height: 24),
+            _buildBillFormSection(theme),
+            const SizedBox(height: 24),
+            _buildBillsListSection(theme),
+            const SizedBox(height: 32),
+            GlassButton(
+              label: 'SUBMIT EXPENSES',
+              onPressed: isSubmitting || bills.isEmpty ? null : _handleSubmit,
+              isLoading: isSubmitting,
+            ),
           ],
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54),
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
+  Widget _buildInfoSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Site & Project Details', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          isLoadingSites
+              ? const LinearProgressIndicator()
+              : _buildDropdown('Select Site ID', siteIds, selectedSiteId, (v) {
+                  setState(() => selectedSiteId = v);
+                  if (v != null) _loadSiteDetails(v);
+                }),
+          const SizedBox(height: 12),
+          GlassTextField(controller: TextEditingController(text: selectedSupervisorId ?? ''), label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
+          const SizedBox(height: 12),
+          GlassTextField(controller: TextEditingController(text: selectedProjectPhase ?? ''), label: 'Project Phase', icon: Icons.timeline_outlined, readOnly: true),
+          const SizedBox(height: 12),
+          _buildDatePicker(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillFormSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Add Bill', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          GlassTextField(controller: billNoController, label: 'Bill Number', icon: Icons.receipt_long_outlined),
+          const SizedBox(height: 12),
+          GlassTextField(controller: billVendorController, label: 'Vendor Name', icon: Icons.storefront_outlined),
+          const SizedBox(height: 12),
+          GlassTextField(
+            controller: billAmountController,
+            label: 'Amount (₹)',
+            icon: Icons.currency_rupee_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 20),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GlassButton(
+              label: 'ADD BILL',
+              onPressed: _addBill,
+              isSecondary: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillsListSection(ThemeData theme) {
+    if (bills.isEmpty) return const SizedBox.shrink();
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Bills List', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              horizontalMargin: 0,
+              columnSpacing: 24,
+              columns: const [
+                DataColumn(label: Text('Bill No')),
+                DataColumn(label: Text('Vendor')),
+                DataColumn(label: Text('Amount')),
+                DataColumn(label: Text('Action')),
+              ],
+              rows: bills.asMap().entries.map((entry) => DataRow(
+                cells: [
+                  DataCell(Text(entry.value['billNo']!)),
+                  DataCell(Text(entry.value['billVendor']!)),
+                  DataCell(Text(entry.value['billAmount']!)),
+                  DataCell(IconButton(
+                    icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 20),
+                    onPressed: () => setState(() => bills.removeAt(entry.key)),
+                  )),
+                ],
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdown(String label, List<String> items, String? value, Function(String?) onChanged) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: theme.cardColor,
+      ),
+      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildDatePicker(ThemeData theme) {
+    return InkWell(
+      onTap: () => _selectDate(context),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Date',
+          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: theme.cardColor,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(DateFormat('dd MMM yyyy').format(selectedDate)),
+            const Icon(Icons.edit_calendar_outlined, size: 18),
+          ],
+        ),
+      ),
     );
   }
 

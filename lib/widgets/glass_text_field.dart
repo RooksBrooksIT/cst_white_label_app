@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class GlassTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -7,12 +8,15 @@ class GlassTextField extends StatelessWidget {
   final bool isPassword;
   final bool showPassword;
   final VoidCallback? onTogglePassword;
-  final TextInputType keyboardType;
+  final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final Function(String)? onChanged;
   final FocusNode? focusNode;
+  final FocusNode? node; // Alias for focusNode
   final bool readOnly;
   final String? hintText;
+  final int? maxLines;
+  final List<dynamic>? inputFormatters;
 
   const GlassTextField({
     super.key,
@@ -26,12 +30,17 @@ class GlassTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.focusNode,
+    this.node,
     this.readOnly = false,
     this.hintText,
+    this.maxLines = 1,
+    this.inputFormatters,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -39,10 +48,8 @@ class GlassTextField extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -51,12 +58,11 @@ class GlassTextField extends StatelessWidget {
           obscureText: isPassword && !showPassword,
           keyboardType: keyboardType,
           onChanged: onChanged,
-          focusNode: focusNode,
+          focusNode: focusNode ?? node,
           readOnly: readOnly,
-          style: const TextStyle(
-            fontSize: 15,
-            color: Color(0xFF1E293B),
-          ),
+          maxLines: maxLines,
+          inputFormatters: inputFormatters?.cast<TextInputFormatter>(),
+          style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: hintText ?? 'Enter your $label',
             prefixIcon: Icon(icon, size: 20),

@@ -8,6 +8,9 @@ class GlassScaffold extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? floatingActionButton;
   final PreferredSizeWidget? bottom;
+  final EdgeInsets? padding;
+  final Color? appBarBackgroundColor;
+  final Color? appBarForegroundColor;
 
   const GlassScaffold({
     super.key,
@@ -17,50 +20,73 @@ class GlassScaffold extends StatelessWidget {
     this.onBack,
     this.floatingActionButton,
     this.bottom,
+    this.padding,
+    this.appBarBackgroundColor,
+    this.appBarForegroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasAppBar = title != null ||
+    final theme = Theme.of(context);
+    final hasAppBar =
+        title != null ||
         onBack != null ||
         (actions != null && actions!.isNotEmpty) ||
         bottom != null;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: hasAppBar
           ? AppBar(
+              toolbarHeight: 90,
+              backgroundColor: appBarBackgroundColor,
+              foregroundColor: appBarForegroundColor,
+              elevation: 4,
+              shadowColor: Colors.black26,
+              scrolledUnderElevation: 8,
+              centerTitle: false,
+              titleSpacing: onBack != null ? 8 : 24,
+              shape: appBarBackgroundColor != null
+                  ? const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(32),
+                        bottomRight: Radius.circular(32),
+                      ),
+                    )
+                  : null,
               title: title != null 
-                ? Text(
-                    title!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ) 
-                : null,
+                  ? Text(
+                      title!,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.0,
+                        color: appBarForegroundColor,
+                      ),
+                    ) 
+                  : null,
               leading: onBack != null
                   ? IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                      icon: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: appBarForegroundColor,
+                      ),
                       onPressed: onBack,
                     )
                   : null,
               actions: actions,
               bottom: bottom,
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
             )
           : null,
       floatingActionButton: floatingActionButton,
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.isMobile(context) ? 16 : 24,
-            vertical: 16,
-          ),
+          padding:
+              padding ??
+              EdgeInsets.symmetric(
+                horizontal: Responsive.isMobile(context) ? 16 : 24,
+                vertical: 16,
+              ),
           child: body,
         ),
       ),

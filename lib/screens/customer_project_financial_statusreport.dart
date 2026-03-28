@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/screens/financial_status_report.dart';
-import 'package:demo_cst/screens/project_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import 'financial_status_report.dart';
+import 'project_indicator.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 class customerProjectFinancialStatusReportPage extends StatefulWidget {
   @override
@@ -20,10 +24,6 @@ class _customerProjectFinancialStatusReportPageState
 
   List<String> siteIds = [];
   bool isLoadingSites = true;
-
-  // User data fields
-  String? _ownerName;
-  String? _ownerPhoneNumber;
   String? _userSiteId;
 
   @override
@@ -37,41 +37,27 @@ class _customerProjectFinancialStatusReportPageState
   @override
   void initState() {
     super.initState();
-    _loadUserDataAndFetchSites();
+    _loadUserData();
   }
 
-  Future<void> _loadUserDataAndFetchSites() async {
-    // Load user data from SharedPreferences
+  Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _ownerName = prefs.getString('ownerName');
-      _ownerPhoneNumber = prefs.getString('ownerPhoneNumber');
-      _userSiteId = prefs.getString('siteId');
-    });
-
+    _userSiteId = prefs.getString('siteId');
     await _fetchSiteIds();
   }
 
   Future<void> _fetchSiteIds() async {
     try {
       Query query = FirestoreService.getCollection('projects');
-
-      // If user has a siteId from login, filter by it
       if (_userSiteId != null && _userSiteId!.isNotEmpty) {
         query = query.where('siteId', isEqualTo: _userSiteId);
       }
 
       final snapshot = await query.get();
       final ids = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            if (data is Map<String, dynamic>) {
-              return data['siteId'];
-            }
-            return null;
-          })
-          .where((value) => value != null && value.toString().trim().isNotEmpty)
-          .map((value) => value.toString())
+          .map((doc) => doc.data() is Map ? (doc.data() as Map)['siteId']?.toString() : null)
+          .where((v) => v != null && v!.trim().isNotEmpty)
+          .map((v) => v!)
           .toSet()
           .toList();
       ids.sort();
@@ -79,8 +65,6 @@ class _customerProjectFinancialStatusReportPageState
       setState(() {
         siteIds = ids;
         isLoadingSites = false;
-
-        // If user has a siteId from login and it exists in the list, pre-select it
         if (_userSiteId != null && siteIds.contains(_userSiteId)) {
           selectedSiteId = _userSiteId;
           _loadSiteDetails(_userSiteId!);
@@ -90,12 +74,7 @@ class _customerProjectFinancialStatusReportPageState
         }
       });
     } catch (e) {
-      setState(() {
-        isLoadingSites = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load sites: $e')));
+      setState(() => isLoadingSites = false);
     }
   }
 
@@ -109,90 +88,108 @@ class _customerProjectFinancialStatusReportPageState
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
         setState(() {
-          siteNameController.text = data?['siteId']?.toString() ?? '';
-          projectNameController.text = data?['projectName']?.toString() ?? '';
-          ownerNameController.text = data?['ownerName']?.toString() ?? '';
-        });
-      } else {
-        setState(() {
-          siteNameController.clear();
-          projectNameController.clear();
-          ownerNameController.clear();
+          siteNameController.text = data['siteId']?.toString() ?? '';
+          projectNameController.text = data['projectName']?.toString() ?? '';
+          ownerNameController.text = data['ownerName']?.toString() ?? '';
         });
       }
     } catch (e) {
-      setState(() {
-        siteNameController.clear();
-        projectNameController.clear();
-        ownerNameController.clear();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load site details: $e')),
-      );
+      // Handle error quietly
     }
   }
 
-  Widget _buildModernCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
+
+    return GlassScaffold(
+      title: 'Project Status Report',
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_userSiteId != null) _buildUserSiteHeader(theme),
+            const SizedBox(height: 24),
+            _buildDetailsCard(theme),
+            const SizedBox(height: 32),
+            GlassButton(
+              label: 'FINANCIAL STATUS',
+              onPressed: _showFinancialStatus,
+              icon: Icons.pie_chart_outline,
+            ),
+            const SizedBox(height: 12),
+            GlassButton(
+              label: 'PROJECT INDICATOR',
+              onPressed: _showProjectIndicator,
+              icon: Icons.analytics_outlined,
+              isSecondary: true,
+            ),
+          ],
+        ),
       ),
-      child: child,
     );
   }
 
-  Widget _buildDisplayField({
-    required String label,
-    required String value,
-    IconData? icon,
-  }) {
+  Widget _buildUserSiteHeader(ThemeData theme) {
+    return GlassCard(
+      color: theme.primaryColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Row(
+        children: [
+          const Icon(Icons.business_outlined, color: Colors.white, size: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('MY ACTIVE SITE', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                Text(_userSiteId!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsCard(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('PROJECT INFORMATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+          const SizedBox(height: 20),
+          _displayField('Site ID', siteNameController.text, Icons.tag),
+          const SizedBox(height: 16),
+          _displayField('Project Name', projectNameController.text, Icons.assignment_outlined),
+          const SizedBox(height: 16),
+          _displayField('Owner Name', ownerNameController.text, Icons.person_outline),
+        ],
+      ),
+    );
+  }
+
+  Widget _displayField(String label, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1.2,
-          ),
-        ),
-        SizedBox(height: 8),
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 8),
         Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade400),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
-              if (icon != null) ...[
-                Icon(icon, color: Color(0xFF003768), size: 20),
-                SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Text(
-                  value.isNotEmpty ? value : 'Not available',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: value.isNotEmpty ? Colors.black87 : Colors.grey,
-                  ),
-                ),
-              ),
+              Icon(icon, size: 18, color: theme.primaryColor),
+              const SizedBox(width: 12),
+              Expanded(child: Text(value.isNotEmpty ? value : '-', style: const TextStyle(fontWeight: FontWeight.w500))),
             ],
           ),
         ),
@@ -200,193 +197,8 @@ class _customerProjectFinancialStatusReportPageState
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isSmallScreen = MediaQuery.of(context).size.width < 600;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Project Financial Status Report',
-          style: TextStyle(
-            fontSize: isSmallScreen ? 18 : 22,
-            fontWeight: FontWeight.bold,
-            
-          ),
-        ),
-        backgroundColor: Color(0xFF003768),
-        centerTitle: true,
-        elevation: 4,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // User Info Card - Displaying login credentials
-            const SizedBox(height: 16),
-
-            // Site Information Card
-            if (_userSiteId != null)
-              _buildModernCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'YOUR SITE',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.business, color: Color(0xFF003768)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Site ID',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  
-                                ),
-                              ),
-                              Text(
-                                _userSiteId!,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'Project Details',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Color(0xFF003768),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-
-            // Site Name Display
-            _buildModernCard(
-              child: _buildDisplayField(
-                label: 'SITE NAME',
-                value: siteNameController.text,
-                icon: Icons.location_on,
-              ),
-            ),
-            SizedBox(height: 20),
-
-            // Project Name Display
-            _buildModernCard(
-              child: _buildDisplayField(
-                label: 'PROJECT NAME',
-                value: projectNameController.text,
-                icon: Icons.assignment,
-              ),
-            ),
-            SizedBox(height: 20),
-
-            // Owner Name Display
-            _buildModernCard(
-              child: _buildDisplayField(
-                label: 'OWNER NAME',
-                value: ownerNameController.text,
-                icon: Icons.person,
-              ),
-            ),
-            SizedBox(height: 32),
-
-            // Buttons Section
-            if (isSmallScreen) ...[
-              _buildPrimaryButton(
-                text: 'Financial Status',
-                onPressed: () => _showFinancialStatus(),
-              ),
-              SizedBox(height: 12),
-              _buildPrimaryButton(
-                text: 'Project Indicator',
-                onPressed: () => _showProjectIndicator(),
-              ),
-            ] else ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPrimaryButton(
-                      text: 'Financial Status',
-                      onPressed: () => _showFinancialStatus(),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: _buildPrimaryButton(
-                      text: 'Project Indicator',
-                      onPressed: () => _showProjectIndicator(),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton({
-    required String text,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 2,
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
   void _showFinancialStatus() {
-    // Validate all fields
-    if ((selectedSiteId == null || selectedSiteId!.isEmpty) ||
-        siteNameController.text.trim().isEmpty ||
-        projectNameController.text.trim().isEmpty ||
-        ownerNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill all fields before proceeding.')),
-      );
-      return;
-    }
+    if (selectedSiteId == null) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -401,16 +213,7 @@ class _customerProjectFinancialStatusReportPageState
   }
 
   void _showProjectIndicator() {
-    // Validate all fields for Project Indicator as well
-    if ((selectedSiteId == null || selectedSiteId!.isEmpty) ||
-        siteNameController.text.trim().isEmpty ||
-        projectNameController.text.trim().isEmpty ||
-        ownerNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill all fields before proceeding.')),
-      );
-      return;
-    }
+    if (selectedSiteId == null) return;
     Navigator.push(
       context,
       MaterialPageRoute(

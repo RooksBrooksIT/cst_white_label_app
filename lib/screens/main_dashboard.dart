@@ -68,20 +68,16 @@ class _MainDashboardState extends State<MainDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    const Color textColor = Color(0xFF1E293B);
-    const Color labelColor = Color(0xFF64748B);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: textColor,
-            size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -103,18 +99,12 @@ class _MainDashboardState extends State<MainDashboard> {
                       // Organization Logo
                       if (_logoUrl != null && _logoUrl!.isNotEmpty)
                         Container(
-                          width: 100,
-                          height: 100,
+                          width: 110,
+                          height: 110,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 20,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                            border: Border.all(color: colorScheme.outline, width: 2),
                             image: DecorationImage(
                               image: NetworkImage(_logoUrl!),
                               fit: BoxFit.cover,
@@ -123,14 +113,14 @@ class _MainDashboardState extends State<MainDashboard> {
                         )
                       else
                         Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(28),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.1),
+                            color: colorScheme.primary.withOpacity(0.08),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.business_rounded,
-                            size: 56,
+                            size: 60,
                             color: colorScheme.primary,
                           ),
                         ),
@@ -138,57 +128,39 @@ class _MainDashboardState extends State<MainDashboard> {
                       Text(
                         _orgName ?? 'Organization',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
-                          letterSpacing: -0.5,
-                        ),
+                        style: textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Select your role to continue',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: labelColor,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: textTheme.bodyMedium,
                       ),
                     ] else ...[
                       // Generic Header
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.1),
+                          color: colorScheme.primary.withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.construction_rounded,
-                          size: 56,
+                          size: 60,
                           color: colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 32),
-                      const Text(
+                      Text(
                         'Select Your Role',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
-                          letterSpacing: -0.8,
-                        ),
+                        style: textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Choose how you\'d like to sign in',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: labelColor,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: textTheme.bodyMedium,
                       ),
                     ],
 
@@ -221,7 +193,7 @@ class _MainDashboardState extends State<MainDashboard> {
                       title: 'Supervisor',
                       subtitle: 'Manage site activities',
                       icon: Icons.supervisor_account_rounded,
-                      accentColor: colorScheme.tertiary,
+                      accentColor: const Color(0xFF0EA5E9), // Light Blue
                       destination: const SupervisorLoginPage(),
                     ),
                     const SizedBox(height: 16),
@@ -230,7 +202,7 @@ class _MainDashboardState extends State<MainDashboard> {
                       title: 'Customer',
                       subtitle: 'View your project status',
                       icon: Icons.person_rounded,
-                      accentColor: colorScheme.outline,
+                      accentColor: const Color(0xFF10B981), // Emerald
                       destination: const CustomerLoginPage(),
                     ),
                     const SizedBox(height: 40),
@@ -249,27 +221,21 @@ class _MainDashboardState extends State<MainDashboard> {
     required Color accentColor,
     required Widget destination,
   }) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor, width: 1),
       ),
       child: InkWell(
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => destination),
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Row(
             children: [
               // Icon circle
@@ -277,8 +243,8 @@ class _MainDashboardState extends State<MainDashboard> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  color: accentColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: accentColor, size: 28),
               ),
@@ -290,30 +256,23 @@ class _MainDashboardState extends State<MainDashboard> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: 0.2,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
                 ),
               ),
               // Arrow
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Color(0xFFCBD5E1),
-                size: 16,
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                size: 14,
               ),
             ],
           ),

@@ -10,6 +10,8 @@ class GlassCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final double? borderRadius;
   final VoidCallback? onTap;
+  final Color? color;
+  final BoxBorder? border;
 
   const GlassCard({
     super.key,
@@ -21,10 +23,13 @@ class GlassCard extends StatelessWidget {
     this.margin,
     this.borderRadius,
     this.onTap,
+    this.color,
+    this.border,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
     final defaultPadding = EdgeInsets.all(isMobile ? 16 : 24);
     final currentPadding = padding ?? defaultPadding;
@@ -33,22 +38,15 @@ class GlassCard extends StatelessWidget {
       width: width,
       margin: margin ?? const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(borderRadius ?? 16),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: color ?? theme.cardColor,
+        borderRadius: BorderRadius.circular(borderRadius ?? 12),
+        border: border ?? Border.all(color: theme.dividerColor, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(borderRadius ?? 16),
+          borderRadius: BorderRadius.circular(borderRadius ?? 12),
           child: Padding(
             padding: currentPadding,
             child: Column(
@@ -65,20 +63,15 @@ class GlassCard extends StatelessWidget {
                           children: [
                             Text(
                               title!,
-                              style: TextStyle(
+                              style: theme.textTheme.titleLarge?.copyWith(
                                 fontSize: isMobile ? 18 : 20,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF1E293B),
                               ),
                             ),
                             if (subtitle != null) ...[
                               const SizedBox(height: 4),
                               Text(
                                 subtitle!,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 14 : 15,
-                                  color: const Color(0xFF64748B),
-                                ),
+                                style: theme.textTheme.bodyMedium,
                               ),
                             ],
                           ],
@@ -87,7 +80,7 @@ class GlassCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Divider(color: Color(0xFFF1F5F9), height: 1),
+                  const Divider(height: 1),
                   const SizedBox(height: 16),
                 ],
                 child,

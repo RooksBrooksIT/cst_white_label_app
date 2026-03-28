@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import 'branding_screen.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_text_field.dart';
 
 // Form screen for organization registration details
 
@@ -29,7 +33,6 @@ class _OrganisationRegistrationPageState
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  bool _showPassword = false;
 
   @override
   void initState() {
@@ -94,42 +97,20 @@ class _OrganisationRegistrationPageState
 
   @override
   Widget build(BuildContext context) {
-    // Force Light Mode colors for this specific page as per user request
-    const backgroundColor = Colors.white;
-    const textColor = Color(0xFF0F172A); // Slate 900
-    const secondaryTextColor = Color(0xFF64748B); // Slate 500
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Register Organization',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: textColor,
-            size: 20,
-          ),
-          onPressed: _goBack,
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Register Organization',
+      onBack: _goBack,
       body: Column(
         children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           // Step Indicator
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: _buildStepIndicator(textColor, secondaryTextColor),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: _buildStepIndicator(theme),
           ),
+          const SizedBox(height: 12),
           // Page Content
           Expanded(
             child: FadeTransition(
@@ -140,7 +121,7 @@ class _OrganisationRegistrationPageState
                   offset: Offset(0, _translateAnimation.value),
                   child: child,
                 ),
-                child: _buildStep1(textColor, secondaryTextColor),
+                child: _buildStep1(theme),
               ),
             ),
           ),
@@ -149,10 +130,11 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildStepIndicator(Color textColor, Color secondaryTextColor) {
+  Widget _buildStepIndicator(ThemeData theme) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0;
-    const primaryColor = Color(0xFFF59E0B);
+    final primaryColor = theme.primaryColor;
+    final colorScheme = theme.colorScheme;
 
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
@@ -160,10 +142,10 @@ class _OrganisationRegistrationPageState
           return Expanded(
             child: Container(
               height: 2,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                color: const Color(0xFFE2E8F0), // Slate 200
+                color: colorScheme.outlineVariant,
               ),
             ),
           );
@@ -175,47 +157,35 @@ class _OrganisationRegistrationPageState
         return Column(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDone || isActive ? primaryColor : Colors.white,
+                color: isDone || isActive ? primaryColor : colorScheme.surface,
                 border: Border.all(
-                  color: isDone || isActive
-                      ? primaryColor
-                      : const Color(0xFFE2E8F0),
+                  color: isDone || isActive ? primaryColor : colorScheme.outline,
                   width: 2,
                 ),
-                boxShadow: isActive
-                    ? [
-                        BoxShadow(
-                          color: primaryColor.withOpacity(0.2),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
               ),
               child: Center(
                 child: isDone
-                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
                     : Text(
                         '${stepIndex + 1}',
                         style: TextStyle(
-                          color: isActive ? Colors.white : secondaryTextColor,
+                          color: isActive ? Colors.white : colorScheme.onSurfaceVariant,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               steps[stepIndex],
-              style: TextStyle(
-                fontSize: 12,
-                color: isActive ? textColor : secondaryTextColor,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: isActive ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],
@@ -224,131 +194,93 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildStep1(Color textColor, Color secondaryTextColor) {
-    const primaryColor = Color(0xFFF59E0B);
-    const inputFillColor = Color(0xFFF8FAFC); // Slate 50
-    const borderColor = Color(0xFFE2E8F0); // Slate 200
+  Widget _buildStep1(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header
           Text(
             'Organization Details',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: textColor,
-              letterSpacing: -0.5,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
             'Complete your organization profile to get started.',
-            style: TextStyle(fontSize: 15, color: secondaryTextColor),
+            style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 32),
 
           // Form
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                _buildField(
-                  controller: _orgNameController,
-                  label: 'Organization Name',
-                  icon: Icons.apartment_rounded,
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 20),
-                _buildField(
-                  controller: _emailController,
-                  label: 'Corporate Email',
-                  icon: Icons.email_rounded,
-                  type: TextInputType.emailAddress,
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 20),
-                _buildField(
-                  controller: _phoneController,
-                  label: 'Phone Number',
-                  icon: Icons.phone_rounded,
-                  type: TextInputType.phone,
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 20),
-                _buildField(
-                  controller: _usernameController,
-                  label: 'Admin Username',
-                  icon: Icons.person_rounded,
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 20),
-                _buildField(
-                  controller: _passwordController,
-                  label: 'Secure Password',
-                  icon: Icons.lock_rounded,
-                  isPassword: true,
-                  showPassword: _showPassword,
-                  onPasswordToggle: () =>
-                      setState(() => _showPassword = !_showPassword),
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 20),
-                _buildField(
-                  controller: _confirmPasswordController,
-                  label: 'Confirm Password',
-                  icon: Icons.lock_outline_rounded,
-                  isPassword: true,
-                  showPassword: _showPassword,
-                  fillColor: inputFillColor,
-                  borderColor: borderColor,
-                ),
-              ],
+          GlassCard(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  GlassTextField(
+                    controller: _orgNameController,
+                    label: 'Organization Name',
+                    icon: Icons.apartment_rounded,
+                  ),
+                  const SizedBox(height: 20),
+                  GlassTextField(
+                    controller: _emailController,
+                    label: 'Corporate Email',
+                    icon: Icons.email_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 20),
+                  GlassTextField(
+                    controller: _phoneController,
+                    label: 'Phone Number',
+                    icon: Icons.phone_rounded,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 20),
+                  GlassTextField(
+                    controller: _usernameController,
+                    label: 'Admin Username',
+                    icon: Icons.person_rounded,
+                  ),
+                  const SizedBox(height: 20),
+                  GlassTextField(
+                    controller: _passwordController,
+                    label: 'Secure Password',
+                    icon: Icons.lock_rounded,
+                    isPassword: true,
+                  ),
+                  const SizedBox(height: 20),
+                  GlassTextField(
+                    controller: _confirmPasswordController,
+                    label: 'Confirm Password',
+                    icon: Icons.lock_outline_rounded,
+                    isPassword: true,
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 40),
 
           // Action Buttons
-          SizedBox(
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _goToNextStep,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'CONTINUE',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ),
+          GlassButton(
+            label: 'CONTINUE',
+            onPressed: _goToNextStep,
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 56,
-            child: TextButton(
-              onPressed: _goBack,
-              style: TextButton.styleFrom(foregroundColor: secondaryTextColor),
-              child: const Text(
-                'CANCEL',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
+          TextButton(
+            onPressed: _goBack,
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onSurfaceVariant,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -356,64 +288,5 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType type = TextInputType.text,
-    bool isPassword = false,
-    bool? showPassword,
-    VoidCallback? onPasswordToggle,
-    required Color fillColor,
-    required Color borderColor,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: type,
-      obscureText: isPassword && (showPassword == false),
-      style: const TextStyle(
-        color: Color(0xFF0F172A),
-        fontWeight: FontWeight.w500,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        prefixIcon: Icon(icon, size: 20, color: const Color(0xFF64748B)),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  showPassword! ? Icons.visibility : Icons.visibility_off,
-                  size: 20,
-                  color: const Color(0xFF64748B),
-                ),
-                onPressed: onPasswordToggle,
-              )
-            : null,
-        filled: true,
-        fillColor: fillColor,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 18,
-        ),
-      ),
-      validator: (v) => v!.isEmpty ? 'Required field' : null,
-    );
-  }
 
 }

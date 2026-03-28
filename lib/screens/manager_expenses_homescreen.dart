@@ -11,6 +11,7 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isSmallScreen = Responsive.isMobile(context);
+    final theme = Theme.of(context);
 
     return GlassScaffold(
       title: 'Manager Expenses',
@@ -67,23 +68,22 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.15),
+            color: theme.primaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white, size: 24),
+          child: Icon(icon, color: theme.primaryColor, size: 24),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ),
-        const Icon(Icons.chevron_right, color: Colors.white70),
+        Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
       ],
     );
   }

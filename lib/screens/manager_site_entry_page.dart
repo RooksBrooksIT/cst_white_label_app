@@ -6,8 +6,8 @@ import '../services/expense_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
-import 'supervisor_dashboard.dart';
 
 class ManagerSiteEntryPage extends StatefulWidget {
   final String userName;
@@ -26,10 +26,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   List<Map<String, dynamic>> materials = [];
   List<Map<String, dynamic>> labours = [];
   String? selectedMaterial;
-  int materialQty = 0;
   final materialQtyController = TextEditingController(text: '0');
   String? selectedLabour;
-  int labourQty = 0;
   final labourQtyController = TextEditingController(text: '0');
   final foodCost = TextEditingController(text: '0');
   final transportCost = TextEditingController(text: '0');
@@ -37,14 +35,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   DateTime? selectedDate = DateTime.now();
   List<String> materialOptions = [];
   List<String> labourOptions = [];
-  List<String>? _filteredMaterialOptions;
-  List<String>? _filteredLabourOptions;
   bool isLoadingMaterials = true;
   bool isLoadingLabours = true;
-  String? materialError;
-  String? labourError;
   String? supervisorId;
-  String? projectName;
   String siteCode = '';
   List<Map<String, String>> siteList = [];
   String? selectedSiteId;
@@ -56,30 +49,17 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Map<String, num> materialPrices = {};
   Map<String, num> labourSalaries = {};
 
-  // Custom material fields
   bool _showCustomMaterialFields = false;
   final _customMaterialNameController = TextEditingController();
   final _customMaterialQtyController = TextEditingController(text: '0');
   final _customMaterialPriceController = TextEditingController(text: '0');
 
-  // Custom labour fields
   bool _showCustomLabourFields = false;
   final _customLabourNameController = TextEditingController();
   final _customLabourSalaryController = TextEditingController(text: '0');
 
-  // Update Entry state
   bool isUpdateMode = false;
   String? _updateDocId;
-  bool isLoadingEntryDates = false;
-  DateTime? _selectedUpdateDate;
-
-  // Theme support
-  late Color primaryColor;
-  late Color accentColor;
-  final Color textColor = Colors.white;
-  final Color successColor = const Color(0xFF27ae60);
-  final Color warningColor = const Color(0xFFe67e22);
-  final Color errorColor = const Color(0xFFe74c3c);
 
   @override
   void initState() {
@@ -87,13 +67,6 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     _fetchMaterialOptions();
     _fetchLabourOptions();
     _fetchSites();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    primaryColor = Theme.of(context).colorScheme.primary;
-    accentColor = Theme.of(context).colorScheme.secondary;
   }
 
   @override
@@ -111,50 +84,22 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     super.dispose();
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70, fontSize: 14),
-      prefixIcon: Icon(icon, color: primaryColor, size: 20),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryColor, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    );
-  }
-
   Future<void> _fetchSites() async {
     setState(() => isLoadingSites = true);
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap
-          .get();
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      siteList = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'siteId': data['site']?.toString() ?? '',
+          'supervisor': data['supervisor']?.toString() ?? '',
+          'supervisorId': data['Supervisor ID']?.toString() ?? '',
+          'location': data['location']?.toString() ?? '',
+          'projectStage': data['projectStage']?.toString() ?? '',
+        };
+      }).where((site) => site['siteId']!.isNotEmpty).toList();
 
-      siteList = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            return {
-              'siteId': data['site']?.toString() ?? '',
-              'supervisor': data['supervisor']?.toString() ?? '',
-              'supervisorId': data['Supervisor ID']?.toString() ?? '',
-              'location': data['location']?.toString() ?? '',
-              'projectStage': data['projectStage']?.toString() ?? '',
-            };
-          })
-          .where((site) => site['siteId']!.isNotEmpty)
-          .toList();
-
-      if (siteList.isNotEmpty) {
+      if (siteList.isNotEmpty && selectedSiteId == null) {
         selectedSiteId = siteList.first['siteId'];
         _onSiteSelected(selectedSiteId!);
       }
@@ -164,118 +109,64 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   }
 
   void _onSiteSelected(String siteId) {
-    final site = siteList.firstWhere((s) => s['siteId'] == siteId,
-        orElse: () => {
-              'siteId': '',
-              'supervisor': '',
-              'supervisorId': '',
-              'location': '',
-              'projectStage': ''
-            });
+    final site = siteList.firstWhere((s) => s['siteId'] == siteId, orElse: () => {'siteId': '', 'supervisor': '', 'supervisorId': '', 'location': '', 'projectStage': ''});
     setState(() {
       selectedSiteId = siteId;
       siteCode = siteId;
       supervisorName = site['supervisor'];
-      supervisorId = site['supervisorId']?.isNotEmpty == true
-          ? site['supervisorId']
-          : 'Not Available';
+      supervisorId = site['supervisorId']?.isNotEmpty == true ? site['supervisorId'] : 'N/A';
       siteLocation = site['location'];
       projectStage = site['projectStage'];
       isUpdateMode = false;
       _updateDocId = null;
-      _selectedUpdateDate = null;
     });
   }
 
   Future<void> _fetchMaterialOptions() async {
-    setState(() {
-      isLoadingMaterials = true;
-      materialError = null;
-    });
+    setState(() => isLoadingMaterials = true);
     try {
       final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data.containsKey('materialName')) {
-          final name = data['materialName']?.toString() ?? '';
-          if (name.isNotEmpty) {
-            options.add(name);
-            final priceRaw = data['materialPrice'];
-            num price = 0;
-            if (priceRaw is num) {
-              price = priceRaw;
-            } else if (priceRaw is String) {
-              price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-            }
-            prices[name] = price;
-          }
+        final name = data['materialName']?.toString();
+        if (name != null) {
+          options.add(name);
+          prices[name] = num.tryParse(data['materialPrice']?.toString().replaceAll(RegExp(r'[^\d.]'), '') ?? '0') ?? 0;
         }
       }
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial = materialOptions.isNotEmpty ? materialOptions.first : null;
-        isLoadingMaterials = false;
+        selectedMaterial = options.isNotEmpty ? options.first : null;
       });
-    } catch (e) {
-      setState(() {
-        materialError = 'Failed to load materials';
-        isLoadingMaterials = false;
-      });
+    } finally {
+      setState(() => isLoadingMaterials = false);
     }
   }
 
   Future<void> _fetchLabourOptions() async {
-    setState(() {
-      isLoadingLabours = true;
-      labourError = null;
-    });
+    setState(() => isLoadingLabours = true);
     try {
       final snapshot = await FirestoreService.getCollection('labours').get();
       final options = <String>[];
       final salaries = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data.containsKey('designation')) {
-          final designation = data['designation']?.toString() ?? '';
-          if (designation.isNotEmpty) {
-            options.add(designation);
-            final salaryRaw = data['salary'];
-            num salary = 0;
-            if (salaryRaw is num) {
-              salary = salaryRaw;
-            } else if (salaryRaw is String) {
-              salary = num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-            }
-            salaries[designation] = salary;
-          }
+        final des = data['designation']?.toString();
+        if (des != null) {
+          options.add(des);
+          salaries[des] = num.tryParse(data['salary']?.toString().replaceAll(RegExp(r'[^\d.]'), '') ?? '0') ?? 0;
         }
       }
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
-        selectedLabour = labourOptions.isNotEmpty ? labourOptions.first : null;
-        isLoadingLabours = false;
+        selectedLabour = options.isNotEmpty ? options.first : null;
       });
-    } catch (e) {
-      setState(() {
-        labourError = 'Failed to load labours';
-        isLoadingLabours = false;
-      });
-    }
-  }
-
-  Future<void> _pickDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() => selectedDate = picked);
+    } finally {
+      setState(() => isLoadingLabours = false);
     }
   }
 
@@ -292,8 +183,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addCustomMaterial() {
     final name = _customMaterialNameController.text.trim();
     final qty = int.tryParse(_customMaterialQtyController.text) ?? 0;
-    final price = int.tryParse(_customMaterialPriceController.text) ?? 0;
-
+    final price = num.tryParse(_customMaterialPriceController.text) ?? 0;
     if (name.isNotEmpty && qty > 0) {
       setState(() {
         materials.add({'type': name, 'quantity': qty});
@@ -319,8 +209,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addCustomLabour() {
     final name = _customLabourNameController.text.trim();
     final qty = int.tryParse(labourQtyController.text) ?? 0;
-    final salary = int.tryParse(_customLabourSalaryController.text) ?? 0;
-
+    final salary = num.tryParse(_customLabourSalaryController.text) ?? 0;
     if (name.isNotEmpty && qty > 0) {
       setState(() {
         labours.add({'type': name, 'count': qty});
@@ -333,406 +222,349 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     }
   }
 
-  void _removeMaterial(int index) => setState(() => materials.removeAt(index));
-  void _removeLabour(int index) => setState(() => labours.removeAt(index));
-
-  String _calculateMaterialAmount(String material, int qty) {
-    final price = materialPrices[material] ?? 0;
-    return '₹${(price * qty).toStringAsFixed(0)}';
-  }
-
-  String _calculateLabourAmount(String labour, int qty) {
-    final salary = labourSalaries[labour] ?? 0;
-    return '₹${(salary * qty).toStringAsFixed(0)}';
-  }
-
-  int _getMaterialsTotal() {
-    int total = 0;
-    for (var m in materials) {
-      final price = materialPrices[m['type'] ?? ''] ?? 0;
-      total += (price * (m['quantity'] ?? 0)).toInt();
-    }
-    return total;
-  }
-
-  int _getLabourTotal() {
-    int total = 0;
-    for (var l in labours) {
-      final salary = labourSalaries[l['type'] ?? ''] ?? 0;
-      total += (salary * (l['count'] ?? 0)).toInt();
-    }
-    return total;
-  }
-
-  int _getMiscTotal() {
-    int total = 0;
+  int _getTotalAmount() {
+    num total = 0;
+    for (var m in materials) total += (materialPrices[m['type']] ?? 0) * (m['quantity'] ?? 0);
+    for (var l in labours) total += (labourSalaries[l['type']] ?? 0) * (l['count'] ?? 0);
     total += int.tryParse(foodCost.text) ?? 0;
     total += int.tryParse(transportCost.text) ?? 0;
     total += int.tryParse(fuelCost.text) ?? 0;
-    return total;
+    return total.toInt();
   }
 
-  int _getTotalAmount() => _getMaterialsTotal() + _getLabourTotal() + _getMiscTotal();
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
+
+    return GlassScaffold(
+      title: isUpdateMode ? 'Update Site Entry' : 'Daily Site Entry',
+      actions: [
+        IconButton(icon: const Icon(Icons.history_outlined), onPressed: _openHistory),
+      ],
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: Column(
+          children: [
+            _buildSiteInfoSection(theme),
+            const SizedBox(height: 16),
+            _buildMaterialSection(theme),
+            const SizedBox(height: 16),
+            _buildLabourSection(theme),
+            const SizedBox(height: 16),
+            _buildMiscSection(theme),
+            const SizedBox(height: 16),
+            _buildSummarySection(theme),
+            const SizedBox(height: 32),
+            GlassButton(
+              label: isUpdateMode ? 'UPDATE ENTRY' : 'SAVE ENTRY',
+              onPressed: isSaving ? null : (isUpdateMode ? _updateEntry : _saveEntry),
+              isLoading: isSaving,
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSiteInfoSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Site Selection', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          _buildDropdown('Select Site', siteList.map((s) => s['siteId']!).toList(), selectedSiteId, (v) => _onSiteSelected(v!)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.person_outline, size: 20, color: theme.primaryColor),
+              const SizedBox(width: 12),
+              Expanded(child: Text(supervisorName ?? 'Select Site', style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.location_on_outlined, size: 20, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Expanded(child: Text(siteLocation ?? 'N/A', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Materials', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              IconButton(
+                onPressed: () => setState(() => _showCustomMaterialFields = !_showCustomMaterialFields),
+                icon: Icon(_showCustomMaterialFields ? Icons.list_alt : Icons.add_circle_outline, color: theme.primaryColor),
+                tooltip: _showCustomMaterialFields ? 'Show Standard' : 'Add Custom',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_showCustomMaterialFields) ...[
+            GlassTextField(controller: _customMaterialNameController, label: 'Material Name', icon: Icons.edit_note),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: GlassTextField(controller: _customMaterialQtyController, label: 'Qty', icon: Icons.numbers, keyboardType: TextInputType.number)),
+                const SizedBox(width: 12),
+                Expanded(child: GlassTextField(controller: _customMaterialPriceController, label: 'Price', icon: Icons.currency_rupee, keyboardType: TextInputType.number)),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(onPressed: _addCustomMaterial, icon: const Icon(Icons.add)),
+              ],
+            ),
+          ] else ...[
+            _buildDropdown('Select Material', materialOptions, selectedMaterial, (v) => setState(() => selectedMaterial = v)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: GlassTextField(controller: materialQtyController, label: 'Quantity', icon: Icons.numbers, keyboardType: TextInputType.number)),
+                const SizedBox(width: 12),
+                GlassButton(label: 'ADD', onPressed: _addMaterial, isSecondary: true),
+              ],
+            ),
+          ],
+          if (materials.isNotEmpty) _buildAddedList(materials, 'quantity', materialPrices, theme, (i) => setState(() => materials.removeAt(i))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLabourSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Labour', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              IconButton(
+                onPressed: () => setState(() => _showCustomLabourFields = !_showCustomLabourFields),
+                icon: Icon(_showCustomLabourFields ? Icons.list_alt : Icons.person_add_alt_1_outlined, color: theme.primaryColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_showCustomLabourFields) ...[
+            GlassTextField(controller: _customLabourNameController, label: 'Designation', icon: Icons.engineering_outlined),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: GlassTextField(controller: labourQtyController, label: 'Count', icon: Icons.groups_outlined, keyboardType: TextInputType.number)),
+                const SizedBox(width: 12),
+                Expanded(child: GlassTextField(controller: _customLabourSalaryController, label: 'Salary', icon: Icons.payments_outlined, keyboardType: TextInputType.number)),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(onPressed: _addCustomLabour, icon: const Icon(Icons.add)),
+              ],
+            ),
+          ] else ...[
+            _buildDropdown('Designation', labourOptions, selectedLabour, (v) => setState(() => selectedLabour = v)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: GlassTextField(controller: labourQtyController, label: 'Count', icon: Icons.groups_outlined, keyboardType: TextInputType.number)),
+                const SizedBox(width: 12),
+                GlassButton(label: 'ADD', onPressed: _addLabour, isSecondary: true),
+              ],
+            ),
+          ],
+          if (labours.isNotEmpty) _buildAddedList(labours, 'count', labourSalaries, theme, (i) => setState(() => labours.removeAt(i))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiscSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Other Expenses', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: GlassTextField(controller: foodCost, label: 'Food', icon: Icons.restaurant, keyboardType: TextInputType.number)),
+              const SizedBox(width: 12),
+              Expanded(child: GlassTextField(controller: transportCost, label: 'Travel', icon: Icons.local_shipping, keyboardType: TextInputType.number)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GlassTextField(controller: fuelCost, label: 'Fuel Cost', icon: Icons.local_gas_station, keyboardType: TextInputType.number),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummarySection(ThemeData theme) {
+    return GlassCard(
+      color: theme.primaryColor.withOpacity(0.05),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Total Daily Cost', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text('₹ ${_getTotalAmount()}', style: theme.textTheme.headlineSmall?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddedList(List<Map<String, dynamic>> items, String qtyKey, Map<String, num> priceMap, ThemeData theme, Function(int) onRemove) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (ctx, i) {
+          final item = items[i];
+          final price = priceMap[item['type']] ?? 0;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(item['type'], style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+            subtitle: Text('${item[qtyKey]} units @ ₹$price'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('₹${(item[qtyKey] * price).toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                IconButton(icon: Icon(Icons.remove_circle_outline, color: theme.colorScheme.error, size: 20), onPressed: () => onRemove(i)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDropdown(String label, List<String> items, String? value, Function(String?) onChanged) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<String>(
+      value: (value != null && items.contains(value)) ? value : null,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: theme.cardColor,
+      ),
+      items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Future<void> _saveEntry() async {
+    if (siteCode.isEmpty || selectedDate == null) return;
+    setState(() => isSaving = true);
+    try {
+      final dateId = DateFormat('ddMMyyyy').format(selectedDate!);
+      final docId = '${siteCode}_$dateId';
+      await FirestoreService.siteSupervisorEntries.doc(docId).set({
+        "date": selectedDate!.toIso8601String(),
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "labours": labours.map((l) => {"type": l['type'], "count": l['count'], "unitSalary": labourSalaries[l['type']] ?? 0, "amount": (labourSalaries[l['type']] ?? 0) * (l['count'] ?? 0)}).toList(),
+        "materials": materials.map((m) => {"type": m['type'], "quantity": m['quantity'], "unitPrice": materialPrices[m['type']] ?? 0, "amount": (materialPrices[m['type']] ?? 0) * (m['quantity'] ?? 0)}).toList(),
+        "Supervisor ID": supervisorId,
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "totalAmount": _getTotalAmount(),
+        "siteId": siteCode,
+        "supervisorName": supervisorName,
+        "projectStage": projectStage,
+      });
+      await ExpenseService.updateTotalSiteExpense(siteCode);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved successfully'), backgroundColor: Colors.green));
+      _resetForm();
+    } finally {
+      if (mounted) setState(() => isSaving = false);
+    }
+  }
+
+  Future<void> _updateEntry() async {
+    if (_updateDocId == null) return;
+    setState(() => isSaving = true);
+    try {
+      await FirestoreService.siteSupervisorEntries.doc(_updateDocId).update({
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "labours": labours.map((l) => {"type": l['type'], "count": l['count'], "unitSalary": labourSalaries[l['type']] ?? 0, "amount": (labourSalaries[l['type']] ?? 0) * (l['count'] ?? 0)}).toList(),
+        "materials": materials.map((m) => {"type": m['type'], "quantity": m['quantity'], "unitPrice": materialPrices[m['type']] ?? 0, "amount": (materialPrices[m['type']] ?? 0) * (m['quantity'] ?? 0)}).toList(),
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "totalAmount": _getTotalAmount(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updated successfully'), backgroundColor: Colors.green));
+      _resetForm();
+    } finally {
+      if (mounted) setState(() => isSaving = false);
+    }
+  }
 
   void _resetForm() {
     setState(() {
       materials.clear();
       labours.clear();
-      materialQtyController.text = '0';
-      labourQtyController.text = '0';
       foodCost.text = '0';
       transportCost.text = '0';
       fuelCost.text = '0';
       isUpdateMode = false;
       _updateDocId = null;
-      _selectedUpdateDate = null;
     });
   }
 
-  Future<void> _saveToFirestore() async {
-    if (siteCode.isEmpty || selectedDate == null || supervisorName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Missing required fields'), backgroundColor: errorColor));
+  void _openHistory() async {
+    final query = await FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: siteCode).get();
+    if (query.docs.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No entries found')));
       return;
     }
-    setState(() => isSaving = true);
-    final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
-    final docId = '${siteCode}_$dateForId';
-    final data = {
-      "date": selectedDate!.toIso8601String(),
-      "food": int.tryParse(foodCost.text) ?? 0,
-      "fuel": int.tryParse(fuelCost.text) ?? 0,
-      "labours": labours.map((l) => {"type": l['type'], "count": l['count'], "unitSalary": labourSalaries[l['type']] ?? 0, "amount": (labourSalaries[l['type']] ?? 0) * (l['count'] ?? 0)}).toList(),
-      "materials": materials.map((m) => {"type": m['type'], "quantity": m['quantity'], "unitPrice": materialPrices[m['type']] ?? 0, "amount": (materialPrices[m['type']] ?? 0) * (m['quantity'] ?? 0)}).toList(),
-      "Supervisor ID": supervisorId,
-      "transport": int.tryParse(transportCost.text) ?? 0,
-      "totalAmount": _getTotalAmount(),
-      "siteLocation": siteLocation,
-      "siteId": siteCode,
-      "supervisorName": supervisorName,
-      "projectStage": projectStage,
-    };
-    try {
-      await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
-      await ExpenseService.updateTotalSiteExpense(siteCode);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved successfully!'), backgroundColor: successColor));
-      _resetForm();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: errorColor));
-    } finally {
-      setState(() => isSaving = false);
-    }
-  }
-
-  Future<void> _updateExistingEntry() async {
-    if (_updateDocId == null) return;
-    setState(() => isSaving = true);
-    final data = {
-      "food": int.tryParse(foodCost.text) ?? 0,
-      "fuel": int.tryParse(fuelCost.text) ?? 0,
-      "labours": labours.map((l) => {"type": l['type'], "count": l['count'], "unitSalary": labourSalaries[l['type']] ?? 0, "amount": (labourSalaries[l['type']] ?? 0) * (l['count'] ?? 0)}).toList(),
-      "materials": materials.map((m) => {"type": m['type'], "quantity": m['quantity'], "unitPrice": materialPrices[m['type']] ?? 0, "amount": (materialPrices[m['type']] ?? 0) * (m['quantity'] ?? 0)}).toList(),
-      "transport": int.tryParse(transportCost.text) ?? 0,
-      "totalAmount": _getTotalAmount(),
-    };
-    try {
-      await FirestoreService.siteSupervisorEntries.doc(_updateDocId).update(data);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Updated successfully!'), backgroundColor: successColor));
-      _resetForm();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: errorColor));
-    } finally {
-      setState(() => isSaving = false);
-    }
-  }
-
-  Future<void> _openUpdateEntrySelector() async {
-    setState(() => isLoadingEntryDates = true);
-    try {
-      final query = await FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: siteCode).get();
-      final entries = query.docs.map((doc) => {'docId': doc.id, 'date': (doc.data()['date'] is Timestamp) ? (doc.data()['date'] as Timestamp).toDate() : DateTime.tryParse(doc.data()['date'] ?? '') ?? DateTime.now()}).toList();
-      entries.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-      if (entries.isEmpty) return;
-
-      String selectedDocId = entries.first['docId'] as String;
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Select Entry'),
-          content: DropdownButtonFormField<String>(
-            value: selectedDocId,
-            items: entries.map((e) => DropdownMenuItem(value: e['docId'] as String, child: Text(DateFormat('yyyy-MM-dd').format(e['date'] as DateTime)))).toList(),
-            onChanged: (val) => selectedDocId = val!,
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () { Navigator.pop(context); _loadEntryByDocId(selectedDocId); }, child: const Text('Load')),
-          ],
+    
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => GlassCard(
+        borderRadius: 24,
+        child: ListView.builder(
+          itemCount: query.docs.length,
+          itemBuilder: (c, i) {
+            final doc = query.docs[i];
+            final data = doc.data();
+            final date = DateTime.tryParse(data['date'] ?? '') ?? DateTime.now();
+            return ListTile(
+              title: Text(DateFormat('dd MMM yyyy').format(date)),
+              subtitle: Text('Total: ₹${data['totalAmount']}'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _loadEntry(doc.id, data);
+              },
+            );
+          },
         ),
-      );
-    } finally {
-      setState(() => isLoadingEntryDates = false);
-    }
+      ),
+    );
   }
 
-  Future<void> _loadEntryByDocId(String docId) async {
-    final doc = await FirestoreService.siteSupervisorEntries.doc(docId).get();
-    if (!doc.exists) return;
-    final data = doc.data()!;
+  void _loadEntry(String id, Map<String, dynamic> data) {
     setState(() {
+      _updateDocId = id;
+      isUpdateMode = true;
       materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
       labours = List<Map<String, dynamic>>.from(data['labours'] ?? []);
       foodCost.text = data['food']?.toString() ?? '0';
       transportCost.text = data['transport']?.toString() ?? '0';
       fuelCost.text = data['fuel']?.toString() ?? '0';
-      isUpdateMode = true;
-      _updateDocId = docId;
-      _selectedUpdateDate = (data['date'] is Timestamp) ? (data['date'] as Timestamp).toDate() : DateTime.tryParse(data['date'] ?? '');
     });
-  }
-
-  Widget _buildMaterialSection(bool isSmallScreen) {
-    return GlassCard(
-      title: 'Material Details',
-      child: Column(
-        children: [
-          _buildMaterialInputs(),
-          if (materials.isNotEmpty) ...[
-            const Divider(color: Colors.white10, height: 32),
-            _buildAddedItemsList(materials, 'Materials', _removeMaterial),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMaterialInputs() {
-    return Column(
-      children: [
-        CheckboxListTile(
-          title: const Text('Custom Material', style: TextStyle(color: Colors.white, fontSize: 14)),
-          value: _showCustomMaterialFields,
-          onChanged: (val) => setState(() => _showCustomMaterialFields = val ?? false),
-          controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: EdgeInsets.zero,
-        ),
-        if (!_showCustomMaterialFields)
-          DropdownButtonFormField<String>(
-            value: selectedMaterial,
-            dropdownColor: const Color(0xFF1A1A1A),
-            decoration: _inputDecoration('Select Material', Icons.category),
-            items: materialOptions.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(color: Colors.white, fontSize: 14)))).toList(),
-            onChanged: (val) => setState(() => selectedMaterial = val),
-          )
-        else
-          GlassTextField(controller: _customMaterialNameController, label: 'Material Name', icon: Icons.edit),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: GlassTextField(controller: _showCustomMaterialFields ? _customMaterialQtyController : materialQtyController, label: 'Qty', icon: Icons.numbers, keyboardType: TextInputType.number)),
-            if (_showCustomMaterialFields) ...[
-              const SizedBox(width: 12),
-              Expanded(child: GlassTextField(controller: _customMaterialPriceController, label: 'Price', icon: Icons.payments, keyboardType: TextInputType.number)),
-            ],
-            IconButton(onPressed: _showCustomMaterialFields ? _addCustomMaterial : _addMaterial, icon: Icon(Icons.add_circle, color: primaryColor, size: 32)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLabourSection(bool isSmallScreen) {
-    return GlassCard(
-      title: 'Labour Details',
-      child: Column(
-        children: [
-          _buildLabourInputs(),
-          if (labours.isNotEmpty) ...[
-            const Divider(color: Colors.white10, height: 32),
-            _buildAddedItemsList(labours, 'Labour', _removeLabour),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLabourInputs() {
-    return Column(
-      children: [
-        CheckboxListTile(
-          title: const Text('Custom Designation', style: TextStyle(color: Colors.white, fontSize: 14)),
-          value: _showCustomLabourFields,
-          onChanged: (val) => setState(() => _showCustomLabourFields = val ?? false),
-          controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: EdgeInsets.zero,
-        ),
-        if (!_showCustomLabourFields)
-          DropdownButtonFormField<String>(
-            value: selectedLabour,
-            dropdownColor: const Color(0xFF1A1A1A),
-            decoration: _inputDecoration('Select Designation', Icons.engineering),
-            items: labourOptions.map((l) => DropdownMenuItem(value: l, child: Text(l, style: const TextStyle(color: Colors.white, fontSize: 14)))).toList(),
-            onChanged: (val) => setState(() => selectedLabour = val),
-          )
-        else
-          Column(
-            children: [
-              GlassTextField(controller: _customLabourNameController, label: 'Designation', icon: Icons.edit),
-              const SizedBox(height: 16),
-              GlassTextField(controller: _customLabourSalaryController, label: 'Salary', icon: Icons.payments, keyboardType: TextInputType.number),
-            ],
-          ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: GlassTextField(controller: labourQtyController, label: 'Count', icon: Icons.people, keyboardType: TextInputType.number)),
-            IconButton(onPressed: _showCustomLabourFields ? _addCustomLabour : _addLabour, icon: Icon(Icons.add_circle, color: primaryColor, size: 32)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiscellaneousExpenses(bool isSmallScreen) {
-    return GlassCard(
-      title: 'Miscellaneous',
-      child: Column(
-        children: [
-          GlassTextField(controller: foodCost, label: 'Food', icon: Icons.restaurant, keyboardType: TextInputType.number),
-          const SizedBox(height: 16),
-          GlassTextField(controller: transportCost, label: 'Transport', icon: Icons.local_shipping, keyboardType: TextInputType.number),
-          const SizedBox(height: 16),
-          GlassTextField(controller: fuelCost, label: 'Fuel', icon: Icons.local_gas_station, keyboardType: TextInputType.number),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(bool isSmallScreen) {
-    return GlassCard(
-      title: 'Entry Summary',
-      child: Column(
-        children: [
-          _buildSummaryRow('Materials', _getMaterialsTotal()),
-          _buildSummaryRow('Labour', _getLabourTotal()),
-          _buildSummaryRow('Misc', _getMiscTotal()),
-          const Divider(color: Colors.white10, height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('TOTAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text('₹${_getTotalAmount()}', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 20)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, int amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
-          Text('₹$amount', style: const TextStyle(color: Colors.white)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddedItemsList(List<Map<String, dynamic>> items, String type, Function(int) onRemove) {
-    return Column(
-      children: items.asMap().entries.map((entry) {
-        final item = entry.value;
-        final qty = item['quantity'] ?? item['count'] ?? 0;
-        final amount = type == 'Materials' ? _calculateMaterialAmount(item['type'], qty) : _calculateLabourAmount(item['type'], qty);
-        return ListTile(
-          dense: true,
-          title: Text(item['type'], style: const TextStyle(color: Colors.white)),
-          subtitle: Text('$qty units • $amount', style: const TextStyle(color: Colors.white54)),
-          trailing: IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 20), onPressed: () => onRemove(entry.key)),
-        );
-      }).toList(),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isSmallScreen = Responsive.isMobile(context);
-    return GlassScaffold(
-      title: isUpdateMode ? 'Update Site Entry' : 'Daily Site Entry',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.history),
-          onPressed: _openUpdateEntrySelector,
-        ),
-      ],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            GlassCard(
-              title: 'Site Information',
-              child: Column(
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: selectedSiteId,
-                    dropdownColor: const Color(0xFF1A1A1A),
-                    decoration: _inputDecoration('Select Site', Icons.construction),
-                    items: siteList.map((s) => DropdownMenuItem(value: s['siteId'], child: Text(s['siteId']!, style: const TextStyle(color: Colors.white)))).toList(),
-                    onChanged: (val) => _onSiteSelected(val!),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    title: Text(supervisorName ?? 'No Supervisor', style: const TextStyle(color: Colors.white)),
-                    subtitle: Text(siteLocation ?? 'No Location', style: const TextStyle(color: Colors.white54)),
-                    leading: CircleAvatar(backgroundColor: primaryColor.withOpacity(0.2), child: Icon(Icons.person, color: primaryColor)),
-                  ),
-                  const Divider(color: Colors.white10),
-                  ListTile(
-                    title: Text(DateFormat('yyyy-MM-dd').format(selectedDate!), style: const TextStyle(color: Colors.white)),
-                    trailing: const Icon(Icons.calendar_today, color: Colors.white54),
-                    onTap: isUpdateMode ? null : _pickDate,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildMaterialSection(isSmallScreen),
-            const SizedBox(height: 16),
-            _buildLabourSection(isSmallScreen),
-            const SizedBox(height: 16),
-            _buildMiscellaneousExpenses(isSmallScreen),
-            const SizedBox(height: 16),
-            _buildSummaryCard(isSmallScreen),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: isSaving ? null : (isUpdateMode ? _updateExistingEntry : _saveToFirestore),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(isUpdateMode ? 'UPDATE ENTRY' : 'SAVE ENTRY', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-            ),
-            if (isUpdateMode) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _resetForm,
-                child: const Text('CANCEL UPDATE', style: TextStyle(color: Colors.white70)),
-              ),
-            ],
-            const SizedBox(height: 48),
-          ],
-        ),
-      ),
-    );
   }
 }

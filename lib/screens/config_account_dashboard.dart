@@ -33,7 +33,7 @@ import 'package:demo_cst/screens/workers_site_mapping_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
-import '../utils/responsive.dart';
+import '../widgets/glass_button.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -258,75 +258,49 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   // 🟢 Show logout confirmation modal
   void _showLogoutConfirmation(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           title: Row(
             children: [
               Icon(
                 Icons.logout_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 28,
+                color: colorScheme.error,
+                size: 24,
               ),
               const SizedBox(width: 12),
               Text(
                 'Logout',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 20),
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           content: Text(
             'Are you sure you want to logout?',
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 16),
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+            style: theme.textTheme.bodyLarge,
           ),
           actions: [
-            // No Button
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
+              onPressed: () => Navigator.of(context).pop(),
               child: Text(
-                'No',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
+                'CANCEL',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
             ),
-            const SizedBox(width: 8),
-            // Yes Button
-            ElevatedButton(
+            TextButton(
               onPressed: () async {
-                Navigator.of(context).pop(); // Close the dialog first
+                Navigator.of(context).pop();
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.clear(); // Clear all stored preferences for logout
+                await prefs.clear();
                 if (mounted) {
                   Navigator.pushAndRemoveUntil(
                     context,
@@ -337,23 +311,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 2,
-              ),
-              child: const Text(
-                'Yes',
+              child: Text(
+                'LOGOUT',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -364,89 +326,79 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Widget _buildBody(BuildContext context) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoSection(context),
-          const SizedBox(height: 32),
-          _buildManagementSection(context),
+          _buildInfoSection(theme),
+          const SizedBox(height: 12),
+          _buildManagementSection(context, theme),
         ],
       ),
     );
   }
 
-  Widget _buildInfoSection(BuildContext context) {
+  Widget _buildInfoSection(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Welcome to",
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 16),
-            color: const Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
           "Management Console",
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 32),
+          style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: const Color(0xFF1E293B),
+            color: colorScheme.onSurface,
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
           "Configure and manage various aspects of your projects.",
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 14),
-            color: const Color(0xFF94A3B8),
-            height: 1.5,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildManagementSection(BuildContext context) {
+  Widget _buildManagementSection(BuildContext context, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: groupedItems.entries.map((entry) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader(context, entry.key),
-            _buildItemList(context, entry.value),
+            _buildSectionHeader(theme, entry.key),
+            _buildItemList(context, theme, entry.value),
           ],
         );
       }).toList(),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildSectionHeader(ThemeData theme, String title) {
+    final colorScheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 40, bottom: 16),
+      padding: const EdgeInsets.only(top: 40, bottom: 20),
       child: Row(
         children: [
           Container(
             width: 4,
             height: 20,
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
+              color: colorScheme.primary,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(width: 12),
           Text(
             title.toUpperCase(),
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 12),
+            style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF94A3B8),
+              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
               letterSpacing: 2.0,
             ),
           ),
@@ -455,7 +407,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  Widget _buildItemList(BuildContext context, List<DashboardItem> items) {
+  Widget _buildItemList(BuildContext context, ThemeData theme, List<DashboardItem> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: items.map((item) {
@@ -467,6 +419,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             child: FadeInAnimation(
               child: _buildColorfulCard(
                 context,
+                theme: theme,
                 title: item.title,
                 subtitle: item.subtitle,
                 icon: item.icon,
@@ -482,54 +435,54 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   Widget _buildColorfulCard(
     BuildContext context, {
+    required ThemeData theme,
     required String title,
     required String subtitle,
     required IconData icon,
     required Color iconColor,
     required VoidCallback onTap,
   }) {
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 16),
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF334155),
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 13),
-                      color: const Color(0xFF64748B),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFFCBD5E1),
+              color: colorScheme.onSurfaceVariant.withOpacity(0.3),
               size: 24,
             ),
           ],

@@ -18,20 +18,12 @@ class GlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     if (isSecondary) {
       return SizedBox(
         width: double.infinity,
         height: 52,
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
           child: _buildContent(context, isSecondary: true),
         ),
       );
@@ -42,12 +34,6 @@ class GlassButton extends StatelessWidget {
       height: 52,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
         child: _buildContent(context, isSecondary: false),
       ),
     );
