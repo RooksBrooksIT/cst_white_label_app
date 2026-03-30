@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-
+import '../widgets/glass_scaffold.dart';
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
 
@@ -104,35 +104,29 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Tool Master'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
+    return GlassScaffold(
+      title: 'Tool Master',
+      onBack: () => Navigator.pop(context),
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: theme.colorScheme.primary,
+        unselectedLabelColor: const Color(0xFF94A3B8),
+        indicatorColor: theme.colorScheme.primary,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: TextStyle(
+          fontSize: isSmallScreen ? 14 : 15,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: theme.colorScheme.primary,
-          unselectedLabelColor: const Color(0xFF94A3B8),
-          indicatorColor: theme.colorScheme.primary,
-          indicatorWeight: 3,
-          indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: TextStyle(
-            fontSize: isSmallScreen ? 14 : 15,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontSize: isSmallScreen ? 14 : 15,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: const [
-            Tab(text: 'ADD TOOL'),
-            Tab(text: 'UPDATE COUNT'),
-          ],
+        unselectedLabelStyle: TextStyle(
+          fontSize: isSmallScreen ? 14 : 15,
+          fontWeight: FontWeight.w500,
         ),
+        tabs: const [
+          Tab(text: 'ADD TOOL'),
+          Tab(text: 'UPDATE COUNT'),
+        ],
       ),
       body: TabBarView(
         controller: _tabController,
@@ -261,7 +255,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: Color(0xFF0b3470),
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                               contentPadding: EdgeInsets.symmetric(
@@ -370,7 +364,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       decoration: BoxDecoration(
         
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF0b3470)),
+        border: Border.all(color: theme.colorScheme.primary),
       ),
       child: Text(value, style: theme.textTheme.bodyMedium),
     );
@@ -382,11 +376,11 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       decoration: InputDecoration(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF0b3470)),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF0b3470), width: 2),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -452,7 +446,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             icon: Icon(Icons.update, size: 20),
             label: Text('Update'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0b3470),
+              backgroundColor: theme.colorScheme.primary,
               foregroundColor: Colors.white,
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -468,8 +462,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             icon: Icon(Icons.clear, size: 20),
             label: Text('Cancel'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Color(0xFF0b3470),
-              side: BorderSide(color: Color(0xFF0b3470)),
+              foregroundColor: theme.colorScheme.primary,
+              side: BorderSide(color: theme.colorScheme.primary),
               
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(

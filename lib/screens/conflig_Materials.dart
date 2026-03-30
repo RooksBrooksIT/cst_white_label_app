@@ -13,8 +13,6 @@ class MatlsScreen extends StatefulWidget {
 
 class _MatlsScreenState extends State<MatlsScreen> {
   // Constants
-  static const Color dangerColor = Color(0xFFDC3545);
-  static const Color successColor = Color(0xFF28A745);
   static const double defaultPadding = 16.0;
   static const double formFieldSpacing = 16.0;
   static const double cardElevation = 2.0;
@@ -293,7 +291,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
   // Snackbar helpers
   void _showSuccessSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: successColor),
+      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.primary),
     );
   }
 
@@ -305,7 +303,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: dangerColor),
+      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
     );
   }
 
@@ -374,7 +372,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
             _buildModeButton(
               label: 'Unit',
               mode: 'unit',
-              activeColor: dangerColor,
+              activeColor: Theme.of(context).colorScheme.secondary,
             ),
           ],
         ),
@@ -403,6 +401,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
 
   // Form action buttons UI
   Widget _buildFormActionButtons() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Wrap(
       spacing: defaultPadding,
       runSpacing: defaultPadding / 2,
@@ -417,7 +416,8 @@ class _MatlsScreenState extends State<MatlsScreen> {
               : const Icon(Icons.save, size: 20),
           label: Text(_isSaving ? 'Saving...' : 'Save'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: successColor,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -429,8 +429,8 @@ class _MatlsScreenState extends State<MatlsScreen> {
           icon: const Icon(Icons.clear, size: 20),
           label: const Text('Clear'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.grey[700],
-            side: BorderSide(color: Colors.grey),
+            foregroundColor: colorScheme.onSurface,
+            side: BorderSide(color: colorScheme.outline),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -452,8 +452,8 @@ class _MatlsScreenState extends State<MatlsScreen> {
           icon: const Icon(Icons.cancel, size: 20),
           label: const Text('Cancel'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: dangerColor,
-            side: BorderSide(color: dangerColor.withOpacity(0.5)),
+            foregroundColor: colorScheme.error,
+            side: BorderSide(color: colorScheme.error.withOpacity(0.5)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -572,7 +572,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: dangerColor,
+                  color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
               const SizedBox(height: formFieldSpacing),
@@ -594,7 +594,8 @@ class _MatlsScreenState extends State<MatlsScreen> {
                   ElevatedButton(
                     onPressed: _addEntry,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: dangerColor,
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      foregroundColor: Theme.of(context).colorScheme.onSecondary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),

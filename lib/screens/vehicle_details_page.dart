@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 // Custom input formatter for number plate
 class NumberPlateFormatter extends TextInputFormatter {
@@ -315,20 +316,17 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Details'),
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          if (_submittedVehicle != null && !_isEditing)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _deleteVehicle,
-              tooltip: 'Delete Vehicle',
-            ),
-        ],
-      ),
+    return GlassScaffold(
+      title: 'Vehicle Details',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        if (_submittedVehicle != null && !_isEditing)
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _deleteVehicle,
+            tooltip: 'Delete Vehicle',
+          ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -491,7 +489,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isEditing
                                         ? Colors.orange
-                                        : Theme.of(context).primaryColor,
+                                        : Theme.of(context).colorScheme.primary,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -551,7 +549,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                               IconButton(
                                 icon: Icon(
                                   Icons.edit,
-                                  color: Theme.of(context).primaryColor,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                                 onPressed: _editVehicle,
                                 tooltip: 'Edit Vehicle',
@@ -579,7 +577,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                               children: [
                                 Icon(
                                   Icons.info,
-                                  color: Theme.of(context).primaryColor,
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 16,
                                 ),
                                 const SizedBox(width: 8),
@@ -588,7 +586,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                     'Tap the edit icon to modify vehicle details',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Theme.of(context).primaryColor,
+                                      color: Theme.of(context).colorScheme.primary,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),

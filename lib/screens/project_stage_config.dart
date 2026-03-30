@@ -17,9 +17,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   String? _selectedStage;
   final TextEditingController _newStageController = TextEditingController();
 
-  // --- Colors ---
-  static const Color kBackground = Color(0xFFF7F9FC);
-  static const Color kErrorColor = Color(0xFFD32F2F);
+
 
   Future<void> _showAddStageDialog() async {
     _newStageController.clear();
@@ -68,7 +66,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                           ),
                         ),
                         filled: true,
-                        fillColor: kBackground,
+                        fillColor: Theme.of(context).cardColor,
                       ),
                       cursorColor: Theme.of(context).colorScheme.primary,
                       onChanged: (value) async {
@@ -131,11 +129,11 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                       ],
                     ),
                     if (isDuplicate)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12.0),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
                         child: Text(
                           'This stage already exists.',
-                          style: TextStyle(color: Colors.red, fontSize: 14),
+                          style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
                         ),
                       ),
                   ],
@@ -211,9 +209,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline,
-                  color: Colors.redAccent,
+                  color: Theme.of(context).colorScheme.error,
                   size: 60,
                 ),
                 const SizedBox(height: 16),
@@ -231,16 +229,20 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   style: const TextStyle(fontSize: 15),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kErrorColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                Builder(builder: (context) {
+                  final cs = Theme.of(context).colorScheme;
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: cs.onError,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK', style: TextStyle()),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  );
+                }),
               ],
             ),
           ),
@@ -300,9 +302,12 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: kErrorColor),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete', style: TextStyle()),
+              child: const Text('Delete'),
             ),
           ],
         );

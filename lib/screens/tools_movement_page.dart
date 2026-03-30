@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class ToolsMovementPage extends StatefulWidget {
   const ToolsMovementPage({super.key});
@@ -13,14 +14,13 @@ class ToolsMovementPage extends StatefulWidget {
 class _ToolsMovementPageState extends State<ToolsMovementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final Color _primaryColor = const Color(0xFF0b3470);
+  Color get _primaryColor => Theme.of(context).colorScheme.primary;
   final Color _accentColor = const Color(0xFF4d79c2);
-  final Color _backgroundColor = const Color(0xFFF5F7FA);
   final Color _cardColor = Colors.white;
   final Color _textColor = const Color(0xFF2c3e50);
-  final Color _successColor = const Color(0xFF27ae60);
+  Color get _successColor => Theme.of(context).colorScheme.primary;
   final Color _warningColor = const Color(0xFFe67e22);
-  final Color _errorColor = const Color(0xFFe74c3c);
+  Color get _errorColor => Theme.of(context).colorScheme.error;
 
   // Company to Site variables
   final TextEditingController _projectNameController = TextEditingController();
@@ -382,36 +382,25 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           name.contains(_returnToolSearchText);
     }).toList();
 
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Tools Movement',
-          style: TextStyle(fontWeight: FontWeight.bold, ),
+    return GlassScaffold(
+      title: 'Tools Movement',
+      onBack: () => Navigator.pop(context),
+      bottom: TabBar(
+        controller: _tabController,
+        indicatorColor: Colors.white,
+        indicatorWeight: 4,
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
         ),
-        centerTitle: true,
-        backgroundColor: _primaryColor,
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 4,
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
-          tabs: const [
-            Tab(text: 'Company to Site'),
-            Tab(text: 'Site to Company'),
-          ],
-        ),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+        tabs: const [
+          Tab(text: 'Company to Site'),
+          Tab(text: 'Site to Company'),
+        ],
       ),
       body: TabBarView(
         controller: _tabController,

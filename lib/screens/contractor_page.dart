@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class ContractorPage extends StatefulWidget {
   const ContractorPage({super.key});
@@ -30,21 +31,13 @@ class _ContractorPageState extends State<ContractorPage> {
     super.dispose();
   }
 
-  static const Color primaryColor = Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: const Text("New Contractor",
-            style: TextStyle( fontWeight: FontWeight.w700)),
-        centerTitle: true,
-        iconTheme: const IconThemeData(),
-        elevation: 3,
-        shadowColor: Colors.black38,
-      ),
+    return GlassScaffold(
+      title: 'New Contractor',
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -265,7 +258,7 @@ class _ContractorPageState extends State<ContractorPage> {
       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
+        labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
         filled: true,
         
         counterText: '',
@@ -280,7 +273,7 @@ class _ContractorPageState extends State<ContractorPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: primaryColor, width: 2.5),
+          borderSide: BorderSide(color: primaryColor, width: 2.5),
         ),
       ),
     );
@@ -303,7 +296,7 @@ class _ContractorPageState extends State<ContractorPage> {
           value: currentValue,
           decoration: InputDecoration(
             labelText: "Project Stage",
-            labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
+            labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
             filled: true,
             
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -316,7 +309,7 @@ class _ContractorPageState extends State<ContractorPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: primaryColor, width: 2.5),
+              borderSide: BorderSide(color: primaryColor, width: 2.5),
             ),
           ),
           items: stages

@@ -11,6 +11,7 @@ class GlassScaffold extends StatelessWidget {
   final EdgeInsets? padding;
   final Color? appBarBackgroundColor;
   final Color? appBarForegroundColor;
+  final Widget? bottomNavigationBar;
 
   const GlassScaffold({
     super.key,
@@ -23,6 +24,7 @@ class GlassScaffold extends StatelessWidget {
     this.padding,
     this.appBarBackgroundColor,
     this.appBarForegroundColor,
+    this.bottomNavigationBar,
   });
 
   @override
@@ -92,6 +94,7 @@ class GlassScaffold extends StatelessWidget {
           child: body,
         ),
       ),
+      bottomNavigationBar: bottomNavigationBar,
     );
   }
 }

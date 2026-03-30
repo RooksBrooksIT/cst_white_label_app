@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -32,8 +31,6 @@ import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -45,7 +42,25 @@ class ConfigAccountDashboard extends StatefulWidget {
 }
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
-  // 🟢 Dashboard Items with colors
+  String _managerName = 'Manager';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchManagerData();
+  }
+
+  Future<void> _fetchManagerData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? name = prefs.getString('manager_name') ?? prefs.getString('org_name');
+      if (name != null && name.isNotEmpty) setState(() => _managerName = name);
+    } catch (e) {
+      debugPrint('Error fetching manager data: $e');
+    }
+  }
+
+  // Dashboard items grouped by section
   final Map<String, List<DashboardItem>> groupedItems = {
     "Project Configuration": [
       DashboardItem(
@@ -98,7 +113,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.deepPurple,
         'Track material transfers',
       ),
-
       DashboardItem(
         'Material Availability',
         Icons.build_circle_outlined,
@@ -242,12 +256,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GlassScaffold(
       title: 'Management Console',
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
           onPressed: () => _showLogoutConfirmation(context),
           tooltip: 'Logout',
         ),
@@ -256,11 +273,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  // 🟢 Show logout confirmation modal
   void _showLogoutConfirmation(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -280,7 +296,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               const SizedBox(width: 12),
               Text(
                 'Logout',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -332,54 +350,86 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoSection(theme),
-          const SizedBox(height: 12),
-          _buildManagementSection(context, theme),
+          _buildWelcomeSection(theme),
+          const SizedBox(height: 32),
+          _buildDashboardSections(context, theme),
         ],
       ),
     );
   }
 
-  Widget _buildInfoSection(ThemeData theme) {
+  Widget _buildWelcomeSection(ThemeData theme) {
     final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Management Console",
+          "Welcome back,",
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _managerName,
           style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurface,
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          "Configure and manage various aspects of your projects.",
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildManagementSection(BuildContext context, ThemeData theme) {
+  Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    int crossAxisCount = screenWidth > 1200
+        ? 5
+        : (screenWidth > 800 ? 4 : (screenWidth > 600 ? 3 : 2));
+
+    double childAspectRatio = screenWidth < 400
+        ? 0.85
+        : (screenWidth < 600 ? 0.95 : 1.1);
+
+    Widget buildGrid(List<Widget> children) {
+      return GridView.count(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: childAspectRatio,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: children,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: groupedItems.entries.map((entry) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader(theme, entry.key),
-            _buildItemList(context, theme, entry.value),
+            _buildSectionHeader(entry.key, theme),
+            buildGrid(
+              entry.value.map((item) {
+                return _buildMenuCard(
+                  context,
+                  title: item.title,
+                  icon: item.icon,
+                  iconColor: item.color,
+                  onTap: () => _navigateToScreen(context, item.title),
+                );
+              }).toList(),
+            ),
           ],
         );
       }).toList(),
     );
   }
 
-  Widget _buildSectionHeader(ThemeData theme, String title) {
+  Widget _buildSectionHeader(String title, ThemeData theme) {
     final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 40, bottom: 20),
@@ -407,85 +457,63 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  Widget _buildItemList(BuildContext context, ThemeData theme, List<DashboardItem> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: items.map((item) {
-        return AnimationConfiguration.staggeredList(
-          position: items.indexOf(item),
-          duration: const Duration(milliseconds: 375),
-          child: SlideAnimation(
-            verticalOffset: 50.0,
-            child: FadeInAnimation(
-              child: _buildColorfulCard(
-                context,
-                theme: theme,
-                title: item.title,
-                subtitle: item.subtitle,
-                icon: item.icon,
-                iconColor: item.color,
-                onTap: () => _navigateToScreen(context, item.title),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildColorfulCard(
+  Widget _buildMenuCard(
     BuildContext context, {
-    required ThemeData theme,
     required String title,
-    required String subtitle,
     required IconData icon,
     required Color iconColor,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
-                    ),
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: theme.dividerColor.withOpacity(0.4)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  child: Icon(icon, color: iconColor, size: 32),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                    height: 1.2,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.3),
-              size: 24,
-            ),
-          ],
+          ),
         ),
       ),
     );

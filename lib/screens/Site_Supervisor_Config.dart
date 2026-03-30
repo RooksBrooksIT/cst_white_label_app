@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SiteSupervisorConfig extends StatefulWidget {
   const SiteSupervisorConfig({super.key});
@@ -11,60 +12,29 @@ class SiteSupervisorConfig extends StatefulWidget {
 
 class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   final _formKey = GlobalKey<FormState>();
-  String? _selectedDesignation;
+  final TextEditingController _designationController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _contactNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  List<String> _designationList = [];
-  bool _isLoadingDesignations = true;
   bool _isPasswordVisible = false;
   int _selectedTab = 0; // 0: Create, 1: Info
   bool _isSubmitting = false;
 
-  final Color primaryColor = const Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
     super.initState();
-    _fetchDesignations();
-  }
-
-  Future<void> _fetchDesignations() async {
-    try {
-      final snapshot = await FirestoreService
-          .getCollection('supervisorDesignation')
-          .get();
-      final designations = snapshot.docs
-          .map((doc) => doc['Designation'] as String)
-          .toList();
-      setState(() {
-        _designationList = designations;
-        _isLoadingDesignations = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingDesignations = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load designations: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   // Function to check if username already exists
   Future<bool> _isUsernameUnique(String username) async {
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('supervisor')
-          .where('UserName', isEqualTo: username.trim())
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'supervisor',
+      ).where('UserName', isEqualTo: username.trim()).get();
 
       return querySnapshot.docs.isEmpty;
     } catch (e) {
@@ -75,10 +45,9 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   // Function to check if contact number already exists
   Future<bool> _isContactNoUnique(String contactNo) async {
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('supervisor')
-          .where('ContactNo', isEqualTo: contactNo.trim())
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'supervisor',
+      ).where('ContactNo', isEqualTo: contactNo.trim()).get();
 
       return querySnapshot.docs.isEmpty;
     } catch (e) {
@@ -177,7 +146,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             children: [
               Text(
                 'Editing password for "$supervisorName"',
-                style: TextStyle(fontSize: 14, ),
+                style: TextStyle(fontSize: 14),
               ),
               SizedBox(height: 16),
               TextFormField(
@@ -270,17 +239,16 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           );
 
           // Update the Password field in Firestore
-          await FirestoreService
-              .getCollection('supervisor')
-              .doc(documentId)
-              .update({'Password': newPassword});
+          await FirestoreService.getCollection(
+            'supervisor',
+          ).doc(documentId).update({'Password': newPassword});
 
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle,  size: 20),
+                  Icon(Icons.check_circle, size: 20),
                   SizedBox(width: 8),
                   Text('Password updated successfully'),
                 ],
@@ -298,7 +266,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.error,  size: 20),
+                  Icon(Icons.error, size: 20),
                   SizedBox(width: 8),
                   Text('Failed to update password: $e'),
                 ],
@@ -315,9 +283,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   // Function to create supervisor account
   Future<void> _createSupervisorAccount() async {
     try {
-      final snapshot = await FirestoreService
-          .getCollection('supervisor')
-          .get();
+      final snapshot = await FirestoreService.getCollection('supervisor').get();
       int maxNumber = 0;
       for (var doc in snapshot.docs) {
         final id = doc.id;
@@ -340,17 +306,16 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         'FullName': _fullNameController.text.trim(),
         'UserName': username,
         'Password': _passwordController.text.trim(),
-        'Designation': _selectedDesignation,
+        'Designation': _designationController.text.trim(),
         'ContactNo': _contactNoController.text.trim(),
         'Email': _emailController.text.trim(),
         'Photo': 'Photo URL or Placeholder',
         'CreatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirestoreService
-          .getCollection('supervisor')
-          .doc(documentId)
-          .set(supervisorData);
+      await FirestoreService.getCollection(
+        'supervisor',
+      ).doc(documentId).set(supervisorData);
 
       // Show success dialog
       _showSuccessDialog();
@@ -362,7 +327,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.error,  size: 20),
+              Icon(Icons.error, size: 20),
               SizedBox(width: 8),
               Text('Failed to create supervisor account: $e'),
             ],
@@ -410,7 +375,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 Text(
                   'Your supervisor details have been saved successfully.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, ),
+                  style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -427,10 +392,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontSize: 16, ),
-                  ),
+                  child: const Text('OK', style: TextStyle(fontSize: 16)),
                 ),
               ],
             ),
@@ -447,9 +409,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     _passwordController.clear();
     _contactNoController.clear();
     _emailController.clear();
-    setState(() {
-      _selectedDesignation = null;
-    });
+    _designationController.clear();
   }
 
   @override
@@ -457,6 +417,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     _fullNameController.dispose();
     _userNameController.dispose();
     _passwordController.dispose();
+    _designationController.dispose();
     _contactNoController.dispose();
     _emailController.dispose();
     super.dispose();
@@ -464,17 +425,9 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Site Supervisor Configuration',
-          style: TextStyle( fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 0,
-        iconTheme: IconThemeData(),
-      ),
+    return GlassScaffold(
+      title: 'Site Supervisor Configuration',
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
           const SizedBox(height: 16),
@@ -483,7 +436,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Container(
               decoration: BoxDecoration(
-                
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey),
               ),
@@ -591,7 +543,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               isPassword: true,
             ),
             const SizedBox(height: 16),
-            _buildDesignationDropdown(),
+            _buildTextField(
+              'Designation',
+              _designationController,
+              isRequired: true,
+            ),
             const SizedBox(height: 16),
             _buildTextField(
               'Contact No',
@@ -641,7 +597,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               const SizedBox(height: 4),
               Text(
                 'Please fill in all required fields (*)',
-                style: TextStyle(fontSize: 14, ),
+                style: TextStyle(fontSize: 14),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -727,111 +683,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             return null;
           },
           cursorColor: primaryColor,
-          style: TextStyle( fontSize: 15),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDesignationDropdown() {
-    if (_isLoadingDesignations) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Designation *',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: primaryColor,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Loading designations...',
-                  style: TextStyle(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Designation *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: primaryColor,
-          ),
-        ),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          decoration: InputDecoration(
-            hintText: 'Select Designation',
-            hintStyle: TextStyle(),
-            filled: true,
-            fillColor: Colors.grey[50],
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: primaryColor, width: 2),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-          ),
-          value: _selectedDesignation,
-          items: _designationList
-              .map(
-                (designation) => DropdownMenuItem(
-                  value: designation,
-                  child: Text(
-                    designation,
-                    style: TextStyle( fontSize: 15),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedDesignation = value;
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a designation';
-            }
-            return null;
-          },
-          dropdownColor: Colors.white,
-          style: TextStyle( fontSize: 15),
+          style: TextStyle(fontSize: 15),
         ),
       ],
     );
@@ -853,7 +705,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         Container(
           height: 150,
           decoration: BoxDecoration(
-            
             border: Border.all(color: Colors.grey),
             borderRadius: BorderRadius.circular(10),
           ),
@@ -861,17 +712,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.camera_alt, size: 40, ),
+                Icon(Icons.camera_alt, size: 40),
                 const SizedBox(height: 8),
-                Text(
-                  'Upload Supervisor Photo',
-                  style: TextStyle(),
-                ),
+                Text('Upload Supervisor Photo', style: TextStyle()),
                 const SizedBox(height: 4),
-                Text(
-                  '(Optional)',
-                  style: TextStyle( fontSize: 12),
-                ),
+                Text('(Optional)', style: TextStyle(fontSize: 12)),
               ],
             ),
           ),
@@ -906,18 +751,15 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.person_add, size: 20, ),
+                      Icon(Icons.person_add, size: 20),
                       SizedBox(width: 8),
-                      Text(
-                        'Create Account',
-                        style: TextStyle(fontSize: 16, ),
-                      ),
+                      Text('Create Account', style: TextStyle(fontSize: 16)),
                     ],
                   ),
           ),
         ),
         const SizedBox(width: 12),
-        Container(width: 1, height: 40, ),
+        Container(width: 1, height: 40),
         const SizedBox(width: 12),
         Expanded(
           child: OutlinedButton(
@@ -972,9 +814,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: FutureBuilder<QuerySnapshot>(
-                  future: FirestoreService
-                      .getCollection('supervisor')
-                      .get(),
+                  future: FirestoreService.getCollection('supervisor').get(),
                   builder: (context, snapshot) {
                     final count = snapshot.data?.docs.length ?? 0;
                     return Text(
@@ -1046,20 +886,20 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.people, size: 60, ),
+                      Icon(Icons.people, size: 60),
                       SizedBox(height: 16),
                       Text(
                         'No Supervisors Found',
                         style: TextStyle(
                           fontSize: 18,
-                          
+
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       SizedBox(height: 8),
                       Text(
                         'Create your first supervisor account',
-                        style: TextStyle(fontSize: 14, ),
+                        style: TextStyle(fontSize: 14),
                       ),
                     ],
                   ),
@@ -1179,15 +1019,10 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                               horizontal: 12,
                             ),
                             decoration: BoxDecoration(
-                              
                               border: Border.all(color: Colors.grey.shade200),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
-                                BoxShadow(
-                                  
-                                  blurRadius: 2,
-                                  offset: Offset(0, 1),
-                                ),
+                                BoxShadow(blurRadius: 2, offset: Offset(0, 1)),
                               ],
                             ),
                             child: Row(
@@ -1203,17 +1038,14 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                         supervisorId,
                                         style: const TextStyle(
                                           fontSize: 13,
-                                          
+
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       if (designation.isNotEmpty)
                                         Text(
                                           designation,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            
-                                          ),
+                                          style: TextStyle(fontSize: 11),
                                         ),
                                     ],
                                   ),
@@ -1237,23 +1069,18 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                                     Container(
                                                       width: 60,
                                                       height: 60,
-                                                      
+
                                                       child: Icon(
                                                         Icons.person,
                                                         size: 30,
-                                                        
                                                       ),
                                                     ),
                                           )
                                         : Container(
                                             width: 60,
                                             height: 60,
-                                            
-                                            child: Icon(
-                                              Icons.person,
-                                              size: 30,
-                                              
-                                            ),
+
+                                            child: Icon(Icons.person, size: 30),
                                           ),
                                   ),
                                 ),
@@ -1276,7 +1103,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                     password,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      
+
                                       fontWeight: FontWeight.w500,
                                       fontFamily: 'Monospace',
                                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class MaterialAvailability extends StatefulWidget {
   const MaterialAvailability({super.key});
@@ -522,18 +523,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Material Availability',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(),
-      ),
+    return GlassScaffold(
+      title: 'Material Availability',
+      onBack: () => Navigator.pop(context),
       body: _isLoadingMaterials
           ? Center(
               child: Column(
@@ -555,7 +547,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Mode Selection Buttons
                   _buildModeSelectionButtons(),
@@ -633,7 +625,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildNewMaterialSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Add New Material',
@@ -701,7 +693,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildUpdateMaterialSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Update Material Count',
@@ -816,17 +808,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: const Color(0xFF003768).withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.7),
                     size: 20,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Update Material Logic',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF003768),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
@@ -852,14 +846,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildOperationCheckboxes() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Operation Type *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 12),
@@ -870,12 +864,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               child: Container(
                 decoration: BoxDecoration(
                   color: _addToExisting
-                      ? const Color(0xFF003768).withOpacity(0.1)
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _addToExisting
-                        ? const Color(0xFF003768)
+                        ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade300,
                     width: _addToExisting ? 2 : 1,
                   ),
@@ -888,7 +882,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   subtitle: const Text('Add to existing count'),
                   value: _addToExisting,
                   onChanged: _onAddToExistingChanged,
-                  activeColor: const Color(0xFF003768),
+                  activeColor: Theme.of(context).colorScheme.primary,
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -901,12 +895,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               child: Container(
                 decoration: BoxDecoration(
                   color: _updateExisting
-                      ? const Color(0xFF003768).withOpacity(0.1)
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _updateExisting
-                        ? const Color(0xFF003768)
+                        ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade300,
                     width: _updateExisting ? 2 : 1,
                   ),
@@ -919,7 +913,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   subtitle: const Text('Replace existing count'),
                   value: _updateExisting,
                   onChanged: _onUpdateExistingChanged,
-                  activeColor: const Color(0xFF003768),
+                  activeColor: Theme.of(context).colorScheme.primary,
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -941,14 +935,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildNewMaterialDropdown() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Select Material *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
@@ -996,7 +990,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 }
                 return null;
               },
-              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF003768)),
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -1019,14 +1016,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         .toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Select Material to Update *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
@@ -1070,7 +1067,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 }
                 return null;
               },
-              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF772323)),
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -1087,14 +1087,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildCountInput() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           _isNewMode ? 'Count to Add *' : 'New Count *',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
@@ -1142,12 +1142,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _submitNewMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF003768),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
-          shadowColor: const Color(0xFF003768).withOpacity(0.3),
+          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1179,12 +1179,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _updateExistingMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF003768),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
-          shadowColor: const Color(0xFF003768).withOpacity(0.3),
+          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 import 'package:intl/intl.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
@@ -110,9 +111,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // Load site data from siteSupervisorMap collection
   Future<void> _loadSiteData() async {
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('siteSupervisorMap')
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).get();
 
       if (mounted) {
         setState(() {
@@ -172,9 +173,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // Load material data from materialsavailablity collection
   Future<void> _loadMaterialData() async {
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('materialsavailablity')
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materialsavailablity',
+      ).get();
 
       // Group by materialname and pick the latest entry (by lastupdated) for each
       final Map<String, Map<String, dynamic>> latestByName = {};
@@ -247,10 +248,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
 
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('materialatsite')
-          .where('siteid', isEqualTo: siteId)
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materialatsite',
+      ).where('siteid', isEqualTo: siteId).get();
 
       final list =
           querySnapshot.docs
@@ -598,7 +598,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 _saveTransferData();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm Transfer'),
@@ -645,9 +645,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       // 1. Save to materialmovementhistory collection
       final movementHistoryDocId = '${_selectedSiteId}_$date';
-      final movementHistoryRef = FirestoreService
-          .getCollection('materialmovementhistory')
-          .doc(movementHistoryDocId);
+      final movementHistoryRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementHistoryDocId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -680,17 +680,17 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final newAvailableCount =
             currentAvailableCount - material['neededCount'];
 
-        final materialAvailabilityRef = FirestoreService
-            .getCollection('materialsavailablity')
-            .doc(docId);
+        final materialAvailabilityRef = FirestoreService.getCollection(
+          'materialsavailablity',
+        ).doc(docId);
         batch.update(materialAvailabilityRef, {"count": newAvailableCount});
 
         // Update materialatsite collection
         final materialAtSiteDocId =
             '${_selectedSiteId}_${material['materialName']}';
-        final materialAtSiteRef = FirestoreService
-            .getCollection('materialatsite')
-            .doc(materialAtSiteDocId);
+        final materialAtSiteRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc(materialAtSiteDocId);
 
         // Check if we need to create or update
         final existingDoc = await materialAtSiteRef.get();
@@ -789,12 +789,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final int moveCount = material['neededCount'];
 
         // Document references
-        final fromDocRef = FirestoreService
-            .getCollection('materialatsite')
-            .doc('${_fromSiteId}_$matName');
-        final toDocRef = FirestoreService
-            .getCollection('materialatsite')
-            .doc('${_toSiteId}_$matName');
+        final fromDocRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc('${_fromSiteId}_$matName');
+        final toDocRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc('${_toSiteId}_$matName');
 
         // Get current counts
         final fromSnap = await fromDocRef.get();
@@ -831,9 +831,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // 2. Save to materialmovementhistory collection
       final movementId =
           '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = FirestoreService
-          .getCollection('materialmovementhistory')
-          .doc(movementId);
+      final movementRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -918,9 +918,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // 1. Save to materialmovementhistory collection
       final movementId =
           '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = FirestoreService
-          .getCollection('materialmovementhistory')
-          .doc(movementId);
+      final movementRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -956,9 +956,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final currentAvailableCount = (latestEntry['count'] ?? 0).toInt();
         final newAvailableCount = currentAvailableCount + moveCount;
 
-        final materialAvailabilityRef = FirestoreService
-            .getCollection('materialsavailablity')
-            .doc(docId);
+        final materialAvailabilityRef = FirestoreService.getCollection(
+          'materialsavailablity',
+        ).doc(docId);
         batch.set(materialAvailabilityRef, {
           "count": newAvailableCount,
           "materialname": matName,
@@ -967,9 +967,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
         // Update materialatsite collection (decrease count at site)
         final materialAtSiteDocId = '${_selectedSiteId}_$matName';
-        final materialAtSiteRef = FirestoreService
-            .getCollection('materialatsite')
-            .doc(materialAtSiteDocId);
+        final materialAtSiteRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc(materialAtSiteDocId);
 
         final existingDoc = await materialAtSiteRef.get();
         if (existingDoc.exists) {
@@ -1241,23 +1241,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _transferMode == 0
-              ? 'Company To Site Transfer'
-              : _transferMode == 1
-              ? 'Site To Site Transfer'
-              : 'Site To Company Transfer',
-          style: const TextStyle(
-            
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF772323),
-        iconTheme: const IconThemeData(),
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: _transferMode == 0
+          ? 'Company To Site Transfer'
+          : _transferMode == 1
+          ? 'Site To Site Transfer'
+          : 'Site To Company Transfer',
+      onBack: () => Navigator.pop(context),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1278,16 +1269,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 0
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 0
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 0 ? 0 : 2,
                         ),
                       ),
@@ -1311,16 +1302,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 1
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 1
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 1 ? 0 : 2,
                         ),
                       ),
@@ -1344,16 +1335,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 2
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 2
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 2 ? 0 : 2,
                         ),
                       ),
@@ -1456,7 +1447,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1518,7 +1509,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton(
                       onPressed: _transferMaterials,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -1715,7 +1706,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1774,7 +1765,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -1901,7 +1892,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1967,7 +1958,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -2036,10 +2027,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       ),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF772323),
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );
@@ -2059,11 +2050,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -2107,11 +2094,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2173,11 +2156,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           'Site *',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2251,11 +2230,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           'Material Name *',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2344,11 +2319,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2384,11 +2355,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         const Text(
           'Materials to Transfer:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2410,9 +2377,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         : null,
                   ),
                   child: ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.inventory,
-                      color: Color(0xFF772323),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     title: Text(
                       material['displayName'],

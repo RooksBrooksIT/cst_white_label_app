@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class AddVehicleLogPage extends StatefulWidget {
   const AddVehicleLogPage({super.key});
@@ -407,13 +408,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Vehicle Movement Log'),
-          centerTitle: true,
-          backgroundColor: Colors.blue[700],
-          foregroundColor: Colors.white,
-        ),
+      return GlassScaffold(
+        title: 'Vehicle Movement Log',
+        onBack: () => Navigator.pop(context),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -427,20 +424,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Movement Log'),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInitialData,
-            tooltip: 'Reload Data',
-          ),
-        ],
-      ),
+    return GlassScaffold(
+      title: 'Vehicle Movement Log',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: _loadInitialData,
+          tooltip: 'Reload Data',
+        ),
+      ],
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -462,7 +455,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -540,7 +533,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                             children: [
                               Icon(
                                 Icons.info,
-                                color: Theme.of(context).primaryColor,
+                                color: Theme.of(context).colorScheme.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -552,7 +545,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                       'Selected Vehicle:',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Theme.of(context).primaryColor,
+                                        color: Theme.of(context).colorScheme.primary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -582,7 +575,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                         children: [
                           Icon(
                             Icons.calendar_today,
-                            color: Theme.of(context).primaryColor,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -593,7 +586,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                           ElevatedButton(
                             onPressed: () => _selectDate(context),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).primaryColor,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               foregroundColor: Colors.white,
                             ),
                             child: const Text('Change Date'),
@@ -619,7 +612,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -665,7 +658,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -765,7 +758,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),

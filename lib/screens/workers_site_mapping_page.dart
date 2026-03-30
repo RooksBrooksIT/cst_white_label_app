@@ -2,6 +2,7 @@ import 'package:demo_cst/utils/responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class WorkerMappingPage extends StatefulWidget {
   const WorkerMappingPage({super.key});
@@ -360,14 +361,9 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Worker Site Mapping'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Worker Site Mapping',
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
