@@ -36,6 +36,8 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Approval',
+      appBarBackgroundColor: theme.colorScheme.primary,
+      appBarForegroundColor: theme.colorScheme.onPrimary,
       body: Column(
         children: [
           Container(
@@ -43,9 +45,9 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
             child: TabBar(
               controller: _tabController,
               tabs: const [Tab(text: "PENDING"), Tab(text: "APPROVED")],
-              labelColor: theme.primaryColor,
+              labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.primaryColor,
+              indicatorColor: theme.colorScheme.primary,
               indicatorWeight: 3,
             ),
           ),
@@ -135,7 +137,7 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
               const Spacer(),
               Text(data['date'] ?? '', style: theme.textTheme.bodySmall),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right, size: 16, color: theme.primaryColor),
+              Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.primary),
             ],
           ),
         ],
@@ -194,7 +196,7 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
               _infoRow(Icons.calendar_today_outlined, data['date'] ?? ''),
               _infoRow(Icons.person_outline, data['supervisorName'] ?? ''),
               const SizedBox(height: 24),
-              Text('REQUESTED MATERIALS', style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, color: theme.primaryColor)),
+              Text('REQUESTED MATERIALS', style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, color: theme.colorScheme.primary)),
               const SizedBox(height: 8),
               Flexible(
                 child: ListView.separated(

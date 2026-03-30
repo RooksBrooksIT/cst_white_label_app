@@ -225,6 +225,8 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Config',
+      appBarBackgroundColor: theme.colorScheme.primary,
+      appBarForegroundColor: theme.colorScheme.onPrimary,
       body: Column(
         children: [
           Container(
@@ -232,9 +234,9 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
             child: TabBar(
               controller: _tabController,
               tabs: const [Tab(text: 'NEW MATERIAL'), Tab(text: 'UPDATE MATERIAL')],
-              labelColor: theme.primaryColor,
+              labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.primaryColor,
+              indicatorColor: theme.colorScheme.primary,
               indicatorWeight: 3,
             ),
           ),
@@ -407,8 +409,12 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
       value: (value != null && items.any((i) => i.value == value)) ? value : null,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.list_alt, size: 20),
+        prefixIcon: Icon(Icons.list_alt, size: 20, color: theme.colorScheme.primary),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.dividerColor),
+        ),
         filled: true,
         fillColor: theme.cardColor,
       ),

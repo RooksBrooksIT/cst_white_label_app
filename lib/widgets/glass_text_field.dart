@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class GlassTextField extends StatelessWidget {
+class GlassTextField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
@@ -38,45 +38,73 @@ class GlassTextField extends StatelessWidget {
   });
 
   @override
+  State<GlassTextField> createState() => _GlassTextFieldState();
+}
+
+class _GlassTextFieldState extends State<GlassTextField> {
+  bool _internalShowPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _internalShowPassword = widget.showPassword;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
+    // Use external state if onTogglePassword is provided, otherwise use internal state
+    final bool effectiveShowPassword = widget.onTogglePassword != null
+        ? widget.showPassword
+        : _internalShowPassword;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label,
+            widget.label,
             style: theme.textTheme.labelLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
         TextFormField(
-          controller: controller,
-          obscureText: isPassword && !showPassword,
-          keyboardType: keyboardType,
-          onChanged: onChanged,
-          focusNode: focusNode ?? node,
-          readOnly: readOnly,
-          maxLines: maxLines,
-          inputFormatters: inputFormatters?.cast<TextInputFormatter>(),
+          controller: widget.controller,
+          obscureText: widget.isPassword && !effectiveShowPassword,
+          keyboardType: widget.keyboardType,
+          onChanged: widget.onChanged,
+          focusNode: widget.focusNode ?? widget.node,
+          readOnly: widget.readOnly,
+          maxLines: widget.maxLines,
+          inputFormatters: widget.inputFormatters?.cast<TextInputFormatter>(),
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
-            hintText: hintText ?? 'Enter your $label',
-            prefixIcon: Icon(icon, size: 20),
-            suffixIcon: isPassword
+            hintText: widget.hintText ?? 'Enter your ${widget.label}',
+            prefixIcon: Icon(widget.icon, size: 20),
+            suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(
-                      showPassword ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                      effectiveShowPassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
                       size: 20,
                     ),
-                    onPressed: onTogglePassword,
+                    onPressed: () {
+                      if (widget.onTogglePassword != null) {
+                        widget.onTogglePassword!();
+                      } else {
+                        setState(() {
+                          _internalShowPassword = !_internalShowPassword;
+                        });
+                      }
+                    },
                   )
                 : null,
           ),
-          validator: validator,
+          validator: widget.validator,
         ),
       ],
     );

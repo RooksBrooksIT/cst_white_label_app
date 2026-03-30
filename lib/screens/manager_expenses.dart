@@ -110,10 +110,13 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Manager Expenses',
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: colorScheme.onPrimary,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
@@ -231,36 +234,57 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   Widget _buildDropdown(String label, List<String> items, String? value, Function(String?) onChanged) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
       value: value,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        prefixIcon: Icon(Icons.location_on_outlined, size: 20, color: colorScheme.primary),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.dividerColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
         filled: true,
         fillColor: theme.cardColor,
       ),
+      dropdownColor: theme.cardColor,
+      style: TextStyle(color: colorScheme.onSurface),
       items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
       onChanged: onChanged,
     );
   }
 
   Widget _buildDatePicker(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => _selectDate(context),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Date',
-          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+          labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+          prefixIcon: Icon(Icons.calendar_today_outlined, size: 20, color: colorScheme.primary),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
           filled: true,
           fillColor: theme.cardColor,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(DateFormat('dd MMM yyyy').format(selectedDate)),
-            const Icon(Icons.edit_calendar_outlined, size: 18),
+            Text(
+              DateFormat('dd MMM yyyy').format(selectedDate),
+              style: TextStyle(color: colorScheme.onSurface),
+            ),
+            Icon(Icons.edit_calendar_outlined, size: 18, color: colorScheme.primary),
           ],
         ),
       ),

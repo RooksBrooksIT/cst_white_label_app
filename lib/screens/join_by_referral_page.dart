@@ -25,20 +25,22 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
 
     setState(() => _isLoading = true);
     try {
-      final referralDoc = await FirebaseFirestore.instance
-          .collection('referralCodes')
-          .doc(code)
+      // Query referralCodes collectionGroup across all organizations
+      final querySnapshot = await FirebaseFirestore.instance
+          .collectionGroup('referralCodes')
+          .where('referralCode', isEqualTo: code)
           .get();
 
-      if (referralDoc.exists) {
-          final dynamicPath = referralDoc.data()?['dynamicPath'] as String?;
-          final role = referralDoc.data()?['role'] as String? ?? 'organization';
-          
-          if (dynamicPath != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('temp_org_path', dynamicPath);
-            await prefs.setString('temp_referral_role', role);
-            await prefs.setString('temp_referral_code', code);
+      if (querySnapshot.docs.isNotEmpty) {
+        final referralDoc = querySnapshot.docs.first;
+        final dynamicPath = referralDoc.data()['dynamicPath'] as String?;
+        final role = referralDoc.data()['role'] as String? ?? 'organization';
+
+        if (dynamicPath != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('temp_org_path', dynamicPath);
+          await prefs.setString('temp_referral_role', role);
+          await prefs.setString('temp_referral_code', code);
 
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(

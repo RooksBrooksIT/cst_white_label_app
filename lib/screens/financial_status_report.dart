@@ -67,8 +67,11 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return GlassScaffold(
       title: 'Financial Status Report',
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: colorScheme.onPrimary,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMsg != null
@@ -128,8 +131,8 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                child: Icon(Icons.apartment, color: theme.primaryColor),
+                decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(Icons.apartment, color: theme.colorScheme.primary),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -185,7 +188,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
         children: [
           Text('Financial Summary', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
           const SizedBox(height: 20),
-          _buildFinanceTile('Total Budget', '₹ $budget', theme.primaryColor, Icons.account_balance_wallet_outlined),
+          _buildFinanceTile('Total Budget', '₹ $budget', theme.colorScheme.primary, Icons.account_balance_wallet_outlined),
           _buildFinanceTile('Total Received', '₹ $received', Colors.green, Icons.arrow_downward_rounded),
           _buildFinanceTile('Total Spent', '₹ $spent', Colors.orange, Icons.arrow_upward_rounded),
           _buildFinanceTile('Balance', '₹ $balance', Colors.blue, Icons.account_balance_outlined),
@@ -196,8 +199,8 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             value: usage / 100,
             minHeight: 10,
             borderRadius: BorderRadius.circular(5),
-            color: usage > 90 ? theme.colorScheme.error : theme.primaryColor,
-            backgroundColor: theme.primaryColor.withOpacity(0.05),
+            color: usage > 90 ? theme.colorScheme.error : theme.colorScheme.primary,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.05),
           ),
         ],
       ),

@@ -598,7 +598,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF003768),
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
                 if (_selectedWorkersList.isNotEmpty)

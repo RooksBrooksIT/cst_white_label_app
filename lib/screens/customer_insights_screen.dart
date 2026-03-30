@@ -234,7 +234,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Color(0xFF003768),
+        backgroundColor: Theme.of(context).primaryColor,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20.0),
@@ -272,7 +272,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                           Text(
                             'Site ID: $_userSiteId',
                             style: TextStyle(
-                              color: Color(0xFF003768),
+                              color: Theme.of(context).primaryColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -399,7 +399,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                                 children: [
                                   Icon(
                                     Icons.business,
-                                    color: Color(0xFF003768),
+                                    color: Theme.of(context).primaryColor,
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -551,7 +551,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                         child: ElevatedButton(
                           onPressed: _openReport,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF003768),
+                            backgroundColor: Theme.of(context).primaryColor,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -620,14 +620,14 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selectedReportType == type
-                    ? const Color(0x1A003768) // 10% opacity of primary
+                    ? Theme.of(context).primaryColor.withOpacity(0.1) // 10% opacity of primary
                     : Colors.grey[50],
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 color: selectedReportType == type
-                    ? Color(0xFF003768)
+                    ? Theme.of(context).primaryColor
                     : Colors.grey,
               ),
             ),
@@ -642,7 +642,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: selectedReportType == type
-                          ? Color(0xFF003768)
+                          ? Theme.of(context).primaryColor
                           : Colors.black87,
                     ),
                   ),
@@ -652,7 +652,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: selectedReportType == type
-                          ? Color(0xFF003768).withOpacity(0.7)
+                          ? Theme.of(context).primaryColor.withOpacity(0.7)
                           : Colors.grey,
                     ),
                   ),
@@ -671,7 +671,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                   toDate = null;
                 });
               },
-              activeColor: Color(0xFF003768),
+              activeColor: Theme.of(context).primaryColor,
             ),
           ],
         ),
@@ -720,7 +720,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       color: date != null ? Colors.black : Colors.grey,
                     ),
                   ),
-                  Icon(Icons.calendar_month, color: Color(0xFF003768)),
+                  Icon(Icons.calendar_month, color: Theme.of(context).primaryColor),
                 ],
               ),
             ),

@@ -12,7 +12,7 @@ class OrganizationExpenses extends StatefulWidget {
 }
 
 class _OrganizationExpensesState extends State<OrganizationExpenses> {
-  final Color primaryColor = const Color(0xFF003768);
+  Color get primaryColor => Theme.of(context).primaryColor;
 
   String? selectedSiteId;
   String? selectedSupervisorId;
@@ -55,10 +55,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     if (bills.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'No bills added yet.',
-          style: TextStyle(),
-        ),
+        child: Text('No bills added yet.', style: TextStyle()),
       );
     }
     return SingleChildScrollView(
@@ -238,8 +235,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       final newDocId = '${selectedSiteId}_$dateStr';
 
       // 1. Save/merge to organizationEntries
-      final entryRef = FirestoreService.organizationEntries
-          .doc(newDocId);
+      final entryRef = FirestoreService.organizationEntries.doc(newDocId);
       final entrySnap = await entryRef.get();
 
       List<dynamic> existingBills = [];
@@ -377,8 +373,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     setState(() {
       isLoadingSites = true;
     });
-    final snapshot = await FirestoreService.siteSupervisorMap
-        .get();
+    final snapshot = await FirestoreService.siteSupervisorMap.get();
     siteIds = snapshot.docs
         .map((doc) => doc.data()['site'] as String?)
         .where((site) => site != null && site.isNotEmpty)
@@ -436,7 +431,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       appBar: AppBar(
         title: const Text(
           'Organization Expenses',
-          style: TextStyle( fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: primaryColor,
         toolbarHeight: 50,
@@ -582,10 +577,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                       children: [
                         ElevatedButton.icon(
                           onPressed: _addBill,
-                          label: const Text(
-                            "Upload Bill",
-                            style: TextStyle(),
-                          ),
+                          label: const Text("Upload Bill", style: TextStyle()),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                           ),
@@ -598,12 +590,9 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.add, ),
+                              const Icon(Icons.add),
                               SizedBox(width: 4),
-                              const Text(
-                                'Add',
-                                style: TextStyle(),
-                              ),
+                              const Text('Add', style: TextStyle()),
                             ],
                           ),
                         ),
@@ -660,10 +649,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                       ),
                     ),
                     onPressed: isSubmitting ? null : _resetForm,
-                    child: const Text(
-                      'Reset',
-                      style: TextStyle(),
-                    ),
+                    child: const Text('Reset', style: TextStyle()),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -709,10 +695,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                               ),
                             ),
                           )
-                        : const Text(
-                            'Submit',
-                            style: TextStyle(),
-                          ),
+                        : const Text('Submit', style: TextStyle()),
                   ),
                 ),
               ],

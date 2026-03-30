@@ -220,6 +220,12 @@ class _DailySitePaymentReportScreenState
 
   Future<void> _onPrint() async {
     final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfOnPrimaryColor = PdfColor.fromInt(
+      0xFFFFFFFF,
+    ); // White for text over primary
+
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
@@ -249,16 +255,14 @@ class _DailySitePaymentReportScreenState
                 border: pw.TableBorder.all(),
                 children: [
                   pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color: PdfColor.fromInt(0xFF772323),
-                    ),
+                    decoration: pw.BoxDecoration(color: pdfPrimaryColor),
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
                         child: pw.Text(
                           'Date',
                           style: pw.TextStyle(
-                            color: PdfColor.fromInt(0xFFFFFFFF),
+                            color: pdfOnPrimaryColor,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
@@ -268,7 +272,7 @@ class _DailySitePaymentReportScreenState
                         child: pw.Text(
                           'Payment',
                           style: pw.TextStyle(
-                            color: PdfColor.fromInt(0xFFFFFFFF),
+                            color: pdfOnPrimaryColor,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
@@ -339,23 +343,26 @@ class _DailySitePaymentReportScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Site Payment Report',
           style: TextStyle(
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
@@ -377,6 +384,7 @@ class _DailySitePaymentReportScreenState
         if (fontSizeBase < 14) fontSizeBase = 14;
         if (fontSizeBase > 22) fontSizeBase = 22;
 
+        final theme = Theme.of(context);
         return Padding(
           padding: EdgeInsets.symmetric(
             horizontal: horizontalPadding,
@@ -389,7 +397,7 @@ class _DailySitePaymentReportScreenState
                 child: Container(
                   padding: EdgeInsets.all(horizontalPadding),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.cardColor,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
@@ -481,10 +489,11 @@ class _DailySitePaymentReportScreenState
     required double fontSizeBase,
     required ValueChanged<String?> onChanged,
   }) {
+    final theme = Theme.of(context);
     return DropdownButtonFormField<String>(
       decoration: _inputDecoration(label, fontSizeBase),
       value: value,
-      dropdownColor: Colors.white,
+      dropdownColor: theme.cardColor,
       items: items
           .map(
             (id) => DropdownMenuItem(
@@ -511,10 +520,11 @@ class _DailySitePaymentReportScreenState
   }
 
   Widget _buildMonthDropdown(double fontSizeBase) {
+    final theme = Theme.of(context);
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Month', fontSizeBase * 0.9),
       value: selectedMonth,
-      dropdownColor: Colors.white,
+      dropdownColor: theme.cardColor,
       items: List.generate(12, (i) => i + 1)
           .map(
             (m) => DropdownMenuItem(
@@ -539,10 +549,11 @@ class _DailySitePaymentReportScreenState
   }
 
   Widget _buildYearDropdown(double fontSizeBase) {
+    final theme = Theme.of(context);
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Year', fontSizeBase * 0.9),
       value: selectedYear,
-      dropdownColor: Colors.white,
+      dropdownColor: theme.cardColor,
       items: years
           .map(
             (y) => DropdownMenuItem(
@@ -580,7 +591,9 @@ class _DailySitePaymentReportScreenState
           label: Text(
             'Week ${i + 1}',
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF64748B),
+              color: isSelected
+                  ? colorScheme.onPrimary
+                  : const Color(0xFF64748B),
               fontSize: 14,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),

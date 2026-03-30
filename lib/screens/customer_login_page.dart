@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'customer_dashboard.dart';
 import '../services/firestore_service.dart';
 import '../utils/responsive.dart';
+import '../utils/firestore_error_handler.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
@@ -86,8 +87,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       try {
         final referralCode = _actualReferralCode ?? _referralController.text.trim();
         
+        // Validate referral code globally using the new top-level mapping
         final referralDoc = await FirebaseFirestore.instance
-            .collection('referralCodes')
+            .collection('globalReferrals')
             .doc(referralCode)
             .get();
 
@@ -147,7 +149,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         }
       } catch (e) {
         debugPrint('Login error: $e');
-        if (context.mounted) _showError('An error occurred. Please try again.');
+        if (context.mounted) {
+          FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }

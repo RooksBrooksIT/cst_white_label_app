@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -122,12 +123,13 @@ class _BrandingScreenState extends State<BrandingScreen> {
           ? _appNameController.text.trim()
           : widget.orgName;
 
-      // Check username
-      final userDoc = await FirebaseFirestore.instance
-          .collection('organizationUser')
-          .doc(widget.username)
+      // Check username availability globally across all organizations
+      final userDocs = await FirebaseFirestore.instance
+          .collectionGroup('organizationUser')
+          .where('username', isEqualTo: widget.username)
+          .limit(1)
           .get();
-      if (userDoc.exists) {
+      if (userDocs.docs.isNotEmpty) {
         _showError('Username already taken.');
         setState(() => _isLoading = false);
         return;
@@ -153,7 +155,37 @@ class _BrandingScreenState extends State<BrandingScreen> {
       }
     } catch (e) {
       debugPrint('Navigation error: $e');
-      _showError('Something went wrong. Please try again.');
+      String errorMsg = 'An error occurred. Please try again.';
+
+      if (e.toString().contains('permission-denied')) {
+        errorMsg = 'Permission denied. Please check Firestore security rules.';
+      } else if (e.toString().contains('index')) {
+        errorMsg = 'Firestore index required. Click to copy creation link.';
+      } else {
+        errorMsg = 'Error: ${e.toString()}';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 10),
+            action: e.toString().contains('http') 
+              ? SnackBarAction(
+                  label: 'COPY LINK',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: e.toString()));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error copied to clipboard!')),
+                    );
+                  },
+                )
+              : null,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -161,7 +193,16 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'DISMISS',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
     );
   }
 

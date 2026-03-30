@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class ToolsInventoryDetailsPage extends StatefulWidget {
   final String toolCode;
@@ -19,9 +22,6 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
   String? errorMessage;
   String toolName = "";
   String toolCategory = "";
-
-  /// ✅ Professional Primary Color
-  final Color primaryColor = const Color(0xFF0B3470);
 
   @override
   void initState() {
@@ -177,22 +177,12 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          "Tool Distribution Details",
-          style: TextStyle(
-            
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 3,
-        centerTitle: true,
-        iconTheme: const IconThemeData(),
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return GlassScaffold(
+      title: "Tool Distribution Details",
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: colorScheme.onPrimary,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
@@ -212,16 +202,9 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
             )
           : Column(
               children: [
-                // Header Card
-                Card(
-                  margin: const EdgeInsets.all(16),
-                  elevation: 6,
-                  shadowColor: primaryColor.withOpacity(0.3),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                GlassCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(18.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -230,7 +213,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: primaryColor,
+                            color: colorScheme.primary,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -269,19 +252,14 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Card(
-                      elevation: 3,
-                      shadowColor: primaryColor.withOpacity(0.25),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    child: GlassCard(
                       child: Column(
                         children: [
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.1),
+                              color: colorScheme.primary.withOpacity(0.1),
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(12),
                               ),
@@ -291,7 +269,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: primaryColor,
+                                color: colorScheme.primary,
                               ),
                             ),
                           ),
@@ -300,7 +278,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                               scrollDirection: Axis.vertical,
                               child: DataTable(
                                 headingRowColor: WidgetStateProperty.all(
-                                  primaryColor,
+                                  colorScheme.primary,
                                 ),
                                 headingTextStyle: const TextStyle(
                                   
@@ -323,7 +301,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                             Text(
                                               data['siteId'],
                                               style: TextStyle(
-                                                color: primaryColor,
+                                                color: colorScheme.primary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -336,7 +314,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                                     vertical: 6,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: primaryColor.withOpacity(
+                                                color: colorScheme.primary.withOpacity(
                                                   0.08,
                                                 ),
                                                 borderRadius:
@@ -345,7 +323,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                               child: Text(
                                                 data['toolsCount'].toString(),
                                                 style: TextStyle(
-                                                  color: primaryColor,
+                                                  color: colorScheme.primary,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -369,41 +347,17 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: GlassButton(
                           onPressed: () => _generatePdf(context),
-                          icon: const Icon(Icons.picture_as_pdf),
-                          label: const Text("Generate Report"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
+                          label: "GENERATE REPORT",
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: OutlinedButton(
+                        child: GlassButton(
                           onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            side: BorderSide(color: primaryColor, width: 1.5),
-                          ),
-                          child: const Text(
-                            "Back",
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                          label: "BACK",
+                          isSecondary: true,
                         ),
                       ),
                     ],
@@ -415,17 +369,18 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
   }
 
   Widget _buildInfoChip({required IconData icon, required String label}) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Chip(
-      avatar: Icon(icon, size: 20, color: primaryColor),
+      avatar: Icon(icon, size: 20, color: colorScheme.primary),
       label: Text(
         label,
         style: TextStyle(
-          color: primaryColor,
+          color: colorScheme.primary,
           fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
       ),
-      backgroundColor: primaryColor.withOpacity(0.08),
+      backgroundColor: colorScheme.primary.withOpacity(0.08),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       side: BorderSide.none,
     );

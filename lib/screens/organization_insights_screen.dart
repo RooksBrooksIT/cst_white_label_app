@@ -5,6 +5,9 @@ import 'package:demo_cst/screens/site_expenses_reportpage.dart';
 import 'package:demo_cst/screens/site_summary_page.dart';
 import 'package:intl/intl.dart';
 
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 // --- SupervisorEntry Model ---
 class SupervisorEntry {
@@ -25,6 +28,7 @@ class SupervisorEntry {
   });
 
   factory SupervisorEntry.fromFirestore(DocumentSnapshot doc) {
+    if (doc.data() == null) return SupervisorEntry(supervisorId: '');
     final data = doc.data() as Map<String, dynamic>;
     return SupervisorEntry(
       supervisorId: data['supervisorId'] ?? '',
@@ -57,14 +61,6 @@ class OrganizationInsightsScreen extends StatefulWidget {
 
 class _OrganizationInsightsScreenState
     extends State<OrganizationInsightsScreen> {
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF4a7cda);
-  static const Color backgroundColor = Color(0xFFf8f9fa);
-  static const Color textColor = Color(0xFF2c3e50);
-  static const Color cardColor = Colors.white;
-  static const Color successColor = Color(0xFF2e7d32);
-  static const Color warningColor = Color(0xFFed6c02);
-
   late Future<List<SupervisorEntry>> supervisorEntriesFuture;
   SupervisorEntry? selectedSupervisorEntry;
 
@@ -89,6 +85,8 @@ class _OrganizationInsightsScreenState
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: selectedDate ?? DateTime.now(),
@@ -96,12 +94,12 @@ class _OrganizationInsightsScreenState
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(),
+          data: theme.copyWith(
+            colorScheme: colorScheme.copyWith(
+              primary: colorScheme.primary,
+              onPrimary: colorScheme.onPrimary,
+              onSurface: colorScheme.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -115,6 +113,8 @@ class _OrganizationInsightsScreenState
   }
 
   Future<void> _selectFromDate(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: fromDate ?? DateTime.now(),
@@ -122,12 +122,12 @@ class _OrganizationInsightsScreenState
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(),
+          data: theme.copyWith(
+            colorScheme: colorScheme.copyWith(
+              primary: colorScheme.primary,
+              onPrimary: colorScheme.onPrimary,
+              onSurface: colorScheme.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -141,6 +141,8 @@ class _OrganizationInsightsScreenState
   }
 
   Future<void> _selectToDate(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: toDate ?? DateTime.now(),
@@ -148,12 +150,12 @@ class _OrganizationInsightsScreenState
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(),
+          data: theme.copyWith(
+            colorScheme: colorScheme.copyWith(
+              primary: colorScheme.primary,
+              onPrimary: colorScheme.onPrimary,
+              onSurface: colorScheme.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -174,7 +176,7 @@ class _OrganizationInsightsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Please select a date'),
-            backgroundColor: warningColor,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         return;
@@ -194,7 +196,7 @@ class _OrganizationInsightsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Please select both dates'),
-            backgroundColor: warningColor,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         return;
@@ -224,29 +226,21 @@ class _OrganizationInsightsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'CST Insights',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(),
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GlassScaffold(
+      title: 'Insights Dashboard',
+      appBarBackgroundColor: Theme.of(context).colorScheme.primary,
+      appBarForegroundColor: Theme.of(context).colorScheme.onPrimary,
+      onBack: () => Navigator.pop(context),
       body: FutureBuilder<List<SupervisorEntry>>(
         future: supervisorEntriesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
               ),
             );
           }
@@ -254,7 +248,7 @@ class _OrganizationInsightsScreenState
             return Center(
               child: Text(
                 'No supervisor entries found.',
-                style: TextStyle(color: textColor),
+                style: TextStyle(color: theme.colorScheme.onSurface),
               ),
             );
           }
@@ -279,21 +273,19 @@ class _OrganizationInsightsScreenState
                 // Header
                 Text(
                   'Generate Reports',
-                  style: TextStyle(
-                    fontSize: 22,
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: textColor,
+                    color: colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'Select a site and report type to generate insights',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: textColor.withOpacity(0.7),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Site Selection Card
                 _buildModernCard(
@@ -305,11 +297,11 @@ class _OrganizationInsightsScreenState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: primaryColor,
+                          color: colorScheme.primary,
                           letterSpacing: 1.2,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: selectedSupervisorEntry?.siteId,
                         items: uniqueSiteIds.map((siteId) {
@@ -317,7 +309,7 @@ class _OrganizationInsightsScreenState
                             value: siteId,
                             child: Text(
                               siteId,
-                              style: TextStyle(fontSize: 16, color: textColor),
+                              style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
                             ),
                           );
                         }).toList(),
@@ -330,12 +322,12 @@ class _OrganizationInsightsScreenState
                             );
                           });
                         },
-                        decoration: _inputDecoration(),
+                        decoration: _inputDecoration(context),
                         borderRadius: BorderRadius.circular(12),
                         elevation: 2,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-                        dropdownColor: cardColor,
+                        icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
+                        dropdownColor: theme.cardColor,
                       ),
                     ],
                   ),
@@ -353,11 +345,11 @@ class _OrganizationInsightsScreenState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: primaryColor,
+                          color: colorScheme.primary,
                           letterSpacing: 1.2,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       _buildReportOption(
                         type: ReportType.dailyExpense,
                         icon: Icons.today,
@@ -411,29 +403,13 @@ class _OrganizationInsightsScreenState
 
                 SizedBox(height: 24),
 
-                // Generate Report Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _openReport,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      'GENERATE REPORT',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: GlassButton(
+                      label: 'GENERATE REPORT',
+                      onPressed: _openReport,
                     ),
                   ),
-                ),
               ],
             ),
           );
@@ -443,21 +419,7 @@ class _OrganizationInsightsScreenState
   }
 
   Widget _buildModernCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return GlassCard(
       child: child,
     );
   }
@@ -468,6 +430,8 @@ class _OrganizationInsightsScreenState
     required String title,
     required String subtitle,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () {
@@ -486,17 +450,17 @@ class _OrganizationInsightsScreenState
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: selectedReportType == type
-                    ? primaryColor.withOpacity(0.1)
-                    : Colors.grey[50],
+                    ? colorScheme.primary.withOpacity(0.1)
+                    : theme.cardColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: selectedReportType == type ? primaryColor : Colors.grey[600],
+                color: selectedReportType == type ? colorScheme.primary : colorScheme.onSurfaceVariant,
                 size: 22,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,17 +470,17 @@ class _OrganizationInsightsScreenState
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: selectedReportType == type ? primaryColor : textColor,
+                      color: selectedReportType == type ? colorScheme.primary : colorScheme.onSurface,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: TextStyle(
                       fontSize: 14,
                       color: selectedReportType == type
-                          ? primaryColor.withOpacity(0.7)
-                          : Colors.grey[600],
+                          ? colorScheme.primary.withOpacity(0.7)
+                          : colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -534,7 +498,7 @@ class _OrganizationInsightsScreenState
                   toDate = null;
                 });
               },
-              activeColor: primaryColor,
+              activeColor: colorScheme.primary,
             ),
           ],
         ),
@@ -547,6 +511,8 @@ class _OrganizationInsightsScreenState
     required DateTime? date,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return _buildModernCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -556,11 +522,11 @@ class _OrganizationInsightsScreenState
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: primaryColor,
+              color: colorScheme.primary,
               letterSpacing: 1.2,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(8),
@@ -568,7 +534,7 @@ class _OrganizationInsightsScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: theme.dividerColor),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -580,10 +546,10 @@ class _OrganizationInsightsScreenState
                         : 'Select Date',
                     style: TextStyle(
                       fontSize: 16,
-                      color: date != null ? textColor : Colors.grey[600],
+                      color: date != null ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  Icon(Icons.calendar_month, color: primaryColor),
+                  Icon(Icons.calendar_month, color: colorScheme.primary),
                 ],
               ),
             ),
@@ -593,23 +559,25 @@ class _OrganizationInsightsScreenState
     );
   }
 
-  InputDecoration _inputDecoration() {
+  InputDecoration _inputDecoration(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: primaryColor, width: 2),
+        borderSide: BorderSide(color: colorScheme.primary, width: 2),
       ),
       filled: true,
-      fillColor: Colors.grey[50],
+      fillColor: theme.cardColor,
     );
   }
 }

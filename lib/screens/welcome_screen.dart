@@ -6,6 +6,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
 import '../utils/responsive.dart';
+import '../utils/firestore_error_handler.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -81,8 +82,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
                   setDialogState(() => isLoading = true);
                   try {
+                    // Validate referral code globally using the new top-level mapping
                     final referralDoc = await FirebaseFirestore.instance
-                        .collection('referralCodes')
+                        .collection('globalReferrals')
                         .doc(code)
                         .get();
 
@@ -108,10 +110,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       }
                     }
                   } catch (e) {
+                    debugPrint('Referral check error: $e');
                     if (mounted) {
-                      ScaffoldMessenger.of(
+                      FirestoreErrorHandler.handleError(
                         context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        e,
+                        title: 'Registration Error',
+                      );
                     }
                   } finally {
                     setDialogState(() => isLoading = false);

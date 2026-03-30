@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
@@ -8,6 +9,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../utils/firestore_error_handler.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -90,22 +92,24 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       final username = _usernameController.text.trim();
       final password = _passwordController.text.trim();
 
-      // Query organizationUser collection
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('organizationUser')
-          .where('username', isEqualTo: username)
-          .where('password', isEqualTo: password)
-          .limit(1)
+      // Query the globalUsers mapping directly by Doc ID (username)
+      final userDoc = await FirebaseFirestore.instance
+          .collection('globalUsers')
+          .doc(username)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final docSnapshot = querySnapshot.docs.first;
-        final userData = docSnapshot.data();
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        
+        // Validate password locally
+        if (userData['password'] != password) {
+          _showError('Invalid username or password');
+          return;
+        }
 
         // Write organization info to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         final String? storedOrgName = userData['orgName'] as String?;
-        // New Path Logic: dynamicPath is the OrgID, fullConfigPath is the doc path
         final String dynamicPath = userData['dynamicPath'] ?? '';
         final String fullConfigPath =
             userData['fullConfigPath'] ??
@@ -135,7 +139,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       }
     } catch (e) {
       debugPrint('Login error: $e');
-      _showError('An error occurred. Please try again.');
+      if (mounted) {
+        FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

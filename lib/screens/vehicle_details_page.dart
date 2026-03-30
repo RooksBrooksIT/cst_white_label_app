@@ -93,8 +93,8 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
   final _modelNameController = TextEditingController();
   final _numberPlateController = TextEditingController();
 
-  final CollectionReference _vehiclesCollection = FirestoreService
-      .getCollection('vehicleDetails');
+  final CollectionReference _vehiclesCollection =
+      FirestoreService.getCollection('vehicleDetails');
 
   String _generatedId = '';
   Vehicle? _submittedVehicle;
@@ -318,7 +318,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vehicle Details'),
-        backgroundColor: Color(0xFF003768),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         actions: [
           if (_submittedVehicle != null && !_isEditing)
@@ -351,10 +351,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                         children: [
                           Text(
                             'Generated Vehicle ID:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              
-                            ),
+                            style: TextStyle(fontSize: 14),
                           ),
                           Text(
                             _generatedId,
@@ -412,10 +409,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
                                     'Format: TN-00-XX-0000',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      
-                                    ),
+                                    style: TextStyle(fontSize: 12),
                                   ),
                                 );
                               },
@@ -497,7 +491,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isEditing
                                         ? Colors.orange
-                                        : Color(0xFF003768),
+                                        : Theme.of(context).primaryColor,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -538,7 +532,6 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
@@ -556,9 +549,9 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.edit,
-                                  color: Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 onPressed: _editVehicle,
                                 tooltip: 'Edit Vehicle',
@@ -586,7 +579,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                               children: [
                                 Icon(
                                   Icons.info,
-                                  color: Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                   size: 16,
                                 ),
                                 const SizedBox(width: 8),
@@ -595,7 +588,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                     'Tap the edit icon to modify vehicle details',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF003768),
+                                      color: Theme.of(context).primaryColor,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),

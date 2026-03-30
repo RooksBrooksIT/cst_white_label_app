@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
 
 class MatlsScreen extends StatefulWidget {
   const MatlsScreen({super.key});
@@ -10,7 +13,6 @@ class MatlsScreen extends StatefulWidget {
 
 class _MatlsScreenState extends State<MatlsScreen> {
   // Constants
-  static const Color primaryColor = Color(0xFF0b3470); // Professional blue
   static const Color dangerColor = Color(0xFFDC3545);
   static const Color successColor = Color(0xFF28A745);
   static const double defaultPadding = 16.0;
@@ -340,7 +342,9 @@ class _MatlsScreenState extends State<MatlsScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
             child: const Text('Confirm'),
           ),
         ],
@@ -364,7 +368,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
             _buildModeButton(
               label: 'Category',
               mode: 'category',
-              activeColor: primaryColor,
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: defaultPadding),
             _buildModeButton(
@@ -408,10 +412,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                    
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.save, size: 20),
           label: Text(_isSaving ? 'Saving...' : 'Save'),
@@ -483,7 +484,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: primaryColor,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(height: formFieldSpacing),
@@ -498,7 +499,6 @@ class _MatlsScreenState extends State<MatlsScreen> {
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
                         filled: true,
-                        
                       ),
                     ),
                   ),
@@ -506,12 +506,12 @@ class _MatlsScreenState extends State<MatlsScreen> {
                   ElevatedButton(
                     onPressed: _addEntry,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),
                     ),
-                    child: const Icon(Icons.add, ),
+                    child: const Icon(Icons.add),
                   ),
                 ],
               ),
@@ -587,7 +587,6 @@ class _MatlsScreenState extends State<MatlsScreen> {
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
                         filled: true,
-                        
                       ),
                     ),
                   ),
@@ -600,7 +599,7 @@ class _MatlsScreenState extends State<MatlsScreen> {
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),
                     ),
-                    child: const Icon(Icons.add, ),
+                    child: const Icon(Icons.add),
                   ),
                 ],
               ),
@@ -646,18 +645,10 @@ class _MatlsScreenState extends State<MatlsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Material Master',
-          style: TextStyle(),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: 'Material Master',
       body: Padding(
-        padding: const EdgeInsets.all(defaultPadding),
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

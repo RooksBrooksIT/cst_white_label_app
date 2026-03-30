@@ -60,6 +60,35 @@ class AppTheme {
     return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }
 
+  /// Converts a [Color] to a hex string in the format #AARRGGBB.
+  static String colorToHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+  }
+
+  /// Parses a hex string into a [Color].
+  /// Supports formats: #AARRGGBB, #RRGGBB, AARRGGBB, RRGGBB.
+  /// Defaults to [defaultColor] if parsing fails.
+  static Color hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return defaultColor;
+
+    String cleanHex = hex.replaceFirst('#', '').toUpperCase();
+
+    try {
+      if (cleanHex.length == 6) {
+        // Add full opacity if only RRGGBB is provided
+        cleanHex = 'FF$cleanHex';
+      }
+
+      if (cleanHex.length == 8) {
+        return Color(int.parse(cleanHex, radix: 16));
+      }
+    } catch (e) {
+      debugPrint('Error parsing hex color "$hex": $e');
+    }
+
+    return defaultColor;
+  }
+
   /// Generates a ThemeData based on the current primary color.
   static ThemeData getTheme(Color primary) {
     // Professional Slate and Navy palette for construction/enterprise
@@ -79,6 +108,8 @@ class AppTheme {
         onPrimary: getForegroundFor(primary),
         secondary: const Color(0xFF334155), // Slate 700
         onSecondary: Colors.white,
+        tertiary: primary.withOpacity(0.8), // Derived tertiary
+        onTertiary: getForegroundFor(primary),
         surface: surface,
         onSurface: onSurface,
         surfaceContainerHighest: const Color(0xFFF1F5F9),

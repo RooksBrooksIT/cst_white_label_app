@@ -7,6 +7,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../utils/firestore_error_handler.dart';
 
 class ConfigLoginPage extends StatefulWidget {
   const ConfigLoginPage({super.key});
@@ -135,9 +136,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       try {
         final referralCode = _actualReferralCode ?? _referralController.text.trim();
 
-        // 1. Validate Referral Code
+        // 1. Validate Referral Code globally using the new top-level mapping
         final referralDoc = await FirebaseFirestore.instance
-            .collection('referralCodes')
+            .collection('globalReferrals')
             .doc(referralCode)
             .get();
 
@@ -196,8 +197,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
         }
       } catch (e) {
         debugPrint('Login error: $e');
-        if (!mounted) return;
-        _showErrorDialog('An error occurred. Please try again.');
+        if (mounted) {
+          FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -467,9 +469,9 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                         return;
                                       }
 
-                                      // Temporarily resolve the referral code
+                                      // Temporarily resolve the referral code globally
                                       final referralDoc = await FirebaseFirestore.instance
-                                          .collection('referralCodes')
+                                          .collection('globalReferrals')
                                           .doc(_referralController.text.trim())
                                           .get();
 
@@ -521,15 +523,18 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                         if (!context.mounted) return;
                                         _showErrorDialog('Username not found in this organization');
                                       }
-                                    } catch (e) {
-                                      if (!context.mounted) return;
-                                      _showErrorDialog(
-                                        'Failed to update password. Please try again.',
-                                      );
-                                    } finally {
-                                      if (context.mounted)
-                                        setState(() => isUpdating = false);
-                                    }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          FirestoreErrorHandler.handleError(
+                                            context,
+                                            e,
+                                            title: 'Password Reset Error',
+                                          );
+                                        }
+                                      } finally {
+                                        if (context.mounted)
+                                          setState(() => isUpdating = false);
+                                      }
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
