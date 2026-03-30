@@ -376,15 +376,16 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
       actions: [
         TextButton(
           onPressed: _isLoading ? null : _skipVerification,
-          child: const Text(
+          child: Text(
             'SKIP',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
       ],
+      
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: TabBarView(
@@ -505,31 +506,32 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       ),
                     ),
                   const SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyAndContinue,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              
-                              strokeWidth: 3,
-                            ),
-                          )
-                        : const Text(
-                            'Verify & Continue to Site Entry',
-                            style: TextStyle(
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _verifyAndContinue,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
                                 
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                  ),
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Text(
+                              'Verify & Continue to Site Entry',
+                              style: TextStyle(
+                                  
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                    ),
                 ],
               ),
             ),

@@ -316,18 +316,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.of(context).pop();
+                final navigator = Navigator.of(this.context);
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.clear();
-                if (mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MainDashboard(),
-                    ),
-                    (route) => false,
-                  );
-                }
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const MainDashboard(),
+                  ),
+                  (route) => false,
+                );
               },
               child: Text(
                 'LOGOUT',
@@ -418,7 +415,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   context,
                   title: item.title,
                   icon: item.icon,
-                  iconColor: item.color,
+                  iconColor: theme.primaryColor,
                   onTap: () => _navigateToScreen(context, item.title),
                 );
               }).toList(),
@@ -448,7 +445,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             title.toUpperCase(),
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w800,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               letterSpacing: 2.0,
             ),
           ),
@@ -473,12 +470,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: theme.dividerColor.withOpacity(0.4)),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -493,7 +490,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.12),
+                    color: iconColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: iconColor, size: 32),
