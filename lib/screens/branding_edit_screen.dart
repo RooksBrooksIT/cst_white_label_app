@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
 import '../widgets/glass_scaffold.dart';
@@ -25,7 +26,6 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
   bool _isFetching = true;
   Color _selectedColor = const Color(0xFF017FDF);
   Color _customColor = const Color(0xFF017FDF);
-  String? _dynamicPath;
 
   final List<Map<String, dynamic>> _colorOptions = [
     {'label': 'Blue', 'color': const Color(0xFF017FDF)},
@@ -43,21 +43,16 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
 
   Future<void> _loadCurrentBranding() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? dynamicPath = prefs.getString('org_dynamic_path');
-      _dynamicPath = dynamicPath;
+      await FirestoreService.initialize();
+      final doc = await FirestoreService.brandingDoc.get();
 
-      if (dynamicPath != null && dynamicPath.isNotEmpty) {
-        final doc = await FirestoreService.brandingDoc.get();
-
-        if (doc.exists) {
-          final data = doc.data()!;
-          setState(() {
-            _appNameController.text = data['appName'] ?? '';
-            _selectedColor = AppTheme.hexToColor(data['primaryColor'] as String?);
-            _customColor = _selectedColor;
-          });
-        }
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          _appNameController.text = data['appName'] ?? '';
+          _selectedColor = AppTheme.hexToColor(data['primaryColor'] as String?);
+          _customColor = _selectedColor;
+        });
       }
     } catch (e) {
       debugPrint('Error loading branding: $e');
@@ -128,17 +123,25 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
   Future<void> _saveChanges() async {
     setState(() => _isLoading = true);
     try {
+      // Re-initialize to ensure org path is fresh
+      await FirestoreService.initialize();
+
       final String appName = _appNameController.text.trim();
       final String colorHex = AppTheme.colorToHex(_selectedColor);
 
-      if (_dynamicPath == null || _dynamicPath!.isEmpty) {
-        throw Exception('Organization path missing');
+      String? logoUrl;
+      if (_logoFile != null) {
+        final String orgId = FirestoreService.currentOrgId;
+        final ref = FirebaseStorage.instance.ref().child('org_logos/$orgId.jpg');
+        await ref.putFile(_logoFile!);
+        logoUrl = await ref.getDownloadURL();
       }
 
-      await FirestoreService.brandingDoc.update({
+      await FirestoreService.brandingDoc.set({
         'appName': appName,
         'primaryColor': colorHex,
-      });
+        if (logoUrl != null) 'logoUrl': logoUrl,
+      }, SetOptions(merge: true));
 
       // Update local theme state immediately
       await AppTheme.updateTheme(_selectedColor);
@@ -152,12 +155,15 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
       }
     } catch (e) {
       debugPrint('Save error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save changes.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -178,7 +184,7 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
         builder: (context) {
           final theme = Theme.of(context);
           final colorScheme = theme.colorScheme;
-          
+
           return GlassScaffold(
             title: 'Branding',
             onBack: () => Navigator.pop(context),
@@ -228,12 +234,17 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: _logoFile != null
                                 ? ClipRRect(
                                     borderRadius: BorderRadius.circular(15),
-                                    child: Image.file(_logoFile!, fit: BoxFit.cover),
+                                    child: Image.file(
+                                      _logoFile!,
+                                      fit: BoxFit.cover,
+                                    ),
                                   )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -246,7 +257,10 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                                       const SizedBox(height: 8),
                                       const Text(
                                         'Change Logo',
-                                        style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                                        style: TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -268,7 +282,9 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                           runSpacing: 12,
                           children: _colorOptions.map((opt) {
                             final isCustom = opt['isCustom'] == true;
-                            final c = isCustom ? _customColor : opt['color'] as Color;
+                            final c = isCustom
+                                ? _customColor
+                                : opt['color'] as Color;
                             final isSelected = isCustom
                                 ? (!_colorOptions.any(
                                     (o) =>
@@ -276,7 +292,7 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                                         o['color'] == _selectedColor,
                                   ))
                                 : _selectedColor.value == c.value;
-      
+
                             return GestureDetector(
                               onTap: isCustom
                                   ? _showColorPicker
@@ -286,50 +302,56 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                                   horizontal: 16,
                                   vertical: 8,
                                 ),
-                                  decoration: BoxDecoration(
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? c.withOpacity(0.1)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
                                     color: isSelected
-                                        ? c.withOpacity(0.1)
-                                        : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isSelected ? c : const Color(0xFFE2E8F0),
-                                      width: 2,
+                                        ? c
+                                        : const Color(0xFFE2E8F0),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: isCustom && !isSelected
+                                            ? null
+                                            : c,
+                                        shape: BoxShape.circle,
+                                        gradient: isCustom && !isSelected
+                                            ? const SweepGradient(
+                                                colors: [
+                                                  Colors.red,
+                                                  Colors.blue,
+                                                  Colors.green,
+                                                  Colors.red,
+                                                ],
+                                              )
+                                            : null,
+                                      ),
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: isCustom && !isSelected ? null : c,
-                                          shape: BoxShape.circle,
-                                          gradient: isCustom && !isSelected
-                                              ? const SweepGradient(
-                                                  colors: [
-                                                    Colors.red,
-                                                    Colors.blue,
-                                                    Colors.green,
-                                                    Colors.red,
-                                                  ],
-                                                )
-                                              : null,
-                                        ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      opt['label'] as String,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? c
+                                            : const Color(0xFF64748B),
+                                        fontSize: 13,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        opt['label'] as String,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? c
-                                              : const Color(0xFF64748B),
-                                          fontSize: 13,
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
                           }).toList(),
@@ -347,7 +369,7 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
               ),
             ),
           );
-        }
+        },
       ),
     );
   }

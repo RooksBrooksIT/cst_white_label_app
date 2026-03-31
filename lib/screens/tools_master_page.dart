@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
 
@@ -67,9 +68,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       _isLoadingTools = true;
     });
     try {
-      final snapshot = await FirestoreService
-          .getCollection('tools')
-          .get();
+      final snapshot = await FirestoreService.getCollection('tools').get();
       setState(() {
         _toolsList = snapshot.docs;
       });
@@ -110,7 +109,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       bottom: TabBar(
         controller: _tabController,
         labelColor: theme.colorScheme.primary,
-        unselectedLabelColor: const Color(0xFF94A3B8),
+        unselectedLabelColor: const Color.fromARGB(255, 255, 255, 255),
         indicatorColor: theme.colorScheme.primary,
         indicatorWeight: 3,
         indicatorSize: TabBarIndicatorSize.label,
@@ -145,7 +144,6 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -225,7 +223,6 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -345,7 +342,10 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme?.primaryColor ?? Colors.blue, width: 2),
+                  borderSide: BorderSide(
+                    color: theme?.primaryColor ?? Colors.blue,
+                    width: 2,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -362,7 +362,6 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: theme.colorScheme.primary),
       ),
@@ -464,7 +463,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.primary,
               side: BorderSide(color: theme.colorScheme.primary),
-              
+
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -495,8 +494,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     }
 
     try {
-      await FirestoreService
-          .getCollection('tools')
+      await FirestoreService.getCollection('tools')
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
@@ -561,10 +559,9 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       //   return;
       // }
 
-      final codeDuplicateQuery = await FirestoreService
-          .getCollection('tools')
-          .where('toolCode', isEqualTo: toolCode)
-          .get();
+      final codeDuplicateQuery = await FirestoreService.getCollection(
+        'tools',
+      ).where('toolCode', isEqualTo: toolCode).get();
 
       if (codeDuplicateQuery.docs.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -581,11 +578,9 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       }
 
       // Get the latest toolId
-      final toolsSnapshot = await FirestoreService
-          .getCollection('tools')
-          .orderBy('toolId', descending: true)
-          .limit(1)
-          .get();
+      final toolsSnapshot = await FirestoreService.getCollection(
+        'tools',
+      ).orderBy('toolId', descending: true).limit(1).get();
 
       String newToolId = 'TC001';
       if (toolsSnapshot.docs.isNotEmpty) {
@@ -607,10 +602,9 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       });
 
       // Save to toolsAtCompany collection
-      await FirestoreService
-          .getCollection('toolsAtCompany')
-          .doc(toolCode)
-          .set({'toolCode': toolCode, 'availableCount': toolCount});
+      await FirestoreService.getCollection(
+        'toolsAtCompany',
+      ).doc(toolCode).set({'toolCode': toolCode, 'availableCount': toolCount});
 
       ScaffoldMessenger.of(
         context,

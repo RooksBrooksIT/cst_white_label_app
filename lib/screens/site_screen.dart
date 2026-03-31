@@ -143,29 +143,23 @@ class _SiteScreenState extends State<SiteScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return GlassScaffold(
       title: 'Site Details',
-      body: Column(
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: theme.cardColor,
+        unselectedLabelColor: theme.cardColor.withOpacity(0.7),
+        indicatorColor: theme.cardColor,
+        indicatorWeight: 3,
+        tabs: const [Tab(text: 'NEW SITE'), Tab(text: 'ALL SITES')],
+      ),
+      padding: EdgeInsets.zero, // Use full width for TabBarView
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          Container(
-            color: theme.cardColor,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: theme.primaryColor,
-              unselectedLabelColor: colorScheme.onSurfaceVariant,
-              indicatorColor: theme.primaryColor,
-              indicatorWeight: 3,
-              tabs: const [Tab(text: 'NEW SITE'), Tab(text: 'ALL SITES')],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildNewSiteTab(), _buildAllSiteTab()],
-            ),
-          ),
+          _buildNewSiteTab(),
+          _buildAllSiteTab(),
         ],
       ),
     );
@@ -269,7 +263,7 @@ class _SiteScreenState extends State<SiteScreen> with SingleTickerProviderStateM
               children: [
                 Expanded(child: GlassButton(label: 'SAVE SITE', onPressed: _isSaving ? null : _saveSiteDetails)),
                 const SizedBox(width: 12),
-                GlassButton(label: 'RESET', onPressed: _resetForm, isSecondary: true),
+                Expanded(child: GlassButton(label: 'RESET', onPressed: _resetForm, isSecondary: true)),
               ],
             ),
           ],

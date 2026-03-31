@@ -40,40 +40,37 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       final String? name = prefs.getString('org_name');
       if (name != null && mounted) setState(() => _orgName = name);
 
-      final String? dynamicPath = prefs.getString('org_dynamic_path');
-      if (dynamicPath != null && dynamicPath.isNotEmpty) {
-        // Fetch referal codes
-        final referalDoc = await FirestoreService.referralDoc.get();
+      // Fetch referal codes using centralized FirestoreService path resolution
+      final referalDoc = await FirestoreService.referralDoc.get();
 
-        if (referalDoc.exists && mounted) {
-          final refData = referalDoc.data()!;
-          setState(() {
-            _orgCode =
-                refData['orgReferralCode'] ??
-                refData['referralCode'] ??
-                'Not Set';
-          });
-        }
+      if (referalDoc.exists && mounted) {
+        final refData = referalDoc.data()!;
+        setState(() {
+          _orgCode =
+              refData['orgReferralCode'] ??
+              refData['referralCode'] ??
+              'Not Set';
+        });
+      }
 
-        // Fetch subscription data
-        final subDoc = await FirestoreService.subscriptionDoc.get();
+      // Fetch subscription data
+      final subDoc = await FirestoreService.subscriptionDoc.get();
 
-        if (subDoc.exists && mounted) {
-          final subData = subDoc.data()!;
-          setState(() {
-            _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';
-            _isSubscriptionActive = subData['isSubscriptionActive'] ?? false;
+      if (subDoc.exists && mounted) {
+        final subData = subDoc.data()!;
+        setState(() {
+          _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';
+          _isSubscriptionActive = subData['isSubscriptionActive'] ?? false;
 
-            final expiry = subData['subscriptionEndDate'];
-            if (expiry is Timestamp) {
-              _subscriptionExpiry = DateFormat(
-                'dd MMM yyyy',
-              ).format(expiry.toDate());
-            } else {
-              _subscriptionExpiry = 'Never';
-            }
-          });
-        }
+          final expiry = subData['subscriptionEndDate'];
+          if (expiry is Timestamp) {
+            _subscriptionExpiry = DateFormat(
+              'dd MMM yyyy',
+            ).format(expiry.toDate());
+          } else {
+            _subscriptionExpiry = 'Never';
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error fetching org data: $e');

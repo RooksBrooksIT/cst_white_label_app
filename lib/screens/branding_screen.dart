@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'pricing_screen.dart';
+import '../utils/app_theme.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
@@ -74,12 +75,19 @@ class _BrandingScreenState extends State<BrandingScreen> {
             TextButton(
               child: Text(
                 'CANCEL',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.7),
+                ),
               ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: Text('OK', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+              child: Text(
+                'OK',
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
               onPressed: () {
                 setState(() => _selectedColor = _customColor);
                 Navigator.of(context).pop();
@@ -171,18 +179,20 @@ class _BrandingScreenState extends State<BrandingScreen> {
             content: Text(errorMsg),
             backgroundColor: Colors.redAccent,
             duration: const Duration(seconds: 10),
-            action: e.toString().contains('http') 
-              ? SnackBarAction(
-                  label: 'COPY LINK',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: e.toString()));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error copied to clipboard!')),
-                    );
-                  },
-                )
-              : null,
+            action: e.toString().contains('http')
+                ? SnackBarAction(
+                    label: 'COPY LINK',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: e.toString()));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Error copied to clipboard!'),
+                        ),
+                      );
+                    },
+                  )
+                : null,
           ),
         );
       }
@@ -208,234 +218,285 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    return Theme(
+      data: AppTheme.getTheme(_selectedColor),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
 
-    return GlassScaffold(
-      title: 'Branding',
-      onBack: () => Navigator.pop(context),
-      body: Column(
-        children: [
-          const SizedBox(height: 24),
-          // Step Indicator
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: _buildStepIndicator(theme),
-          ),
-          const SizedBox(height: 12),
+          return GlassScaffold(
+            title: 'Branding',
+            onBack: () => Navigator.pop(context),
+            body: Column(
+              children: [
+                const SizedBox(height: 24),
+                // Step Indicator
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildStepIndicator(theme),
+                ),
+                const SizedBox(height: 12),
 
-          // Scrollable content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Customize Branding',
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Make your app unique with logo & colors',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // App Information Card
-                  GlassCard(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionHeader(
-                          theme: theme,
-                          icon: Icons.grid_view_rounded,
-                          title: 'App Information',
-                        ),
-                        const SizedBox(height: 20),
-                        GlassTextField(
-                          controller: _appNameController,
-                          label: 'App Name',
-                          hintText: widget.orgName,
-                          icon: Icons.edit_rounded,
-                        ),
-                      ],
+                // Scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Company Logo Card
-                  GlassCard(
-                    padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionHeader(
-                          theme: theme,
-                          icon: Icons.upload_rounded,
-                          title: 'Company Logo',
+                        Text(
+                          'Customize Branding',
+                          style: theme.textTheme.headlineSmall,
                         ),
-                        const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: _pickLogo,
-                          child: Container(
-                            width: double.infinity,
-                            height: 140,
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: colorScheme.outlineVariant,
+                        const SizedBox(height: 8),
+                        Text(
+                          'Make your app unique with logo & colors',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 32),
+
+                        // App Information Card
+                        GlassCard(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader(
+                                theme: theme,
+                                icon: Icons.grid_view_rounded,
+                                title: 'App Information',
                               ),
-                            ),
-                            child: _logoFile != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(15),
-                                    child: Image.file(
-                                      _logoFile!,
-                                      fit: BoxFit.cover,
+                              const SizedBox(height: 20),
+                              GlassTextField(
+                                controller: _appNameController,
+                                label: 'App Name',
+                                hintText: widget.orgName,
+                                icon: Icons.edit_rounded,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Company Logo Card
+                        GlassCard(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader(
+                                theme: theme,
+                                icon: Icons.upload_rounded,
+                                title: 'Company Logo',
+                              ),
+                              const SizedBox(height: 20),
+                              GestureDetector(
+                                onTap: _pickLogo,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: colorScheme.outlineVariant,
                                     ),
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.cloud_upload_outlined,
-                                        size: 40,
-                                        color: colorScheme.primary.withOpacity(0.5),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'Upload Logo',
-                                        style: theme.textTheme.titleSmall,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Recommended: PNG or JPG',
-                                        style: theme.textTheme.bodySmall,
-                                      ),
-                                    ],
                                   ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: _pickLogo,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text('CHANGE LOGO'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Color Theme Card
-                  GlassCard(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionHeader(
-                          theme: theme,
-                          icon: Icons.palette_rounded,
-                          title: 'Color Theme',
-                          subtitle: 'Primary Color #${_selectedColor.value.toRadixString(16).toUpperCase().substring(2)}',
-                        ),
-                        const SizedBox(height: 20),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: _colorOptions.map((opt) {
-                            final isCustom = opt['isCustom'] == true;
-                            final c = isCustom ? _customColor : opt['color'] as Color;
-                            final sel = isCustom
-                                ? (!_colorOptions.any((o) => o['isCustom'] != true && o['color'] == _selectedColor))
-                                : _selectedColor.value == c.value;
-
-                            return GestureDetector(
-                              onTap: isCustom ? _showColorPicker : () {
-                                setState(() {
-                                  _selectedColor = c;
-                                  _customColor = c;
-                                });
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: sel ? c.withOpacity(0.1) : colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: sel ? c : colorScheme.outlineVariant,
-                                    width: sel ? 2 : 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isCustom && !sel)
-                                      Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: const BoxDecoration(
-                                          gradient: SweepGradient(
-                                            colors: [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.purple, Colors.red],
+                                  child: _logoFile != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
                                           ),
-                                          shape: BoxShape.circle,
+                                          child: Image.file(
+                                            _logoFile!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.cloud_upload_outlined,
+                                              size: 40,
+                                              color: colorScheme.primary
+                                                  .withOpacity(0.5),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'Upload Logo',
+                                              style: theme.textTheme.titleSmall,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Recommended: PNG or JPG',
+                                              style: theme.textTheme.bodySmall,
+                                            ),
+                                          ],
                                         ),
-                                      )
-                                    else
-                                      Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: BoxDecoration(
-                                          color: c,
-                                          shape: BoxShape.circle,
-                                          border: isCustom && sel ? null : Border.all(color: Colors.black12),
-                                        ),
-                                      ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      opt['label'] as String,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: sel ? c : colorScheme.onSurface,
-                                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ),
-                            );
-                          }).toList(),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: _pickLogo,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text('CHANGE LOGO'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 20),
+
+                        // Color Theme Card
+                        GlassCard(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader(
+                                theme: theme,
+                                icon: Icons.palette_rounded,
+                                title: 'Color Theme',
+                                subtitle:
+                                    'Primary Color #${_selectedColor.value.toRadixString(16).toUpperCase().substring(2)}',
+                              ),
+                              const SizedBox(height: 20),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: _colorOptions.map((opt) {
+                                  final isCustom = opt['isCustom'] == true;
+                                  final c = isCustom
+                                      ? _customColor
+                                      : opt['color'] as Color;
+                                  final sel = isCustom
+                                      ? (!_colorOptions.any(
+                                          (o) =>
+                                              o['isCustom'] != true &&
+                                              o['color'] == _selectedColor,
+                                        ))
+                                      : _selectedColor.value == c.value;
+
+                                  return GestureDetector(
+                                    onTap: isCustom
+                                        ? _showColorPicker
+                                        : () {
+                                            setState(() {
+                                              _selectedColor = c;
+                                              _customColor = c;
+                                            });
+                                          },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: sel
+                                            ? c.withOpacity(0.1)
+                                            : colorScheme.surface,
+                                        borderRadius: BorderRadius.circular(24),
+                                        border: Border.all(
+                                          color: sel
+                                              ? c
+                                              : colorScheme.outlineVariant,
+                                          width: sel ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isCustom && !sel)
+                                            Container(
+                                              width: 16,
+                                              height: 16,
+                                              decoration: const BoxDecoration(
+                                                gradient: SweepGradient(
+                                                  colors: [
+                                                    Colors.red,
+                                                    Colors.orange,
+                                                    Colors.yellow,
+                                                    Colors.green,
+                                                    Colors.blue,
+                                                    Colors.purple,
+                                                    Colors.red,
+                                                  ],
+                                                ),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              width: 16,
+                                              height: 16,
+                                              decoration: BoxDecoration(
+                                                color: c,
+                                                shape: BoxShape.circle,
+                                                border: isCustom && sel
+                                                    ? null
+                                                    : Border.all(
+                                                        color: Colors.black12,
+                                                      ),
+                                              ),
+                                            ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            opt['label'] as String,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: sel
+                                                  ? c
+                                                  : colorScheme.onSurface,
+                                              fontWeight: sel
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+
+                        // Next button
+                        GlassButton(
+                          label: 'NEXT',
+                          isLoading: _isLoading,
+                          onPressed: _goToNextStep,
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 48),
-
-                  // Next button
-                  GlassButton(
-                    label: 'NEXT',
-                    isLoading: _isLoading,
-                    onPressed: _goToNextStep,
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -464,13 +525,17 @@ class _BrandingScreenState extends State<BrandingScreen> {
             children: [
               Text(
                 title,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],
@@ -495,7 +560,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                color: activeStep >= i ~/ 2 + 1 ? primaryColor : colorScheme.outlineVariant,
+                color: activeStep >= i ~/ 2 + 1
+                    ? primaryColor
+                    : colorScheme.outlineVariant,
               ),
             ),
           );
@@ -523,7 +590,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
                     : Text(
                         '${idx + 1}',
                         style: TextStyle(
-                          color: active ? Colors.white : colorScheme.onSurfaceVariant,
+                          color: active
+                              ? Colors.white
+                              : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -534,7 +603,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
             Text(
               steps[idx],
               style: theme.textTheme.labelMedium?.copyWith(
-                color: active || done ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                color: active || done
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurfaceVariant,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -543,5 +614,4 @@ class _BrandingScreenState extends State<BrandingScreen> {
       }),
     );
   }
-
 }

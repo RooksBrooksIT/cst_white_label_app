@@ -67,6 +67,9 @@ class FirestoreService {
     return orgId;
   }
 
+  /// Gets the current organization ID.
+  static String get currentOrgId => _getOrgIdFromPath();
+
   /// Gets the organization's core data document (Admin metadata).
   static DocumentReference<Map<String, dynamic>> get orgDataDoc {
     final orgId = _getOrgIdFromPath();
