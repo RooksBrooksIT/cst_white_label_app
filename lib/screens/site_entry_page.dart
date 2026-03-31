@@ -42,6 +42,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   bool isLoadingLabours = true;
   String? materialError;
   String? labourError;
+  final materialSearchController = TextEditingController();
+  final labourSearchController = TextEditingController();
   String? supervisorId;
   String? projectName;
   String siteCode = '';
@@ -490,7 +492,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       style: TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: 16,
-        color: Theme.of(context).primaryColor,
+        color: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -500,24 +502,28 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     TextEditingController controller,
     IconData icon,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        prefixIcon: Icon(icon, size: 20, color: colorScheme.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).primaryColor,
-            width: 2,
-          ),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
         filled: true,
-
+        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 12,
           horizontal: 16,
@@ -525,8 +531,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         isDense: true,
       ),
       keyboardType: TextInputType.number,
-      cursorColor: Theme.of(context).primaryColor,
-      style: const TextStyle(),
+      cursorColor: colorScheme.primary,
+      style: TextStyle(color: colorScheme.onSurface),
       onChanged: (_) => setState(() {}),
     );
   }
@@ -875,9 +881,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Widget _buildInfoRow(IconData icon, String value, {String? subValue}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+        Icon(icon, size: 20, color: colorScheme.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -885,10 +893,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white,
+                  color: colorScheme.onSurface,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -897,7 +905,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                   subValue,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
             ],
@@ -919,6 +927,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     _customMaterialPriceController.dispose();
     _customLabourNameController.dispose();
     _customLabourSalaryController.dispose();
+    materialSearchController.dispose();
+    labourSearchController.dispose();
     super.dispose();
   }
 
@@ -955,33 +965,50 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 child: DropdownButtonFormField<String>(
                                   value: selectedSiteId,
                                   isExpanded: true,
-                                  dropdownColor: Colors.blueGrey[900],
-                                  style: const TextStyle(color: Colors.white),
+                                  dropdownColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surface,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
                                   decoration: InputDecoration(
                                     labelText: 'Site Id (Supervisor Only)',
                                     labelStyle: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.2),
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
                                       ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.2),
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
                                       ),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.white.withOpacity(0.05),
+                                    fillColor: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest
+                                        .withOpacity(0.5),
                                     contentPadding: const EdgeInsets.symmetric(
                                       vertical: 12,
                                       horizontal: 16,
                                     ),
                                   ),
-                                  iconEnabledColor: Colors.white,
+                                  iconEnabledColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
                                   items: supervisorSites
                                       .map(
                                         (site) => DropdownMenuItem(
@@ -1070,10 +1097,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           'EEEE, MMM d, yyyy',
                                         ).format(selectedDate!)
                                       : 'No date chosen',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -1102,15 +1131,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         'Add Entry',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const Divider(
-                      height: 24,
-                      thickness: 1,
-                      color: Colors.white24,
-                    ),
+                    const Divider(height: 24, thickness: 1),
 
                     // Material Details Card
                     GlassCard(
@@ -1129,8 +1153,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               : Column(
                                   children: [
                                     GlassTextField(
-                                      controller:
-                                          TextEditingController(), // Placeholder for search logic if needed
+                                      controller: materialSearchController,
                                       label: 'Search Material...',
                                       icon: Icons.search,
                                       onChanged: (query) {
@@ -1166,18 +1189,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                     DropdownButtonFormField<String>(
                                       value: selectedMaterial,
                                       isExpanded: true,
-                                      dropdownColor: Colors.blueGrey[900],
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       ),
                                       decoration: InputDecoration(
                                         labelText: 'Material',
                                         labelStyle: TextStyle(
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                         ),
                                         prefixIcon: Icon(
                                           Icons.category_outlined,
-                                          color: Theme.of(context).primaryColor,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                         ),
                                         border: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(
@@ -1185,11 +1216,14 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           ),
                                         ),
                                         filled: true,
-                                        fillColor: Colors.white.withOpacity(
-                                          0.05,
-                                        ),
+                                        fillColor: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withOpacity(0.5),
                                       ),
-                                      iconEnabledColor: Colors.white,
+                                      iconEnabledColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       items:
                                           (_filteredMaterialOptions ??
                                                   materialOptions)
@@ -1325,8 +1359,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               : Column(
                                   children: [
                                     GlassTextField(
-                                      controller:
-                                          TextEditingController(), // Search placeholder
+                                      controller: labourSearchController,
                                       label: 'Search Labour...',
                                       icon: Icons.search,
                                       onChanged: (query) {
@@ -1362,18 +1395,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                     DropdownButtonFormField<String>(
                                       value: selectedLabour,
                                       isExpanded: true,
-                                      dropdownColor: Colors.blueGrey[900],
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       ),
                                       decoration: InputDecoration(
                                         labelText: 'Labour Type',
                                         labelStyle: TextStyle(
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                         ),
                                         prefixIcon: Icon(
                                           Icons.group,
-                                          color: Theme.of(context).primaryColor,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                         ),
                                         border: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(
@@ -1381,11 +1422,14 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           ),
                                         ),
                                         filled: true,
-                                        fillColor: Colors.white.withOpacity(
-                                          0.05,
-                                        ),
+                                        fillColor: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withOpacity(0.5),
                                       ),
-                                      iconEnabledColor: Colors.white,
+                                      iconEnabledColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       items:
                                           (_filteredLabourOptions ??
                                                   labourOptions)
@@ -1551,6 +1595,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   foodCost.text = '0';
                                   transportCost.text = '0';
                                   fuelCost.text = '0';
+                                  materialSearchController.clear();
+                                  labourSearchController.clear();
                                 });
                               },
                             ),

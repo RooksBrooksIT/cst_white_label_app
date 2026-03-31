@@ -215,14 +215,10 @@ class FirestoreService {
         (index) => chars[random.nextInt(chars.length)],
       ).join();
 
-      // Check if this code already exists globally in the top-level globalReferrals collection
+      // Check if this code already exists in any /organisation/{id}/admin/referal document
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('globalReferrals')
-            .doc(code)
-            .get();
-
-        if (!doc.exists) {
+        final isUniqueCode = await isReferralCodeUnique(code);
+        if (isUniqueCode) {
           isUnique = true;
         }
       } catch (e) {
@@ -232,5 +228,45 @@ class FirestoreService {
     }
 
     return code!;
+  }
+
+  /// Finds the Organization ID (document ID in /organisation collection) by search across
+  /// all admin/referal documents for a matching referralCode.
+  static Future<String?> findOrgIdByReferralCode(String code) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('referralCode', isEqualTo: code)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        // The referal document is at: /organisation/{orgId}/admin/referal
+        // reference.parent is collection 'admin'
+        // reference.parent.parent is document {orgId}
+        return doc.reference.parent.parent?.id;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error searching referral code: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if a referral code is unique across all organizations.
+  static Future<bool> isReferralCodeUnique(String code) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('referralCode', isEqualTo: code)
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking referral code uniqueness: $e');
+      rethrow;
+    }
   }
 }

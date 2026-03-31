@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 class SupervisorMaterialViewRequestScreen extends StatefulWidget {
   final String supervisorId;
@@ -23,11 +25,6 @@ class _SupervisorMaterialViewRequestScreenState
   final TextEditingController _searchCtrl = TextEditingController();
   String _statusFilter = 'All';
 
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color secondaryColor = Color(0xFF2D9CDB);
-  static const Color backgroundColor = Color(0xFFF8FAFC);
-  static const Color cardColor = Color(0xFFFFFFFF);
-
   late String _currentSupervisorName;
 
   @override
@@ -37,8 +34,7 @@ class _SupervisorMaterialViewRequestScreenState
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _queryStream() {
-    final col = FirestoreService
-        .getCollection('siteMaterialsRequest')
+    final col = FirestoreService.getCollection('siteMaterialsRequest')
         .withConverter<Map<String, dynamic>>(
           fromFirestore: (snap, _) => snap.data() ?? <String, dynamic>{},
           toFirestore: (data, _) => data,
@@ -55,35 +51,21 @@ class _SupervisorMaterialViewRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Material Requests',
-          style: TextStyle( fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
-      ),
+    final cs = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Material Requests',
       body: Column(
         children: [
-          // Header with stats
-          // _buildHeaderSection(),
-          // Search and Filter
-          _buildSearchAndFilter(),
+          _buildSearchAndFilter(cs),
           const SizedBox(height: 8),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _queryStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
+                  return Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
                   );
                 }
@@ -92,16 +74,12 @@ class _SupervisorMaterialViewRequestScreenState
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: Colors.red.shade400,
-                          size: 64,
-                        ),
+                        Icon(Icons.error_outline, color: cs.error, size: 64),
                         const SizedBox(height: 16),
                         Text(
                           'Error loading requests',
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: cs.onSurface.withOpacity(0.6),
                             fontSize: 16,
                           ),
                         ),
@@ -113,7 +91,7 @@ class _SupervisorMaterialViewRequestScreenState
                 final docs = snapshot.data?.docs ?? [];
 
                 if (docs.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(cs);
                 }
 
                 final search = _searchCtrl.text.trim().toLowerCase();
@@ -160,7 +138,7 @@ class _SupervisorMaterialViewRequestScreenState
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return _buildNoResultsState();
+                  return _buildNoResultsState(cs);
                 }
 
                 return ListView.separated(
@@ -215,58 +193,25 @@ class _SupervisorMaterialViewRequestScreenState
     );
   }
 
-  Widget _buildHeaderSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: primaryColor,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome, ${widget.supervisorName}',
-            style: const TextStyle(
-              
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Manage your material requests',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchAndFilter() {
+  Widget _buildSearchAndFilter(ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         children: [
           // Search Bar
           Container(
             decoration: BoxDecoration(
-              color: cardColor,
+              color: cs.surface.withOpacity(0.3),
               borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              border: Border.all(color: cs.outlineVariant),
             ),
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
+              style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search requests...',
+                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
                 filled: true,
                 fillColor: Colors.transparent,
                 contentPadding: const EdgeInsets.symmetric(
@@ -274,10 +219,16 @@ class _SupervisorMaterialViewRequestScreenState
                   vertical: 16,
                 ),
                 border: InputBorder.none,
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: cs.onSurface.withOpacity(0.5),
+                ),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: Colors.grey.shade500),
+                        icon: Icon(
+                          Icons.clear,
+                          color: cs.onSurface.withOpacity(0.5),
+                        ),
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() {});
@@ -317,21 +268,21 @@ class _SupervisorMaterialViewRequestScreenState
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ColorScheme cs) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.inventory_2_outlined,
-            color: Colors.grey.shade400,
+            color: cs.onSurface.withOpacity(0.3),
             size: 80,
           ),
           const SizedBox(height: 20),
           Text(
             'No Requests Found',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: cs.onSurface.withOpacity(0.6),
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -339,24 +290,31 @@ class _SupervisorMaterialViewRequestScreenState
           const SizedBox(height: 8),
           Text(
             'Your material requests will appear here',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            style: TextStyle(
+              color: cs.onSurface.withOpacity(0.5),
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNoResultsState() {
+  Widget _buildNoResultsState(ColorScheme cs) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, color: Colors.grey.shade400, size: 80),
+          Icon(
+            Icons.search_off,
+            color: cs.onSurface.withOpacity(0.3),
+            size: 80,
+          ),
           const SizedBox(height: 20),
           Text(
             'No Matching Requests',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: cs.onSurface.withOpacity(0.6),
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -364,7 +322,10 @@ class _SupervisorMaterialViewRequestScreenState
           const SizedBox(height: 8),
           Text(
             'Try changing your search or filter',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            style: TextStyle(
+              color: cs.onSurface.withOpacity(0.5),
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -385,6 +346,7 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -392,25 +354,16 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? _FilterChip.primaryColor : Colors.white,
+            color: isSelected ? cs.primary : cs.surface.withOpacity(0.3),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected
-                  ? _FilterChip.primaryColor
-                  : Colors.grey.shade300,
+              color: isSelected ? cs.primary : cs.outlineVariant,
             ),
-            boxShadow: [
-              BoxShadow(
-                
-                blurRadius: 5,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? cs.onPrimary : cs.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -418,8 +371,6 @@ class _FilterChip extends StatelessWidget {
       ),
     );
   }
-
-  static const Color primaryColor = Color(0xFF0b3470);
 }
 
 class _RequestCard extends StatelessWidget {
@@ -431,9 +382,6 @@ class _RequestCard extends StatelessWidget {
   final String projectStage;
   final String supervisorName;
   final List materials;
-
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color secondaryColor = Color(0xFF2D9CDB);
 
   const _RequestCard({
     super.key,
@@ -456,7 +404,7 @@ class _RequestCard extends StatelessWidget {
       case 'immediate':
         return Colors.orange;
       case 'processing':
-        return secondaryColor;
+        return Colors.blue;
       default:
         return Colors.blueGrey;
     }
@@ -479,18 +427,8 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
       child: Column(
         children: [
           // Header with gradient
@@ -499,7 +437,7 @@ class _RequestCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, secondaryColor],
+                colors: [cs.primary, cs.secondary],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
@@ -517,8 +455,8 @@ class _RequestCard extends StatelessWidget {
                     children: [
                       Text(
                         'Request ID: $matReqId',
-                        style: const TextStyle(
-                          
+                        style: TextStyle(
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -526,8 +464,8 @@ class _RequestCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         date,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: cs.onPrimary.withOpacity(0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -540,18 +478,18 @@ class _RequestCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    
+                    color: cs.onPrimary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_statusIcon(status),  size: 16),
+                      Icon(_statusIcon(status), color: cs.onPrimary, size: 16),
                       const SizedBox(width: 4),
                       Text(
                         status.toUpperCase(),
-                        style: const TextStyle(
-                          
+                        style: TextStyle(
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -568,7 +506,6 @@ class _RequestCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Project Info
                 _InfoRow(
                   icon: Icons.business,
                   label: 'Project',
@@ -590,12 +527,12 @@ class _RequestCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 // Materials Section
-                const Text(
+                Text(
                   'Materials Requested',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: primaryColor,
+                    color: cs.primary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -625,9 +562,10 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(icon, color: _InfoRow.primaryColor, size: 18),
+        Icon(icon, color: cs.primary, size: 18),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -635,14 +573,18 @@ class _InfoRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.6),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
+                  color: cs.onSurface,
                 ),
               ),
             ],
@@ -651,8 +593,6 @@ class _InfoRow extends StatelessWidget {
       ],
     );
   }
-
-  static const Color primaryColor = Color(0xFF0b3470);
 }
 
 class _MaterialItem extends StatelessWidget {
@@ -662,6 +602,7 @@ class _MaterialItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final name = (item['materialName'] ?? '').toString();
     final qty = (item['materialQty'] ?? '').toString();
     final unit = (item['materialUnit'] ?? '').toString();
@@ -671,9 +612,9 @@ class _MaterialItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: cs.surface.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Row(
         children: [
@@ -692,15 +633,19 @@ class _MaterialItem extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$qty $unit • $priority Priority',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: TextStyle(
+                    color: cs.onSurface.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),

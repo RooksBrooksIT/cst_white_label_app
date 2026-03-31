@@ -130,19 +130,6 @@ class _PricingScreenState extends State<PricingScreen> {
             'createdAt': FieldValue.serverTimestamp(),
           },
         );
-
-        // Global lookup mapping: Referral Code to Org Details
-        transaction.set(
-          FirebaseFirestore.instance.collection('globalReferrals').doc(orgReferralCode),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'referralCode': orgReferralCode,
-            'role': 'organization',
-            'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigDocPath,
-          },
-        );
       });
 
       // Auto-login

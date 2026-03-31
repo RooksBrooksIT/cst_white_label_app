@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
@@ -391,18 +390,18 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                             'Username not found',
                                           );
                                       }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          FirestoreErrorHandler.handleError(
-                                            context,
-                                            e,
-                                            title: 'Password Reset Error',
-                                          );
-                                        }
-                                      } finally {
-                                        if (context.mounted)
-                                          setState(() => isUpdating = false);
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        FirestoreErrorHandler.handleError(
+                                          context,
+                                          e,
+                                          title: 'Password Reset Error',
+                                        );
                                       }
+                                    } finally {
+                                      if (context.mounted)
+                                        setState(() => isUpdating = false);
+                                    }
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
@@ -445,30 +444,21 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         final referralCode =
             _actualReferralCode ?? _referralController.text.trim();
 
-        // 1. Validate Referral Code globally using the new top-level mapping
-        final referralDoc = await FirebaseFirestore.instance
-            .collection('globalReferrals')
-            .doc(referralCode)
-            .get();
+        // 1. Validate Referral Code by searching across all admin/referal documents
+        final orgId = await FirestoreService.findOrgIdByReferralCode(
+          referralCode,
+        );
 
-        if (!referralDoc.exists) {
-          if (context.mounted) _showErrorDialog('Invalid Referral Code');
-          return;
-        }
-
-        final orgId = referralDoc.data()?['dynamicPath'] as String?;
-        final fullConfigPath = referralDoc.data()?['fullConfigPath'] as String?;
         if (orgId == null) {
-          if (context.mounted)
-            _showErrorDialog('Organization configuration error');
+          if (context.mounted) _showErrorDialog('Invalid Referral Code');
           return;
         }
 
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_orgPathKey, orgId);
-        final String resolvedPath =
-            fullConfigPath ?? 'organisation/$orgId/admin/data';
+        // Default relative path for organization details
+        final String resolvedPath = 'organisation/$orgId/admin/data';
         await prefs.setString('sup_org_doc_path', resolvedPath);
 
         // Refresh FirestoreService cache
