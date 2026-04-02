@@ -14,7 +14,7 @@ class WorkersConfigPage extends StatefulWidget {
 class _WorkersConfigPageState extends State<WorkersConfigPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
   // Removed _firestore field
   // Form controllers for Create New Worker tab
   final TextEditingController _nameController = TextEditingController();
@@ -61,6 +61,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       final querySnapshot = await FirestoreService.getCollection(
         'labours',
       ).get();
+      if (!mounted) return;
       setState(() {
         _designations = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -89,8 +90,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       final lastWorkerId = lastWorker['workerId'] as String? ?? 'WC000';
 
       // Extract number and increment
-      final numberStr = lastWorkerId.replaceAll('WC', '');
-      final nextNumber = int.parse(numberStr) + 1;
+      final numberStr = lastWorkerId.replaceAll(RegExp(r'[^0-9]'), '');
+      final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
 
       return 'WC${nextNumber.toString().padLeft(3, '0')}';
     } catch (e) {
@@ -132,6 +133,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       _joiningDateController.text = DateFormat(
         'yyyy-MM-dd',
       ).format(DateTime.now());
+      if (!mounted) return;
       setState(() {
         _selectedDesignation = null;
         _isSalaryEditable = false;

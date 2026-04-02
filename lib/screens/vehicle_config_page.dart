@@ -15,13 +15,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   final _formKey = GlobalKey<FormState>();
   // Removed _firestore field
 
-  final TextEditingController _vehicleIdController = TextEditingController();
-  final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _fromLocationController = TextEditingController();
   final TextEditingController _toLocationController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
-  final TextEditingController _materialTypeController = TextEditingController();
+
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
@@ -69,6 +67,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       print('Error loading initial data: $e');
       _showErrorSnackBar('Failed to load data. Please try again.');
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -81,11 +80,14 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         'drivers',
       ).where('status', isEqualTo: 'Active').get();
 
+      final names = snapshot.docs
+          .map((doc) => doc['driverName'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+
+      if (!mounted) return;
       setState(() {
-        _driverNames = snapshot.docs
-            .map((doc) => doc['driverName'] as String? ?? '')
-            .where((name) => name.isNotEmpty)
-            .toList();
+        _driverNames = names;
       });
     } catch (e) {
       print('Error loading drivers: $e');
@@ -201,9 +203,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         return 'VM001';
       }
 
-      final lastMovementId = snapshot.docs.first['movementId'] as String;
-      final number = int.parse(lastMovementId.substring(2));
-      return 'VM${(number + 1).toString().padLeft(3, '0')}';
+      final lastMovementId =
+          snapshot.docs.first['movementId'] as String? ?? 'VM000';
+      final numberStr = lastMovementId.replaceAll(RegExp(r'[^0-9]'), '');
+      final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
+      return 'VM${nextNumber.toString().padLeft(3, '0')}';
     } catch (e) {
       print('Error generating movement ID: $e');
       return 'VM001';
@@ -545,7 +549,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                       'Selected Vehicle:',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -578,15 +584,18 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
-                            style: const TextStyle(fontSize: 16),
+                          Expanded(
+                            child: Text(
+                              'Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ),
-                          const Spacer(),
                           ElevatedButton(
                             onPressed: () => _selectDate(context),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                             ),
                             child: const Text('Change Date'),

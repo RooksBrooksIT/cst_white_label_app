@@ -30,8 +30,12 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final statusSnapshot = await FirestoreService.getCollection('projectStatus').get();
-      final financialSnapshot = await FirestoreService.getCollection('projectFinances').doc('currentProject').get();
+      final statusSnapshot = await FirestoreService.getCollection(
+        'projectStatus',
+      ).get();
+      final financialSnapshot = await FirestoreService.getCollection(
+        'projectFinances',
+      ).doc('currentProject').get();
 
       Set<String> uniqueStatuses = {};
       for (var doc in statusSnapshot.docs) {
@@ -50,12 +54,16 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
         final financeData = financialSnapshot.data();
         _budgetAmount = (financeData?['budget'] as num?)?.toDouble() ?? 0.0;
         _spentAmount = (financeData?['spent'] as num?)?.toDouble() ?? 0.0;
-        _spendingPercentage = _budgetAmount > 0 ? _spentAmount / _budgetAmount : 0.0;
+        _spendingPercentage = _budgetAmount > 0
+            ? _spentAmount / _budgetAmount
+            : 0.0;
       }
 
       if (mounted) {
         setState(() {
-          _statusOptions = uniqueStatuses.isNotEmpty ? uniqueStatuses.toList() : ['No Status Found'];
+          _statusOptions = uniqueStatuses.isNotEmpty
+              ? uniqueStatuses.toList()
+              : ['No Status Found'];
           _selectedStatus = _statusOptions.first;
           _isLoading = false;
         });
@@ -71,6 +79,7 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
   }
 
   void _handleReport() {
+    if (!mounted) return;
     if (_selectedStatus != null) {
       Navigator.push(
         context,
@@ -106,29 +115,32 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? _buildErrorView(theme)
-              : SingleChildScrollView(
-                  padding: EdgeInsets.all(isMobile ? 16 : 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeaderCard(theme),
-                      const SizedBox(height: 24),
-                      _buildSelectorSection(theme),
-                      const SizedBox(height: 40),
-                      GlassButton(
-                        label: 'GENERATE REPORT',
-                        onPressed: (_selectedStatus == null || _statusOptions.isEmpty) ? null : _handleReport,
-                      ),
-                      const SizedBox(height: 12),
-                      GlassButton(
-                        label: 'CANCEL',
-                        onPressed: () => Navigator.pop(context),
-                        isSecondary: true,
-                      ),
-                    ],
+          ? _buildErrorView(theme)
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeaderCard(theme),
+                  const SizedBox(height: 24),
+                  _buildSelectorSection(theme),
+                  const SizedBox(height: 40),
+                  GlassButton(
+                    label: 'GENERATE REPORT',
+                    onPressed:
+                        (_selectedStatus == null || _statusOptions.isEmpty)
+                        ? null
+                        : _handleReport,
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  GlassButton(
+                    label: 'CANCEL',
+                    onPressed: () => Navigator.pop(context),
+                    isSecondary: true,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -141,7 +153,11 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
           children: [
             Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
             const SizedBox(height: 16),
-            Text(_errorMessage!, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
             const SizedBox(height: 24),
             GlassButton(label: 'RETRY', onPressed: _fetchProjectData),
           ],
@@ -157,10 +173,13 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
         children: [
           Icon(Icons.insights_outlined, color: theme.primaryColor, size: 24),
           const SizedBox(width: 16),
-          Expanded(
+          Flexible(
             child: Text(
               'Track project status and financial health. Select a status to generate a detailed analytics report.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -173,18 +192,29 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('FILTER BY STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+          const Text(
+            'FILTER BY STATUS',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             value: _selectedStatus,
             decoration: InputDecoration(
               labelText: 'Project State',
               prefixIcon: const Icon(Icons.flag_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
               fillColor: theme.cardColor,
             ),
-            items: _statusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+            items: _statusOptions
+                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                .toList(),
             onChanged: (v) => setState(() => _selectedStatus = v),
           ),
         ],

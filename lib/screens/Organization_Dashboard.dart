@@ -313,12 +313,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-              letterSpacing: 2.0,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                letterSpacing: 2.0,
+              ),
             ),
           ),
         ],

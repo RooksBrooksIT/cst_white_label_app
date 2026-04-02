@@ -68,6 +68,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   }
 
   Future<void> _fetchLabourData() async {
+    if (!mounted) return;
     setState(() => _loading = true);
 
     final scheduleQuery = await FirebaseFirestore.instance
@@ -142,6 +143,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       // Compute actualTotal as actualDays * actualAmountPerDay
       double computedActualTotal = fetchedActualDays * actualAmountPerDay;
 
+      if (!mounted) return;
       setState(() {
         _labourData = loadedLabourData;
         requestedTotal = (doc['estimatedPayment'] ?? 0).toDouble();
@@ -161,6 +163,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       // Use fetchedActualDays and actualAmountPerDay to compute actualTotal
       double computedActualTotal = fetchedActualDays * actualAmountPerDay;
 
+      if (!mounted) return;
       setState(() {
         _labourData = [];
         requestedTotal = 0;

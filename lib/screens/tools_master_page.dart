@@ -69,17 +69,21 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     });
     try {
       final snapshot = await FirestoreService.getCollection('tools').get();
+      if (!mounted) return;
       setState(() {
         _toolsList = snapshot.docs;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load tools: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isLoadingTools = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingTools = false;
+        });
+      }
     }
   }
 
@@ -498,6 +502,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Tool count updated successfully!')),
       );
@@ -505,6 +510,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       _fetchTools();
       _onToolSelected(_selectedToolDocId);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update tool count: ${e.toString()}')),
       );
@@ -563,6 +569,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         'tools',
       ).where('toolCode', isEqualTo: toolCode).get();
 
+      if (!mounted) return;
       if (codeDuplicateQuery.docs.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -606,6 +613,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         'toolsAtCompany',
       ).doc(toolCode).set({'toolCode': toolCode, 'availableCount': toolCount});
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Tool saved successfully!')));
@@ -621,13 +629,16 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       // Refresh tools list for update tab
       _fetchTools();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save tool: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 }

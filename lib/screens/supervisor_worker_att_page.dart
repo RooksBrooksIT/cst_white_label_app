@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/list_extensions.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   const AttendanceManagementPage({super.key});
@@ -42,6 +43,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
     try {
       final querySnapshot = await FirestoreService.getCollection('workerSiteMap').get();
+      if (!mounted) return;
       setState(() {
         _sites = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -85,6 +87,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         // Load existing attendance for today if any
         await _loadExistingAttendance(site);
 
+        if (!mounted) return;
         setState(() {
           _workers = workersList;
           _isLoadingWorkers = false;
@@ -99,6 +102,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       }
     } catch (e) {
       print('Error loading workers: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingWorkers = false;
       });
@@ -170,6 +174,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       return;
     }
 
+    if (!mounted) return;
     setState(() {
       _isSubmitting = true;
     });
@@ -206,6 +211,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       // Update workersSummary collection
       await _updateWorkersSummary(summaryDocId, workersData);
 
+      if (!mounted) return;
       setState(() {
         _isSubmitting = false;
       });
@@ -218,6 +224,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isSubmitting = false;
       });

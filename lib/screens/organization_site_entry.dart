@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/services/expense_service.dart';
@@ -112,6 +111,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         _onSiteSelected(selectedSiteId!);
       }
     } finally {
+      if (!mounted) return;
       setState(() {
         isLoadingSites = false;
       });
@@ -184,6 +184,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
       print('Loaded ${options.length} materials with prices: $prices');
 
+      if (!mounted) return;
       setState(() {
         materialOptions = options;
         materialPrices = prices;
@@ -244,6 +245,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
       print('Loaded ${options.length} labour types with salaries: $salaries');
 
+      if (!mounted) return;
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
@@ -528,6 +530,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             ],
           ),
         );
+        if (!mounted) return;
         setState(() {
           isSaving = false;
         });
@@ -545,6 +548,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
     } finally {
+      if (!mounted) return;
       setState(() {
         isSaving = false;
       });

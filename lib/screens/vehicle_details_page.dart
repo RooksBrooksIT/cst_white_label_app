@@ -205,11 +205,12 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
     }
 
     final lastVehicle = snapshot.docs.first;
-    final lastId = lastVehicle['id'] as String;
+    final lastId = lastVehicle['id'] as String? ?? 'VC000';
 
     // Extract number from last ID and increment
-    final number = int.parse(lastId.replaceAll('VC', ''));
-    return 'VC${(number + 1).toString().padLeft(3, '0')}';
+    final numberStr = lastId.replaceAll(RegExp(r'[^0-9]'), '');
+    final number = (int.tryParse(numberStr) ?? 0) + 1;
+    return 'VC${number.toString().padLeft(3, '0')}';
   }
 
   void _editVehicle() {

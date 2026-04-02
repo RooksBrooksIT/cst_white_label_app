@@ -53,8 +53,9 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
       return 'DV001';
     }
 
-    final lastDriverId = snapshot.docs.first['driverId'] as String;
-    final number = int.parse(lastDriverId.substring(2));
+    final lastDriverId = snapshot.docs.first['driverId'] as String? ?? 'DV000';
+    final numberStr = lastDriverId.replaceAll(RegExp(r'[^0-9]'), '');
+    final number = int.tryParse(numberStr) ?? 0;
     return 'DV${(number + 1).toString().padLeft(3, '0')}';
   }
 

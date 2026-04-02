@@ -3,7 +3,7 @@ import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
 import 'package:demo_cst/screens/config_materialavailability.dart';
-import 'package:demo_cst/screens/conflig_Materials.dart';
+import 'package:demo_cst/screens/config_materials.dart';
 import 'package:demo_cst/screens/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
@@ -53,7 +53,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   Future<void> _fetchManagerData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? name = prefs.getString('manager_name') ?? prefs.getString('org_name');
+      final String? name =
+          prefs.getString('manager_name') ?? prefs.getString('org_name');
       if (name != null && name.isNotEmpty) setState(() => _managerName = name);
     } catch (e) {
       debugPrint('Error fetching manager data: $e');
@@ -288,11 +289,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.logout_rounded,
-                color: colorScheme.error,
-                size: 24,
-              ),
+              Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
               const SizedBox(width: 12),
               Text(
                 'Logout',
@@ -441,12 +438,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              letterSpacing: 2.0,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                letterSpacing: 2.0,
+              ),
             ),
           ),
         ],
@@ -534,7 +533,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Manager Expenses': const ManagerExpensesHomeScreen(),
       'Layout and Drawings': const LayoutAndDrawingsPage(),
       'Tools Inventory': const ToolsInventoryPage(),
-      'Material Master': const MatlsScreen(),
+      'Material Master': const ConfigMaterialsScreen(),
       'Material Sub Category': const MatlsSubCat(),
       'Material Movements': const MaterialInfoScreen(),
       "Material Availability": const MaterialAvailability(),
@@ -543,6 +542,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         userName: '',
         userDetails: const {},
       ),
+      'Material Config': MaterialScreen(),
       'Workers Configuration': WorkersConfigPage(),
       'Workers Site Mapping': WorkerMappingPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),

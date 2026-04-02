@@ -55,6 +55,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
       }
     }
 
+    if (!mounted) return;
     setState(() {
       _siteIds = siteIds.toList();
       _siteSupervisors = siteSupervisors;

@@ -4,6 +4,7 @@ import 'package:demo_cst/screens/daily_site_report.dart';
 import 'package:demo_cst/screens/site_expenses_reportpage.dart';
 import 'package:demo_cst/screens/site_summary_page.dart';
 import 'package:intl/intl.dart';
+import '../utils/list_extensions.dart';
 
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -260,10 +261,13 @@ class _OrganizationInsightsScreenState
               .toSet()
               .toList();
 
-          selectedSupervisorEntry ??= supervisorEntries.firstWhere(
-            (entry) => entry.siteId == uniqueSiteIds.first,
-            orElse: () => supervisorEntries.first,
-          );
+          if (uniqueSiteIds.isNotEmpty) {
+            selectedSupervisorEntry ??= supervisorEntries.firstWhereOrNull(
+              (entry) => entry.siteId == uniqueSiteIds.first,
+            ) ?? supervisorEntries.firstOrNull;
+          } else {
+            selectedSupervisorEntry ??= supervisorEntries.firstOrNull;
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
