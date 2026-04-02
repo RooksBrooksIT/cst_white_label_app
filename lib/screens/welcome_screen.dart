@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/app_theme.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
 import '../utils/responsive.dart';
+import '../utils/firestore_error_handler.dart';
+import '../services/firestore_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -81,22 +82,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
                   setDialogState(() => isLoading = true);
                   try {
-                    final referralDoc = await FirebaseFirestore.instance
-                        .collection('referralCodes')
-                        .doc(code)
-                        .get();
+                    // Search organization ID by scanning across all admin/referal documents
+                    final orgId =
+                        await FirestoreService.findOrgIdByReferralCode(code);
 
-                    if (referralDoc.exists) {
-                      final dynamicPath =
-                          referralDoc.data()?['dynamicPath'] as String?;
-                      if (dynamicPath != null) {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString('temp_org_path', dynamicPath);
+                    if (orgId != null) {
+                      final prefs = await SharedPreferences.getInstance();
+                      // Dynamic path to organization details
+                      await prefs.setString('temp_org_path', orgId);
 
-                        if (mounted) {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/authSelection');
-                        }
+                      if (mounted) {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/authSelection');
                       }
                     } else {
                       if (mounted) {
@@ -108,10 +105,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       }
                     }
                   } catch (e) {
+                    debugPrint('Referral check error: $e');
                     if (mounted) {
-                      ScaffoldMessenger.of(
+                      FirestoreErrorHandler.handleError(
                         context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        e,
+                        title: 'Registration Error',
+                      );
                     }
                   } finally {
                     setDialogState(() => isLoading = false);

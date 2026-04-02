@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class MaterialRequestForm extends StatefulWidget {
   final String supervisorId;
@@ -38,10 +39,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   bool isLoadingSupervisorData = true;
 
   // Color scheme
-  final Color primaryColor = const Color(0xFF0B3470);
-  final Color accentColor = Color(0xFF4CAF50);
-  final Color errorColor = Color(0xFFE53935);
-  final Color backgroundColor = Color(0xFFF5F7FA);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get accentColor => Theme.of(context).colorScheme.secondary;
+  Color get errorColor => Theme.of(context).colorScheme.error;
+  Color get backgroundColor => Theme.of(context).colorScheme.surface;
 
   // Material dropdown data
   List<Map<String, dynamic>> materialDocs = [];
@@ -395,7 +396,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         labelText: label,
         labelStyle: TextStyle(color: primaryColor),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+          borderSide: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: primaryColor, width: 2),
@@ -424,9 +425,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       margin: EdgeInsets.only(top: 20, bottom: 8),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.1),
+        color: primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: primaryColor.withOpacity(0.3)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -461,7 +462,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             labelStyle: TextStyle(color: primaryColor),
             hintText: 'Select Date',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+              borderSide: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
             ),
             focusedBorder: OutlineInputBorder(
               borderSide: BorderSide(color: primaryColor, width: 2),
@@ -478,42 +479,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: ThemeData(
-        primaryColor: primaryColor,
-        colorScheme: ColorScheme.light(primary: primaryColor),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: EdgeInsets.symmetric(vertical: 14),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: primaryColor,
-          ),
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        appBar: AppBar(
-          title: Text('Material Request Form',style: TextStyle(),),
-          centerTitle: true,
-          elevation: 0,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [primaryColor.withOpacity(0.8), primaryColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-        ),
-        body: isLoadingSupervisorData
+    return GlassScaffold(
+      title: 'Material Request Form',
+      onBack: () => Navigator.pop(context),
+      body: isLoadingSupervisorData
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -540,10 +509,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                         padding: EdgeInsets.all(12),
                         margin: EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: errorColor.withOpacity(0.1),
+                          color: errorColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border:
-                              Border.all(color: errorColor.withOpacity(0.3)),
+                              Border.all(color: errorColor.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
@@ -831,6 +800,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                             onPressed: _sendForApproval,
                             style: ElevatedButton.styleFrom(
                               elevation: 2,
+                              backgroundColor: primaryColor,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -851,7 +822,6 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                   ],
                 ),
               ),
-      ),
     );
   }
 }

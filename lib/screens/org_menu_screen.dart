@@ -3,9 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
-import 'package:demo_cst/services/firestore_service.dart';
 import 'organisation_loginPage.dart';
 import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
@@ -23,9 +23,6 @@ class OrgMenuScreen extends StatefulWidget {
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
   String _orgCode = 'Loading...';
-  String _managerCode = 'Loading...';
-  String _supervisorCode = 'Loading...';
-  String _customerCode = 'Loading...';
   String _orgName = 'Organization User';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
@@ -43,46 +40,43 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       final String? name = prefs.getString('org_name');
       if (name != null && mounted) setState(() => _orgName = name);
 
-      // Fetch dynamic organization and subscription data
-      final String? dynamicPath = prefs.getString('org_dynamic_path');
-      if (dynamicPath != null && dynamicPath.isNotEmpty) {
-        final subDoc = await FirestoreService.getCollection(
-          'admin',
-        ).doc('data').get();
+      // Fetch referal codes using centralized FirestoreService path resolution
+      final referalDoc = await FirestoreService.referralDoc.get();
 
-        if (subDoc.exists && mounted) {
-          final subData = subDoc.data()!;
-          setState(() {
-            _orgCode =
-                subData['orgReferralCode'] ??
-                subData['referralCode'] ??
-                'Not Set';
-            _managerCode = subData['managerReferralCode'] ?? 'Not Set';
-            _supervisorCode = subData['supervisorReferralCode'] ?? 'Not Set';
-            _customerCode = subData['customerReferralCode'] ?? 'Not Set';
+      if (referalDoc.exists && mounted) {
+        final refData = referalDoc.data()!;
+        setState(() {
+          _orgCode =
+              refData['orgReferralCode'] ??
+              refData['referralCode'] ??
+              'Not Set';
+        });
+      }
 
-            _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';
-            _isSubscriptionActive = subData['isSubscriptionActive'] ?? false;
+      // Fetch subscription data
+      final subDoc = await FirestoreService.subscriptionDoc.get();
 
-            final expiry = subData['subscriptionEndDate'];
-            if (expiry is Timestamp) {
-              _subscriptionExpiry = DateFormat(
-                'dd MMM yyyy',
-              ).format(expiry.toDate());
-            } else {
-              _subscriptionExpiry = 'Never';
-            }
-          });
-        }
+      if (subDoc.exists && mounted) {
+        final subData = subDoc.data()!;
+        setState(() {
+          _subscriptionPlan = subData['subscriptionPlan'] ?? 'No Plan';
+          _isSubscriptionActive = subData['isSubscriptionActive'] ?? false;
+
+          final expiry = subData['subscriptionEndDate'];
+          if (expiry is Timestamp) {
+            _subscriptionExpiry = DateFormat(
+              'dd MMM yyyy',
+            ).format(expiry.toDate());
+          } else {
+            _subscriptionExpiry = 'Never';
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error fetching org data: $e');
       if (mounted) {
         setState(() {
           _orgCode = 'Error';
-          _managerCode = 'Error';
-          _supervisorCode = 'Error';
-          _customerCode = 'Error';
           _subscriptionPlan = 'Error';
         });
       }
@@ -131,7 +125,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -204,13 +201,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
           ),
           const SizedBox(height: 20),
-          _buildCodeRow('Organization', _orgCode, colorScheme),
-          const SizedBox(height: 12),
-          // _buildCodeRow('Manager', _managerCode, colorScheme),
-          // const SizedBox(height: 12),
-          // _buildCodeRow('Supervisor', _supervisorCode, colorScheme),
-          // const SizedBox(height: 12),
-          // _buildCodeRow('Customer', _customerCode, colorScheme),
+          _buildCodeRow('Referral', _orgCode, colorScheme),
         ],
       ),
     );

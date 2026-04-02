@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/glass_scaffold.dart';
 
 class LayoutAndDrawingsPage extends StatefulWidget {
   const LayoutAndDrawingsPage({super.key});
@@ -20,8 +21,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
 
   List<Map<String, String>> uploadedDocuments = [];
 
-  final Color primaryColor = const Color(0xFF0b3470);
-  final Color accentColor = const Color(0xFF073060);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get accentColor => Theme.of(context).colorScheme.primary;
   final Color backgroundColor = const Color(0xFFF5F7FA);
 
   List<Map<String, String>> allSites = [];
@@ -160,21 +161,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Layout and Drawings',
-          style: TextStyle(),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 5,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
-        ),
-        shadowColor: primaryColor.withOpacity(0.6),
-      ),
+    return GlassScaffold(
+      title: 'Layout and Drawings',
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
         child: Column(

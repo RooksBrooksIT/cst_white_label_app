@@ -14,7 +14,8 @@ class MaterialScreen extends StatefulWidget {
   State<MaterialScreen> createState() => _MaterialScreenState();
 }
 
-class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProviderStateMixin {
+class _MaterialScreenState extends State<MaterialScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _updateFormKey = GlobalKey<FormState>();
   late TabController _tabController;
@@ -30,6 +31,7 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
   final materialNameController = TextEditingController();
   final unitPriceController = TextEditingController();
   final descriptionController = TextEditingController();
+  final materialUnitController = TextEditingController();
 
   List<Map<String, dynamic>> categories = [];
   List<Map<String, dynamic>> subCategories = [];
@@ -69,138 +71,226 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
     updateMaterialIdController.dispose();
     updateMaterialUnitController.dispose();
     updateMaterialPriceController.dispose();
+    materialUnitController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchCategories() async {
-    setState(() => isLoadingCategories = true);
-    final snapshot = await FirestoreService.materialCategories.get();
-    categories = snapshot.docs.map((doc) => {'ref': doc.reference, 'name': doc['matCategory'] as String}).toList();
-    if (categories.isNotEmpty) {
-      selectedCategoryRef = categories.first['ref'];
-      selectedCategoryName = categories.first['name'];
-      await _fetchSubCategories();
+    if (mounted) setState(() => isLoadingCategories = true);
+    try {
+      final snapshot = await FirestoreService.materialCategories.get();
+      if (!mounted) return;
+      categories = snapshot.docs
+          .map(
+            (doc) => {
+              'ref': doc.reference,
+              'name': doc['matCategory'] as String,
+            },
+          )
+          .toList();
+      if (categories.isNotEmpty) {
+        selectedCategoryRef = categories.first['ref'];
+        selectedCategoryName = categories.first['name'];
+        await _fetchSubCategories();
+      }
+    } finally {
+      if (mounted) setState(() => isLoadingCategories = false);
     }
-    setState(() => isLoadingCategories = false);
   }
 
   Future<void> _fetchSubCategories() async {
     if (selectedCategoryRef == null) {
-      setState(() {
-        subCategories = [];
-        selectedSubCategoryRef = null;
-        selectedUnitName = null;
-      });
+      if (mounted) {
+        setState(() {
+          subCategories = [];
+          selectedSubCategoryRef = null;
+          selectedUnitName = null;
+        });
+      }
       return;
     }
-    setState(() => isLoadingSubCategories = true);
-    final snapshot = await FirestoreService.materialSubCategories
-        .where('matCategory', isEqualTo: selectedCategoryRef)
-        .get();
-    subCategories = snapshot.docs.map((doc) => {
-      'ref': doc.reference,
-      'name': doc['matSubCategory'] as String,
-      'unitRef': doc['matUnit'] as DocumentReference,
-    }).toList();
-    if (subCategories.isNotEmpty) {
-      selectedSubCategoryRef = subCategories.first['ref'];
-      selectedSubCategoryName = subCategories.first['name'];
-      await _fetchUnitName(subCategories.first['unitRef']);
-    } else {
-      selectedSubCategoryRef = null;
-      selectedUnitName = null;
+    if (mounted) setState(() => isLoadingSubCategories = true);
+    try {
+      final snapshot = await FirestoreService.materialSubCategories
+          .where('matCategory', isEqualTo: selectedCategoryRef)
+          .get();
+      if (!mounted) return;
+      subCategories = snapshot.docs
+          .map(
+            (doc) => {
+              'ref': doc.reference,
+              'name': doc['matSubCategory'] as String,
+              'unitRef': doc['matUnit'] as DocumentReference,
+            },
+          )
+          .toList();
+      if (subCategories.isNotEmpty) {
+        selectedSubCategoryRef = subCategories.first['ref'];
+        selectedSubCategoryName = subCategories.first['name'];
+        await _fetchUnitName(subCategories.first['unitRef']);
+      } else {
+        selectedSubCategoryRef = null;
+        selectedUnitName = null;
+      }
+      _updateMaterialName();
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingSubCategories = false);
+      }
     }
-    _updateMaterialName();
-    setState(() => isLoadingSubCategories = false);
   }
 
   Future<void> _fetchUnitName(DocumentReference unitRef) async {
-    setState(() => isLoadingUnits = true);
-    final doc = await unitRef.get();
-    selectedUnitRef = unitRef;
-    selectedUnitName = doc['matUnit'] as String;
-    setState(() => isLoadingUnits = false);
+    if (mounted) setState(() => isLoadingUnits = true);
+    try {
+      final doc = await unitRef.get();
+      if (!mounted) return;
+      selectedUnitRef = unitRef;
+      selectedUnitName = doc['matUnit'] as String;
+      materialUnitController.text = selectedUnitName ?? '';
+    } finally {
+      if (mounted) setState(() => isLoadingUnits = false);
+    }
   }
 
   Future<void> _fetchNextMaterialId() async {
-    setState(() => isLoadingMaterialId = true);
-    final snapshot = await FirestoreService.materials.orderBy('materialId', descending: true).limit(1).get();
-    if (snapshot.docs.isNotEmpty) {
-      final String lastId = snapshot.docs.first['materialId'];
-      final int lastNum = int.tryParse(lastId.replaceAll('MT', '')) ?? 0;
-      materialIdController.text = 'MT${(lastNum + 1).toString().padLeft(3, '0')}';
-    } else {
-      materialIdController.text = 'MT001';
+    if (mounted) setState(() => isLoadingMaterialId = true);
+    try {
+      final snapshot = await FirestoreService.materials
+          .orderBy('materialId', descending: true)
+          .limit(1)
+          .get();
+      if (!mounted) return;
+      if (snapshot.docs.isNotEmpty) {
+        final String lastId = snapshot.docs.first['materialId'];
+        final int lastNum = int.tryParse(lastId.replaceAll('MT', '')) ?? 0;
+        materialIdController.text =
+            'MT${(lastNum + 1).toString().padLeft(3, '0')}';
+      } else {
+        materialIdController.text = 'MT001';
+      }
+    } finally {
+      if (mounted) setState(() => isLoadingMaterialId = false);
     }
-    setState(() => isLoadingMaterialId = false);
   }
 
   void _updateMaterialName() {
-    if ((selectedCategoryName ?? '').isNotEmpty && (selectedSubCategoryName ?? '').isNotEmpty) {
-      materialNameController.text = '${selectedCategoryName}_$selectedSubCategoryName';
+    if ((selectedCategoryName ?? '').isNotEmpty &&
+        (selectedSubCategoryName ?? '').isNotEmpty) {
+      materialNameController.text =
+          '${selectedCategoryName}_$selectedSubCategoryName';
     } else {
       materialNameController.text = '';
     }
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _saveForm() async {
     if (!_formKey.currentState!.validate() || _isSaving || _isSaved) return;
     setState(() => _isSaving = true);
 
+    final name = materialNameController.text.trim();
+    final price = unitPriceController.text;
+    final description = descriptionController.text;
+
     try {
       final materialsRef = FirestoreService.getCollection('materials');
-      final duplicate = await materialsRef.where('materialName', isEqualTo: materialNameController.text.trim()).get();
+      final duplicate = await materialsRef
+          .where('materialName', isEqualTo: name)
+          .get();
       if (duplicate.docs.isNotEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name already exists'), backgroundColor: Colors.red));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Name already exists'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
 
-      final counterRef = FirestoreService.getCollection('counters').doc('materials');
+      final counterRef = FirestoreService.getCollection(
+        'counters',
+      ).doc('materials');
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final counterSnap = await transaction.get(counterRef);
-        int nextNum = (counterSnap.exists ? (counterSnap.get('lastMaterialId') ?? 0) : 0) + 1;
+        int nextNum =
+            (counterSnap.exists
+                ? (counterSnap.get('lastMaterialId') ?? 0)
+                : 0) +
+            1;
         String id = 'MT${nextNum.toString().padLeft(3, '0')}';
 
         transaction.set(materialsRef.doc(id), {
           'materialId': id,
-          'materialName': materialNameController.text.trim(),
+          'materialName': name,
           'materialCategory': selectedCategoryRef,
           'materialSubCategory': selectedSubCategoryRef,
           'materialUnit': selectedUnitRef,
-          'materialPrice': unitPriceController.text,
-          'description': descriptionController.text,
+          'materialPrice': price,
+          'description': description,
           'createdAt': FieldValue.serverTimestamp(),
         });
-        transaction.set(counterRef, {'lastMaterialId': nextNum}, SetOptions(merge: true));
+        transaction.set(counterRef, {
+          'lastMaterialId': nextNum,
+        }, SetOptions(merge: true));
       });
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material Saved'), backgroundColor: Colors.green));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Material Saved'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
       _resetForm();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   void _resetForm() {
+    if (!mounted) return;
     materialNameController.clear();
     unitPriceController.clear();
     descriptionController.clear();
-    setState(() {
-      _isSaved = false;
-      _fetchCategories();
-      _fetchNextMaterialId();
-    });
+    materialUnitController.clear();
+    if (mounted) {
+      setState(() {
+        _isSaved = false;
+        _fetchCategories();
+        _fetchNextMaterialId();
+      });
+    }
   }
 
   Future<void> _fetchMaterials() async {
-    setState(() => isLoadingMaterials = true);
-    final snapshot = await FirestoreService.materials.orderBy('materialId').get();
-    materials = snapshot.docs.map((doc) => {'ref': doc.reference, ...doc.data() as Map<String, dynamic>}).toList();
-    setState(() => isLoadingMaterials = false);
+    if (mounted) setState(() => isLoadingMaterials = true);
+    try {
+      final snapshot = await FirestoreService.materials
+          .orderBy('materialId')
+          .get();
+      if (!mounted) return;
+      materials = snapshot.docs
+          .map(
+            (doc) => {
+              'ref': doc.reference,
+              ...doc.data() as Map<String, dynamic>,
+            },
+          )
+          .toList();
+    } finally {
+      if (mounted) setState(() => isLoadingMaterials = false);
+    }
   }
 
   void _onMaterialSelected(Map<String, dynamic> data) async {
@@ -212,12 +302,13 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
 
     if (data['materialUnit'] is DocumentReference) {
       final unitSnap = await (data['materialUnit'] as DocumentReference).get();
+      if (!mounted) return;
       selectedMaterialUnit = unitSnap['matUnit'] as String?;
     } else {
       selectedMaterialUnit = data['materialUnit']?.toString();
     }
     updateMaterialUnitController.text = selectedMaterialUnit ?? '';
-    setState(() => isEditingPrice = false);
+    if (mounted) setState(() => isEditingPrice = false);
   }
 
   @override
@@ -225,16 +316,23 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Config',
+      appBarBackgroundColor: theme.colorScheme.primary,
+      appBarForegroundColor: theme.colorScheme.onPrimary,
       body: Column(
         children: [
           Container(
             color: theme.cardColor,
             child: TabBar(
               controller: _tabController,
-              tabs: const [Tab(text: 'NEW MATERIAL'), Tab(text: 'UPDATE MATERIAL')],
-              labelColor: theme.primaryColor,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: const [
+                Tab(text: 'NEW MATERIAL'),
+                Tab(text: 'UPDATE MATERIAL'),
+              ],
+              labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.primaryColor,
+              indicatorColor: theme.colorScheme.primary,
               indicatorWeight: 3,
             ),
           ),
@@ -261,16 +359,35 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Core Details', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Core Details',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  GlassTextField(controller: materialIdController, label: 'Material ID', icon: Icons.tag, readOnly: true),
+                  GlassTextField(
+                    controller: materialIdController,
+                    label: 'Material ID',
+                    icon: Icons.tag,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 12),
                   _buildDropdown(
                     label: 'Category',
                     value: selectedCategoryRef?.path,
-                    items: categories.map((c) => DropdownMenuItem(value: (c['ref'] as DocumentReference).path, child: Text(c['name']))).toList(),
+                    items: categories
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: (c['ref'] as DocumentReference).path,
+                            child: Text(c['name']),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) {
-                      final cat = categories.firstWhere((c) => (c['ref'] as DocumentReference).path == v);
+                      final cat = categories.firstWhere(
+                        (c) => (c['ref'] as DocumentReference).path == v,
+                      );
                       setState(() {
                         selectedCategoryRef = cat['ref'];
                         selectedCategoryName = cat['name'];
@@ -282,9 +399,18 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
                   _buildDropdown(
                     label: 'Sub Category',
                     value: selectedSubCategoryRef?.path,
-                    items: subCategories.map((s) => DropdownMenuItem(value: (s['ref'] as DocumentReference).path, child: Text(s['name']))).toList(),
+                    items: subCategories
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: (s['ref'] as DocumentReference).path,
+                            child: Text(s['name']),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) {
-                      final sub = subCategories.firstWhere((s) => (s['ref'] as DocumentReference).path == v);
+                      final sub = subCategories.firstWhere(
+                        (s) => (s['ref'] as DocumentReference).path == v,
+                      );
                       setState(() {
                         selectedSubCategoryRef = sub['ref'];
                         selectedSubCategoryName = sub['name'];
@@ -295,7 +421,12 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
                     },
                   ),
                   const SizedBox(height: 12),
-                  GlassTextField(controller: materialNameController, label: 'Material Name', icon: Icons.label_outline, readOnly: true),
+                  GlassTextField(
+                    controller: materialNameController,
+                    label: 'Material Name',
+                    icon: Icons.label_outline,
+                    readOnly: true,
+                  ),
                 ],
               ),
             ),
@@ -304,9 +435,19 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Pricing & Specs', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Pricing & Specs',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  GlassTextField(controller: TextEditingController(text: selectedUnitName ?? ''), label: 'Unit', icon: Icons.square_foot, readOnly: true),
+                  GlassTextField(
+                    controller: materialUnitController,
+                    label: 'Unit',
+                    icon: Icons.square_foot,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 12),
                   GlassTextField(
                     controller: unitPriceController,
@@ -317,16 +458,32 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
                     validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
-                  GlassTextField(controller: descriptionController, label: 'Description', icon: Icons.description_outlined, maxLines: 3),
+                  GlassTextField(
+                    controller: descriptionController,
+                    label: 'Description',
+                    icon: Icons.description_outlined,
+                    maxLines: 3,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
             Row(
               children: [
-                Expanded(child: GlassButton(label: 'SAVE MATERIAL', onPressed: _isSaving ? null : _saveForm)),
+                Expanded(
+                  child: GlassButton(
+                    label: 'SAVE MATERIAL',
+                    onPressed: _isSaving ? null : _saveForm,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                GlassButton(label: 'RESET', onPressed: _resetForm, isSecondary: true),
+                Expanded(
+                  child: GlassButton(
+                    label: 'RESET',
+                    onPressed: _resetForm,
+                    isSecondary: true,
+                  ),
+                ),
               ],
             ),
           ],
@@ -347,20 +504,45 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Search Material', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Search Material',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Autocomplete<Map<String, dynamic>>(
-                    optionsBuilder: (v) => materials.where((m) => m['materialName'].toString().toLowerCase().contains(v.text.toLowerCase())),
+                    optionsBuilder: (v) => materials.where(
+                      (m) => m['materialName']
+                          .toString()
+                          .toLowerCase()
+                          .contains(v.text.toLowerCase()),
+                    ),
                     displayStringForOption: (m) => m['materialName'].toString(),
                     fieldViewBuilder: (ctx, ctrl, node, onSub) {
-                      return GlassTextField(controller: ctrl, node: node, label: 'Material Name', icon: Icons.search);
+                      return GlassTextField(
+                        controller: ctrl,
+                        node: node,
+                        label: 'Material Name',
+                        icon: Icons.search,
+                      );
                     },
                     onSelected: _onMaterialSelected,
                   ),
                   const SizedBox(height: 12),
-                  GlassTextField(controller: updateMaterialIdController, label: 'Material ID', icon: Icons.tag, readOnly: true),
+                  GlassTextField(
+                    controller: updateMaterialIdController,
+                    label: 'Material ID',
+                    icon: Icons.tag,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 12),
-                  GlassTextField(controller: updateMaterialUnitController, label: 'Unit', icon: Icons.square_foot, readOnly: true),
+                  GlassTextField(
+                    controller: updateMaterialUnitController,
+                    label: 'Unit',
+                    icon: Icons.square_foot,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -371,13 +553,22 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
                           icon: Icons.currency_rupee,
                           readOnly: !isEditingPrice,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
-                      IconButton.filledTonal(
-                        onPressed: selectedMaterialRef == null ? null : () => setState(() => isEditingPrice = !isEditingPrice),
-                        icon: Icon(isEditingPrice ? Icons.close : Icons.edit),
+                      Flexible(
+                        flex: 0,
+                        child: IconButton.filledTonal(
+                          onPressed: selectedMaterialRef == null
+                              ? null
+                              : () => setState(
+                                  () => isEditingPrice = !isEditingPrice,
+                                ),
+                          icon: Icon(isEditingPrice ? Icons.close : Icons.edit),
+                        ),
                       ),
                     ],
                   ),
@@ -389,10 +580,19 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
               GlassButton(
                 label: 'UPDATE PRICE',
                 onPressed: () async {
-                  await selectedMaterialRef!.update({'materialPrice': updateMaterialPriceController.text});
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Price Updated'), backgroundColor: Colors.green));
+                  await selectedMaterialRef!.update({
+                    'materialPrice': updateMaterialPriceController.text,
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Price Updated'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                   _fetchMaterials();
-                  setState(() => isEditingPrice = false);
+                  if (mounted) setState(() => isEditingPrice = false);
                 },
               ),
           ],
@@ -401,14 +601,29 @@ class _MaterialScreenState extends State<MaterialScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildDropdown({required String label, required String? value, required List<DropdownMenuItem<String>> items, required Function(String?) onChanged}) {
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required Function(String?) onChanged,
+  }) {
     final theme = Theme.of(context);
     return DropdownButtonFormField<String>(
-      value: (value != null && items.any((i) => i.value == value)) ? value : null,
+      value: (value != null && items.any((i) => i.value == value))
+          ? value
+          : null,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.list_alt, size: 20),
+        prefixIcon: Icon(
+          Icons.list_alt,
+          size: 20,
+          color: theme.colorScheme.primary,
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.dividerColor),
+        ),
         filled: true,
         fillColor: theme.cardColor,
       ),

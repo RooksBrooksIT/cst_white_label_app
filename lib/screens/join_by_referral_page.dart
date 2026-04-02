@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 
 class JoinByReferralPage extends StatefulWidget {
   const JoinByReferralPage({super.key});
@@ -25,28 +25,21 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
 
     setState(() => _isLoading = true);
     try {
-      final referralDoc = await FirebaseFirestore.instance
-          .collection('referralCodes')
-          .doc(code)
-          .get();
+      // Search for organization ID across all admin/referal documents
+      final orgId = await FirestoreService.findOrgIdByReferralCode(code);
 
-      if (referralDoc.exists) {
-          final dynamicPath = referralDoc.data()?['dynamicPath'] as String?;
-          final role = referralDoc.data()?['role'] as String? ?? 'organization';
-          
-          if (dynamicPath != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('temp_org_path', dynamicPath);
-            await prefs.setString('temp_referral_role', role);
-            await prefs.setString('temp_referral_code', code);
+      if (orgId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('temp_org_path', orgId);
+        await prefs.setString('temp_referral_role', 'organization');
+        await prefs.setString('temp_referral_code', code);
 
-          if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/authSelection',
-              (route) => route.settings.name == '/landing',
-            );
-          }
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/authSelection',
+            (route) => route.settings.name == '/landing',
+          );
         }
       } else {
         if (mounted) {

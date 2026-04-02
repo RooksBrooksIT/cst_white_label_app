@@ -96,13 +96,14 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       builder: (context, child) {
+        final cs = Theme.of(context).colorScheme;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: Theme.of(context).primaryColor,
-              onPrimary: Colors.white,
-              surface: const Color(0xFF1A1A1A),
-              onSurface: Colors.white,
+            colorScheme: cs.copyWith(
+              primary: cs.primary,
+              onPrimary: cs.onPrimary,
+              surface: cs.surface,
+              onSurface: cs.onSurface,
             ),
           ),
           child: child!,
@@ -456,10 +457,10 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }
@@ -488,19 +489,20 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
       value: value,
       onChanged: onChanged,
       isExpanded: true,
-      dropdownColor: Colors.blueGrey[900],
-      style: const TextStyle(color: Colors.white),
+      dropdownColor: cs.surfaceContainerHighest,
+      style: TextStyle(color: cs.onSurface),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-        prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, color: Theme.of(context).primaryColor),
+        labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, color: cs.primary),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: cs.surface.withOpacity(0.05),
       ),
       items: items.map((String item) {
         return DropdownMenuItem<String>(
@@ -508,7 +510,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
           child: Text(
             item,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: cs.onSurface),
           ),
         );
       }).toList(),
@@ -516,24 +518,25 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }
 
   Widget _buildDatePicker() {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: () => _selectDate(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: cs.surface.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: cs.onSurface.withOpacity(0.1)),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, color: Theme.of(context).primaryColor, size: 20),
+            Icon(Icons.calendar_today, color: cs.primary, size: 20),
             const SizedBox(width: 12),
             Text(
               _selectedDate == null
                   ? 'Select Date'
                   : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(color: cs.onSurface, fontSize: 16),
             ),
           ],
         ),
@@ -542,9 +545,10 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }
 
   Widget _buildToolsTable() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
       ),
       child: ClipRRect(
@@ -552,7 +556,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         child: Column(
           children: [
             Container(
-              color: Colors.grey.shade100,
+              color: cs.primary.withOpacity(0.1),
               padding: EdgeInsets.symmetric(
                 vertical: Responsive.scaleV(context, 12),
                 horizontal: Responsive.scaleH(context, 8),
@@ -566,6 +570,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
                     ),
                   ),
@@ -576,6 +581,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
                     ),
                   ),
@@ -586,6 +592,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -598,7 +605,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
               final tool = _addedTools[index];
               return Container(
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  border: Border(top: BorderSide(color: cs.outlineVariant)),
                 ),
                 padding: EdgeInsets.symmetric(
                   vertical: Responsive.scaleV(context, 8),
@@ -610,28 +617,37 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
                       flex: 3,
                       child: Text(
                         tool['name'] ?? '',
-                        style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
+                        ),
                       ),
                     ),
                     Expanded(
                       flex: 2,
                       child: Text(
                         tool['toolCode'] ?? '',
-                        style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
+                        ),
                       ),
                     ),
                     Expanded(
                       flex: 1,
                       child: Text(
                         tool['count'].toString(),
-                        style: TextStyle(fontSize: Responsive.fontSize(context, 14)),
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     IconButton(
                       icon: Icon(
                         Icons.delete_outline,
-                        color: Colors.red.shade400,
+                        color: cs.error,
                         size: Responsive.scaleH(context, 20),
                       ),
                       onPressed: () => setState(() => _addedTools.removeAt(index)),
@@ -656,8 +672,9 @@ class _AvailableCountWithWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     if (availableCount == null) return const SizedBox.shrink();
 
+    final cs = Theme.of(context).colorScheme;
     final bool isLow = availableCount! < 5;
-    final Color color = isLow ? Colors.red.shade700 : Colors.green.shade700;
+    final Color color = isLow ? cs.error : Colors.green.shade700;
 
     return Padding(
       padding: EdgeInsets.only(top: Responsive.scaleV(context, 4)),

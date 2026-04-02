@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
 
 class MatlsSubCat extends StatefulWidget {
   const MatlsSubCat({super.key});
@@ -11,8 +14,6 @@ class MatlsSubCat extends StatefulWidget {
 
 class _MatlsSubCatState extends State<MatlsSubCat> {
   // Constants
-  static const Color primaryColor = Color(0xFF0b3470); // Updated primary color
-  static const Color cardColor = Color(0xFFF5F5F5);
   static const double defaultPadding = 16.0;
   static const double borderRadius = 12.0; // larger radius for modern look
   static const double cardElevation = 4.0; // subtle shadow uplift
@@ -129,7 +130,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(borderRadius),
@@ -203,193 +204,148 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: cardColor,
-      appBar: AppBar(
-        title: const Text(
-          'Material Sub Category Master',
-          style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5,),
-        ),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        elevation: 2,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
-      ),
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
+    return GlassScaffold(
+      title: 'Material Sub Category Master',
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-              ),
+              child: CircularProgressIndicator(),
             )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
-              child: Card(
-                elevation: cardElevation,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(borderRadius),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Add New Sub Category',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                          letterSpacing: 0.3,
-                        ),
+              child: GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add New Sub Category',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                        letterSpacing: 0.3,
                       ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Material Category',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          
-                        ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Material Category',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<DocumentSnapshot>(
-                        value: _selectedCategory,
-                        decoration: InputDecoration(
-                          hintText: 'Select category',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(borderRadius),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<DocumentSnapshot>(
+                      value: _selectedCategory,
+                      decoration: InputDecoration(
+                        hintText: 'Select category',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(borderRadius),
+                        ),
+                        filled: true,
+                        prefixIcon: Icon(Icons.category, color: primaryColor),
+                      ),
+                      isExpanded: true,
+                      dropdownColor: theme.cardColor,
+                      items: _categories.map((cat) {
+                        final data = cat.data() as Map<String, dynamic>? ?? {};
+                        final displayName =
+                            data['matCategory']?.toString() ?? cat.id;
+                        return DropdownMenuItem(
+                          value: cat,
+                          child: Text(
+                            displayName,
+                            style: const TextStyle(fontSize: 15),
                           ),
-                          filled: true,
-                          
-                          prefixIcon: const Icon(Icons.category, color: primaryColor),
-                        ),
-                        isExpanded: true,
-                        items: _categories.map((cat) {
-                          final data =
-                              cat.data() as Map<String, dynamic>? ?? {};
-                          final displayName =
-                              data['matCategory']?.toString() ?? cat.id;
-                          return DropdownMenuItem(
-                            value: cat,
-                            child: Text(
-                              displayName,
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) =>
-                            setState(() => _selectedCategory = value),
+                        );
+                      }).toList(),
+                      onChanged: (value) =>
+                          setState(() => _selectedCategory = value),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Material Unit',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Material Unit',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<DocumentSnapshot>(
+                      value: _selectedUnit,
+                      decoration: InputDecoration(
+                        hintText: 'Select unit',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(borderRadius),
                         ),
+                        filled: true,
+                        prefixIcon: Icon(Icons.straighten, color: primaryColor),
                       ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<DocumentSnapshot>(
-                        value: _selectedUnit,
-                        decoration: InputDecoration(
-                          hintText: 'Select unit',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(borderRadius),
+                      isExpanded: true,
+                      dropdownColor: theme.cardColor,
+                      items: _units.map((unit) {
+                        final data = unit.data() as Map<String, dynamic>? ?? {};
+                        final displayName =
+                            data['matUnit']?.toString() ?? unit.id;
+                        return DropdownMenuItem(
+                          value: unit,
+                          child: Text(
+                            displayName,
+                            style: const TextStyle(fontSize: 15),
                           ),
-                          filled: true,
-                          
-                          prefixIcon: const Icon(Icons.straighten, color: primaryColor),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setState(() => _selectedUnit = value),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Material Sub Category',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _subCategoryController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter sub category',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(borderRadius),
                         ),
-                        isExpanded: true,
-                        items: _units.map((unit) {
-                          final data =
-                              unit.data() as Map<String, dynamic>? ?? {};
-                          final displayName =
-                              data['matUnit']?.toString() ?? unit.id;
-                          return DropdownMenuItem(
-                            value: unit,
-                            child: Text(
-                              displayName,
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) => setState(() => _selectedUnit = value),
+                        filled: true,
+                        prefixIcon:
+                            Icon(Icons.label_important, color: primaryColor),
                       ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Material Sub Category',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'SAVE',
+                            onPressed:
+                                _loading ? null : _showSaveConfirmationDialog,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _subCategoryController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter sub category',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(borderRadius),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'CANCEL',
+                            onPressed: _loading
+                                ? null
+                                : () {
+                                    _cancel();
+                                    Navigator.of(context).pop();
+                                  },
+                            isSecondary: true,
                           ),
-                          filled: true,
-                          
-                          prefixIcon: const Icon(Icons.label_important, color: primaryColor),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.save, size: 20),
-                              label: const Text(
-                                'SAVE',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(borderRadius),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              onPressed: _loading ? null : _showSaveConfirmationDialog,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.cancel, size: 20),
-                              label: const Text(
-                                'CANCEL',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: primaryColor,
-                                side: BorderSide(color: primaryColor),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(borderRadius),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              onPressed: _loading
-                                  ? null
-                                  : () {
-                                      _cancel();
-                                      Navigator.of(context).pop();
-                                    },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),

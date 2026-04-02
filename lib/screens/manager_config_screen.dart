@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class ManagerConfigScreen extends StatefulWidget {
   const ManagerConfigScreen({super.key});
@@ -29,7 +30,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   int _selectedTab = 0; // 0: Create, 1: Info
   bool _isSubmitting = false;
 
-  final Color primaryColor = const Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -219,13 +220,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manager Configuration', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: 'Manager Configuration',
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
           const SizedBox(height: 16),

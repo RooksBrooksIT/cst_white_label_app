@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -17,13 +19,13 @@ class MaterialAtSiteEntryPage extends StatefulWidget {
 }
 
 class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
-  // Color Scheme
-  final Color primaryColor = const Color(0xFF0B3470);
-  final Color accentColor = const Color(0xFFD9A441);
-  final Color backgroundColor = const Color(0xFFF5F5F5);
-  final Color cardColor = Colors.white;
-  final Color errorColor = const Color(0xFFD32F2F);
-  final Color successColor = const Color(0xFF388E3C);
+  // Colors resolved from theme
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get accentColor => Theme.of(context).colorScheme.secondary;
+  Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
+  Color get cardColor => Theme.of(context).colorScheme.surface;
+  Color get errorColor => Theme.of(context).colorScheme.error;
+  Color get successColor => Colors.green;
 
   // Form State
   final TextEditingController siteIdController = TextEditingController();
@@ -452,13 +454,14 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       builder: (context, child) {
+        final cs = Theme.of(context).colorScheme;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ), dialogTheme: DialogThemeData(),
+            colorScheme: cs.copyWith(
+              primary: cs.primary,
+              onPrimary: cs.onPrimary,
+              onSurface: cs.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -483,13 +486,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildInfoCard() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
-      ),
-      color: cardColor,
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -500,7 +498,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: cs.onSurface.withOpacity(0.6),
                 letterSpacing: 1.2,
               ),
             ),
@@ -519,6 +517,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildSiteIdDropdown() {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -526,7 +525,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           'Site ID',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: cs.onSurface.withOpacity(0.6),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -540,7 +539,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     siteId,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                    style: TextStyle(fontSize: 15, color: cs.onSurface),
                   ),
                 ),
               )
@@ -585,19 +584,19 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: cs.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: cs.outlineVariant),
             ),
             filled: true,
-            
+            fillColor: cs.surface.withOpacity(0.1),
           ),
           isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-          style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-          dropdownColor: Colors.white,
+          icon: Icon(Icons.arrow_drop_down, color: cs.onSurface.withOpacity(0.6)),
+          style: TextStyle(fontSize: 15, color: cs.onSurface),
+          dropdownColor: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
       ],
@@ -605,32 +604,34 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildReadOnlyField(String label, TextEditingController controller) {
+    final cs = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide(color: cs.outlineVariant),
         ),
         filled: true,
-        
+        fillColor: cs.surface.withOpacity(0.1),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
         ),
-        labelStyle: TextStyle(color: Colors.grey.shade600),
+        labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
       ),
       readOnly: true,
-      style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+      style: TextStyle(fontSize: 15, color: cs.onSurface),
     );
   }
 
   Widget _buildDateField() {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -638,7 +639,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           'Date',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: cs.onSurface.withOpacity(0.6),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -649,20 +650,20 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-              color: Colors.grey.shade50,
+              border: Border.all(color: cs.outlineVariant),
+              color: cs.surface.withOpacity(0.1),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.calendar_today,
                   size: 20,
-                  color: Colors.grey.shade600,
+                  color: cs.primary,
                 ),
                 const SizedBox(width: 12),
                 Text(
                   DateFormat('MMMM d, yyyy').format(selectedDate),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style: TextStyle(fontSize: 15, color: cs.onSurface),
                 ),
               ],
             ),
@@ -673,13 +674,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildMaterialInputCard() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
-      ),
-      color: cardColor,
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -690,24 +686,24 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: cs.onSurface.withOpacity(0.6),
                 letterSpacing: 1.2,
               ),
             ),
             const SizedBox(height: 16),
             if (dropdownsLoading)
-              const Center(child: CircularProgressIndicator())
+              Center(child: CircularProgressIndicator(color: cs.primary))
             else if (materialOptions.isEmpty || unitOptions.isEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: Colors.orange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
                 ),
-                child: Text(
+                child: const Text(
                   'No materials or units available. Please add them in Firestore.',
-                  style: TextStyle(color: Colors.orange.shade800),
+                  style: TextStyle(color: Colors.orange),
                 ),
               )
             else
@@ -731,26 +727,22 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                             labelText: 'Quantity',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
+                              borderSide: BorderSide(color: cs.outlineVariant),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
+                              borderSide: BorderSide(color: cs.outlineVariant),
                             ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 14,
                             ),
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
                           ),
                           keyboardType: TextInputType.number,
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.grey.shade800,
+                            color: cs.onSurface,
                           ),
                         ),
                       ),
@@ -758,8 +750,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       ElevatedButton(
                         onPressed: _addMaterialEntry,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor,
-                          foregroundColor: Colors.white,
+                          backgroundColor: cs.secondary,
+                          foregroundColor: cs.onSecondary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -974,7 +966,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                     IconButton(
                       icon: Icon(
                         Icons.delete_outline,
-                        color: Colors.red.shade400,
+                        color: Theme.of(context).colorScheme.error,
                       ),
                       onPressed: () => _deleteMaterialEntry(index),
                       splashRadius: 20,
@@ -990,14 +982,15 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildActionButtons() {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey.shade700,
-              side: BorderSide(color: Colors.grey.shade300),
+              foregroundColor: cs.onSurface.withOpacity(0.7),
+              side: BorderSide(color: cs.outlineVariant),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1011,8 +1004,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           child: ElevatedButton(
             onPressed: _onSave,
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1218,62 +1211,75 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        appBar: AppBar(
-          title: const Text('Material at Site Entry'),
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          bottom: TabBar(
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white,
-            tabs: const [
-              Tab(text: 'New Entry'),
-              Tab(text: 'Update Entry'),
-            ],
-          ),
-        ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : errorMsg != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 48, color: errorColor),
-                      const SizedBox(height: 16),
-                      Text(
-                        errorMsg!,
-                        style: TextStyle(color: errorColor, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: fetchSiteDetails,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
+      child: GlassScaffold(
+        title: 'Material at Site Entry',
+        body: Column(
+          children: [
+            // Tab bar
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                indicator: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: cs.primary,
                 ),
-              )
-            : TabBarView(
-                children: [
-                  _buildNewEntryTabContent(),
-                  _buildUpdateTabContent(),
+                labelColor: cs.onPrimary,
+                unselectedLabelColor: cs.onSurface.withOpacity(0.7),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'New Entry'),
+                  Tab(text: 'Update Entry'),
                 ],
               ),
+            ),
+            Expanded(
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator(color: cs.primary))
+                  : errorMsg != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: cs.error),
+                            const SizedBox(height: 16),
+                            Text(
+                              errorMsg!,
+                              style: TextStyle(color: cs.error, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton(
+                              onPressed: fetchSiteDetails,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: cs.primary,
+                                foregroundColor: cs.onPrimary,
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : TabBarView(
+                      children: [
+                        _buildNewEntryTabContent(),
+                        _buildUpdateTabContent(),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

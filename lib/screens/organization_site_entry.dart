@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/services/expense_service.dart';
@@ -112,6 +111,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         _onSiteSelected(selectedSiteId!);
       }
     } finally {
+      if (!mounted) return;
       setState(() {
         isLoadingSites = false;
       });
@@ -184,6 +184,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
       print('Loaded ${options.length} materials with prices: $prices');
 
+      if (!mounted) return;
       setState(() {
         materialOptions = options;
         materialPrices = prices;
@@ -244,6 +245,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
       print('Loaded ${options.length} labour types with salaries: $salaries');
 
+      if (!mounted) return;
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
@@ -269,12 +271,14 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: Color(0xFF003768),
+              primary: Theme.of(context).primaryColor,
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
             textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(foregroundColor: Color(0xFF003768)),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+              ),
             ),
           ),
           child: child!,
@@ -434,7 +438,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF003768),
+                backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm'),
@@ -526,6 +530,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             ],
           ),
         );
+        if (!mounted) return;
         setState(() {
           isSaving = false;
         });
@@ -543,6 +548,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
     } finally {
+      if (!mounted) return;
       setState(() {
         isSaving = false;
       });
@@ -565,7 +571,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: const Color(0xFF003768)),
+        prefixIcon: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 12,
@@ -876,7 +882,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
-                          color: const Color(0xFF003768),
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                     ),
@@ -915,7 +921,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFF003768),
+        backgroundColor: Theme.of(context).primaryColor,
         elevation: 0,
       ),
       body: LayoutBuilder(
@@ -950,7 +956,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Icon(
                                   Icons.construction,
                                   size: 22,
-                                  color: const Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
@@ -1003,7 +1009,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Icon(
                                   Icons.person,
                                   size: 20,
-                                  color: const Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -1035,7 +1041,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Icon(
                                   Icons.location_on,
                                   size: 20,
-                                  color: const Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -1053,7 +1059,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Icon(
                                   Icons.timeline,
                                   size: 20,
-                                  color: const Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -1071,7 +1077,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Icon(
                                   Icons.calendar_today,
                                   size: 20,
-                                  color: const Color(0xFF003768),
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -1091,7 +1097,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   icon: const Icon(Icons.edit, size: 16),
                                   label: const Text('Change'),
                                   style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF003768),
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).primaryColor,
                                     padding: EdgeInsets.zero,
                                     minimumSize: Size.zero,
                                   ),
@@ -1216,9 +1224,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                                   isExpanded: true,
                                                   decoration: InputDecoration(
                                                     labelText: 'Material',
-                                                    prefixIcon: const Icon(
+                                                    prefixIcon: Icon(
                                                       Icons.category_outlined,
-                                                      color: Color(0xFF003768),
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).primaryColor,
                                                     ),
                                                     border: OutlineInputBorder(
                                                       borderRadius:
@@ -1304,7 +1314,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  backgroundColor: const Color(0xFF003768),
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -1333,7 +1345,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF003768),
+                                backgroundColor: Theme.of(context).primaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 10,
@@ -1404,8 +1416,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                     child: ElevatedButton(
                                       onPressed: _addCustomMaterial,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFF003768,
+                                        backgroundColor: Color(
+                                          Theme.of(context).primaryColor.value,
                                         ),
                                         foregroundColor: Colors.white,
                                       ),
@@ -1533,9 +1545,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                                   isExpanded: true,
                                                   decoration: InputDecoration(
                                                     labelText: 'Labour',
-                                                    prefixIcon: const Icon(
+                                                    prefixIcon: Icon(
                                                       Icons.group,
-                                                      color: Color(0xFF003768),
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).primaryColor,
                                                     ),
                                                     border: OutlineInputBorder(
                                                       borderRadius:
@@ -1621,7 +1635,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  backgroundColor: const Color(0xFF003768),
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -1649,7 +1665,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF003768),
+                                backgroundColor: Theme.of(context).primaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 10,
@@ -1716,8 +1732,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                     child: ElevatedButton(
                                       onPressed: _addCustomLabour,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFF003768,
+                                        backgroundColor: Color(
+                                          Theme.of(context).primaryColor.value,
                                         ),
                                         foregroundColor: Colors.white,
                                       ),
@@ -1805,7 +1821,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    color: const Color(0xFF003768),
+                                    color: Theme.of(context).primaryColor,
                                   ),
                                 ),
                               ],
@@ -1828,7 +1844,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   ? null
                                   : () => _showConfirmationDialog(),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF003768),
+                                backgroundColor: Theme.of(context).primaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 16,

@@ -33,7 +33,6 @@ class SiteStatusReportPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = getStatusColor(status);
-    final lighterStatusColor = statusColor.withOpacity(0.1);
 
     return Scaffold(
       appBar: AppBar(
@@ -223,8 +222,15 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -263,7 +269,10 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
                   decoration: BoxDecoration(
                     color: balanceColor,
                     shape: BoxShape.circle,
-                    border: Border.all(width: 2),
+                    border: Border.all(
+                      width: 2,
+                      color: balanceColor.withOpacity(0.5),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

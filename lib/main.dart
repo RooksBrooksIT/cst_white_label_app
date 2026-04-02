@@ -19,11 +19,9 @@ import 'package:demo_cst/screens/branding_edit_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirestoreService.initialize();
   await AppTheme.initialize();
-  // Start the app
 
   runApp(const MyApp());
 }
@@ -46,11 +44,11 @@ class MyApp extends StatelessWidget {
 
               // Define initial route
               initialRoute: '/',
+
               // Define app routes
               routes: {
                 '/': (context) => const SplashScreen(),
                 '/landing': (context) => const LandingPage(),
-
                 '/authSelection': (context) =>
                     const MainDashboard(), // Role selection screen
                 '/orgLogin': (context) => const Organisation_LoginPage(),

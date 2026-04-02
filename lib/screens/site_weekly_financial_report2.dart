@@ -19,25 +19,26 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         ? (siteDetails!['siteId'] ?? siteDetails!['site'])?.toString()
         : null;
     final String? paymentPeriod = this.paymentPeriod;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "Financial Report",
           style: TextStyle(
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
@@ -62,7 +63,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                 if (snapshot.hasError ||
                     !snapshot.hasData ||
                     snapshot.data!.docs.isEmpty) {
-                  return _buildErrorOrEmpty(snapshot);
+                  return _buildErrorOrEmpty(context, snapshot);
                 }
 
                 final doc = snapshot.data!.docs.first;
@@ -124,9 +125,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildSiteInfoCard(summary),
+                              _buildSiteInfoCard(context, summary),
                               const SizedBox(height: 24),
                               _buildSummaryGrid(
+                                context,
                                 openingBalance,
                                 totalPayment,
                                 totalAmount,
@@ -135,16 +137,17 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                                 colorScheme,
                               ),
                               const SizedBox(height: 32),
-                              const Text(
+                              Text(
                                 'Daily Breakdown',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 16),
                               _buildPaymentsTable(
+                                context,
                                 payments,
                                 expensesByDate,
                                 openingBalance,
@@ -162,8 +165,9 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorOrEmpty(AsyncSnapshot snapshot) {
+  Widget _buildErrorOrEmpty(BuildContext context, AsyncSnapshot snapshot) {
     bool isError = snapshot.hasError;
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -171,15 +175,15 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           Icon(
             isError ? Icons.error_outline_rounded : Icons.receipt_long_rounded,
             size: 80,
-            color: const Color(0xFFE2E8F0),
+            color: colorScheme.onSurfaceVariant.withOpacity(0.2),
           ),
           const SizedBox(height: 16),
           Text(
             isError ? 'Error Loading Data' : 'No Records Found',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: colorScheme.onSurface,
             ),
           ),
         ],
@@ -187,13 +191,18 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     );
   }
 
-  Widget _buildSiteInfoCard(Map<String, dynamic> summary) {
+  Widget _buildSiteInfoCard(
+    BuildContext context,
+    Map<String, dynamic> summary,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,16 +231,18 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                    color: colorScheme.primary.withOpacity(0.2),
+                  ),
                 ),
                 child: Text(
                   summary['paymentPeriod'] ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: colorScheme.primary,
                   ),
                 ),
               ),
@@ -242,10 +253,18 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
             spacing: 32,
             runSpacing: 16,
             children: [
-              _buildDetailItem('Site ID', summary['siteId'] ?? ''),
-              _buildDetailItem('Supervisor', summary['supervisorName'] ?? ''),
-              _buildDetailItem('Project', summary['projectName'] ?? ''),
-              _buildDetailItem('Stage', summary['projectStage'] ?? ''),
+              _buildDetailItem(context, 'Site ID', summary['siteId'] ?? ''),
+              _buildDetailItem(
+                context,
+                'Supervisor',
+                summary['supervisorName'] ?? '',
+              ),
+              _buildDetailItem(
+                context,
+                'Project',
+                summary['projectName'] ?? '',
+              ),
+              _buildDetailItem(context, 'Stage', summary['projectStage'] ?? ''),
             ],
           ),
         ],
@@ -253,21 +272,24 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailItem(String label, String value) {
+  Widget _buildDetailItem(BuildContext context, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -275,6 +297,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
   }
 
   Widget _buildSummaryGrid(
+    BuildContext context,
     int opening,
     int payment,
     int amount,
@@ -291,24 +314,28 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       childAspectRatio: 2.2,
       children: [
         _buildSummaryItem(
+          context,
           'Opening',
           opening,
           Icons.account_balance_rounded,
           const Color(0xFF64748B),
         ),
         _buildSummaryItem(
+          context,
           'Payments',
           payment,
           Icons.payment_rounded,
           colorScheme.primary,
         ),
         _buildSummaryItem(
+          context,
           'Expenses',
           expenses,
           Icons.receipt_long_rounded,
           const Color(0xFFF59E0B),
         ),
         _buildSummaryItem(
+          context,
           'Net Amount',
           net,
           Icons.account_balance_wallet_rounded,
@@ -319,6 +346,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
   }
 
   Widget _buildSummaryItem(
+    BuildContext context,
     String title,
     int amount,
     IconData icon,
@@ -327,7 +355,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.1)),
         boxShadow: [
@@ -356,10 +384,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF64748B),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -387,6 +415,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
   }
 
   Widget _buildPaymentsTable(
+    BuildContext context,
     List<dynamic> payments,
     Map<String, num> expensesByDate,
     int openingBalance,
@@ -396,7 +425,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Table(
         columnWidths: const {
@@ -411,18 +440,19 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
               color: colorScheme.primary.withOpacity(0.05),
             ),
             children: [
-              _buildTableCell('Date', isHeader: true),
-              _buildTableCell('Payment', isHeader: true),
-              _buildTableCell('Expenses', isHeader: true),
-              _buildTableCell('Net', isHeader: true),
+              _buildTableCell(context, 'Date', isHeader: true),
+              _buildTableCell(context, 'Payment', isHeader: true),
+              _buildTableCell(context, 'Expenses', isHeader: true),
+              _buildTableCell(context, 'Net', isHeader: true),
             ],
           ),
           TableRow(
             children: [
-              _buildTableCell('Opening'),
-              _buildTableCell('-'),
-              _buildTableCell('-'),
+              _buildTableCell(context, 'Opening'),
+              _buildTableCell(context, '-'),
+              _buildTableCell(context, '-'),
               _buildTableCell(
+                context,
                 NumberFormat.currency(
                   locale: 'en_IN',
                   symbol: '₹',
@@ -440,8 +470,9 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
             final int net = pAmt - eAmt;
             return TableRow(
               children: [
-                _buildTableCell(date),
+                _buildTableCell(context, date),
                 _buildTableCell(
+                  context,
                   NumberFormat.currency(
                     locale: 'en_IN',
                     symbol: '₹',
@@ -449,6 +480,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                   ).format(pAmt),
                 ),
                 _buildTableCell(
+                  context,
                   NumberFormat.currency(
                     locale: 'en_IN',
                     symbol: '₹',
@@ -456,6 +488,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                   ).format(eAmt),
                 ),
                 _buildTableCell(
+                  context,
                   NumberFormat.currency(
                     locale: 'en_IN',
                     symbol: '₹',
@@ -473,13 +506,15 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
   }
 
   Widget _buildTableCell(
+    BuildContext context,
     String text, {
     bool isHeader = false,
     bool isNet = false,
     int netValue = 0,
   }) {
-    Color? txtColor = const Color(0xFF1E293B);
-    if (isHeader) txtColor = const Color(0xFF64748B);
+    final colorScheme = Theme.of(context).colorScheme;
+    Color? txtColor = colorScheme.onSurface;
+    if (isHeader) txtColor = colorScheme.onSurfaceVariant;
     if (isNet)
       txtColor = netValue >= 0
           ? const Color(0xFF10B981)

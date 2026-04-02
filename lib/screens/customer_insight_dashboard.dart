@@ -18,6 +18,8 @@ class CustomerWorkProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Insights Dashboard',
+      appBarBackgroundColor: Theme.of(context).colorScheme.primary,
+      appBarForegroundColor: Theme.of(context).colorScheme.onPrimary,
       onBack: () => Navigator.pop(context),
       body: ListView(
         padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),

@@ -11,6 +11,7 @@ class GlassScaffold extends StatelessWidget {
   final EdgeInsets? padding;
   final Color? appBarBackgroundColor;
   final Color? appBarForegroundColor;
+  final Widget? bottomNavigationBar;
 
   const GlassScaffold({
     super.key,
@@ -23,53 +24,56 @@ class GlassScaffold extends StatelessWidget {
     this.padding,
     this.appBarBackgroundColor,
     this.appBarForegroundColor,
+    this.bottomNavigationBar,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final hasAppBar =
         title != null ||
         onBack != null ||
         (actions != null && actions!.isNotEmpty) ||
         bottom != null;
 
+    final effectiveBgColor = appBarBackgroundColor ?? colorScheme.primary;
+    final effectiveFgColor = appBarForegroundColor ?? colorScheme.onPrimary;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: hasAppBar
           ? AppBar(
               toolbarHeight: 90,
-              backgroundColor: appBarBackgroundColor,
-              foregroundColor: appBarForegroundColor,
+              backgroundColor: effectiveBgColor,
+              foregroundColor: effectiveFgColor,
               elevation: 4,
               shadowColor: Colors.black26,
               scrolledUnderElevation: 8,
               centerTitle: false,
               titleSpacing: onBack != null ? 8 : 24,
-              shape: appBarBackgroundColor != null
-                  ? const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(32),
-                        bottomRight: Radius.circular(32),
-                      ),
-                    )
-                  : null,
-              title: title != null 
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
+                ),
+              ),
+              title: title != null
                   ? Text(
                       title!,
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -1.0,
-                        color: appBarForegroundColor,
+                        color: effectiveFgColor,
                       ),
-                    ) 
+                    )
                   : null,
               leading: onBack != null
                   ? IconButton(
                       icon: Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: appBarForegroundColor,
+                        color: effectiveFgColor,
                       ),
                       onPressed: onBack,
                     )
@@ -90,6 +94,7 @@ class GlassScaffold extends StatelessWidget {
           child: body,
         ),
       ),
+      bottomNavigationBar: bottomNavigationBar,
     );
   }
 }

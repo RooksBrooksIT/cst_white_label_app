@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
 import '../services/firestore_service.dart';
 import '../utils/responsive.dart';
+import '../utils/firestore_error_handler.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
@@ -55,7 +55,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         _tempOrgName = prefs.getString('temp_org_name');
         _tempLogoUrl = prefs.getString('temp_logo_url');
         _actualReferralCode = prefs.getString('temp_referral_code');
-        
+
         if (_tempOrgName != null) {
           _referralController.text = _tempOrgName!;
         } else if (_actualReferralCode != null) {
@@ -163,10 +163,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
       final contractorsCollection = await FirestoreService.contractors;
       final querySnapshot = await contractorsCollection.get();
       final names = querySnapshot.docs
-          .map(
-            (doc) =>
-                doc.data()['contractorName'] as String?,
-          )
+          .map((doc) => doc.data()['contractorName'] as String?)
           .where((name) => name != null)
           .cast<String>()
           .toList();
@@ -262,11 +259,18 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       controller: usernameController,
                       decoration: InputDecoration(
                         labelText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: Icon(
+                          Icons.person_outline_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
@@ -278,11 +282,18 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       obscureText: true,
                       decoration: InputDecoration(
                         labelText: 'New Password',
-                        prefixIcon: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: Icon(
+                          Icons.lock_outline_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
@@ -294,11 +305,18 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       obscureText: true,
                       decoration: InputDecoration(
                         labelText: 'Confirm New Password',
-                        prefixIcon: Icon(Icons.lock_reset_rounded, color: colorScheme.primary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: Icon(
+                          Icons.lock_reset_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
@@ -312,10 +330,15 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               side: const BorderSide(color: Color(0xFFE2E8F0)),
                             ),
-                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Color(0xFF64748B)),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -326,7 +349,10 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                 : () async {
                                     if (newPasswordController.text !=
                                         confirmPasswordController.text) {
-                                      if (context.mounted) _showErrorDialog('Passwords do not match');
+                                      if (context.mounted)
+                                        _showErrorDialog(
+                                          'Passwords do not match',
+                                        );
                                       return;
                                     }
                                     setState(() => isUpdating = true);
@@ -359,21 +385,31 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                                           );
                                         }
                                       } else {
-                                        if (context.mounted) _showErrorDialog('Username not found');
+                                        if (context.mounted)
+                                          _showErrorDialog(
+                                            'Username not found',
+                                          );
                                       }
                                     } catch (e) {
-                                      if (context.mounted) _showErrorDialog(
-                                        'Failed to update password. Please try again.',
-                                      );
+                                      if (context.mounted) {
+                                        FirestoreErrorHandler.handleError(
+                                          context,
+                                          e,
+                                          title: 'Password Reset Error',
+                                        );
+                                      }
                                     } finally {
-                                      if (context.mounted) setState(() => isUpdating = false);
+                                      if (context.mounted)
+                                        setState(() => isUpdating = false);
                                     }
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               elevation: 0,
                             ),
                             child: isUpdating
@@ -405,33 +441,26 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
       setState(() => _isLoading = true);
 
       try {
-        final referralCode = _actualReferralCode ?? _referralController.text.trim();
-        
-        // 1. Validate Referral Code
-        final referralDoc = await FirebaseFirestore.instance
-            .collection('referralCodes')
-            .doc(referralCode)
-            .get();
+        final referralCode =
+            _actualReferralCode ?? _referralController.text.trim();
 
-        if (!referralDoc.exists) {
-          if (context.mounted) _showErrorDialog('Invalid Referral Code');
-          return;
-        }
+        // 1. Validate Referral Code by searching across all admin/referal documents
+        final orgId = await FirestoreService.findOrgIdByReferralCode(
+          referralCode,
+        );
 
-        final orgId = referralDoc.data()?['dynamicPath'] as String?;
-        final fullConfigPath = referralDoc.data()?['fullConfigPath'] as String?;
         if (orgId == null) {
-          if (context.mounted) _showErrorDialog('Organization configuration error');
+          if (context.mounted) _showErrorDialog('Invalid Referral Code');
           return;
         }
 
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_orgPathKey, orgId);
-        final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
+        // Default relative path for organization details
+        final String resolvedPath = 'organisation/$orgId/admin/data';
         await prefs.setString('sup_org_doc_path', resolvedPath);
 
-        
         // Refresh FirestoreService cache
         await FirestoreService.initialize();
 
@@ -447,8 +476,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
           final doc = querySnapshot.docs.first;
           final supervisorId = doc.id;
           final supervisorName =
-              doc.data()['Name'] ??
-              _usernameController.text.trim();
+              doc.data()['Name'] ?? _usernameController.text.trim();
 
           if (_isContractor && _selectedSupervisorName != null) {
             final contractorsCollection = await FirestoreService.contractors;
@@ -515,7 +543,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         }
       } catch (e) {
         debugPrint('Login error: $e');
-        if (context.mounted) _showErrorDialog('An error occurred. Please try again.');
+        if (context.mounted) {
+          FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+        }
       } finally {
         if (mounted) {
           setState(() {
@@ -536,8 +566,11 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF1E293B), size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF1E293B),
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -639,17 +672,23 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                         readOnly: _referralController.text.isNotEmpty,
                         decoration: InputDecoration(
                           labelText: 'Referral Code',
-                          prefixIcon: Icon(Icons.business_outlined, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.business_outlined,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                         ),
-                        validator: (value) =>
-                            (value == null || value.isEmpty)
+                        validator: (value) => (value == null || value.isEmpty)
                             ? 'Referral Code is required'
                             : null,
                       ),
@@ -658,17 +697,23 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                         controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                         ),
-                        validator: (value) =>
-                            (value == null || value.isEmpty)
+                        validator: (value) => (value == null || value.isEmpty)
                             ? 'UserName is required'
                             : null,
                       ),
@@ -678,17 +723,23 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                         ),
-                        validator: (value) =>
-                            (value == null || value.isEmpty)
+                        validator: (value) => (value == null || value.isEmpty)
                             ? 'Password is required'
                             : null,
                       ),
@@ -718,7 +769,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                             });
                           },
                           controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                       if (_isContractor) ...[
@@ -727,11 +780,18 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Contractor Name',
-                            prefixIcon: Icon(Icons.supervisor_account_outlined, color: colorScheme.primary),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            prefixIcon: Icon(
+                              Icons.supervisor_account_outlined,
+                              color: colorScheme.primary,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                             ),
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),
@@ -746,8 +806,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           onChanged: (val) {
                             setState(() => _selectedSupervisorName = val);
                           },
-                          validator: (value) =>
-                              _isContractor && value == null ? 'Required' : null,
+                          validator: (value) => _isContractor && value == null
+                              ? 'Required'
+                              : null,
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -773,16 +834,27 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
                           child: _isLoading
                               ? const SizedBox(
                                   height: 24,
                                   width: 24,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
                                 )
-                              : const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              : const Text(
+                                  'LOGIN',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

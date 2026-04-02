@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../utils/responsive.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 class SitePaymentScreen extends StatefulWidget {
   const SitePaymentScreen({super.key});
@@ -15,8 +13,6 @@ class SitePaymentScreen extends StatefulWidget {
 }
 
 class _SitePaymentScreenState extends State<SitePaymentScreen> {
-  final Color mainColor = const Color(0xFF003768);
-
   // Site list for dropdown (list of {id, display})
   List<Map<String, String>> siteList = [];
 
@@ -288,13 +284,16 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment Added Successfully!'),
-          backgroundColor: mainColor,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        final themeColor = Theme.of(context).primaryColor;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Payment Added Successfully!'),
+            backgroundColor: themeColor,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
 
       resetForm();
     } catch (e) {
@@ -310,23 +309,26 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Site Payment',
           style: TextStyle(
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
@@ -351,7 +353,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
         Container(
@@ -367,21 +370,22 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           ),
         ),
         const SizedBox(width: 16),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Payment Entry',
-                style: TextStyle(
-                  fontSize: 24,
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: colorScheme.onSurface,
                 ),
               ),
               Text(
                 'Record site supervisor payments',
-                style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -391,10 +395,10 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -403,28 +407,29 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSectionTitle('Site Details'),
+          _buildSectionTitle(context, 'Site Details'),
           const SizedBox(height: 16),
-          _buildSiteDropdown(),
+          _buildSiteDropdown(context),
           const SizedBox(height: 16),
-          _buildSupervisorField(),
+          _buildSupervisorField(context),
           const SizedBox(height: 16),
-          _buildAmountField(),
+          _buildAmountField(context),
           const SizedBox(height: 16),
-          _buildProjectStageDropdown(),
+          _buildProjectStageDropdown(context),
           const SizedBox(height: 32),
-          _buildSectionTitle('Payment Period'),
+          _buildSectionTitle(context, 'Payment Period'),
           const SizedBox(height: 16),
-          _buildPeriodSelection(),
+          _buildPeriodSelection(context),
           const SizedBox(height: 24),
-          _buildWeeksSelection(),
+          _buildWeeksSelection(context),
           const SizedBox(height: 24),
-          if (selectedPaymentWeekIndex != null) _buildDatePickerSection(),
+          if (selectedPaymentWeekIndex != null)
+            _buildDatePickerSection(context),
           const SizedBox(height: 40),
           _buildActionButtons(context),
         ],
@@ -432,13 +437,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildSiteDropdown() {
+  Widget _buildSiteDropdown(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
       value: selectedSiteId,
       isExpanded: true,
-      dropdownColor: Colors.white,
-      style: const TextStyle(color: Color(0xFF1E293B)),
-      decoration: _inputDecoration('Select Site ID', Icons.place_rounded),
+      dropdownColor: theme.cardColor,
+      style: TextStyle(color: colorScheme.onSurface),
+      decoration: _inputDecoration(
+        context,
+        'Select Site ID',
+        Icons.place_rounded,
+      ),
       items: siteList.map((site) {
         return DropdownMenuItem<String>(
           value: site['id'],
@@ -459,22 +470,28 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildSupervisorField() {
+  Widget _buildSupervisorField(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextFormField(
       readOnly: true,
       controller: TextEditingController(text: supervisor),
-      style: const TextStyle(color: Color(0xFF1E293B)),
-      decoration: _inputDecoration('Supervisor', Icons.person_rounded),
+      style: TextStyle(color: colorScheme.onSurface),
+      decoration: _inputDecoration(context, 'Supervisor', Icons.person_rounded),
     );
   }
 
-  Widget _buildAmountField() {
+  Widget _buildAmountField(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextFormField(
       controller: amountController,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: const TextStyle(color: Color(0xFF1E293B)),
-      decoration: _inputDecoration('Amount', Icons.currency_rupee_rounded),
+      style: TextStyle(color: colorScheme.onSurface),
+      decoration: _inputDecoration(
+        context,
+        'Amount',
+        Icons.currency_rupee_rounded,
+      ),
       onChanged: (value) {
         setState(() {
           amount = int.tryParse(value) ?? 0;
@@ -483,13 +500,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildProjectStageDropdown() {
+  Widget _buildProjectStageDropdown(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
       value: selectedProjectStage,
       isExpanded: true,
-      dropdownColor: Colors.white,
-      style: const TextStyle(color: Color(0xFF1E293B)),
-      decoration: _inputDecoration('Project Stage', Icons.flag_rounded),
+      dropdownColor: theme.cardColor,
+      style: TextStyle(color: colorScheme.onSurface),
+      decoration: _inputDecoration(
+        context,
+        'Project Stage',
+        Icons.flag_rounded,
+      ),
       items: projectStages.map((stage) {
         return DropdownMenuItem<String>(value: stage, child: Text(stage));
       }).toList(),
@@ -501,15 +524,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildPeriodSelection() {
+  Widget _buildPeriodSelection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
         Expanded(
           child: DropdownButtonFormField<int>(
             value: selectedPaymentYear,
-            dropdownColor: Colors.white,
-            style: const TextStyle(color: Color(0xFF1E293B)),
-            decoration: _inputDecoration('Year', Icons.calendar_today_rounded),
+            dropdownColor: theme.cardColor,
+            style: TextStyle(color: colorScheme.onSurface),
+            decoration: _inputDecoration(
+              context,
+              'Year',
+              Icons.calendar_today_rounded,
+            ),
             items: paymentYears.map((y) {
               return DropdownMenuItem<int>(value: y, child: Text(y.toString()));
             }).toList(),
@@ -525,9 +554,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         Expanded(
           child: DropdownButtonFormField<int>(
             value: selectedPaymentMonth,
-            dropdownColor: Colors.white,
-            style: const TextStyle(color: Color(0xFF1E293B)),
-            decoration: _inputDecoration('Month', Icons.calendar_month_rounded),
+            dropdownColor: theme.cardColor,
+            style: TextStyle(color: colorScheme.onSurface),
+            decoration: _inputDecoration(
+              context,
+              'Month',
+              Icons.calendar_month_rounded,
+            ),
             items: List.generate(12, (i) => i + 1).map((m) {
               return DropdownMenuItem<int>(
                 value: m,
@@ -547,14 +580,16 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: resetForm,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF64748B),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              foregroundColor: colorScheme.onSurfaceVariant,
+              side: BorderSide(color: theme.dividerColor),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -577,9 +612,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               ),
               elevation: 0,
             ),
-            child: const Text(
+            child: Text(
               'Submit Payment',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onPrimary,
+              ),
             ),
           ),
         ),
@@ -587,8 +625,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
-    final colorScheme = Theme.of(context).colorScheme;
+  InputDecoration _inputDecoration(
+    BuildContext context,
+    String label,
+    IconData icon,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Color(0xFF64748B)),
@@ -597,11 +640,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       fillColor: const Color(0xFFF8FAFC),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -611,26 +654,28 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.bold,
-        color: Color(0xFF64748B),
+        color: colorScheme.onSurfaceVariant,
         letterSpacing: 0.5,
       ),
     );
   }
 
-  Widget _buildWeeksSelection() {
+  Widget _buildWeeksSelection(BuildContext context) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Select Week *'),
+        _buildSectionTitle(context, 'Select Week *'),
         const SizedBox(height: 12),
         weeks.isEmpty
             ? Container(
@@ -640,9 +685,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Text(
+                child: Text(
                   'No weeks available for selected month',
-                  style: TextStyle(color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  ),
                 ),
               )
             : Wrap(
@@ -689,8 +736,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF1E293B),
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -699,8 +746,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               color: isSelected
-                                  ? Colors.white.withOpacity(0.9)
-                                  : const Color(0xFF64748B),
+                                  ? colorScheme.onPrimary.withOpacity(0.9)
+                                  : colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -713,15 +760,16 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildDatePickerSection() {
+  Widget _buildDatePickerSection(BuildContext context) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
     final weekDays = weeks[selectedPaymentWeekIndex!];
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Select Date within Week'),
+        _buildSectionTitle(context, 'Select Date within Week'),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () async {
@@ -749,8 +797,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: theme.cardColor,
+              border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -760,9 +808,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   selectedDate != null
                       ? DateFormat('EEE, MMM dd, yyyy').format(selectedDate!)
                       : 'Select Date',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF1E293B),
+                    color: colorScheme.onSurface,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

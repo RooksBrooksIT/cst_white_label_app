@@ -13,15 +13,6 @@ class SiteWeeklyFinancialReports extends StatefulWidget {
 
 class _SiteWeeklyFinancialReportState
     extends State<SiteWeeklyFinancialReports> {
-  // Color constants
-  final Color primaryColor = const Color(0xFF0b3470);
-  final Color primaryLightColor = const Color(0xFF1e4a8e);
-  final Color accentColor = const Color(0xFF4285F4);
-  final Color backgroundColor = const Color(0xFFF8F9FA);
-  final Color cardColor = Colors.white;
-  final Color textColor = const Color(0xFF2c3e50);
-  final Color secondaryTextColor = const Color(0xFF7f8c8d);
-
   // List to hold all documents
   List<Map<String, dynamic>> supervisorMaps = [];
   int selectedIndex = 0;
@@ -54,8 +45,7 @@ class _SiteWeeklyFinancialReportState
 
   Future<void> fetchSupervisorData() async {
     try {
-      final snapshot = await FirestoreService
-          .getCollection('siteSupervisorMap')
+      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -73,7 +63,7 @@ class _SiteWeeklyFinancialReportState
       supervisorMaps = snapshot.docs.isEmpty
           ? []
           : snapshot.docs
-                .map((doc) => doc.data() as Map<String, dynamic>)
+                .map((doc) => doc.data())
                 .toList();
 
       if (mounted) {
@@ -104,35 +94,41 @@ class _SiteWeeklyFinancialReportState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Weekly Financial Report',
           style: TextStyle(
-            color: Color(0xFF1E293B),
+            color: colorScheme.onPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF1E293B), size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: colorScheme.onPrimary,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : _buildBody(context),
     );
   }
 
   Widget _buildBody(BuildContext context) {
     if (supervisorMaps.isEmpty) {
-      return _buildEmptyState();
+      return _buildEmptyState(context);
     }
+    final theme = Theme.of(context);
 
     return SingleChildScrollView(
       child: Center(
@@ -143,7 +139,7 @@ class _SiteWeeklyFinancialReportState
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
@@ -152,7 +148,7 @@ class _SiteWeeklyFinancialReportState
                     offset: const Offset(0, 10),
                   ),
                 ],
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: _buildForm(context),
             ),
@@ -162,7 +158,9 @@ class _SiteWeeklyFinancialReportState
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -170,21 +168,21 @@ class _SiteWeeklyFinancialReportState
           Icon(
             Icons.receipt_long_rounded,
             size: 80,
-            color: const Color(0xFFE2E8F0),
+            color: colorScheme.onSurfaceVariant.withOpacity(0.2),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Sites Found',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'No site supervisor data available',
-            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+            style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -192,6 +190,8 @@ class _SiteWeeklyFinancialReportState
   }
 
   Widget _buildForm(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -200,31 +200,31 @@ class _SiteWeeklyFinancialReportState
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: colorScheme.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.bar_chart_rounded,
               size: 32,
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
             ),
           ),
         ),
         const SizedBox(height: 32),
-        const Text(
+        Text(
           'Select Site',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF64748B),
+            color: colorScheme.onSurfaceVariant,
             letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
           value: selectedIndex < supervisorMaps.length ? selectedIndex : null,
-          decoration: _inputDecoration('Choose Site'),
-          dropdownColor: Colors.white,
+          decoration: _inputDecoration(context, 'Choose Site'),
+          dropdownColor: theme.cardColor,
           isExpanded: true,
           items: List.generate(
             supervisorMaps.length,
@@ -232,8 +232,8 @@ class _SiteWeeklyFinancialReportState
               value: index,
               child: Text(
                 supervisorMaps[index]['site'] ?? 'Site',
-                style: const TextStyle(
-                  color: Color(0xFF1E293B),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -246,20 +246,21 @@ class _SiteWeeklyFinancialReportState
           },
         ),
         const SizedBox(height: 32),
-        const Text(
+        Text(
           'Select Period',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF64748B),
+            color: colorScheme.onSurfaceVariant,
             letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedYear,
-          decoration: _inputDecoration('Select Year'),
-          dropdownColor: Colors.white,
+          decoration: _inputDecoration(context, 'Select Year'),
+          dropdownColor: theme.cardColor,
+          style: TextStyle(color: colorScheme.onSurface),
           items: List.generate(
             5,
             (i) => DropdownMenuItem(
@@ -272,24 +273,22 @@ class _SiteWeeklyFinancialReportState
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedMonth,
-          decoration: _inputDecoration('Select Month'),
-          dropdownColor: Colors.white,
+          decoration: _inputDecoration(context, 'Select Month'),
+          dropdownColor: theme.cardColor,
+          style: TextStyle(color: colorScheme.onSurface),
           items: List.generate(
             12,
-            (i) => DropdownMenuItem(
-              value: i + 1,
-              child: Text(_monthNames[i]),
-            ),
+            (i) => DropdownMenuItem(value: i + 1, child: Text(_monthNames[i])),
           ),
           onChanged: (val) => setState(() => _selectedMonth = val),
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Select Week',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 12),
@@ -304,11 +303,15 @@ class _SiteWeeklyFinancialReportState
               onSelected: (selected) {
                 setState(() => _selectedWeek = selected ? i + 1 : null);
               },
-              selectedColor: Theme.of(context).colorScheme.primary,
-              backgroundColor: const Color(0xFFF1F5F9),
+              selectedColor: colorScheme.primary,
+              backgroundColor: colorScheme.surfaceVariant,
               labelStyle: TextStyle(
-                color: _selectedWeek == i + 1 ? Colors.white : const Color(0xFF64748B),
-                fontWeight: _selectedWeek == i + 1 ? FontWeight.bold : FontWeight.normal,
+                color: _selectedWeek == i + 1
+                    ? colorScheme.onPrimary
+                    : colorScheme.onSurfaceVariant,
+                fontWeight: _selectedWeek == i + 1
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -324,7 +327,8 @@ class _SiteWeeklyFinancialReportState
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Column(
       children: [
         SizedBox(
@@ -346,6 +350,7 @@ class _SiteWeeklyFinancialReportState
             ),
           ),
         ),
+
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
@@ -353,8 +358,8 @@ class _SiteWeeklyFinancialReportState
           child: OutlinedButton(
             onPressed: () => Navigator.pop(context),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF64748B),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              foregroundColor: colorScheme.onSurfaceVariant,
+              side: BorderSide(color: theme.dividerColor),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -374,7 +379,9 @@ class _SiteWeeklyFinancialReportState
       _showSnackBar('No sites available to select.', Colors.red);
       return;
     }
-    if (_selectedYear == null || _selectedMonth == null || _selectedWeek == null) {
+    if (_selectedYear == null ||
+        _selectedMonth == null ||
+        _selectedWeek == null) {
       _showSnackBar('Please select year, month, and week.', Colors.orange);
       return;
     }
@@ -384,11 +391,12 @@ class _SiteWeeklyFinancialReportState
     final paymentPeriod = "${_selectedYear}_${monthName}_Week$_selectedWeek";
 
     try {
-      final query = await FirestoreService.getCollection('siteSupervisorPayments')
-          .where('paymentPeriod', isEqualTo: paymentPeriod)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 10));
+      final query =
+          await FirestoreService.getCollection('siteSupervisorPayments')
+              .where('paymentPeriod', isEqualTo: paymentPeriod)
+              .limit(1)
+              .get()
+              .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
@@ -411,9 +419,9 @@ class _SiteWeeklyFinancialReportState
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   void _showNoDataDialog() {
@@ -433,23 +441,25 @@ class _SiteWeeklyFinancialReportState
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(BuildContext context, String label) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      labelStyle: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+        borderSide: BorderSide(color: colorScheme.primary, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );

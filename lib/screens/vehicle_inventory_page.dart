@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:demo_cst/screens/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 /// Vehicle Inventory Report
 /// - Filter modes: by Date (string equality on 'date'), by Month (createdAt range), by Site (toLocation equality)
@@ -412,8 +413,9 @@ class _VehicleInventoryReportPageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Vehicle Inventory Report')),
+    return GlassScaffold(
+      title: 'Vehicle Inventory Report',
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

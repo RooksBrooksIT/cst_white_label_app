@@ -16,6 +16,7 @@ import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
 import 'org_menu_screen.dart';
+import '../utils/app_theme.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -25,43 +26,31 @@ class OrganizationDashboard extends StatefulWidget {
 }
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
-  String _orgName = 'Organization User';
-
   @override
   void initState() {
     super.initState();
-    _fetchOrgData();
-  }
-
-  Future<void> _fetchOrgData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? name = prefs.getString('org_name');
-
-      if (name != null) setState(() => _orgName = name);
-    } catch (e) {
-      debugPrint('Error fetching org data: $e');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return GlassScaffold(
-      title: _orgName.isNotEmpty ? _orgName : 'Organization Dashboard',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: Colors.white,
-      onBack: () => _showLogoutConfirmation(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const OrgMenuScreen()),
-          ),
-        ),
-      ],
-      body: _buildBody(context),
+    return ValueListenableBuilder<String>(
+      valueListenable: AppTheme.appName,
+      builder: (context, appName, _) {
+        return GlassScaffold(
+          title: appName.isNotEmpty ? appName : 'Organization Dashboard',
+          onBack: () => _showLogoutConfirmation(context),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const OrgMenuScreen()),
+              ),
+            ),
+          ],
+          body: _buildBody(context),
+        );
+      },
     );
   }
 
@@ -123,13 +112,18 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          _orgName,
-          style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            letterSpacing: -0.5,
-          ),
+        ValueListenableBuilder<String>(
+          valueListenable: AppTheme.appName,
+          builder: (context, appName, _) {
+            return Text(
+              appName,
+              style: theme.textTheme.headlineLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+                letterSpacing: -1.0,
+              ),
+            );
+          },
         ),
       ],
     );
@@ -181,7 +175,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Manager Account",
             icon: Icons.settings,
-            iconColor: Colors.blue[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToConfiguration(context),
           ),
         ]),
@@ -192,21 +186,21 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Site Payment Entry",
             icon: Icons.payments,
-            iconColor: Colors.green[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
           _buildMenuCard(
             context,
             title: "Site Payment Report",
             icon: Icons.receipt,
-            iconColor: Colors.purple[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToDailyReport(context),
           ),
           _buildMenuCard(
             context,
             title: "Weekly Finance Report",
             icon: Icons.bar_chart,
-            iconColor: Colors.orange[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToSiteWeeklyFinancialReport(context),
           ),
         ]),
@@ -217,21 +211,21 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Organization Expenses",
             icon: Icons.account_balance_wallet,
-            iconColor: Colors.red[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToOrganizationExpenses(context),
           ),
           _buildMenuCard(
             context,
             title: "Manager Expenses",
             icon: Icons.attach_money,
-            iconColor: Colors.teal[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToManagerExpenses(context),
           ),
           _buildMenuCard(
             context,
             title: "Supervisor Expenses",
             icon: Icons.money,
-            iconColor: Colors.indigo[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToSiteExpenses(context),
           ),
         ]),
@@ -242,7 +236,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Schedule Request Approval",
             icon: Icons.work,
-            iconColor: Colors.deepPurple[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -254,7 +248,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Material Request Approval",
             icon: Icons.inventory,
-            iconColor: Colors.blueGrey[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -270,7 +264,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Incentive Calculation",
             icon: Icons.calculate,
-            iconColor: Colors.amber[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToIncentiveCaliculation(context),
           ),
         ]),
@@ -281,21 +275,21 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             context,
             title: "Financial Reports",
             icon: Icons.analytics,
-            iconColor: Colors.pink[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToInsights(context),
           ),
           _buildMenuCard(
             context,
             title: "Materials Inventory",
             icon: Icons.inventory_2,
-            iconColor: Colors.deepOrange[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToMaterialReport(context),
           ),
           _buildMenuCard(
             context,
             title: "Tools Inventory",
             icon: Icons.build,
-            iconColor: Colors.cyan[600]!,
+            iconColor: theme.primaryColor,
             onTap: () => _navigateToToolsInventory(context),
           ),
         ]),
@@ -319,12 +313,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-              letterSpacing: 2.0,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                letterSpacing: 2.0,
+              ),
             ),
           ),
         ],
@@ -345,47 +341,50 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
+            color: colorScheme.primary.withOpacity(0.06),
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: theme.dividerColor.withOpacity(0.4)),
+        border: Border.all(
+          color: colorScheme.outline.withOpacity(0.5),
+          width: 1.5,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.12),
+                    color: colorScheme.primary.withOpacity(0.08),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, color: iconColor, size: 32),
+                  child: Icon(icon, color: colorScheme.primary, size: 28),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   title,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
-                    height: 1.2,
+                    fontSize: 14,
+                    height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 4),
               ],
             ),
           ),

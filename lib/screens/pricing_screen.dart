@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
+import '../utils/app_theme.dart';
 import 'Organization_Dashboard.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -45,19 +47,16 @@ class _PricingScreenState extends State<PricingScreen> {
     try {
       final String orgReferralCode =
           await FirestoreService.generateUniqueReferralCode();
-      final String managerReferralCode =
-          await FirestoreService.generateUniqueReferralCode();
-      final String supervisorReferralCode =
-          await FirestoreService.generateUniqueReferralCode();
-      final String customerReferralCode =
-          await FirestoreService.generateUniqueReferralCode();
 
-      final String orgId =
-          '${widget.orgName.replaceAll(' ', '_')}_${widget.dateStr}';
-      
+      // Sanitize orgName to create a valid Firestore document ID
+      final String sanitizedOrgName = widget.orgName.replaceAll(
+        RegExp(r'[^a-zA-Z0-9_]'),
+        '_',
+      );
+      final String orgId = '${sanitizedOrgName}_${widget.dateStr}';
+
       // Simplified path for organization details
       final String orgConfigDocPath = 'organisation/$orgId/admin/data';
-
 
       // Upload logo
       String? logoUrl;
@@ -75,92 +74,62 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        transaction.set(FirebaseFirestore.instance.doc(orgConfigDocPath), {
-
-          'orgName': widget.orgName,
-          'appName': widget.appName,
-          'email': widget.email,
-          'phone': widget.phone,
-          'username': widget.username,
-          'password': widget.password,
-          'referralCode': orgReferralCode, // Legacy support
-          'orgReferralCode': orgReferralCode,
-          'managerReferralCode': managerReferralCode,
-          'supervisorReferralCode': supervisorReferralCode,
-          'customerReferralCode': customerReferralCode,
-          'primaryColor': widget.selectedColor.value.toRadixString(16),
-          if (logoUrl != null) 'logoUrl': logoUrl,
-          'createdAt': FieldValue.serverTimestamp(),
-          // Subscription data
-          'subscriptionPlan': '30_days_free_trial',
-          'subscriptionStartDate': Timestamp.fromDate(now),
-          'subscriptionEndDate': Timestamp.fromDate(endDate),
-          'isSubscriptionActive': true,
-        });
+        transaction.set(
+          FirebaseFirestore.instance.doc('organisation/$orgId/admin/data'),
+          {
+            'orgName': widget.orgName,
+            'email': widget.email,
+            'phone': widget.phone,
+            'username': widget.username,
+            'password': widget.password,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
 
         transaction.set(
+          FirebaseFirestore.instance.doc('organisation/$orgId/admin/referal'),
+          {
+            'referralCode': orgReferralCode,
+            'orgReferralCode': orgReferralCode,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        transaction.set(
+          FirebaseFirestore.instance.doc('organisation/$orgId/admin/branding'),
+          {
+            'appName': widget.appName,
+            'primaryColor': AppTheme.colorToHex(widget.selectedColor),
+            if (logoUrl != null) 'logoUrl': logoUrl,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        transaction.set(
+          FirebaseFirestore.instance.doc(
+            'organisation/$orgId/admin/subscription',
+          ),
+          {
+            'subscriptionPlan': '30_days_free_trial',
+            'subscriptionStartDate': Timestamp.fromDate(now),
+            'subscriptionEndDate': Timestamp.fromDate(endDate),
+            'isSubscriptionActive': true,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        // Global lookup mapping: Username to Org Details
+        transaction.set(
           FirebaseFirestore.instance
-              .collection('organizationUser')
+              .collection('globalUsers')
               .doc(widget.username),
           {
             'orgName': widget.orgName,
-            'dynamicPath': orgId, // Store only the ID for FirestoreService
+            'dynamicPath': orgId,
             'username': widget.username,
             'password': widget.password,
             'fullConfigPath': orgConfigDocPath,
-          },
-
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance
-              .collection('referralCodes')
-              .doc(orgReferralCode),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'role': 'organization',
             'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigDocPath,
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance
-              .collection('referralCodes')
-              .doc(managerReferralCode),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'role': 'manager',
-            'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigDocPath,
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance
-              .collection('referralCodes')
-              .doc(supervisorReferralCode),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'role': 'supervisor',
-            'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigDocPath,
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance
-              .collection('referralCodes')
-              .doc(customerReferralCode),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'role': 'customer',
-            'createdAt': FieldValue.serverTimestamp(),
-            'fullConfigPath': orgConfigDocPath,
           },
         );
       });
@@ -173,32 +142,193 @@ class _PricingScreenState extends State<PricingScreen> {
       await prefs.setString('org_name', widget.orgName);
       await prefs.setString('org_doc_path', orgConfigDocPath);
 
+      // Apply the new branding globally immediately after successful registration
+      await AppTheme.updateTheme(widget.selectedColor);
+      await AppTheme.updateAppName(widget.appName);
+
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) {
+            final theme = Theme.of(ctx);
+            final colorScheme = theme.colorScheme;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(32, 28, 32, 12),
+              actionsPadding: const EdgeInsets.fromLTRB(32, 0, 32, 24),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00A86B).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF00A86B),
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Registration Successful!',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your organization referral code is:',
+                    style: theme.textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          orgReferralCode,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.primary,
+                            letterSpacing: 4,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: orgReferralCode),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Referral code copied!'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.copy_rounded,
+                            color: colorScheme.primary,
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Copy Code',
+                            style: TextStyle(color: colorScheme.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Share this code with your managers and supervisors so they can join your organization.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'CONTINUE TO DASHBOARD',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const OrganizationDashboard(),
+            ),
+            (route) => false,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Registration error: $e');
+      String errorMsg = 'Registration failed. Please try again.';
+
+      if (e.toString().contains('permission-denied')) {
+        errorMsg = 'Permission denied. Please check Firestore security rules.';
+      } else if (e.toString().contains('index')) {
+        errorMsg = 'Firestore index required. Click to copy creation link.';
+      } else {
+        errorMsg = 'Error: ${e.toString()}';
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Registration successful! Org Code: $orgReferralCode',
-            ),
-            backgroundColor: Colors.green,
+            content: Text(errorMsg),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 10),
+            action: e.toString().contains('http')
+                ? SnackBarAction(
+                    label: 'COPY LINK',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: e.toString()));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Error copied to clipboard!'),
+                        ),
+                      );
+                    },
+                  )
+                : null,
           ),
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const OrganizationDashboard(),
-          ),
-          (route) => false,
         );
       }
-    } catch (e) {
-      debugPrint('Registration error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration failed. Please try again.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -206,97 +336,119 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    return Theme(
+      data: AppTheme.getTheme(widget.selectedColor),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
 
-    return GlassScaffold(
-      title: 'Pricing',
-      onBack: () => Navigator.pop(context),
-      body: Column(
-        children: [
-          const SizedBox(height: 24),
-          // Step Indicator
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: _buildStepIndicator(theme),
-          ),
-          const SizedBox(height: 12),
+          return GlassScaffold(
+            title: 'Pricing',
+            onBack: () => Navigator.pop(context),
+            body: Column(
+              children: [
+                const SizedBox(height: 24),
+                // Step Indicator
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildStepIndicator(theme),
+                ),
+                const SizedBox(height: 12),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Column(
-                children: [
-                  Text(
-                    'Choose a Plan',
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Start growing your business with zero upfront cost',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Pricing Card
-                  GlassCard(
-                    padding: const EdgeInsets.all(32),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                     child: Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A86B).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: const Text(
-                            'RECOMMENDED',
-                            style: TextStyle(
-                              color: Color(0xFF00A86B),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
                         Text(
-                          '30 Days Free Trial',
-                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          'Choose a Plan',
+                          style: theme.textTheme.headlineSmall,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
-                          'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
+                          'Start growing your business with zero upfront cost',
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                          style: theme.textTheme.bodyMedium,
                         ),
-                        const SizedBox(height: 32),
-                        const Divider(),
-                        const SizedBox(height: 32),
-                        _buildFeatureRow('Unlimited user seats', theme),
-                        const SizedBox(height: 16),
-                        _buildFeatureRow('Advanced reporting & analytics', theme),
-                        const SizedBox(height: 16),
-                        _buildFeatureRow('Custom branding tools', theme),
-                        const SizedBox(height: 16),
-                        _buildFeatureRow('Priority 24/7 support', theme),
                         const SizedBox(height: 40),
 
-                        // Register Final Actions
-                        GlassButton(
-                          label: 'START FREE TRIAL',
-                          isLoading: _isLoading,
-                          onPressed: _register,
+                        // Pricing Card
+                        GlassCard(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF00A86B,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: const Text(
+                                  'RECOMMENDED',
+                                  style: TextStyle(
+                                    color: Color(0xFF00A86B),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                '30 Days Free Trial',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                              const Divider(),
+                              const SizedBox(height: 32),
+                              _buildFeatureRow('Unlimited user seats', theme),
+                              const SizedBox(height: 16),
+                              _buildFeatureRow(
+                                'Advanced reporting & analytics',
+                                theme,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildFeatureRow('Custom branding tools', theme),
+                              const SizedBox(height: 16),
+                              _buildFeatureRow('Priority 24/7 support', theme),
+                              const SizedBox(height: 40),
+
+                              // Register Final Actions
+                              GlassButton(
+                                label: 'START FREE TRIAL',
+                                isLoading: _isLoading,
+                                onPressed: _register,
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -304,14 +456,13 @@ class _PricingScreenState extends State<PricingScreen> {
   Widget _buildFeatureRow(String text, ThemeData theme) {
     return Row(
       children: [
-        const Icon(Icons.check_circle_rounded, color: Color(0xFF00A86B), size: 22),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodyLarge,
-          ),
+        const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF00A86B),
+          size: 22,
         ),
+        const SizedBox(width: 16),
+        Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
       ],
     );
   }
@@ -331,7 +482,9 @@ class _PricingScreenState extends State<PricingScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                color: activeStep >= i ~/ 2 + 1 ? primaryColor : colorScheme.outlineVariant,
+                color: activeStep >= i ~/ 2 + 1
+                    ? primaryColor
+                    : colorScheme.outlineVariant,
               ),
             ),
           );
@@ -359,7 +512,9 @@ class _PricingScreenState extends State<PricingScreen> {
                     : Text(
                         '${idx + 1}',
                         style: TextStyle(
-                          color: active ? Colors.white : colorScheme.onSurfaceVariant,
+                          color: active
+                              ? Colors.white
+                              : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -370,7 +525,9 @@ class _PricingScreenState extends State<PricingScreen> {
             Text(
               steps[idx],
               style: theme.textTheme.labelMedium?.copyWith(
-                color: active || done ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                color: active || done
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurfaceVariant,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
               ),
             ),

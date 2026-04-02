@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
   const SiteSupervisorMapScreen({super.key});
@@ -31,7 +32,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   List<String> supervisorIdList = [];
   List<String> projectStageList = [];
 
-  final Color primaryColor = Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -287,26 +288,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: Text(
-          'Site-Supervisor Mapping',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            
-            letterSpacing: 0.7,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
-        ),
-        toolbarHeight: 65,
-      ),
+    return GlassScaffold(
+      title: 'Site-Supervisor Mapping',
+      onBack: () => Navigator.pop(context),
       body: LayoutBuilder(
         builder: (context, constraints) {
           double horizontalPadding = constraints.maxWidth * 0.06; // 6%
@@ -798,13 +782,14 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
       builder: (context, child) {
+        final themeColor = Theme.of(context).colorScheme.primary;
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryColor,
+              primary: themeColor,
               onPrimary: Colors.white,
               surface: Colors.white,
-              onSurface: primaryColor,
+              onSurface: themeColor,
             ),
             dialogTheme: DialogThemeData(),
           ),

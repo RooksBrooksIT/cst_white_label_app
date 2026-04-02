@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class WorkersConfigPage extends StatefulWidget {
   const WorkersConfigPage({super.key});
@@ -13,6 +14,7 @@ class WorkersConfigPage extends StatefulWidget {
 class _WorkersConfigPageState extends State<WorkersConfigPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
   // Removed _firestore field
   // Form controllers for Create New Worker tab
   final TextEditingController _nameController = TextEditingController();
@@ -59,6 +61,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       final querySnapshot = await FirestoreService.getCollection(
         'labours',
       ).get();
+      if (!mounted) return;
       setState(() {
         _designations = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -87,8 +90,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       final lastWorkerId = lastWorker['workerId'] as String? ?? 'WC000';
 
       // Extract number and increment
-      final numberStr = lastWorkerId.replaceAll('WC', '');
-      final nextNumber = int.parse(numberStr) + 1;
+      final numberStr = lastWorkerId.replaceAll(RegExp(r'[^0-9]'), '');
+      final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
 
       return 'WC${nextNumber.toString().padLeft(3, '0')}';
     } catch (e) {
@@ -130,6 +133,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       _joiningDateController.text = DateFormat(
         'yyyy-MM-dd',
       ).format(DateTime.now());
+      if (!mounted) return;
       setState(() {
         _selectedDesignation = null;
         _isSalaryEditable = false;
@@ -243,46 +247,33 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Workers Configuration'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
+    return GlassScaffold(
+      title: 'Workers Configuration',
+      onBack: () => Navigator.pop(context),
+      bottom: TabBar(
+        controller: _tabController,
+        indicatorColor: Colors.white,
+        indicatorWeight: 3,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: colorScheme.primary,
-          indicatorWeight: 3,
-          labelColor: colorScheme.primary,
-          unselectedLabelColor: const Color(0xFF64748B),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-          tabs: const [
-            Tab(text: 'Create New'),
-            Tab(text: 'Workers List'),
-          ],
-        ),
+        tabs: const [
+          Tab(text: 'Create New'),
+          Tab(text: 'Workers List'),
+        ],
       ),
-      body: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            // Create New Worker Tab
-            _buildCreateWorkerTab(),
-            // Workers List Tab
-            _buildWorkersListTab(),
-          ],
-        ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Create New Worker Tab
+          _buildCreateWorkerTab(),
+          // Workers List Tab
+          _buildWorkersListTab(),
+        ],
       ),
     );
   }
@@ -406,8 +397,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   ElevatedButton(
                     onPressed: _createWorker,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0b3470),
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       minimumSize: Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
@@ -45,7 +46,7 @@ class _SupervisorWorkSchedulePageState
   final List<Map<String, dynamic>> _addedLabours = [];
   int _selectedLabourCount = 1;
 
-  static const Color mainColor = Color(0xFF0b3470);
+  Color get mainColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -336,13 +337,9 @@ class _SupervisorWorkSchedulePageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Work Schedule', style: TextStyle()),
-        backgroundColor: mainColor,
-        iconTheme: IconThemeData(),
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: 'Work Schedule',
+      onBack: () => Navigator.pop(context),
       body: _isLoadingSupervisorSite
           ? Center(child: CircularProgressIndicator(color: mainColor))
           : _supervisorSiteError != null
@@ -363,7 +360,7 @@ class _SupervisorWorkSchedulePageState
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            color: Color(0xFFE6E7F8),
+                            color: Theme.of(context).colorScheme.primaryContainer,
                             child: Padding(
                               padding: EdgeInsets.symmetric(
                                   vertical: 24.0, horizontal: 20.0),
@@ -487,7 +484,7 @@ class _SupervisorWorkSchedulePageState
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        color: Color(0xFFF4F7FF),
+                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -580,7 +577,7 @@ class _SupervisorWorkSchedulePageState
                                                                 vertical: 2),
                                                         decoration: BoxDecoration(
                                                           color:
-                                                              Color(0xFFE0E5F8),
+                                                              Theme.of(context).colorScheme.secondaryContainer,
                                                           borderRadius:
                                                               BorderRadius.circular(
                                                                   8),
@@ -617,7 +614,7 @@ class _SupervisorWorkSchedulePageState
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      color: Color(0xFFF9F9FF),
+                                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                                       child: Padding(
                                         padding: EdgeInsets.all(14),
                                         child: Column(

@@ -42,6 +42,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   bool isLoadingLabours = true;
   String? materialError;
   String? labourError;
+  final materialSearchController = TextEditingController();
+  final labourSearchController = TextEditingController();
   String? supervisorId;
   String? projectName;
   String siteCode = '';
@@ -73,7 +75,6 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   final TextEditingController _customLabourSalaryController =
       TextEditingController(text: '0');
 
-
   @override
   void initState() {
     super.initState();
@@ -89,8 +90,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       projectPhaseError = null;
     });
     try {
-      final snapshot = await FirestoreService.getCollection('projectStages')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectStages',
+      ).get();
       final phases = <String>[];
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -118,9 +120,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
   Future<void> _fetchSupervisorData() async {
     try {
-      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
-          .where('supervisor', isEqualTo: widget.userName)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('supervisor', isEqualTo: widget.userName).get();
       if (snapshot.docs.isNotEmpty) {
         final sites = snapshot.docs
             .map((doc) {
@@ -185,8 +187,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       materialError = null;
     });
     try {
-      final snapshot = await FirestoreService.getCollection('materials')
-          .get();
+      final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -229,8 +230,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       labourError = null;
     });
     try {
-      final snapshot = await FirestoreService.getCollection('labours')
-          .get();
+      final snapshot = await FirestoreService.getCollection('labours').get();
       final options = <String>[];
       final salaries = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -281,7 +281,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
               onSurface: Colors.black,
             ),
             textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(foregroundColor: Theme.of(context).primaryColor),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+              ),
             ),
           ),
           child: child!,
@@ -409,9 +411,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     };
     try {
       // Check for existing entry for this site and date
-      final existing = await FirestoreService.getCollection('siteSupervisorEntries')
-          .doc(docId)
-          .get();
+      final existing = await FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).doc(docId).get();
       if (existing.exists) {
         showDialog(
           context: context,
@@ -433,9 +435,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         });
         return;
       }
-      await FirestoreService.getCollection('siteSupervisorEntries')
-          .doc(docId)
-          .set(data);
+      await FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).doc(docId).set(data);
       // Update total site expense aggregation
       await ExpenseService.updateTotalSiteExpense(siteCode);
       // --- Update siteSupervisorProjectStageActual collection ---
@@ -490,7 +492,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       style: TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: 16,
-        color: Theme.of(context).primaryColor,
+        color: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -500,21 +502,28 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     TextEditingController controller,
     IconData icon,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        prefixIcon: Icon(icon, size: 20, color: colorScheme.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
         filled: true,
-        
+        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 12,
           horizontal: 16,
@@ -522,8 +531,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         isDense: true,
       ),
       keyboardType: TextInputType.number,
-      cursorColor: Theme.of(context).primaryColor,
-      style: const TextStyle(),
+      cursorColor: colorScheme.primary,
+      style: TextStyle(color: colorScheme.onSurface),
       onChanged: (_) => setState(() {}),
     );
   }
@@ -872,9 +881,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Widget _buildInfoRow(IconData icon, String value, {String? subValue}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+        Icon(icon, size: 20, color: colorScheme.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -882,10 +893,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white,
+                  color: colorScheme.onSurface,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -894,7 +905,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                   subValue,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
             ],
@@ -916,6 +927,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     _customMaterialPriceController.dispose();
     _customLabourNameController.dispose();
     _customLabourSalaryController.dispose();
+    materialSearchController.dispose();
+    labourSearchController.dispose();
     super.dispose();
   }
 
@@ -952,27 +965,50 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 child: DropdownButtonFormField<String>(
                                   value: selectedSiteId,
                                   isExpanded: true,
-                                  dropdownColor: Colors.blueGrey[900],
-                                  style: const TextStyle(color: Colors.white),
+                                  dropdownColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surface,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
                                   decoration: InputDecoration(
                                     labelText: 'Site Id (Supervisor Only)',
-                                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                                    labelStyle: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
+                                      ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
+                                      ),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.white.withOpacity(0.05),
+                                    fillColor: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest
+                                        .withOpacity(0.5),
                                     contentPadding: const EdgeInsets.symmetric(
                                       vertical: 12,
                                       horizontal: 16,
                                     ),
                                   ),
-                                  iconEnabledColor: Colors.white,
+                                  iconEnabledColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
                                   items: supervisorSites
                                       .map(
                                         (site) => DropdownMenuItem(
@@ -1000,14 +1036,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               );
                                           setState(() {
                                             selectedSiteId = value;
-                                            siteCode =
-                                                selected['siteId'] ?? '';
+                                            siteCode = selected['siteId'] ?? '';
                                             siteLocation =
                                                 selected['location'] ??
                                                 'Unknown';
                                             supervisorId =
-                                                selected['supervisorId'] ??
-                                                '';
+                                                selected['supervisorId'] ?? '';
                                             projectName =
                                                 selected['projectName'] ??
                                                 'Not found';
@@ -1025,13 +1059,28 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          _buildInfoRow(Icons.person, 'Supervisor: ${widget.userName}', subValue: supervisorId != null ? 'ID: $supervisorId' : null),
+                          _buildInfoRow(
+                            Icons.person,
+                            'Supervisor: ${widget.userName}',
+                            subValue: supervisorId != null
+                                ? 'ID: $supervisorId'
+                                : null,
+                          ),
                           const SizedBox(height: 12),
-                          _buildInfoRow(Icons.business, 'Project: $projectName'),
+                          _buildInfoRow(
+                            Icons.business,
+                            'Project: $projectName',
+                          ),
                           const SizedBox(height: 12),
-                          _buildInfoRow(Icons.location_on, 'Location: $siteLocation'),
+                          _buildInfoRow(
+                            Icons.location_on,
+                            'Location: $siteLocation',
+                          ),
                           const SizedBox(height: 12),
-                          _buildInfoRow(Icons.layers, 'Stage: ${selectedProjectPhase ?? "Not selected"}'),
+                          _buildInfoRow(
+                            Icons.layers,
+                            'Stage: ${selectedProjectPhase ?? "Not selected"}',
+                          ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -1044,12 +1093,16 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               Expanded(
                                 child: Text(
                                   selectedDate != null
-                                      ? DateFormat('EEEE, MMM d, yyyy').format(selectedDate!)
+                                      ? DateFormat(
+                                          'EEEE, MMM d, yyyy',
+                                        ).format(selectedDate!)
                                       : 'No date chosen',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -1058,7 +1111,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 icon: const Icon(Icons.edit, size: 16),
                                 label: const Text('Change'),
                                 style: TextButton.styleFrom(
-                                  foregroundColor: Theme.of(context).primaryColor,
+                                  foregroundColor: Theme.of(
+                                    context,
+                                  ).primaryColor,
                                 ),
                               ),
                             ],
@@ -1068,17 +1123,19 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                     ),
                     const SizedBox(height: 16),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 8.0,
+                      ),
                       child: Text(
                         'Add Entry',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const Divider(height: 24, thickness: 1, color: Colors.white24),
-                    
+                    const Divider(height: 24, thickness: 1),
+
                     // Material Details Card
                     GlassCard(
                       child: Column(
@@ -1089,56 +1146,104 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           isLoadingMaterials
                               ? const Center(child: CircularProgressIndicator())
                               : materialError != null
-                                  ? Text(materialError!, style: const TextStyle(color: Colors.red))
-                                  : Column(
-                                      children: [
-                                        GlassTextField(
-                                          controller: TextEditingController(), // Placeholder for search logic if needed
-                                          label: 'Search Material...',
-                                          icon: Icons.search,
-                                          onChanged: (query) {
-                                            setState(() {
-                                              final q = query.toLowerCase();
-                                              final filtered = materialOptions
-                                                  .where((item) => item.toLowerCase().startsWith(q))
-                                                  .toList();
-                                              filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-                                              if (filtered.isNotEmpty) {
-                                                selectedMaterial = filtered.contains(selectedMaterial)
-                                                    ? selectedMaterial
-                                                    : filtered.first;
-                                              } else {
-                                                selectedMaterial = null;
-                                              }
-                                              _filteredMaterialOptions = filtered;
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        DropdownButtonFormField<String>(
-                                          value: selectedMaterial,
-                                          isExpanded: true,
-                                          dropdownColor: Colors.blueGrey[900],
-                                          style: const TextStyle(color: Colors.white),
-                                          decoration: InputDecoration(
-                                            labelText: 'Material',
-                                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                                            prefixIcon: Icon(Icons.category_outlined, color: Theme.of(context).primaryColor),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                            filled: true,
-                                            fillColor: Colors.white.withOpacity(0.05),
-                                          ),
-                                          iconEnabledColor: Colors.white,
-                                          items: (_filteredMaterialOptions ?? materialOptions)
-                                              .map((item) => DropdownMenuItem(
-                                                    value: item,
-                                                    child: Text(item, overflow: TextOverflow.ellipsis),
-                                                  ))
-                                              .toList(),
-                                          onChanged: (value) => setState(() => selectedMaterial = value),
-                                        ),
-                                      ],
+                              ? Text(
+                                  materialError!,
+                                  style: const TextStyle(color: Colors.red),
+                                )
+                              : Column(
+                                  children: [
+                                    GlassTextField(
+                                      controller: materialSearchController,
+                                      label: 'Search Material...',
+                                      icon: Icons.search,
+                                      onChanged: (query) {
+                                        setState(() {
+                                          final q = query.toLowerCase();
+                                          final filtered = materialOptions
+                                              .where(
+                                                (item) => item
+                                                    .toLowerCase()
+                                                    .startsWith(q),
+                                              )
+                                              .toList();
+                                          filtered.sort(
+                                            (a, b) => a.toLowerCase().compareTo(
+                                              b.toLowerCase(),
+                                            ),
+                                          );
+                                          if (filtered.isNotEmpty) {
+                                            selectedMaterial =
+                                                filtered.contains(
+                                                  selectedMaterial,
+                                                )
+                                                ? selectedMaterial
+                                                : filtered.first;
+                                          } else {
+                                            selectedMaterial = null;
+                                          }
+                                          _filteredMaterialOptions = filtered;
+                                        });
+                                      },
                                     ),
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      value: selectedMaterial,
+                                      isExpanded: true,
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Material',
+                                        labelStyle: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.category_outlined,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withOpacity(0.5),
+                                      ),
+                                      iconEnabledColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      items:
+                                          (_filteredMaterialOptions ??
+                                                  materialOptions)
+                                              .map(
+                                                (item) => DropdownMenuItem(
+                                                  value: item,
+                                                  child: Text(
+                                                    item,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                      onChanged: (value) => setState(
+                                        () => selectedMaterial = value,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -1149,24 +1254,38 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   label: 'Qty',
                                   icon: Icons.production_quantity_limits,
                                   keyboardType: TextInputType.number,
-                                  onChanged: (value) => setState(() => materialQty = int.tryParse(value) ?? 0),
+                                  onChanged: (value) => setState(
+                                    () =>
+                                        materialQty = int.tryParse(value) ?? 0,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: GlassButton(
                                   label: 'Add',
-                                  onPressed: isLoadingMaterials || materialOptions.isEmpty ? null : _addMaterial,
+                                  onPressed:
+                                      isLoadingMaterials ||
+                                          materialOptions.isEmpty
+                                      ? null
+                                      : _addMaterial,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           TextButton(
-                            onPressed: () => setState(() => _showCustomMaterialFields = !_showCustomMaterialFields),
+                            onPressed: () => setState(
+                              () => _showCustomMaterialFields =
+                                  !_showCustomMaterialFields,
+                            ),
                             child: Text(
-                              _showCustomMaterialFields ? 'Hide Others' : 'Show Others',
-                              style: TextStyle(color: Theme.of(context).primaryColor),
+                              _showCustomMaterialFields
+                                  ? 'Hide Others'
+                                  : 'Show Others',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
                             ),
                           ),
                           if (_showCustomMaterialFields) ...[
@@ -1212,7 +1331,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   child: GlassButton(
                                     label: 'Cancel',
                                     isSecondary: true,
-                                    onPressed: () => setState(() => _showCustomMaterialFields = false),
+                                    onPressed: () => setState(
+                                      () => _showCustomMaterialFields = false,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1231,56 +1352,104 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           isLoadingLabours
                               ? const Center(child: CircularProgressIndicator())
                               : labourError != null
-                                  ? Text(labourError!, style: const TextStyle(color: Colors.red))
-                                  : Column(
-                                      children: [
-                                        GlassTextField(
-                                          controller: TextEditingController(), // Search placeholder
-                                          label: 'Search Labour...',
-                                          icon: Icons.search,
-                                          onChanged: (query) {
-                                            setState(() {
-                                              final q = query.toLowerCase();
-                                              final filtered = labourOptions
-                                                  .where((item) => item.toLowerCase().startsWith(q))
-                                                  .toList();
-                                              filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-                                              if (filtered.isNotEmpty) {
-                                                selectedLabour = filtered.contains(selectedLabour)
-                                                    ? selectedLabour
-                                                    : filtered.first;
-                                              } else {
-                                                selectedLabour = null;
-                                              }
-                                              _filteredLabourOptions = filtered;
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        DropdownButtonFormField<String>(
-                                          value: selectedLabour,
-                                          isExpanded: true,
-                                          dropdownColor: Colors.blueGrey[900],
-                                          style: const TextStyle(color: Colors.white),
-                                          decoration: InputDecoration(
-                                            labelText: 'Labour Type',
-                                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                                            prefixIcon: Icon(Icons.group, color: Theme.of(context).primaryColor),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                            filled: true,
-                                            fillColor: Colors.white.withOpacity(0.05),
-                                          ),
-                                          iconEnabledColor: Colors.white,
-                                          items: (_filteredLabourOptions ?? labourOptions)
-                                              .map((item) => DropdownMenuItem(
-                                                    value: item,
-                                                    child: Text(item, overflow: TextOverflow.ellipsis),
-                                                  ))
-                                              .toList(),
-                                          onChanged: (value) => setState(() => selectedLabour = value),
-                                        ),
-                                      ],
+                              ? Text(
+                                  labourError!,
+                                  style: const TextStyle(color: Colors.red),
+                                )
+                              : Column(
+                                  children: [
+                                    GlassTextField(
+                                      controller: labourSearchController,
+                                      label: 'Search Labour...',
+                                      icon: Icons.search,
+                                      onChanged: (query) {
+                                        setState(() {
+                                          final q = query.toLowerCase();
+                                          final filtered = labourOptions
+                                              .where(
+                                                (item) => item
+                                                    .toLowerCase()
+                                                    .startsWith(q),
+                                              )
+                                              .toList();
+                                          filtered.sort(
+                                            (a, b) => a.toLowerCase().compareTo(
+                                              b.toLowerCase(),
+                                            ),
+                                          );
+                                          if (filtered.isNotEmpty) {
+                                            selectedLabour =
+                                                filtered.contains(
+                                                  selectedLabour,
+                                                )
+                                                ? selectedLabour
+                                                : filtered.first;
+                                          } else {
+                                            selectedLabour = null;
+                                          }
+                                          _filteredLabourOptions = filtered;
+                                        });
+                                      },
                                     ),
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      value: selectedLabour,
+                                      isExpanded: true,
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Labour Type',
+                                        labelStyle: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.group,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withOpacity(0.5),
+                                      ),
+                                      iconEnabledColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      items:
+                                          (_filteredLabourOptions ??
+                                                  labourOptions)
+                                              .map(
+                                                (item) => DropdownMenuItem(
+                                                  value: item,
+                                                  child: Text(
+                                                    item,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                      onChanged: (value) => setState(
+                                        () => selectedLabour = value,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -1291,24 +1460,36 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   label: 'Count',
                                   icon: Icons.person_add,
                                   keyboardType: TextInputType.number,
-                                  onChanged: (value) => setState(() => labourQty = int.tryParse(value) ?? 0),
+                                  onChanged: (value) => setState(
+                                    () => labourQty = int.tryParse(value) ?? 0,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: GlassButton(
                                   label: 'Add',
-                                  onPressed: isLoadingLabours || labourOptions.isEmpty ? null : _addLabour,
+                                  onPressed:
+                                      isLoadingLabours || labourOptions.isEmpty
+                                      ? null
+                                      : _addLabour,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           TextButton(
-                            onPressed: () => setState(() => _showCustomLabourFields = !_showCustomLabourFields),
+                            onPressed: () => setState(
+                              () => _showCustomLabourFields =
+                                  !_showCustomLabourFields,
+                            ),
                             child: Text(
-                              _showCustomLabourFields ? 'Hide Others' : 'Show Others',
-                              style: TextStyle(color: Theme.of(context).primaryColor),
+                              _showCustomLabourFields
+                                  ? 'Hide Others'
+                                  : 'Show Others',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
                             ),
                           ),
                           if (_showCustomLabourFields) ...[
@@ -1339,7 +1520,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   child: GlassButton(
                                     label: 'Cancel',
                                     isSecondary: true,
-                                    onPressed: () => setState(() => _showCustomLabourFields = false),
+                                    onPressed: () => setState(
+                                      () => _showCustomLabourFields = false,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1412,6 +1595,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   foodCost.text = '0';
                                   transportCost.text = '0';
                                   fuelCost.text = '0';
+                                  materialSearchController.clear();
+                                  labourSearchController.clear();
                                 });
                               },
                             ),
@@ -1419,7 +1604,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: isSaving
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 : GlassButton(
                                     label: 'Save Entry',
                                     onPressed: _saveToFirestore,

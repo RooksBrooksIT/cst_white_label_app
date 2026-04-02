@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
@@ -67,20 +68,22 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       _isLoadingTools = true;
     });
     try {
-      final snapshot = await FirestoreService
-          .getCollection('tools')
-          .get();
+      final snapshot = await FirestoreService.getCollection('tools').get();
+      if (!mounted) return;
       setState(() {
         _toolsList = snapshot.docs;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load tools: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isLoadingTools = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingTools = false;
+        });
+      }
     }
   }
 
@@ -104,35 +107,29 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Tool Master'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
+    return GlassScaffold(
+      title: 'Tool Master',
+      onBack: () => Navigator.pop(context),
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: theme.colorScheme.primary,
+        unselectedLabelColor: const Color.fromARGB(255, 255, 255, 255),
+        indicatorColor: theme.colorScheme.primary,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: TextStyle(
+          fontSize: isSmallScreen ? 14 : 15,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: theme.colorScheme.primary,
-          unselectedLabelColor: const Color(0xFF94A3B8),
-          indicatorColor: theme.colorScheme.primary,
-          indicatorWeight: 3,
-          indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: TextStyle(
-            fontSize: isSmallScreen ? 14 : 15,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontSize: isSmallScreen ? 14 : 15,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: const [
-            Tab(text: 'ADD TOOL'),
-            Tab(text: 'UPDATE COUNT'),
-          ],
+        unselectedLabelStyle: TextStyle(
+          fontSize: isSmallScreen ? 14 : 15,
+          fontWeight: FontWeight.w500,
         ),
+        tabs: const [
+          Tab(text: 'ADD TOOL'),
+          Tab(text: 'UPDATE COUNT'),
+        ],
       ),
       body: TabBarView(
         controller: _tabController,
@@ -151,7 +148,6 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -231,7 +227,6 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 600),
           child: Card(
-            
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -261,7 +256,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: Color(0xFF0b3470),
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                               contentPadding: EdgeInsets.symmetric(
@@ -351,7 +346,10 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme?.primaryColor ?? Colors.blue, width: 2),
+                  borderSide: BorderSide(
+                    color: theme?.primaryColor ?? Colors.blue,
+                    width: 2,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -368,9 +366,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF0b3470)),
+        border: Border.all(color: theme.colorScheme.primary),
       ),
       child: Text(value, style: theme.textTheme.bodyMedium),
     );
@@ -382,11 +379,11 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       decoration: InputDecoration(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF0b3470)),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF0b3470), width: 2),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -452,7 +449,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             icon: Icon(Icons.update, size: 20),
             label: Text('Update'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0b3470),
+              backgroundColor: theme.colorScheme.primary,
               foregroundColor: Colors.white,
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -468,9 +465,9 @@ class _ToolMasterPageState extends State<ToolMasterPage>
             icon: Icon(Icons.clear, size: 20),
             label: Text('Cancel'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Color(0xFF0b3470),
-              side: BorderSide(color: Color(0xFF0b3470)),
-              
+              foregroundColor: theme.colorScheme.primary,
+              side: BorderSide(color: theme.colorScheme.primary),
+
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -501,11 +498,11 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     }
 
     try {
-      await FirestoreService
-          .getCollection('tools')
+      await FirestoreService.getCollection('tools')
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Tool count updated successfully!')),
       );
@@ -513,6 +510,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       _fetchTools();
       _onToolSelected(_selectedToolDocId);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update tool count: ${e.toString()}')),
       );
@@ -567,11 +565,11 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       //   return;
       // }
 
-      final codeDuplicateQuery = await FirestoreService
-          .getCollection('tools')
-          .where('toolCode', isEqualTo: toolCode)
-          .get();
+      final codeDuplicateQuery = await FirestoreService.getCollection(
+        'tools',
+      ).where('toolCode', isEqualTo: toolCode).get();
 
+      if (!mounted) return;
       if (codeDuplicateQuery.docs.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -587,11 +585,9 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       }
 
       // Get the latest toolId
-      final toolsSnapshot = await FirestoreService
-          .getCollection('tools')
-          .orderBy('toolId', descending: true)
-          .limit(1)
-          .get();
+      final toolsSnapshot = await FirestoreService.getCollection(
+        'tools',
+      ).orderBy('toolId', descending: true).limit(1).get();
 
       String newToolId = 'TC001';
       if (toolsSnapshot.docs.isNotEmpty) {
@@ -613,11 +609,11 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       });
 
       // Save to toolsAtCompany collection
-      await FirestoreService
-          .getCollection('toolsAtCompany')
-          .doc(toolCode)
-          .set({'toolCode': toolCode, 'availableCount': toolCount});
+      await FirestoreService.getCollection(
+        'toolsAtCompany',
+      ).doc(toolCode).set({'toolCode': toolCode, 'availableCount': toolCount});
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Tool saved successfully!')));
@@ -633,13 +629,16 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       // Refresh tools list for update tab
       _fetchTools();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save tool: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 }

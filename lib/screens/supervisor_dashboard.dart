@@ -224,8 +224,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withOpacity(0.8),
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -233,7 +233,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -252,7 +252,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               backgroundColor: Colors.white,
               child: Icon(
                 Icons.person_rounded,
-                color: Theme.of(context).primaryColor,
+                color: Theme.of(context).colorScheme.primary,
                 size: 32,
               ),
             ),
@@ -276,7 +276,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   'Site Supervisor • ID: ${widget.supervisorId}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -297,7 +297,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             width: 4,
             height: 20,
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
+              color: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -307,7 +307,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             style: TextStyle(
               fontSize: Responsive.fontSize(context, 12),
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF94A3B8),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: 2.0,
             ),
           ),
@@ -327,7 +327,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: item.color.withOpacity(0.1),
+                color: item.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(item.icon, color: item.color, size: 24),
@@ -339,13 +339,13 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 16),
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF334155),
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFFCBD5E1),
+              color: Theme.of(context).colorScheme.outlineVariant,
               size: 24,
             ),
           ],

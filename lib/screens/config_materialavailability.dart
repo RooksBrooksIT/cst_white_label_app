@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class MaterialAvailability extends StatefulWidget {
   const MaterialAvailability({super.key});
@@ -47,7 +48,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Future<void> _loadMaterials() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('materials').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materials',
+      ).get();
       setState(() {
         _materialNames = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -68,10 +71,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _isLoadingAvailability = true;
     });
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('materialsavailablity')
-          .orderBy('lastupdated', descending: true)
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materialsavailablity',
+      ).orderBy('lastupdated', descending: true).get();
 
       setState(() {
         _availabilityData = querySnapshot.docs.map((doc) {
@@ -121,9 +123,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
     try {
       final documentId = _generateDocumentId(_selectedMaterial!);
-      final todayDocRef = FirestoreService
-          .getCollection('materialsavailablity')
-          .doc(documentId);
+      final todayDocRef = FirestoreService.getCollection(
+        'materialsavailablity',
+      ).doc(documentId);
 
       // Check if document exists for today
       final todayDoc = await todayDocRef.get();
@@ -180,9 +182,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       // Find the existing document for today
       final documentId = _generateDocumentId(_selectedMaterialToUpdate!);
-      final todayDocRef = FirestoreService
-          .getCollection('materialsavailablity')
-          .doc(documentId);
+      final todayDocRef = FirestoreService.getCollection(
+        'materialsavailablity',
+      ).doc(documentId);
 
       // Check if document exists for today
       final todayDoc = await todayDocRef.get();
@@ -204,12 +206,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         );
       } else {
         // If no document exists for today, check if there's any existing document for this material
-        final existingDocs = await FirestoreService
-            .getCollection('materialsavailablity')
-            .where('materialName', isEqualTo: _selectedMaterialToUpdate)
-            .orderBy('lastupdated', descending: true)
-            .limit(1)
-            .get();
+        final existingDocs =
+            await FirestoreService.getCollection('materialsavailablity')
+                .where('materialName', isEqualTo: _selectedMaterialToUpdate)
+                .orderBy('lastupdated', descending: true)
+                .limit(1)
+                .get();
 
         if (existingDocs.docs.isNotEmpty) {
           // Update the most recent existing document
@@ -217,13 +219,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           final currentCount = existingDoc.data()['count'] as int;
           final newCount = _addToExisting ? currentCount + _count : _count;
 
-          await FirestoreService
-              .getCollection('materialsavailablity')
-              .doc(existingDoc.id)
-              .update({
-                'count': newCount,
-                'lastupdated': FieldValue.serverTimestamp(),
-              });
+          await FirestoreService.getCollection(
+            'materialsavailablity',
+          ).doc(existingDoc.id).update({
+            'count': newCount,
+            'lastupdated': FieldValue.serverTimestamp(),
+          });
 
           _showSuccessDialog(
             _addToExisting
@@ -269,10 +270,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       // First try to get today's document
       final documentId = _generateDocumentId(materialName);
-      final todayDoc = await FirestoreService
-          .getCollection('materialsavailablity')
-          .doc(documentId)
-          .get();
+      final todayDoc = await FirestoreService.getCollection(
+        'materialsavailablity',
+      ).doc(documentId).get();
 
       if (todayDoc.exists) {
         setState(() {
@@ -284,12 +284,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       }
 
       // If no today's document, get the most recent one
-      final existingDocs = await FirestoreService
-          .getCollection('materialsavailablity')
-          .where('materialName', isEqualTo: materialName)
-          .orderBy('lastupdated', descending: true)
-          .limit(1)
-          .get();
+      final existingDocs =
+          await FirestoreService.getCollection('materialsavailablity')
+              .where('materialName', isEqualTo: materialName)
+              .orderBy('lastupdated', descending: true)
+              .limit(1)
+              .get();
 
       if (existingDocs.docs.isNotEmpty) {
         setState(() {
@@ -340,11 +340,11 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: const Text(
+          title: Text(
             'Edit Count',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF003768),
+              color: Theme.of(context).primaryColor,
             ),
           ),
           content: Column(
@@ -375,12 +375,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF003768),
+                backgroundColor: Theme.of(context).primaryColor,
               ),
-              child: const Text(
-                'Update',
-                style: TextStyle(),
-              ),
+              child: const Text('Update', style: TextStyle()),
             ),
           ],
         );
@@ -389,13 +386,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
     if (newCount != null && newCount > 0) {
       try {
-        await FirestoreService
-            .getCollection('materialsavailablity')
-            .doc(documentId)
-            .update({
-              'count': newCount,
-              'lastupdated': FieldValue.serverTimestamp(),
-            });
+        await FirestoreService.getCollection(
+          'materialsavailablity',
+        ).doc(documentId).update({
+          'count': newCount,
+          'lastupdated': FieldValue.serverTimestamp(),
+        });
 
         _showSuccessDialog('Count updated successfully!');
         _loadAvailabilityData(); // Refresh the list
@@ -441,7 +437,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.check_circle, color: Colors.green, size: 24),
               SizedBox(width: 12),
@@ -460,10 +456,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text(
+              child: Text(
                 'OK',
                 style: TextStyle(
-                  color: Color(0xFF003768),
+                  color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -482,7 +478,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.error_outline, color: Colors.red, size: 24),
               SizedBox(width: 12),
@@ -501,10 +497,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text(
+              child: Text(
                 'OK',
                 style: TextStyle(
-                  color: Color(0xFF003768),
+                  color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -527,26 +523,17 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Material Availability',
-          style: TextStyle( fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF003768),
-        elevation: 0,
-        iconTheme: const IconThemeData(),
-      ),
+    return GlassScaffold(
+      title: 'Material Availability',
+      onBack: () => Navigator.pop(context),
       body: _isLoadingMaterials
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF003768),
+                      Theme.of(context).primaryColor,
                     ),
                   ),
                   SizedBox(height: 16),
@@ -560,7 +547,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Mode Selection Buttons
                   _buildModeSelectionButtons(),
@@ -584,22 +571,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             onPressed: _switchToNewMode,
             style: ElevatedButton.styleFrom(
               backgroundColor: _isNewMode
-                  ? const Color(0xFF003768)
+                  ? Theme.of(context).primaryColor
                   : Colors.white,
               foregroundColor: _isNewMode
                   ? Colors.white
-                  : const Color(0xFF003768),
+                  : Theme.of(context).primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
-                  color: const Color(0xFF003768),
+                  color: Theme.of(context).primaryColor,
                   width: _isNewMode ? 0 : 2,
                 ),
               ),
               elevation: _isNewMode ? 2 : 0,
             ),
-            child: const Text(
+            child: Text(
               'New',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
@@ -611,22 +598,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             onPressed: _switchToUpdateMode,
             style: ElevatedButton.styleFrom(
               backgroundColor: !_isNewMode
-                  ? const Color(0xFF003768)
+                  ? Theme.of(context).primaryColor
                   : Colors.white,
               foregroundColor: !_isNewMode
                   ? Colors.white
-                  : const Color(0xFF003768),
+                  : Theme.of(context).primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
-                  color: const Color(0xFF003768),
+                  color: Theme.of(context).primaryColor,
                   width: !_isNewMode ? 0 : 2,
                 ),
               ),
               elevation: !_isNewMode ? 2 : 0,
             ),
-            child: const Text(
+            child: Text(
               'Update',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
@@ -638,14 +625,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildNewMaterialSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Add New Material',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF003768),
+            color: Theme.of(context).primaryColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -666,10 +653,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -677,17 +661,17 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: const Color(0xFF003768).withOpacity(0.7),
+                    color: Theme.of(context).primaryColor.withOpacity(0.7),
                     size: 20,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'New Material Logic',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF003768),
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                   ),
@@ -698,11 +682,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 '• If same material exists today, counts will be summed\n'
                 '• Example: Existing 12 + New 12 = Total 24\n'
                 '• Use this for adding new stock to existing materials',
-                style: TextStyle(
-                  fontSize: 12,
-                  
-                  height: 1.5,
-                ),
+                style: TextStyle(fontSize: 12, height: 1.5),
               ),
             ],
           ),
@@ -713,14 +693,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildUpdateMaterialSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Update Material Count',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF003768),
+            color: Theme.of(context).primaryColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -739,17 +719,17 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF003768).withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: const Color(0xFF003768).withOpacity(0.3),
+                color: Theme.of(context).primaryColor.withOpacity(0.3),
               ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.inventory_2_outlined,
-                  color: const Color(0xFF003768),
+                  color: Theme.of(context).primaryColor,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -759,19 +739,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                     children: [
                       Text(
                         'Current Count for "$_selectedMaterialToUpdate"',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '$_existingCount units',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                     ],
@@ -820,10 +800,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -831,17 +808,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: const Color(0xFF003768).withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.7),
                     size: 20,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Update Material Logic',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF003768),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
@@ -856,11 +835,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                     : '• Replaces the current count with new value\n'
                           '• Example: Current 22 → Update 44 = Total 44\n'
                           '• Use this for correcting or setting exact counts',
-                style: TextStyle(
-                  fontSize: 12,
-                  
-                  height: 1.5,
-                ),
+                style: TextStyle(fontSize: 12, height: 1.5),
               ),
             ],
           ),
@@ -871,14 +846,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildOperationCheckboxes() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Operation Type *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 12),
@@ -889,12 +864,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               child: Container(
                 decoration: BoxDecoration(
                   color: _addToExisting
-                      ? const Color(0xFF003768).withOpacity(0.1)
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _addToExisting
-                        ? const Color(0xFF003768)
+                        ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade300,
                     width: _addToExisting ? 2 : 1,
                   ),
@@ -907,7 +882,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   subtitle: const Text('Add to existing count'),
                   value: _addToExisting,
                   onChanged: _onAddToExistingChanged,
-                  activeColor: const Color(0xFF003768),
+                  activeColor: Theme.of(context).colorScheme.primary,
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -920,12 +895,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               child: Container(
                 decoration: BoxDecoration(
                   color: _updateExisting
-                      ? const Color(0xFF003768).withOpacity(0.1)
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _updateExisting
-                        ? const Color(0xFF003768)
+                        ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade300,
                     width: _updateExisting ? 2 : 1,
                   ),
@@ -938,7 +913,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   subtitle: const Text('Replace existing count'),
                   value: _updateExisting,
                   onChanged: _onUpdateExistingChanged,
-                  activeColor: const Color(0xFF003768),
+                  activeColor: Theme.of(context).colorScheme.primary,
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -952,11 +927,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           _addToExisting
               ? 'The entered count will be added to the existing count'
               : 'The existing count will be replaced with the entered count',
-          style: TextStyle(
-            fontSize: 14,
-            
-            fontStyle: FontStyle.italic,
-          ),
+          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
         ),
       ],
     );
@@ -964,20 +935,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildNewMaterialDropdown() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Select Material *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1020,7 +990,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 }
                 return null;
               },
-              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF003768)),
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -1043,20 +1016,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         .toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Select Material to Update *',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1095,7 +1067,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 }
                 return null;
               },
-              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF772323)),
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -1112,20 +1087,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Widget _buildCountInput() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           _isNewMode ? 'Count to Add *' : 'New Count *',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF003768),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
             boxShadow: [
@@ -1157,10 +1131,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          'Enter a number greater than 0',
-          style: TextStyle(fontSize: 14, ),
-        ),
+        Text('Enter a number greater than 0', style: TextStyle(fontSize: 14)),
       ],
     );
   }
@@ -1171,12 +1142,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _submitNewMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF003768),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
-          shadowColor: const Color(0xFF003768).withOpacity(0.3),
+          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1208,12 +1179,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _updateExistingMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF003768),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
-          shadowColor: const Color(0xFF003768).withOpacity(0.3),
+          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(

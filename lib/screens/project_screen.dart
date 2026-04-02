@@ -160,8 +160,12 @@ class _ProjectScreenState extends State<ProjectScreen> {
         'projectStage': projectStage,
         'currentStatus': currentStatus,
         'isContractWork': _isContractWork,
-        'contractorName': _isContractWork ? _contractorNameController.text : null,
-        'contractorBudget': _isContractWork ? double.tryParse(_contractorBudgetController.text) : null,
+        'contractorName': _isContractWork
+            ? _contractorNameController.text
+            : null,
+        'contractorBudget': _isContractWork
+            ? double.tryParse(_contractorBudgetController.text)
+            : null,
         'plannedStartDate': plannedStartDate,
         'plannedEndDate': plannedEndDate,
         'actualStateDate': actualStartDate,
@@ -172,9 +176,9 @@ class _ProjectScreenState extends State<ProjectScreen> {
       };
 
       if (isUpdateMode && selectedProjectId != null) {
-        await FirestoreService.getCollection('projects')
-            .doc(selectedProjectId)
-            .update(data);
+        await FirestoreService.getCollection(
+          'projects',
+        ).doc(selectedProjectId).update(data);
       } else {
         data['createdAt'] = FieldValue.serverTimestamp();
         data['siteId'] = 'SITE_${DateTime.now().millisecondsSinceEpoch}';
@@ -256,16 +260,23 @@ class _ProjectScreenState extends State<ProjectScreen> {
                     if (isUpdateMode) ...[
                       const SizedBox(height: 16),
                       StreamBuilder<QuerySnapshot>(
-                        stream: FirestoreService.getCollection('projects').snapshots(),
+                        stream: FirestoreService.getCollection(
+                          'projects',
+                        ).snapshots(),
                         builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const CircularProgressIndicator();
+                          if (!snapshot.hasData)
+                            return const CircularProgressIndicator();
                           final projects = snapshot.data!.docs;
                           return DropdownButtonFormField<String>(
                             value: selectedProjectId,
                             decoration: InputDecoration(
                               labelText: 'Select Project to Update',
-                              prefixIcon: const Icon(Icons.location_city_rounded),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              prefixIcon: const Icon(
+                                Icons.location_city_rounded,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               filled: true,
                               fillColor: theme.cardColor,
                             ),
@@ -273,37 +284,64 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               final data = doc.data() as Map<String, dynamic>;
                               return DropdownMenuItem(
                                 value: doc.id,
-                                child: Text("${data['projectName']} (${data['ownerName']})"),
+                                child: Text(
+                                  "${data['projectName']} (${data['ownerName']})",
+                                ),
                               );
                             }).toList(),
                             onChanged: (value) async {
-                              final doc = projects.firstWhere((d) => d.id == value);
+                              final doc = projects.firstWhere(
+                                (d) => d.id == value,
+                              );
                               final data = doc.data() as Map<String, dynamic>;
                               setState(() {
                                 selectedProjectId = doc.id;
                                 selectedProjectData = data;
-                                _projectNameController.text = data['projectName'] ?? '';
-                                _ownerNameController.text = data['ownerName'] ?? '';
-                                _ownerPhoneNumberController.text = data['ownerPhoneNumber'] ?? '';
-                                _projectBudgetController.text = (data['projectBudget'] ?? '').toString();
-                                _amountPaidController.text = (data['amountPaid'] ?? '').toString();
+                                _projectNameController.text =
+                                    data['projectName'] ?? '';
+                                _ownerNameController.text =
+                                    data['ownerName'] ?? '';
+                                _ownerPhoneNumberController.text =
+                                    data['ownerPhoneNumber'] ?? '';
+                                _projectBudgetController.text =
+                                    (data['projectBudget'] ?? '').toString();
+                                _amountPaidController.text =
+                                    (data['amountPaid'] ?? '').toString();
                                 projectCategory = data['projectCategory'];
                                 projectSubCategory = data['projectSubCategory'];
                                 projectContract = data['projectContract'];
                                 projectStage = data['projectStage'];
-                                _isContractWork = data['isContractWork'] == true;
-                                _contractorNameController.text = data['contractorName'] ?? '';
-                                _contractorBudgetController.text = (data['contractorBudget'] ?? '').toString();
+                                _isContractWork =
+                                    data['isContractWork'] == true;
+                                _contractorNameController.text =
+                                    data['contractorName'] ?? '';
+                                _contractorBudgetController.text =
+                                    (data['contractorBudget'] ?? '').toString();
                                 currentStatus = data['currentStatus'];
-                                plannedStartDate = (data['plannedStartDate'] as Timestamp?)?.toDate();
-                                plannedEndDate = (data['plannedEndDate'] as Timestamp?)?.toDate();
-                                actualStartDate = (data['actualStateDate'] as Timestamp?)?.toDate();
-                                actualEndDate = (data['actualEndDate'] as Timestamp?)?.toDate();
-                                contractStartDate = (data['contractStartDate'] as Timestamp?)?.toDate();
-                                contractEndDate = (data['contractEndDate'] as Timestamp?)?.toDate();
-                                _updateSiteIdController.text = data['siteId'] ?? '';
+                                plannedStartDate =
+                                    (data['plannedStartDate'] as Timestamp?)
+                                        ?.toDate();
+                                plannedEndDate =
+                                    (data['plannedEndDate'] as Timestamp?)
+                                        ?.toDate();
+                                actualStartDate =
+                                    (data['actualStateDate'] as Timestamp?)
+                                        ?.toDate();
+                                actualEndDate =
+                                    (data['actualEndDate'] as Timestamp?)
+                                        ?.toDate();
+                                contractStartDate =
+                                    (data['contractStartDate'] as Timestamp?)
+                                        ?.toDate();
+                                contractEndDate =
+                                    (data['contractEndDate'] as Timestamp?)
+                                        ?.toDate();
+                                _updateSiteIdController.text =
+                                    data['siteId'] ?? '';
                               });
-                              await _fetchAndSetAmountSpentAndBalance(data['siteId']);
+                              await _fetchAndSetAmountSpentAndBalance(
+                                data['siteId'],
+                              );
                             },
                           );
                         },
@@ -319,7 +357,12 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('General Information', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'General Information',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     _buildTextFormField(
                       context,
@@ -355,12 +398,23 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Categorization', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Categorization',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection('projectCategories').snapshots(),
+                      stream: FirestoreService.getCollection(
+                        'projectCategories',
+                      ).snapshots(),
                       builder: (context, snapshot) {
-                        final items = snapshot.hasData ? snapshot.data!.docs.map((d) => d['projectCategory'].toString()).toList() : <String>[];
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map((d) => d['projectCategory'].toString())
+                                  .toList()
+                            : <String>[];
                         return _buildDropdownField(
                           context,
                           value: projectCategory,
@@ -373,24 +427,39 @@ class _ProjectScreenState extends State<ProjectScreen> {
                     ),
                     const SizedBox(height: 12),
                     StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection('projectSubCategories').snapshots(),
+                      stream: FirestoreService.getCollection(
+                        'projectSubCategories',
+                      ).snapshots(),
                       builder: (context, snapshot) {
-                        final items = snapshot.hasData ? snapshot.data!.docs.map((d) => d['projectSubCategory'].toString()).toList() : <String>[];
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map(
+                                    (d) => d['projectSubCategory'].toString(),
+                                  )
+                                  .toList()
+                            : <String>[];
                         return _buildDropdownField(
                           context,
                           value: projectSubCategory,
                           label: 'Sub Category',
                           items: items,
                           icon: Icons.subdirectory_arrow_right_rounded,
-                          onChanged: (v) => setState(() => projectSubCategory = v),
+                          onChanged: (v) =>
+                              setState(() => projectSubCategory = v),
                         );
                       },
                     ),
                     const SizedBox(height: 12),
                     StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection('projectStages').snapshots(),
+                      stream: FirestoreService.getCollection(
+                        'projectStages',
+                      ).snapshots(),
                       builder: (context, snapshot) {
-                        final items = snapshot.hasData ? snapshot.data!.docs.map((d) => d['projectStage'].toString()).toList() : <String>[];
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map((d) => d['projectStage'].toString())
+                                  .toList()
+                            : <String>[];
                         return _buildDropdownField(
                           context,
                           value: projectStage,
@@ -411,15 +480,40 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Timeline', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Timeline',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    _buildDatePicker(context, 'Planned Start Date', plannedStartDate, (d) => setState(() => plannedStartDate = d)),
+                    _buildDatePicker(
+                      context,
+                      'Planned Start Date',
+                      plannedStartDate,
+                      (d) => setState(() => plannedStartDate = d),
+                    ),
                     const SizedBox(height: 12),
-                    _buildDatePicker(context, 'Planned End Date', plannedEndDate, (d) => setState(() => plannedEndDate = d)),
+                    _buildDatePicker(
+                      context,
+                      'Planned End Date',
+                      plannedEndDate,
+                      (d) => setState(() => plannedEndDate = d),
+                    ),
                     const SizedBox(height: 12),
-                    _buildDatePicker(context, 'Actual Start Date', actualStartDate, (d) => setState(() => actualStartDate = d)),
+                    _buildDatePicker(
+                      context,
+                      'Actual Start Date',
+                      actualStartDate,
+                      (d) => setState(() => actualStartDate = d),
+                    ),
                     const SizedBox(height: 12),
-                    _buildDatePicker(context, 'Actual End Date', actualEndDate, (d) => setState(() => actualEndDate = d)),
+                    _buildDatePicker(
+                      context,
+                      'Actual End Date',
+                      actualEndDate,
+                      (d) => setState(() => actualEndDate = d),
+                    ),
                   ],
                 ),
               ),
@@ -430,7 +524,12 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Financials', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Financials',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     _buildTextFormField(
                       context,
@@ -446,7 +545,9 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       label: 'Amount Received',
                       icon: Icons.account_balance_wallet_outlined,
                       keyboardType: TextInputType.number,
-                      onChanged: (v) => _fetchAndSetAmountSpentAndBalance(_updateSiteIdController.text),
+                      onChanged: (v) => _fetchAndSetAmountSpentAndBalance(
+                        _updateSiteIdController.text,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _buildTextFormField(
@@ -481,15 +582,18 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Future<void> _fetchAndSetAmountSpentAndBalance(String? siteId) async {
     if (siteId == null || siteId.isEmpty) return;
     try {
-      final expenseSnapshot = await FirestoreService.getCollection('totalSiteExpensesPerDay').doc(siteId).get();
+      final expenseSnapshot = await FirestoreService.getCollection(
+        'totalSiteExpensesPerDay',
+      ).doc(siteId).get();
       if (expenseSnapshot.exists) {
         final data = expenseSnapshot.data()!;
-        final amountSpent = (data['totalMgrExpense'] ?? 0.0) +
+        final amountSpent =
+            (data['totalMgrExpense'] ?? 0.0) +
             (data['totalOrgExpense'] ?? 0.0) +
             (data['totalSiteExpense'] ?? 0.0) +
             (data['totalIncentiveExpenses'] ?? 0.0) +
             (data['totalContractorExpense'] ?? 0.0);
-        
+
         _amountSpentController.text = amountSpent.toStringAsFixed(2);
         final paid = double.tryParse(_amountPaidController.text) ?? 0.0;
         _balanceAmountController.text = (paid - amountSpent).toStringAsFixed(2);
@@ -537,7 +641,10 @@ class _ProjectScreenState extends State<ProjectScreen> {
         filled: true,
         fillColor: theme.cardColor,
       ),
-      items: items.toSet().map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      items: items
+          .toSet()
+          .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+          .toList(),
       onChanged: onChanged,
     );
   }
@@ -574,10 +681,12 @@ class _ProjectScreenState extends State<ProjectScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        GlassButton(
-          label: 'Reset',
-          onPressed: _resetForm,
-          isSecondary: true,
+        Expanded(
+          child: GlassButton(
+            label: 'Reset',
+            onPressed: _resetForm,
+            isSecondary: true,
+          ),
         ),
       ],
     );
@@ -593,9 +702,19 @@ class _ProjectScreenState extends State<ProjectScreen> {
           children: [
             Icon(Icons.check_circle, color: successColor, size: 64),
             const SizedBox(height: 24),
-            Text('Success', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: successColor)),
+            Text(
+              'Success',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: successColor,
+              ),
+            ),
             const SizedBox(height: 16),
-            GlassButton(label: 'Close', onPressed: () => Navigator.pop(context)),
+            GlassButton(
+              label: 'Close',
+              onPressed: () => Navigator.pop(context),
+            ),
           ],
         ),
       ),

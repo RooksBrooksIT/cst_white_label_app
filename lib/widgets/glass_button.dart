@@ -41,7 +41,7 @@ class GlassButton extends StatelessWidget {
 
   Widget _buildContent(BuildContext context, {required bool isSecondary}) {
     final theme = Theme.of(context);
-    
+
     if (isLoading) {
       return SizedBox(
         width: 20,
@@ -49,7 +49,9 @@ class GlassButton extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: 2,
           valueColor: AlwaysStoppedAnimation<Color>(
-            isSecondary ? theme.colorScheme.primary : theme.colorScheme.onPrimary,
+            isSecondary
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onPrimary,
           ),
         ),
       );
@@ -58,16 +60,18 @@ class GlassButton extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (icon != null) ...[
-          Icon(icon, size: 18),
-          const SizedBox(width: 8),
-        ],
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+        if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
           ),
         ),
       ],

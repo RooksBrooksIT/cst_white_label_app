@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
 
 class ProjectStageConfig extends StatefulWidget {
   const ProjectStageConfig({super.key});
@@ -14,10 +17,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   String? _selectedStage;
   final TextEditingController _newStageController = TextEditingController();
 
-  // --- Colors ---
-  static const Color kPrimaryColor = Color(0xFF0B3470);
-  static const Color kBackground = Color(0xFFF7F9FC);
-  static const Color kErrorColor = Color(0xFFD32F2F);
+
 
   Future<void> _showAddStageDialog() async {
     _newStageController.clear();
@@ -43,7 +43,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
-                        color: kPrimaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -52,18 +52,23 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                       autofocus: true,
                       decoration: InputDecoration(
                         labelText: 'Stage Name',
-                        labelStyle: TextStyle(color: kPrimaryColor),
+                        labelStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: kPrimaryColor, width: 2),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
                         ),
                         filled: true,
-                        fillColor: kBackground,
+                        fillColor: Theme.of(context).cardColor,
                       ),
-                      cursorColor: kPrimaryColor,
+                      cursorColor: Theme.of(context).colorScheme.primary,
                       onChanged: (value) async {
                         final duplicate = await _isDuplicateStage(value.trim());
                         setState(() {
@@ -78,18 +83,20 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
                           style: TextButton.styleFrom(
-                            foregroundColor: kPrimaryColor,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
                           ),
                           child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.save, ),
-                          label: const Text('Save',
-                              style: TextStyle()),
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save', style: TextStyle()),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                isDuplicate ? Colors.grey : kPrimaryColor,
+                            backgroundColor: isDuplicate
+                                ? Colors.grey
+                                : Theme.of(context).colorScheme.primary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -98,14 +105,14 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                           onPressed: isDuplicate
                               ? null
                               : () async {
-                                  final newStage =
-                                      _newStageController.text.trim();
+                                  final newStage = _newStageController.text
+                                      .trim();
                                   if (newStage.isEmpty) return;
 
                                   final nextId = await _getNextStageId();
-                                  await FirestoreService.getCollection('projectStages')
-                                      .doc(nextId)
-                                      .set({
+                                  await FirestoreService.getCollection(
+                                    'projectStages',
+                                  ).doc(nextId).set({
                                     'projectStageId': nextId,
                                     'projectStage': newStage,
                                   });
@@ -115,20 +122,18 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                     _selectedStage = newStage;
                                   });
                                   await _showSuccessAnimation(
-                                      message: 'Stage added successfully!');
+                                    message: 'Stage added successfully!',
+                                  );
                                 },
                         ),
                       ],
                     ),
                     if (isDuplicate)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12.0),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
                         child: Text(
                           'This stage already exists.',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
+                          style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
                         ),
                       ),
                   ],
@@ -141,8 +146,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
     );
   }
 
-  Future<void> _showSuccessAnimation(
-      {String message = 'Stage added successfully!'}) async {
+  Future<void> _showSuccessAnimation({
+    String message = 'Stage added successfully!',
+  }) async {
     await showDialog(
       context: context,
       builder: (context) {
@@ -167,7 +173,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: kPrimaryColor,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -175,15 +181,12 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(),
-                  ),
+                  child: const Text('OK', style: TextStyle()),
                 ),
               ],
             ),
@@ -206,37 +209,40 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline,
-                    color: Colors.redAccent, size: 60),
+                Icon(
+                  Icons.error_outline,
+                  color: Theme.of(context).colorScheme.error,
+                  size: 60,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   title,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    
-                  ),
+                  style: const TextStyle(fontSize: 15),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kErrorColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                Builder(builder: (context) {
+                  final cs = Theme.of(context).colorScheme;
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: cs.onError,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK', style: TextStyle()),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  );
+                }),
               ],
             ),
           ),
@@ -246,10 +252,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   }
 
   Future<String> _getNextStageId() async {
-    final snapshot = await FirestoreService.getCollection('projectStages')
-        .orderBy('projectStageId', descending: true)
-        .limit(1)
-        .get();
+    final snapshot = await FirestoreService.getCollection(
+      'projectStages',
+    ).orderBy('projectStageId', descending: true).limit(1).get();
 
     if (snapshot.docs.isEmpty) {
       return 'PST001';
@@ -263,8 +268,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   }
 
   Future<bool> _isDuplicateStage(String stage) async {
-    final snapshot =
-        await FirestoreService.getCollection('projectStages').get();
+    final snapshot = await FirestoreService.getCollection(
+      'projectStages',
+    ).get();
     final existingStages = snapshot.docs
         .map((doc) => (doc['projectStage'] as String).toLowerCase())
         .toList();
@@ -275,7 +281,10 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   Future<void> _deleteSelectedStage() async {
     if (_selectedStage == null) {
       _showErrorModal(
-          context, 'No Stage Selected', 'Please select a stage to delete.');
+        context,
+        'No Stage Selected',
+        'Please select a stage to delete.',
+      );
       return;
     }
 
@@ -285,7 +294,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
         return AlertDialog(
           title: const Text('Delete Stage'),
           content: Text(
-              'Are you sure you want to delete the stage "${_selectedStage!}"? This action cannot be undone.'),
+            'Are you sure you want to delete the stage "${_selectedStage!}"? This action cannot be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -293,11 +303,11 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: kErrorColor,
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child:
-                  const Text('Delete', style: TextStyle()),
+              child: const Text('Delete'),
             ),
           ],
         );
@@ -307,13 +317,16 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
     if (confirm != true) return;
 
     try {
-      final snapshot = await FirestoreService.getCollection('projectStages')
-          .where('projectStage', isEqualTo: _selectedStage)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectStages',
+      ).where('projectStage', isEqualTo: _selectedStage).get();
 
       if (snapshot.docs.isEmpty) {
-        _showErrorModal(context, 'Not Found',
-            'The selected stage was not found in Firestore.');
+        _showErrorModal(
+          context,
+          'Not Found',
+          'The selected stage was not found in Firestore.',
+        );
         return;
       }
 
@@ -331,171 +344,130 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
     }
   }
 
-  Widget _buildCircularActionButton({
-    required IconData icon,
-    required String label,
-    required Color backgroundColor,
-    required Color iconColor,
-    required Color labelColor,
-    required VoidCallback? onPressed,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 55,
-          height: 55,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: iconColor),
-            onPressed: onPressed,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBackground,
-      appBar: AppBar(
-        title: const Text(
-          'Project Stage Configuration',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20,),
-        ),
-        centerTitle: true,
-        backgroundColor: kPrimaryColor,
-        elevation: 2,
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    return GlassScaffold(
+      title: 'Project Stage Configuration',
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // --- Project Stage Card ---
               Container(
                 constraints: const BoxConstraints(maxWidth: 500),
-                child: Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(16),
-                  
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Project Stage',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: kPrimaryColor,
-                            fontSize: 18,
-                          ),
+                child: GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Project Stage',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                          fontSize: 18,
                         ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: StreamBuilder<QuerySnapshot>(
-                                stream: FirestoreService.getCollection('projectStages')
-                                    .snapshots(),
-                                builder: (context, snapshot) {
-                                  if (!snapshot.hasData) {
-                                    return const LinearProgressIndicator();
-                                  }
-                                  final stages = snapshot.data!.docs
-                                      .map((doc) =>
-                                          doc['projectStage'] as String)
-                                      .toSet()
-                                      .toList();
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: StreamBuilder<QuerySnapshot>(
+                              stream: FirestoreService.getCollection(
+                                'projectStages',
+                              ).snapshots(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const LinearProgressIndicator();
+                                }
+                                final stages = snapshot.data!.docs
+                                    .map((doc) => doc['projectStage'] as String)
+                                    .toSet()
+                                    .toList();
 
-                                  bool isStageSelected = _selectedStage != null &&
-                                      stages.contains(_selectedStage);
+                                bool isStageSelected =
+                                    _selectedStage != null &&
+                                    stages.contains(_selectedStage);
 
-                                  final dropdownValue =
-                                      isStageSelected ? _selectedStage : null;
+                                final dropdownValue = isStageSelected
+                                    ? _selectedStage
+                                    : null;
 
-                                  return DropdownButtonFormField<String>(
-                                    value: dropdownValue,
-                                    isExpanded: true,
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: kBackground,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      hintText: 'Select project stage',
+                                return DropdownButtonFormField<String>(
+                                  value: dropdownValue,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: theme.cardColor,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
                                     ),
-                                    icon: const Icon(Icons.arrow_drop_down,
-                                        color: kPrimaryColor),
-                                    dropdownColor: Colors.white,
-                                    items: stages.map((stage) {
-                                      return DropdownMenuItem<String>(
-                                        value: stage,
-                                        child: Text(stage,
-                                            style: TextStyle(
-                                                color: kPrimaryColor,
-                                                fontWeight: FontWeight.w500)),
-                                      );
-                                    }).toList(),
-                                    onChanged: (String? newValue) {
-                                      if (newValue != null &&
-                                          stages.contains(newValue)) {
-                                        setState(() {
-                                          _selectedStage = newValue;
-                                        });
-                                      } else {
-                                        _showErrorModal(context,
-                                            'Invalid Selection', 'Please try again.');
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Tooltip(
-                              message: "Add New Stage",
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(24),
-                                onTap: () => _showAddStageDialog(),
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: const BoxDecoration(
-                                    color: kPrimaryColor,
-                                    shape: BoxShape.circle,
+                                    hintText: 'Select project stage',
                                   ),
-                                  child: const Icon(Icons.add,
-                                       size: 24),
+                                  icon: Icon(
+                                    Icons.arrow_drop_down,
+                                    color: primaryColor,
+                                  ),
+                                  dropdownColor: theme.cardColor,
+                                  items: stages.map((stage) {
+                                    return DropdownMenuItem<String>(
+                                      value: stage,
+                                      child: Text(
+                                        stage,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    if (newValue != null &&
+                                        stages.contains(newValue)) {
+                                      setState(() {
+                                        _selectedStage = newValue;
+                                      });
+                                    } else {
+                                      _showErrorModal(
+                                        context,
+                                        'Invalid Selection',
+                                        'Please try again.',
+                                      );
+                                    }
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Tooltip(
+                            message: "Add New Stage",
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(24),
+                              onTap: () => _showAddStageDialog(),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: primaryColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.add,
+                                  size: 24,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -503,32 +475,30 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               const SizedBox(height: 50),
 
               // --- Action Buttons ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildCircularActionButton(
-                    icon: Icons.arrow_back,
-                    label: 'Back',
-                    backgroundColor: Colors.green.shade100,
-                    iconColor: Colors.green.shade900,
-                    labelColor: Colors.green.shade800,
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const SizedBox(width: 40),
-                  _buildCircularActionButton(
-                    icon: Icons.delete,
-                    label: 'Delete',
-                    backgroundColor: _selectedStage != null
-                        ? Colors.red.shade100
-                        : Colors.grey.shade200,
-                    iconColor: _selectedStage != null
-                        ? Colors.red.shade900
-                        : Colors.grey.shade500,
-                    labelColor: Colors.red.shade700,
-                    onPressed:
-                        _selectedStage != null ? _deleteSelectedStage : null,
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: GlassButton(
+                        label: 'BACK',
+                        onPressed: () => Navigator.of(context).pop(),
+                        isSecondary: true,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: GlassButton(
+                        label: 'DELETE',
+                        onPressed: _selectedStage != null
+                            ? _deleteSelectedStage
+                            : null,
+                        isSecondary: true,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

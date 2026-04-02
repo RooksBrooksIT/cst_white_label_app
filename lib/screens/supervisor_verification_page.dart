@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import 'dart:io';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SupervisorVerificationPage extends StatefulWidget {
   final String supervisorId;
@@ -40,7 +41,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
   double? _distanceFromSite;
   final double _allowedDistance = 100.0;
 
-  final Color primaryColor = const Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -369,29 +370,22 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Supervisor Verification',
-          style: TextStyle(),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _skipVerification,
-            child: const Text(
-              'SKIP',
-              style: TextStyle(
-                
-                fontWeight: FontWeight.bold,
-              ),
+    return GlassScaffold(
+      title: 'Supervisor Verification',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : _skipVerification,
+          child: Text(
+            'SKIP',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+      
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: TabBarView(
@@ -512,31 +506,32 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       ),
                     ),
                   const SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyAndContinue,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              
-                              strokeWidth: 3,
-                            ),
-                          )
-                        : const Text(
-                            'Verify & Continue to Site Entry',
-                            style: TextStyle(
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _verifyAndContinue,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
                                 
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                  ),
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Text(
+                              'Verify & Continue to Site Entry',
+                              style: TextStyle(
+                                  
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                    ),
                 ],
               ),
             ),

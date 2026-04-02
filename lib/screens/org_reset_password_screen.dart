@@ -5,6 +5,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../utils/firestore_error_handler.dart';
 
 class OrgResetPasswordScreen extends StatefulWidget {
   const OrgResetPasswordScreen({super.key});
@@ -21,9 +22,6 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
       TextEditingController();
 
   bool _isLoading = false;
-  bool _showOldPassword = false;
-  bool _showNewPassword = false;
-  bool _showConfirmPassword = false;
 
   @override
   void dispose() {
@@ -79,30 +77,27 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
       final oldPassword = _oldPasswordController.text.trim();
       final newPassword = _newPasswordController.text.trim();
 
-      // Verify old password
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('organizationUser')
-          .where('username', isEqualTo: username)
-          .where('password', isEqualTo: oldPassword)
-          .limit(1)
+      // Verify old password globally using the new top-level mapping
+      final userDoc = await FirebaseFirestore.instance
+          .collection('globalUsers')
+          .doc(username)
           .get();
 
-      if (querySnapshot.docs.isEmpty) {
+      if (!userDoc.exists || userDoc.data()?['password'] != oldPassword) {
         _showError('Incorrect old password');
       } else {
-        // Update to new password
-        final docId = querySnapshot.docs.first.id;
-        await FirebaseFirestore.instance
-            .collection('organizationUser')
-            .doc(docId)
-            .update({'password': newPassword});
+        // Update to new password via the found document reference
+        final userDocRef = userDoc.reference;
+        await userDocRef.update({'password': newPassword});
 
         _showSuccess('Password updated successfully');
-        Navigator.pop(context);
+        if (mounted) Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Reset password error: $e');
-      _showError('An error occurred. Please try again.');
+      if (mounted) {
+        FirestoreErrorHandler.handleError(context, e, title: 'Reset Error');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -154,10 +149,6 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                         label: 'Old Password',
                         icon: Icons.lock_outline_rounded,
                         isPassword: true,
-                        showPassword: _showOldPassword,
-                        onTogglePassword: () => setState(
-                          () => _showOldPassword = !_showOldPassword,
-                        ),
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 20),
@@ -166,10 +157,6 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                         label: 'New Password',
                         icon: Icons.lock_clock_outlined,
                         isPassword: true,
-                        showPassword: _showNewPassword,
-                        onTogglePassword: () => setState(
-                          () => _showNewPassword = !_showNewPassword,
-                        ),
                         validator: (v) => v!.isEmpty
                             ? 'Required'
                             : (v.length < 6 ? 'Minimum 6 characters' : null),
@@ -180,10 +167,6 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                         label: 'Confirm New Password',
                         icon: Icons.lock_reset_rounded,
                         isPassword: true,
-                        showPassword: _showConfirmPassword,
-                        onTogglePassword: () => setState(
-                          () => _showConfirmPassword = !_showConfirmPassword,
-                        ),
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 32),
