@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -8,7 +9,6 @@ import 'package:demo_cst/screens/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
-import 'package:demo_cst/screens/main_dashboard.dart';
 import 'package:demo_cst/screens/manager_config_screen.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/material_screen.dart';
@@ -29,7 +29,7 @@ import 'package:demo_cst/screens/vehicle_inventory_page.dart';
 import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
@@ -43,6 +43,7 @@ class ConfigAccountDashboard extends StatefulWidget {
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerName = 'Manager';
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -51,13 +52,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Future<void> _fetchManagerData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? name =
-          prefs.getString('manager_name') ?? prefs.getString('org_name');
-      if (name != null && name.isNotEmpty) setState(() => _managerName = name);
-    } catch (e) {
-      debugPrint('Error fetching manager data: $e');
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.manager) {
+      final String? name = auth.userData['username'] ?? auth.userData['org_name'];
+      if (name != null) setState(() => _managerName = name);
     }
   }
 
@@ -258,19 +256,51 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return GlassScaffold(
-      title: 'Management Console',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () => _showLogoutConfirmation(context),
-          tooltip: 'Logout',
-        ),
-      ],
-      body: _buildBody(context),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        
+        // If we can navigate back (e.g. from Organization Dashboard), just pop
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+          return;
+        }
+
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Press back again to exit'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: GlassScaffold(
+        title: 'Management Console',
+        appBarBackgroundColor: colorScheme.primary,
+        appBarForegroundColor: Colors.white,
+        onBack: Navigator.of(context).canPop() 
+            ? () => Navigator.of(context).pop() 
+            : () => _showLogoutConfirmation(context),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            onPressed: () => _showLogoutConfirmation(context),
+            tooltip: 'Logout',
+          ),
+        ],
+        body: _buildBody(context),
+      ),
     );
   }
 
@@ -313,15 +343,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             TextButton(
               onPressed: () async {
-                final navigator = Navigator.of(this.context);
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.clear();
-                navigator.pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => const MainDashboard(),
-                  ),
-                  (route) => false,
-                );
+                await AuthService().logout();
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/landing',
+                    (route) => false,
+                  );
+                }
               },
               child: Text(
                 'LOGOUT',

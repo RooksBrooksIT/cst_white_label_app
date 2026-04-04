@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'organisation_loginPage.dart';
+import 'package:flutter/services.dart';
+import '../services/auth_service.dart';
 import 'config_account_dashboard.dart';
 import 'org_site_payment_screen.dart';
 import 'incentive_calculation.dart';
@@ -26,6 +26,8 @@ class OrganizationDashboard extends StatefulWidget {
 }
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
+  DateTime? _lastBackPressTime;
+
   @override
   void initState() {
     super.initState();
@@ -33,24 +35,56 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: AppTheme.appName,
-      builder: (context, appName, _) {
-        return GlassScaffold(
-          title: appName.isNotEmpty ? appName : 'Organization Dashboard',
-          onBack: () => _showLogoutConfirmation(context),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const OrgMenuScreen()),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Press back again to exit'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-          ],
-          body: _buildBody(context),
-        );
+          );
+        } else {
+          SystemNavigator.pop();
+        }
       },
+      child: ValueListenableBuilder<String>(
+        valueListenable: AppTheme.appName,
+        builder: (context, appName, _) {
+          return GlassScaffold(
+            title: appName.isNotEmpty ? appName : 'Organization Dashboard',
+            onBack: () => _showLogoutConfirmation(context),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.menu,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const OrgMenuScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            body: _buildBody(context),
+          );
+        },
+      ),
     );
   }
 
@@ -88,14 +122,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
 
     if (result == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      await AuthService().logout();
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const Organisation_LoginPage()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/landing',
+          (route) => false,
+        );
+      }
     }
   }
 

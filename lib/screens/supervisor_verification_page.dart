@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:demo_cst/screens/site_entry_page.dart';
+import 'package:demo_cst/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -142,24 +143,11 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            setState(() {
-              _locationError = 'Location permissions are denied.';
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
+      final hasPermission = await LocationService.handleLocationPermission(context);
+      if (!hasPermission) {
         if (mounted) {
           setState(() {
-            _locationError = 'Location permissions are permanently denied.';
+            _locationError = 'Location permissions are required.';
             _isLoading = false;
           });
         }
