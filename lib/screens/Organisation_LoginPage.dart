@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -100,7 +101,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
       if (userDoc.exists) {
         final userData = userDoc.data()!;
-        
+
         // Validate password locally
         if (userData['password'] != password) {
           _showError('Invalid username or password');
@@ -125,6 +126,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
         // Refresh FirestoreService cache
         await FirestoreService.initialize();
+
+        // Synchronize branding details
+        await AppTheme.syncWithFirestore(dynamicPath);
 
         if (mounted) {
           Navigator.pushReplacement(

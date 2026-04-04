@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AppTheme {
   // Default primary color matching the current app theme
   static const Color defaultColor = Color(0xFF003768);
-  
+
   // ValueNotifier to broadcast color changes to the entire app
   static final ValueNotifier<Color> primaryColor = ValueNotifier(defaultColor);
 
@@ -15,7 +16,9 @@ class AppTheme {
   static final ValueNotifier<String> appName = ValueNotifier(defaultAppName);
 
   // Dummy ValueNotifier for backward compatibility
-  static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.light);
+  static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(
+    ThemeMode.light,
+  );
 
   /// Initializes the theme by loading the stored brand color and app name from SharedPreferences.
   static Future<void> initialize() async {
@@ -24,29 +27,64 @@ class AppTheme {
     if (colorVal != null) {
       primaryColor.value = Color(colorVal);
     }
-    
+
     final storedAppName = prefs.getString('app_name');
     if (storedAppName != null && storedAppName.isNotEmpty) {
       appName.value = storedAppName;
     }
   }
 
+  /// Synchronizes branding from Firestore for a given organization.
+  static Future<void> syncWithFirestore(String orgId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .doc('organisation/$orgId/admin/branding')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final String? newAppName = data['appName'] as String?;
+        final String? newColorHex = data['primaryColor'] as String?;
+
+        if (newAppName != null && newAppName.isNotEmpty) {
+          await updateAppName(newAppName);
+        }
+
+        if (newColorHex != null && newColorHex.isNotEmpty) {
+          final color = hexToColor(newColorHex);
+          await updateTheme(color);
+        }
+
+        debugPrint(
+          'AppTheme: Successfully synchronized branding from Firestore for $orgId',
+        );
+      } else {
+        debugPrint(
+          'AppTheme: No branding document found for $orgId, using defaults.',
+        );
+      }
+    } catch (e) {
+      debugPrint('AppTheme: Error syncing with Firestore: $e');
+    }
+  }
+
   /// Updates the global app name and persists it to SharedPreferences.
   static Future<void> updateAppName(String newName) async {
     appName.value = newName;
-    
+
     // Explicitly notify listeners
     // ignore: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
     appName.notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_name', newName);
+    await prefs.setString('org_name', newName);
   }
 
   /// Updates the global primary color and persists it to SharedPreferences.
   static Future<void> updateTheme(Color newColor) async {
     primaryColor.value = newColor;
-    
+
     // Explicitly notify listeners to trigger a rebuild
     // ignore: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
     primaryColor.notifyListeners();
@@ -120,12 +158,24 @@ class AppTheme {
       scaffoldBackgroundColor: background,
       cardColor: surface,
       dividerColor: outline,
-      
+
       // Modern Typography Hierarchy
       textTheme: const TextTheme(
-        displayLarge: TextStyle(color: onSurface, fontWeight: FontWeight.bold, letterSpacing: -1.0),
-        headlineMedium: TextStyle(color: onSurface, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-        titleLarge: TextStyle(color: onSurface, fontWeight: FontWeight.w600, fontSize: 18),
+        displayLarge: TextStyle(
+          color: onSurface,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -1.0,
+        ),
+        headlineMedium: TextStyle(
+          color: onSurface,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+        ),
+        titleLarge: TextStyle(
+          color: onSurface,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
         bodyLarge: TextStyle(color: onSurface, fontSize: 16),
         bodyMedium: TextStyle(color: onSurfaceVariant, fontSize: 14),
         labelLarge: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.1),
@@ -162,8 +212,14 @@ class AppTheme {
           foregroundColor: getForegroundFor(primary),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
 
@@ -171,7 +227,9 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: getForegroundFor(primary),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
       ),
@@ -180,7 +238,9 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
           side: BorderSide(color: primary, width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
       ),
@@ -195,7 +255,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: background,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: outline),
@@ -214,10 +277,14 @@ class AppTheme {
         ),
         prefixIconColor: onSurfaceVariant,
         suffixIconColor: onSurfaceVariant,
-        labelStyle: const TextStyle(color: onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          color: onSurfaceVariant,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
         hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
       ),
-      
+
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );
   }

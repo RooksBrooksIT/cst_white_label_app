@@ -26,7 +26,8 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
           .get();
 
       if (snapshot.docs.isEmpty) return 'PSC001';
-      final lastId = snapshot.docs.first['subCategoryId'] as String;
+      final lastId = snapshot.docs.first['subCategoryId']?.toString() ?? '';
+      if (lastId.isEmpty) return 'PSC001';
       final numericPart = int.parse(lastId.replaceAll(RegExp(r'[^0-9]'), ''));
       return 'PSC${(numericPart + 1).toString().padLeft(3, '0')}';
     } catch (e) {
@@ -173,8 +174,11 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirestoreService.getCollection('projectSubCategories').orderBy('subCategoryId').snapshots(),
                             builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const LinearProgressIndicator();
-                              final items = snapshot.data!.docs.map((d) => d['projectSubCategory'].toString()).toList();
+                              if (!snapshot.hasData || snapshot.data == null) return const LinearProgressIndicator();
+                              final items = snapshot.data!.docs
+                                  .map((d) => d['projectSubCategory']?.toString() ?? '')
+                                  .where((val) => val.isNotEmpty)
+                                  .toList();
                               return DropdownButtonFormField<String>(
                                 value: (_selectedSubCategory != null && items.contains(_selectedSubCategory)) ? _selectedSubCategory : null,
                                 decoration: InputDecoration(

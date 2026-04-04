@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,7 +47,20 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
+    _checkLoginAndSync();
+  }
 
+  Future<void> _checkLoginAndSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('org_isLoggedIn') ?? false;
+    final orgId = prefs.getString('org_dynamic_path');
+
+    if (isLoggedIn && orgId != null && orgId.isNotEmpty) {
+      // Refresh branding from Firestore if logged in
+      await AppTheme.syncWithFirestore(orgId);
+    }
+
+    // After animation and sync, navigate
     Future.delayed(const Duration(milliseconds: 3000), () {
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/landing');

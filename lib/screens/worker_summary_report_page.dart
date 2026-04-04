@@ -15,10 +15,12 @@ class WorkerAttendanceSalaryPage extends StatefulWidget {
   const WorkerAttendanceSalaryPage({super.key});
 
   @override
-  _WorkerAttendanceSalaryPageState createState() => _WorkerAttendanceSalaryPageState();
+  _WorkerAttendanceSalaryPageState createState() =>
+      _WorkerAttendanceSalaryPageState();
 }
 
-class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage> {
+class _WorkerAttendanceSalaryPageState
+    extends State<WorkerAttendanceSalaryPage> {
   List<Map<String, dynamic>> _filteredWorkers = [];
   String? _selectedSite;
   String? _selectedMonth;
@@ -36,25 +38,30 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
 
   Future<void> _loadInitialData() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('workersSummary').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersSummary',
+      ).orderBy('month', descending: true).limit(100).get();
       final Set<String> uniqueSites = {};
       final Set<String> uniqueMonths = {};
-      
+
       for (var doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        if (data['site'] != null) uniqueSites.add(data['site']);
-        if (data['month'] != null) uniqueMonths.add(data['month']);
+        final data = doc.data();
+        final site = data['site']?.toString();
+        final month = data['month']?.toString();
+        if (site != null && site.isNotEmpty) uniqueSites.add(site);
+        if (month != null && month.isNotEmpty) uniqueMonths.add(month);
       }
 
+      if (!mounted) return;
       setState(() {
         _sites = uniqueSites.toList()..sort();
-        _months = uniqueMonths.toList()..sort((a,b) => b.compareTo(a));
+        _months = uniqueMonths.toList()..sort((a, b) => b.compareTo(a));
         _selectedMonth = _months.isNotEmpty ? _months.first : _currentMonth;
         _isLoading = false;
       });
       _loadWorkersData();
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -62,34 +69,50 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
     setState(() => _isLoading = true);
     try {
       Query query = FirestoreService.getCollection('workersSummary');
-      if (_selectedSite != null) query = query.where('site', isEqualTo: _selectedSite);
-      if (_selectedMonth != null) query = query.where('month', isEqualTo: _selectedMonth);
-      
-      final snapshot = await query.get();
+      if (_selectedSite != null)
+        query = query.where('site', isEqualTo: _selectedSite);
+      if (_selectedMonth != null)
+        query = query.where('month', isEqualTo: _selectedMonth);
+
+      final snapshot = await query.limit(50).get();
       final List<Map<String, dynamic>> workers = [];
       for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
+        final rawData = doc.data();
+        if (rawData is! Map<String, dynamic>) continue;
+        final data = rawData;
+        final workersField = data['workers'];
+        if (workersField is! Map) continue;
+        final workersMap = workersField.cast<String, dynamic>();
         workersMap.forEach((name, wData) {
-          final wd = wData as Map<String, dynamic>;
+          if (wData is! Map) return;
+          final wd = Map<String, dynamic>.from(wData);
           workers.add({
-            'id': '${name}_${data['site']}',
+            'id': '${name}_${data['site'] ?? ''}',
             'name': name,
-            'designation': wd['designation'] ?? 'Worker',
+            'designation': wd['designation']?.toString() ?? 'Worker',
             'baseSalary': wd['salary']?.toString() ?? '0',
-            'site': data['site'] ?? 'N/A',
-            'month': data['month'] ?? 'N/A',
-            'attendance': wd['attendance'] ?? {},
-            'calculatedSalary': _calculateSalary(wd['salary']?.toString() ?? '0', wd['attendance'] ?? {}),
+            'site': data['site']?.toString() ?? 'N/A',
+            'month': data['month']?.toString() ?? 'N/A',
+            'attendance': wd['attendance'] is Map
+                ? Map<String, dynamic>.from(wd['attendance'] as Map)
+                : <String, dynamic>{},
+            'calculatedSalary': _calculateSalary(
+              wd['salary']?.toString() ?? '0',
+              wd['attendance'] is Map
+                  ? Map<String, dynamic>.from(wd['attendance'] as Map)
+                  : <String, dynamic>{},
+            ),
           });
         });
       }
+
+      if (!mounted) return;
       setState(() {
         _filteredWorkers = workers;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -110,22 +133,26 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
       title: 'Worker Summary',
       actions: [
         if (_selectedWorkerIds.isNotEmpty)
-          IconButton(icon: const Icon(Icons.send_outlined), onPressed: _submitReports),
-      ],
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              _buildFilterBar(theme, isMobile),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _filteredWorkers.length,
-                  itemBuilder: (ctx, i) => _buildWorkerCard(_filteredWorkers[i], theme),
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.send_outlined),
+            onPressed: _submitReports,
           ),
+      ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                _buildFilterBar(theme, isMobile),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredWorkers.length,
+                    itemBuilder: (ctx, i) =>
+                        _buildWorkerCard(_filteredWorkers[i], theme),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -142,8 +169,18 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
                   value: _selectedSite,
                   hint: const Text('All Sites'),
                   isExpanded: true,
-                  items: [null, ..._sites].map((s) => DropdownMenuItem(value: s, child: Text(s ?? 'All Sites'))).toList(),
-                  onChanged: (v) { setState(() => _selectedSite = v); _loadWorkersData(); },
+                  items: [null, ..._sites]
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s ?? 'All Sites'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedSite = v);
+                    _loadWorkersData();
+                  },
                 ),
               ),
             ),
@@ -153,8 +190,13 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
                 child: DropdownButton<String>(
                   value: _selectedMonth,
                   isExpanded: true,
-                  items: _months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                  onChanged: (v) { setState(() => _selectedMonth = v); _loadWorkersData(); },
+                  items: _months
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedMonth = v);
+                    _loadWorkersData();
+                  },
                 ),
               ),
             ),
@@ -173,23 +215,46 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
         color: isSelected ? theme.primaryColor.withOpacity(0.05) : null,
         child: Row(
           children: [
-            Checkbox(value: isSelected, onChanged: (_) => _toggleSelection(worker['id'])),
+            Checkbox(
+              value: isSelected,
+              onChanged: (_) => _toggleSelection(worker['id']),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(worker['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    worker['name'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   Text(worker['designation'], style: theme.textTheme.bodySmall),
-                  Text(worker['site'], style: theme.textTheme.bodySmall?.copyWith(color: theme.primaryColor)),
+                  Text(
+                    worker['site'],
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.primaryColor,
+                    ),
+                  ),
                 ],
               ),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('₹ ${worker['calculatedSalary'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                Text('Present: ${worker['attendance']['presentDays'] ?? 0}', style: theme.textTheme.bodySmall),
+                Text(
+                  '₹ ${worker['calculatedSalary'].toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  'Present: ${worker['attendance']['presentDays'] ?? 0}',
+                  style: theme.textTheme.bodySmall,
+                ),
               ],
             ),
           ],
@@ -200,14 +265,20 @@ class _WorkerAttendanceSalaryPageState extends State<WorkerAttendanceSalaryPage>
 
   void _toggleSelection(String id) {
     setState(() {
-      if (_selectedWorkerIds.contains(id)) _selectedWorkerIds.remove(id);
-      else _selectedWorkerIds.add(id);
+      if (_selectedWorkerIds.contains(id))
+        _selectedWorkerIds.remove(id);
+      else
+        _selectedWorkerIds.add(id);
     });
   }
 
   void _submitReports() async {
     // Logic to batch submit reports to WorkerAllDetails
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submitting ${_selectedWorkerIds.length} reports...')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Submitting ${_selectedWorkerIds.length} reports...'),
+      ),
+    );
     // Implementation omitted for brevity
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:demo_cst/screens/org_sub_menu_screen.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -43,11 +45,24 @@ class ConfigAccountDashboard extends StatefulWidget {
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerName = 'Manager';
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
     _fetchManagerData();
+    _scrollController.addListener(() {
+      setState(() {
+        _scrollOffset = _scrollController.offset;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchManagerData() async {
@@ -61,196 +76,225 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     }
   }
 
-  // Dashboard items grouped by section
+  // Dashboard items grouped by section with enhanced data
   final Map<String, List<DashboardItem>> groupedItems = {
     "Project Configuration": [
       DashboardItem(
         'Project Category',
         Icons.category_rounded,
         Colors.orange,
-        'Manage project categories',
+        'Define and manage project categories',
+        Colors.orange,
       ),
       DashboardItem(
         'Project Sub Category',
         Icons.subtitles_rounded,
         Colors.purple,
-        'Define project sub-categories',
+        'Create detailed sub-categories',
+        Colors.purple,
       ),
       DashboardItem(
         'Project Stage',
         Icons.flag_rounded,
         Colors.red,
-        'Configure project stages',
+        'Configure project milestones',
+        Colors.red,
       ),
       DashboardItem(
         'Project Contract',
         Icons.assignment_rounded,
         Colors.teal,
-        'Manage project contracts',
-      ),
-    ],
-    "Material Configuration": [
-      DashboardItem(
-        'Material Master',
-        Icons.upload_file_rounded,
-        Colors.green,
-        'Master list of materials',
-      ),
-      DashboardItem(
-        'Material Sub Category',
-        Icons.category_rounded,
-        Colors.blue,
-        'Categorize materials further',
-      ),
-      DashboardItem(
-        'Material Config',
-        Icons.build_rounded,
-        Colors.deepOrange,
-        'Configure material properties',
-      ),
-      DashboardItem(
-        'Material Movements',
-        Icons.toggle_on_outlined,
-        Colors.deepPurple,
-        'Track material transfers',
-      ),
-      DashboardItem(
-        'Material Availability',
-        Icons.build_circle_outlined,
-        Colors.deepPurple,
-        'Check material stock',
-      ),
-    ],
-    "Tools Configuration": [
-      DashboardItem(
-        'Tools',
-        Icons.handyman_rounded,
-        Colors.indigo,
-        'Manage tools inventory',
-      ),
-    ],
-    "Labour Configuration": [
-      DashboardItem(
-        'Labour',
-        Icons.engineering_rounded,
-        Colors.brown,
-        'Configure labour details',
-      ),
-    ],
-    "Contractor Configuration": [
-      DashboardItem(
-        'Contractor',
-        Icons.person_4_rounded,
-        Colors.deepPurple,
-        'Manage contractor information',
-      ),
-    ],
-    "Diagrams Configuration": [
-      DashboardItem(
-        'Layout and Drawings',
-        Icons.upload_file_rounded,
-        Colors.cyan,
-        'Manage project layouts and drawings',
-      ),
-    ],
-    "Site Configuration": [
-      DashboardItem(
-        'Site',
-        Icons.place_rounded,
-        Colors.green,
-        'Configure site details',
+        'Manage legal agreements',
+        Colors.teal,
       ),
       DashboardItem(
         'Project',
         Icons.work_rounded,
         Colors.orangeAccent,
-        'Manage projects',
+        'Oversee project portfolios',
+        Colors.orangeAccent,
+      ),
+    ],
+    "Material Configuration": [
+      DashboardItem(
+        'Material Master',
+        Icons.inventory_2_rounded,
+        Colors.green,
+        'Central material database',
+        Colors.green,
+      ),
+      DashboardItem(
+        'Material Sub Category',
+        Icons.category_rounded,
+        Colors.blue,
+        'Organize material types',
+        Colors.blue,
+      ),
+      DashboardItem(
+        'Material Config',
+        Icons.settings_applications_rounded,
+        Colors.deepOrange,
+        'Material specifications',
+        Colors.deepOrange,
+      ),
+      DashboardItem(
+        'Material Movements',
+        Icons.swap_horiz_rounded,
+        Colors.deepPurple,
+        'Track material transfers',
+        Colors.deepPurple,
+      ),
+      DashboardItem(
+        'Material Availability',
+        Icons.check_circle_rounded,
+        Colors.lightGreen,
+        'Real-time stock status',
+        Colors.lightGreen,
+      ),
+    ],
+    "Site & Supervisor": [
+      DashboardItem(
+        'Site',
+        Icons.location_city_rounded,
+        Colors.green,
+        'Manage construction sites',
+        Colors.green,
       ),
       DashboardItem(
         'Supervisor',
         Icons.supervisor_account_rounded,
         Colors.blueGrey,
-        'Configure supervisor accounts',
+        'Supervisor profiles',
+        Colors.blueGrey,
       ),
       DashboardItem(
         'Site-Supervisor Map',
         Icons.map_rounded,
         Colors.redAccent,
-        'Map supervisors to sites',
+        'Assign supervisors to sites',
+        Colors.redAccent,
       ),
       DashboardItem(
         'Manager',
         Icons.admin_panel_settings_rounded,
         Colors.indigo,
-        'Configure manager accounts',
+        'Manager configurations',
+        Colors.indigo,
       ),
     ],
-    "Tools Tracking": [
+    "Tools & Equipment": [
+      DashboardItem(
+        'Tools Master',
+        Icons.handyman_rounded,
+        Colors.indigo,
+        'Tools inventory database',
+        Colors.indigo,
+      ),
       DashboardItem(
         'Tools Movement',
         Icons.directions_walk_rounded,
         Colors.deepOrangeAccent,
-        'Track tool movements',
+        'Track tool assignments',
+        Colors.deepOrangeAccent,
       ),
       DashboardItem(
         'Tools Inventory',
         Icons.inventory_rounded,
         Colors.pink,
-        'View tools inventory',
+        'Current stock status',
+        Colors.pink,
       ),
     ],
-    "Expenses": [
+    "Labour & Contractor": [
       DashboardItem(
-        'Manager Expenses',
-        Icons.account_balance_wallet_rounded,
-        Colors.blue,
-        'Manage manager expenses',
+        'Labour',
+        Icons.engineering_rounded,
+        Colors.brown,
+        'Labour management',
+        Colors.brown,
+      ),
+      DashboardItem(
+        'Contractor',
+        Icons.person_4_rounded,
+        Colors.deepPurple,
+        'Contractor profiles',
+        Colors.deepPurple,
+      ),
+      DashboardItem(
+        'Contractor Entry',
+        Icons.person_add_rounded,
+        Colors.deepPurpleAccent,
+        'Register new contractors',
+        Colors.deepPurpleAccent,
       ),
     ],
     "Workers Management": [
       DashboardItem(
         'Workers Configuration',
-        Icons.work_rounded,
-        const Color.fromARGB(255, 130, 57, 179),
-        'Configure worker details',
+        Icons.people_rounded,
+        const Color(0xFF8E24AA),
+        'Worker profiles and roles',
+        const Color(0xFF8E24AA),
       ),
       DashboardItem(
         'Workers Site Mapping',
-        Icons.work_history,
-        const Color.fromARGB(255, 243, 145, 33),
-        'Map workers to sites',
+        Icons.place_rounded,
+        const Color(0xFFF57C00),
+        'Assign workers to sites',
+        const Color(0xFFF57C00),
       ),
       DashboardItem(
         'Workers Attendance',
-        Icons.supervisor_account_rounded,
+        Icons.fact_check_rounded,
         Colors.blueGrey,
-        'Manage worker attendance',
+        'Track attendance records',
+        Colors.blueGrey,
       ),
     ],
-    "Vehicle Management": [
+    "Vehicle Fleet": [
       DashboardItem(
         'Vehicle Configuration',
-        Icons.fire_truck_sharp,
+        Icons.settings_rounded,
         Colors.red,
-        'Configure vehicle details',
+        'Vehicle specifications',
+        Colors.red,
       ),
       DashboardItem(
         'Vehicle Driver Configuration',
-        Icons.fire_truck_outlined,
+        Icons.person_rounded,
         Colors.blue,
-        'Configure vehicle driver details',
+        'Driver profiles',
+        Colors.blue,
       ),
       DashboardItem(
         'Vehicle Details',
         Icons.directions_car_rounded,
         Colors.green,
-        'View vehicle details',
+        'Fleet information',
+        Colors.green,
       ),
       DashboardItem(
         'Vehicle Inventory',
-        Icons.inventory_rounded,
-        const Color.fromARGB(255, 185, 62, 223),
-        'Manage vehicle inventory',
+        Icons.inventory_2_rounded,
+        const Color(0xFF9C27B0),
+        'Fleet stock status',
+        const Color(0xFF9C27B0),
+      ),
+    ],
+    "Diagrams & Expenses": [
+      DashboardItem(
+        'Layout and Drawings',
+        Icons.upload_file_rounded,
+        Colors.cyan,
+        'Project blueprints',
+        Colors.cyan,
+      ),
+      DashboardItem(
+        'Manager Expenses',
+        Icons.account_balance_wallet_rounded,
+        Colors.blue,
+        'Expense tracking',
+        Colors.blue,
       ),
     ],
   };
@@ -264,14 +308,404 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () => _showLogoutConfirmation(context),
-          tooltip: 'Logout',
+        PopupMenuButton<String>(
+          icon: const Icon(
+            Icons.account_circle_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+          color: Theme.of(context).cardColor,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: Theme.of(context).dividerColor.withOpacity(0.1),
+            ),
+          ),
+          onSelected: (value) {
+            if (value == 'logout') {
+              _showLogoutConfirmation(context);
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                  const SizedBox(width: 12),
+                  const Text('Logout'),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
-      body: _buildBody(context),
+      body: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildWelcomeSection(context),
+                  const SizedBox(height: 28),
+                  _buildQuickStats(context),
+                  const SizedBox(height: 32),
+                  _buildDashboardSections(context),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildWelcomeSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary.withOpacity(0.1),
+                  colorScheme.primary.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.admin_panel_settings_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "Configuration Panel",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Welcome back,",
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _managerName,
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -1.0,
+              fontSize: 32,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Configure and manage your organization settings",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickStats(BuildContext context) {
+    final theme = Theme.of(context);
+    final stats = [
+      {
+        'icon': Icons.category_rounded,
+        'label': 'Categories',
+        'value': '12',
+        'color': Colors.orange,
+      },
+      {
+        'icon': Icons.inventory_2_rounded,
+        'label': 'Materials',
+        'value': '156',
+        'color': Colors.green,
+      },
+      {
+        'icon': Icons.people_rounded,
+        'label': 'Workers',
+        'value': '89',
+        'color': Colors.blue,
+      },
+      {
+        'icon': Icons.engineering_rounded,
+        'label': 'Sites',
+        'value': '8',
+        'color': Colors.purple,
+      },
+    ];
+
+    return SizedBox(
+      height: 90,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: stats.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final stat = stats[index];
+          return Container(
+            width: (MediaQuery.of(context).size.width - 64) / 2.2,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: (stat['color'] as Color).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    stat['icon'] as IconData,
+                    color: stat['color'] as Color,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        stat['value'] as String,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Text(
+                        stat['label'] as String,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDashboardSections(BuildContext context) {
+    return Column(
+      children: groupedItems.entries.map((entry) {
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutQuint,
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, 30 * (1 - value)),
+              child: Opacity(opacity: value, child: child),
+            );
+          },
+          child: _buildCategoryCard(context, entry.key, entry.value),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCategoryCard(
+    BuildContext context,
+    String title,
+    List<DashboardItem> items,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final firstItem = items.first;
+    final color = firstItem.color;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openCategorySubMenu(context, title),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Icon with Gradient Background
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [color, color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(firstItem.icon, color: Colors.white, size: 32),
+                ),
+                const SizedBox(width: 20),
+                // Text Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.5,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${items.length} Configuration Options",
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Progress/Status indicator hint
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'General Settings',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Arrow Action
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: color,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openCategorySubMenu(BuildContext context, String categoryName) {
+    final items = groupedItems[categoryName] ?? [];
+    if (items.isEmpty) return;
+
+    _triggerHapticFeedback();
+
+    final subMenuItems = items.map((item) {
+      return SubMenuItem(
+        title: item.title,
+        subtitle: item.subtitle,
+        icon: item.icon,
+        color: item.color,
+        onTap: () => _navigateToScreen(context, item.title),
+      );
+    }).toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            OrgSubMenuScreen(title: categoryName, items: subMenuItems),
+      ),
+    );
+  }
+
+  void _triggerHapticFeedback() {
+    HapticFeedback.mediumImpact();
   }
 
   void _showLogoutConfirmation(BuildContext context) {
@@ -283,19 +717,24 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: colorScheme.surface,
+          backgroundColor: theme.cardColor,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
           title: Row(
             children: [
-              Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Logout',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(Icons.logout_rounded, color: Colors.red, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Logout',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               ),
             ],
           ),
@@ -306,14 +745,23 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: Text(
-                'CANCEL',
+                'Cancel',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () async {
-                final navigator = Navigator.of(this.context);
+                final navigator = Navigator.of(context);
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.clear();
                 navigator.pushAndRemoveUntil(
@@ -323,195 +771,25 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   (route) => false,
                 );
               },
-              child: Text(
-                'LOGOUT',
-                style: TextStyle(
-                  color: colorScheme.error,
-                  fontWeight: FontWeight.bold,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
                 ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Logout',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         );
       },
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildWelcomeSection(theme),
-          const SizedBox(height: 32),
-          _buildDashboardSections(context, theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWelcomeSection(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Welcome back,",
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _managerName,
-          style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            letterSpacing: -0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = screenWidth > 1200
-        ? 5
-        : (screenWidth > 800 ? 4 : (screenWidth > 600 ? 3 : 2));
-
-    double childAspectRatio = screenWidth < 400
-        ? 0.85
-        : (screenWidth < 600 ? 0.95 : 1.1);
-
-    Widget buildGrid(List<Widget> children) {
-      return GridView.count(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: childAspectRatio,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: children,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: groupedItems.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(entry.key, theme),
-            buildGrid(
-              entry.value.map((item) {
-                return _buildMenuCard(
-                  context,
-                  title: item.title,
-                  icon: item.icon,
-                  iconColor: theme.primaryColor,
-                  onTap: () => _navigateToScreen(context, item.title),
-                );
-              }).toList(),
-            ),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 40, bottom: 20),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 20,
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title.toUpperCase(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                letterSpacing: 2.0,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuCard(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 32),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -528,7 +806,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Material': MaterialScreen(),
       'Project': ProjectScreen(),
       'Labour': LabourScreen(),
-      'Tools': ToolMasterPage(),
+      'Tools Master': ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
       'Manager Expenses': const ManagerExpensesHomeScreen(),
       'Layout and Drawings': const LayoutAndDrawingsPage(),
@@ -554,6 +832,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
     final screen = routeMap[title];
     if (screen != null) {
+      HapticFeedback.lightImpact();
       Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
     }
   }
@@ -561,9 +840,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
 class DashboardItem {
   final String title;
-  final String subtitle;
   final IconData icon;
   final Color color;
+  final String subtitle;
+  final Color gradientColor;
 
-  const DashboardItem(this.title, this.icon, this.color, this.subtitle);
+  const DashboardItem(
+    this.title,
+    this.icon,
+    this.color,
+    this.subtitle,
+    this.gradientColor,
+  );
 }

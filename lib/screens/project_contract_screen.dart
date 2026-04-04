@@ -186,8 +186,11 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirestoreService.getCollection('projectContracts').snapshots(),
                             builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const LinearProgressIndicator();
-                              final items = snapshot.data!.docs.map((d) => d['projectContract'].toString()).toList();
+                              if (!snapshot.hasData || snapshot.data == null) return const LinearProgressIndicator();
+                              final items = snapshot.data!.docs
+                                  .map((d) => d['projectContract']?.toString() ?? '')
+                                  .where((val) => val.isNotEmpty)
+                                  .toList();
                               return DropdownButtonFormField<String>(
                                 value: (_selectedContractType != null && items.contains(_selectedContractType)) ? _selectedContractType : null,
                                 decoration: InputDecoration(

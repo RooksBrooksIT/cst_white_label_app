@@ -10,6 +10,10 @@ class FirestoreService {
 
   static String? _cachedDynamicPath;
 
+  /// Returns true if the service has a valid organization path cached.
+  static bool get isReady =>
+      _cachedDynamicPath != null && _cachedDynamicPath!.isNotEmpty;
+
   /// Initializes the service by loading the dynamic path from SharedPreferences.
   /// Should be called after login or at app startup.
   static Future<void> initialize() async {
@@ -19,6 +23,12 @@ class FirestoreService {
         prefs.getString('config_org_path') ??
         prefs.getString('sup_org_path') ??
         prefs.getString('cust_org_path');
+  }
+
+  /// Explicitly sets the organization path, bypassing SharedPreferences.
+  /// Useful for immediate initialization during login or registration.
+  static void setOrgPath(String path) {
+    _cachedDynamicPath = path;
   }
 
   /// Gets a collection that is nested under the organization's data root.
@@ -54,7 +64,10 @@ class FirestoreService {
   /// Internal helper to extract OrgID robustly from cached path
   static String _getOrgIdFromPath() {
     if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
-      throw Exception('Organization not logged in');
+      debugPrint(
+        'FirestoreService: Accessing org-specific data before login/initialization.',
+      );
+      return 'uninitialized';
     }
     String orgId = _cachedDynamicPath!;
     if (orgId.contains('/')) {
@@ -128,7 +141,11 @@ class FirestoreService {
   getOrgDataRoot() async {
     if (_cachedDynamicPath == null) await initialize();
     if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
-      throw Exception('Organization not logged in');
+      return FirebaseFirestore.instance
+          .collection('organisation')
+          .doc('uninitialized')
+          .collection('admin')
+          .doc('data');
     }
     final pathParts = _cachedDynamicPath!.split('/');
     final String orgId = pathParts[0];

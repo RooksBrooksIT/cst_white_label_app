@@ -17,8 +17,6 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
   String? _selectedStage;
   final TextEditingController _newStageController = TextEditingController();
 
-
-
   Future<void> _showAddStageDialog() async {
     _newStageController.clear();
     bool isDuplicate = false;
@@ -133,7 +131,10 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                         padding: const EdgeInsets.only(top: 12.0),
                         child: Text(
                           'This stage already exists.',
-                          style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                   ],
@@ -177,6 +178,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -229,20 +231,22 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   style: const TextStyle(fontSize: 15),
                 ),
                 const SizedBox(height: 20),
-                Builder(builder: (context) {
-                  final cs = Theme.of(context).colorScheme;
-                  return ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.error,
-                      foregroundColor: cs.onError,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                Builder(
+                  builder: (context) {
+                    final cs = Theme.of(context).colorScheme;
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.error,
+                        foregroundColor: cs.onError,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  );
-                }),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -256,15 +260,15 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
       'projectStages',
     ).orderBy('projectStageId', descending: true).limit(1).get();
 
-    if (snapshot.docs.isEmpty) {
-      return 'PST001';
-    } else {
-      final lastId = snapshot.docs.first['projectStageId'] as String;
-      final number =
-          int.tryParse(lastId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-      final nextNumber = number + 1;
-      return 'PST${nextNumber.toString().padLeft(3, '0')}';
-    }
+    if (snapshot.docs.isEmpty) return 'PST001';
+
+    final lastId = snapshot.docs.first['projectStageId']?.toString() ?? '';
+
+    if (lastId.isEmpty || !lastId.startsWith('PST')) return 'PST001';
+
+    final number = int.tryParse(lastId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final nextNumber = number + 1;
+    return 'PST${nextNumber.toString().padLeft(3, '0')}';
   }
 
   Future<bool> _isDuplicateStage(String stage) async {
@@ -272,7 +276,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
       'projectStages',
     ).get();
     final existingStages = snapshot.docs
-        .map((doc) => (doc['projectStage'] as String).toLowerCase())
+        .map((doc) => doc['projectStage']?.toString().toLowerCase() ?? '')
         .toList();
 
     return existingStages.contains(stage.toLowerCase());
@@ -382,11 +386,12 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                 'projectStages',
                               ).snapshots(),
                               builder: (context, snapshot) {
-                                if (!snapshot.hasData) {
+                                if (!snapshot.hasData || snapshot.data == null) {
                                   return const LinearProgressIndicator();
                                 }
                                 final stages = snapshot.data!.docs
-                                    .map((doc) => doc['projectStage'] as String)
+                                    .map((doc) => doc['projectStage']?.toString() ?? '')
+                                    .where((val) => val.isNotEmpty)
                                     .toSet()
                                     .toList();
 

@@ -27,7 +27,7 @@ class _SiteScreenState extends State<SiteScreen>
   DateTime? _startDate;
   DateTime? _endDate;
   String? _projectType;
-  String _status = 'In-Progress';
+  String _status = 'In Progress';
   bool _isGettingLocation = false;
   bool _isSaving = false;
 
@@ -52,7 +52,7 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<void> _initializeDefaults() async {
     final statusList = await fetchProjectStatus();
-    if (statusList.isNotEmpty) {
+    if (statusList.isNotEmpty && mounted) {
       setState(() {
         _status = statusList.first;
       });
@@ -74,16 +74,21 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<List<String>> fetchProjectStatus() async {
+    // Default statuses as requested by the user
+    final defaultStatuses = ['In Progress', 'On Hold', 'Completed'];
     try {
       final snapshot = await FirestoreService.getCollection(
         'projectStatus',
       ).get();
-      return snapshot.docs
+      final dbStatuses = snapshot.docs
           .map((doc) => doc['projectState']?.toString().trim() ?? '')
           .where((val) => val.isNotEmpty)
           .toList();
+
+      // Merge defaults with database values and remove duplicates
+      return {...defaultStatuses, ...dbStatuses}.toList();
     } catch (e) {
-      return [];
+      return defaultStatuses;
     }
   }
 
@@ -123,6 +128,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() => _isGettingLocation = true);
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -132,7 +138,7 @@ class _SiteScreenState extends State<SiteScreen>
         position.latitude,
         position.longitude,
       );
-      if (placemarks.isNotEmpty) {
+      if (placemarks.isNotEmpty && mounted) {
         Placemark place = placemarks.first;
         String address = [
           place.street,
@@ -153,7 +159,9 @@ class _SiteScreenState extends State<SiteScreen>
         );
       }
     } finally {
-      setState(() => _isGettingLocation = false);
+      if (mounted) {
+        setState(() => _isGettingLocation = false);
+      }
     }
   }
 
@@ -316,7 +324,7 @@ class _SiteScreenState extends State<SiteScreen>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
             Row(
               children: [
@@ -428,6 +436,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   void _resetForm() {
+    if (!mounted) return;
     _siteNameController.clear();
     _locationController.clear();
     _latitudeController.clear();
@@ -441,7 +450,7 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<void> _saveSiteDetails() async {
     if (!_formKey.currentState!.validate() || _isSaving) return;
-    setState(() => _isSaving = true);
+    if (mounted) setState(() => _isSaving = true);
 
     try {
       final siteId =
@@ -477,7 +486,9 @@ class _SiteScreenState extends State<SiteScreen>
         );
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 }

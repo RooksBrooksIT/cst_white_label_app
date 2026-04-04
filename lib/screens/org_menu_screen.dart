@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,7 +24,6 @@ class OrgMenuScreen extends StatefulWidget {
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
   String _orgCode = 'Loading...';
-  String _orgName = 'Organization User';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
   bool _isSubscriptionActive = false;
@@ -36,9 +36,8 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? name = prefs.getString('org_name');
-      if (name != null && mounted) setState(() => _orgName = name);
+      // Ensure FirestoreService is fully initialized before fetching
+      await FirestoreService.initialize();
 
       // Fetch referal codes using centralized FirestoreService path resolution
       final referalDoc = await FirestoreService.referralDoc.get();
@@ -162,14 +161,19 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           child: Icon(Icons.business, color: colorScheme.primary, size: 40),
         ),
         const SizedBox(height: 16),
-        Text(
-          _orgName,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0xFF1E293B),
-            fontSize: Responsive.fontSize(context, 24),
-            fontWeight: FontWeight.bold,
-          ),
+        ValueListenableBuilder<String>(
+          valueListenable: AppTheme.appName,
+          builder: (context, name, _) {
+            return Text(
+              name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: const Color(0xFF1E293B),
+                fontSize: Responsive.fontSize(context, 24),
+                fontWeight: FontWeight.bold,
+              ),
+            );
+          },
         ),
       ],
     );
@@ -423,7 +427,9 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
     if (result == true) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      await prefs.remove('org_isLoggedIn');
+      await prefs.remove('org_username');
+      // We keep branding keys so the login screen stays branded for the org
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(

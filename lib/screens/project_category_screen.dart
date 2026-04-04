@@ -25,14 +25,19 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
         .limit(1)
         .get();
     if (snapshot.docs.isEmpty) return 'PC001';
-    final lastId = snapshot.docs.first['projectCategoryId'] as String;
+    final lastId = snapshot.docs.first.data().containsKey('projectCategoryId')
+        ? snapshot.docs.first['projectCategoryId']?.toString() ?? ''
+        : '';
+    if (lastId.isEmpty || !lastId.startsWith('PC')) return 'PC001';
     final number = int.parse(lastId.replaceAll('PC', '')) + 1;
     return 'PC${number.toString().padLeft(3, '0')}';
   }
 
   Future<bool> _isDuplicateCategory(String category) async {
     final snapshot = await FirestoreService.getCollection('projectCategories').get();
-    final existingCategories = snapshot.docs.map((doc) => (doc['projectCategory'] as String).toLowerCase()).toList();
+    final existingCategories = snapshot.docs
+        .map((doc) => doc['projectCategory']?.toString().toLowerCase() ?? '')
+        .toList();
     return existingCategories.contains(category.toLowerCase());
   }
 
@@ -167,8 +172,11 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirestoreService.getCollection('projectCategories').orderBy('projectCategoryId').snapshots(),
                             builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const LinearProgressIndicator();
-                              final items = snapshot.data!.docs.map((d) => d['projectCategory'].toString()).toList();
+                              if (!snapshot.hasData || snapshot.data == null) return const LinearProgressIndicator();
+                              final items = snapshot.data!.docs
+                                  .map((d) => d['projectCategory']?.toString() ?? '')
+                                  .where((val) => val.isNotEmpty)
+                                  .toList();
                               return DropdownButtonFormField<String>(
                                 value: (_selectedCategory != null && items.contains(_selectedCategory)) ? _selectedCategory : null,
                                 decoration: InputDecoration(
