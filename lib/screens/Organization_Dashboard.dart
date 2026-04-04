@@ -15,9 +15,9 @@ import 'site_weekly_financial_report.dart';
 import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
-
 import '../utils/app_theme.dart';
 import 'org_sub_menu_screen.dart';
+import 'org_menu_screen.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -55,14 +55,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           title: appName.isNotEmpty ? appName : 'Organization Dashboard',
           onBack: () => _showLogoutConfirmation(context),
           actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.logout_rounded),
-                tooltip: 'Logout',
-                color: Theme.of(context).colorScheme.onPrimary,
-                onPressed: () => _showLogoutConfirmation(context),
-              ),
+            IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              tooltip: 'Menu',
+              color: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () => _navigateToOrgMenu(context),
             ),
           ],
           body: _buildBody(context),
@@ -694,6 +691,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       MaterialPageRoute(
         builder: (context) =>
             const OrganizationSiteEntry(userName: '', userDetails: {}),
+      ),
+    );
+  }
+
+  void _navigateToOrgMenu(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OrgMenuScreen(standalone: true),
       ),
     );
   }
