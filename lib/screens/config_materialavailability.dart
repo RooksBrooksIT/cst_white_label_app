@@ -11,7 +11,7 @@ class MaterialAvailability extends StatefulWidget {
 }
 
 class _MaterialAvailabilityState extends State<MaterialAvailability> {
-  // Removed unused _firestore field
+// Removed unused _firestore field
 
   String? _selectedMaterial;
   int _count = 0;
@@ -50,7 +50,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       final querySnapshot = await FirestoreService.getCollection(
         'materials',
-      ).get();
+      ).limit(100).get();
+      if (!mounted) return;
       setState(() {
         _materialNames = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -59,6 +60,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         _isLoadingMaterials = false;
       });
     } catch (e) {
+      if (!mounted) return;
       _showErrorDialog('Failed to load materials: $e');
       setState(() {
         _isLoadingMaterials = false;
@@ -73,8 +75,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       final querySnapshot = await FirestoreService.getCollection(
         'materialsavailablity',
-      ).orderBy('lastupdated', descending: true).get();
+      ).orderBy('lastupdated', descending: true).limit(50).get();
 
+      if (!mounted) return;
       setState(() {
         _availabilityData = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -88,6 +91,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         _isLoadingAvailability = false;
       });
     } catch (e) {
+      if (!mounted) return;
       _showErrorDialog('Failed to load availability data: $e');
       setState(() {
         _isLoadingAvailability = false;
@@ -152,11 +156,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _resetForm();
       _loadAvailabilityData(); // Refresh the list
     } catch (e) {
+      if (!mounted) return;
       _showErrorDialog('Failed to save data: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -245,11 +252,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _resetForm();
       _loadAvailabilityData(); // Refresh the list
     } catch (e) {
+      if (!mounted) return;
       _showErrorDialog('Failed to update data: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -292,19 +302,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               .get();
 
       if (existingDocs.docs.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           _existingCount = existingDocs.docs.first.data()['count'] as int;
           _countController.text = _existingCount.toString();
           _count = _existingCount;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _existingCount = 0;
           _countController.clear();
         });
       }
     } catch (e) {
-      print('Error fetching existing count: $e');
+      debugPrint('Error fetching existing count: $e');
+      if (!mounted) return;
       setState(() {
         _existingCount = 0;
         _countController.clear();

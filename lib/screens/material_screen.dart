@@ -129,6 +129,7 @@ class _MaterialScreenState extends State<MaterialScreen>
         selectedSubCategoryRef = subCategories.first['ref'];
         selectedSubCategoryName = subCategories.first['name'];
         await _fetchUnitName(subCategories.first['unitRef']);
+        if (!mounted) return;
       } else {
         selectedSubCategoryRef = null;
         selectedUnitName = null;
@@ -176,6 +177,7 @@ class _MaterialScreenState extends State<MaterialScreen>
   }
 
   void _updateMaterialName() {
+    if (!mounted) return;
     if ((selectedCategoryName ?? '').isNotEmpty &&
         (selectedSubCategoryName ?? '').isNotEmpty) {
       materialNameController.text =
@@ -198,6 +200,7 @@ class _MaterialScreenState extends State<MaterialScreen>
       final materialsRef = FirestoreService.getCollection('materials');
       final duplicate = await materialsRef
           .where('materialName', isEqualTo: name)
+          .limit(1)
           .get();
       if (duplicate.docs.isNotEmpty) {
         if (mounted) {
@@ -245,8 +248,8 @@ class _MaterialScreenState extends State<MaterialScreen>
             backgroundColor: Colors.green,
           ),
         );
+        _resetForm();
       }
-      _resetForm();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -278,6 +281,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     try {
       final snapshot = await FirestoreService.materials
           .orderBy('materialId')
+          .limit(50)
           .get();
       if (!mounted) return;
       materials = snapshot.docs
@@ -303,12 +307,16 @@ class _MaterialScreenState extends State<MaterialScreen>
     if (data['materialUnit'] is DocumentReference) {
       final unitSnap = await (data['materialUnit'] as DocumentReference).get();
       if (!mounted) return;
-      selectedMaterialUnit = unitSnap['matUnit'] as String?;
+      if (unitSnap.exists) {
+        selectedMaterialUnit = unitSnap['matUnit'] as String?;
+      }
     } else {
       selectedMaterialUnit = data['materialUnit']?.toString();
     }
-    updateMaterialUnitController.text = selectedMaterialUnit ?? '';
-    if (mounted) setState(() => isEditingPrice = false);
+    if (mounted) {
+      updateMaterialUnitController.text = selectedMaterialUnit ?? '';
+      setState(() => isEditingPrice = false);
+    }
   }
 
   @override
@@ -580,17 +588,15 @@ class _MaterialScreenState extends State<MaterialScreen>
               GlassButton(
                 label: 'UPDATE PRICE',
                 onPressed: () async {
-                  await selectedMaterialRef!.update({
-                    'materialPrice': updateMaterialPriceController.text,
-                  });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Price Updated'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  final price = updateMaterialPriceController.text;
+                  await selectedMaterialRef!.update({'materialPrice': price});
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Price Updated'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                   _fetchMaterials();
                   if (mounted) setState(() => isEditingPrice = false);
                 },

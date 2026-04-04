@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'config_account_dashboard.dart';
 import 'org_site_payment_screen.dart';
 import 'incentive_calculation.dart';
@@ -15,8 +16,9 @@ import 'site_weekly_financial_report.dart';
 import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
-import 'org_menu_screen.dart';
+
 import '../utils/app_theme.dart';
+import 'org_sub_menu_screen.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -26,65 +28,49 @@ class OrganizationDashboard extends StatefulWidget {
 }
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0.0;
+
   DateTime? _lastBackPressTime;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      setState(() {
+        _scrollOffset = _scrollController.offset;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        final now = DateTime.now();
-        if (_lastBackPressTime == null ||
-            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-          _lastBackPressTime = now;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Press back again to exit'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+    return ValueListenableBuilder<String>(
+      valueListenable: AppTheme.appName,
+      builder: (context, appName, _) {
+        return GlassScaffold(
+          title: appName.isNotEmpty ? appName : 'Organization Dashboard',
+          onBack: () => _showLogoutConfirmation(context),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.logout_rounded),
+                tooltip: 'Logout',
+                color: Theme.of(context).colorScheme.onPrimary,
+                onPressed: () => _showLogoutConfirmation(context),
               ),
             ),
-          );
-        } else {
-          SystemNavigator.pop();
-        }
+          ],
+          body: _buildBody(context),
+        );
       },
-      child: ValueListenableBuilder<String>(
-        valueListenable: AppTheme.appName,
-        builder: (context, appName, _) {
-          return GlassScaffold(
-            title: appName.isNotEmpty ? appName : 'Organization Dashboard',
-            onBack: () => _showLogoutConfirmation(context),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 20),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.menu,
-                    size: 28,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const OrgMenuScreen(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            body: _buildBody(context),
-          );
-        },
-      ),
     );
   }
 
@@ -93,28 +79,52 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Confirm Logout',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+          ],
         ),
-        content: const Text('Are you sure you want to logout?'),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(fontSize: 16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: Text(
-              'No',
+              'Cancel',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontWeight: FontWeight.w600,
+                fontSize: 15,
               ),
             ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text(
-              'Yes',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
           ),
         ],
@@ -123,6 +133,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
     if (result == true) {
       await AuthService().logout();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('org_isLoggedIn');
+      await prefs.remove('org_username');
 
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
@@ -136,142 +149,285 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Widget _buildWelcomeSection(ThemeData theme) {
     final colorScheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Welcome back,",
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ValueListenableBuilder<String>(
-          valueListenable: AppTheme.appName,
-          builder: (context, appName, _) {
-            return Text(
-              appName,
-              style: theme.textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-                letterSpacing: -1.0,
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildWelcomeSection(theme),
-          const SizedBox(height: 32),
-          _buildDashboardSections(context, theme),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.primaryColor.withOpacity(0.1),
+                  theme.primaryColor.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.waving_hand_rounded,
+                  size: 18,
+                  color: theme.primaryColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "Welcome back,",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, appName, _) {
+              return Text(
+                appName,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                  letterSpacing: -1.0,
+                  fontSize: 34,
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Manage your organization efficiently",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );
   }
 
+  Widget _buildBody(BuildContext context) {
+    final theme = Theme.of(context);
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWelcomeSection(theme),
+                const SizedBox(height: 32),
+                _buildQuickStats(context, theme),
+                const SizedBox(height: 32),
+                _buildDashboardSections(context, theme),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickStats(BuildContext context, ThemeData theme) {
+    final stats = [
+      {
+        'icon': Icons.payments_rounded,
+        'label': 'Pending',
+        'value': '12',
+        'color': Colors.orange,
+      },
+      {
+        'icon': Icons.check_circle_rounded,
+        'label': 'Approved',
+        'value': '45',
+        'color': Colors.green,
+      },
+      {
+        'icon': Icons.pending_actions_rounded,
+        'label': 'Requests',
+        'value': '8',
+        'color': Colors.blue,
+      },
+      {
+        'icon': Icons.trending_up_rounded,
+        'label': 'Revenue',
+        'value': '₹2.4L',
+        'color': Colors.purple,
+      },
+    ];
+
+    return Container(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: stats.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final stat = stats[index];
+          return Container(
+            width: (MediaQuery.of(context).size.width - 64) / 2.2,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: (stat['color'] as Color).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    stat['icon'] as IconData,
+                    color: stat['color'] as Color,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        stat['value'] as String,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Text(
+                        stat['label'] as String,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = screenWidth > 1200
-        ? 5
-        : (screenWidth > 800 ? 4 : (screenWidth > 600 ? 3 : 2));
-
-    double childAspectRatio = screenWidth < 400
-        ? 0.85
-        : (screenWidth < 600 ? 0.95 : 1.1);
-
-    Widget buildGrid(List<Widget> children) {
-      return GridView.count(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: childAspectRatio,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: children,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader("Configuration", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
+    final categories = [
+      _CategoryData(
+        title: "Administrative & Config",
+        subtitle: "Manage accounts and system settings",
+        icon: Icons.admin_panel_settings_rounded,
+        color: theme.primaryColor,
+        gradientColors: [
+          theme.primaryColor,
+          theme.primaryColor.withOpacity(0.7),
+        ],
+        items: [
+          SubMenuItem(
             title: "Manager Account",
-            icon: Icons.settings,
-            iconColor: theme.primaryColor,
+            subtitle: "Configure profiles and access permissions",
+            icon: Icons.admin_panel_settings_rounded,
+            color: theme.primaryColor,
             onTap: () => _navigateToConfiguration(context),
           ),
-        ]),
-
-        _buildSectionHeader("Weekly Financial Balance Sheet", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
+        ],
+      ),
+      _CategoryData(
+        title: "Finance & Balance Sheets",
+        subtitle: "Site payments, entries, and financial reports",
+        icon: Icons.account_balance_wallet_rounded,
+        color: Colors.blueAccent,
+        gradientColors: [Colors.blueAccent, Colors.blueAccent.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
             title: "Site Payment Entry",
-            icon: Icons.payments,
-            iconColor: theme.primaryColor,
+            subtitle: "Record daily site transactions",
+            icon: Icons.payments_rounded,
+            color: Colors.blueAccent,
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Site Payment Report",
-            icon: Icons.receipt,
-            iconColor: theme.primaryColor,
+            subtitle: "Daily site-level financial reports",
+            icon: Icons.receipt_long_rounded,
+            color: Colors.indigoAccent,
             onTap: () => _navigateToDailyReport(context),
           ),
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Weekly Finance Report",
-            icon: Icons.bar_chart,
-            iconColor: theme.primaryColor,
+            subtitle: "Weekly financial health overview",
+            icon: Icons.account_balance_rounded,
+            color: Colors.teal,
             onTap: () => _navigateToSiteWeeklyFinancialReport(context),
           ),
-        ]),
-
-        _buildSectionHeader("Expenses", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
+        ],
+      ),
+      _CategoryData(
+        title: "Expense Management",
+        subtitle: "Track organization and field expenses",
+        icon: Icons.money_rounded,
+        color: Colors.orange,
+        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
             title: "Organization Expenses",
-            icon: Icons.account_balance_wallet,
-            iconColor: theme.primaryColor,
+            subtitle: "Central operational cost monitoring",
+            icon: Icons.corporate_fare_rounded,
+            color: Colors.orange,
             onTap: () => _navigateToOrganizationExpenses(context),
           ),
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Manager Expenses",
-            icon: Icons.attach_money,
-            iconColor: theme.primaryColor,
+            subtitle: "Project management expenditures",
+            icon: Icons.person_search_rounded,
+            color: Colors.deepOrange,
             onTap: () => _navigateToManagerExpenses(context),
           ),
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Supervisor Expenses",
-            icon: Icons.money,
-            iconColor: theme.primaryColor,
+            subtitle: "Daily field-level operational expenses",
+            icon: Icons.engineering_rounded,
+            color: Colors.amber[800]!,
             onTap: () => _navigateToSiteExpenses(context),
           ),
-        ]),
-
-        _buildSectionHeader("Approvals", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
+        ],
+      ),
+      _CategoryData(
+        title: "Review & Approvals",
+        subtitle: "Approve schedules, materials, and incentives",
+        icon: Icons.fact_check_rounded,
+        color: Colors.green,
+        gradientColors: [Colors.green, Colors.green.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
             title: "Schedule Request Approval",
-            icon: Icons.work,
-            iconColor: theme.primaryColor,
+            subtitle: "Approve project work schedules",
+            icon: Icons.event_available_rounded,
+            color: Colors.green,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -279,11 +435,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ),
             ),
           ),
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Material Request Approval",
-            icon: Icons.inventory,
-            iconColor: theme.primaryColor,
+            subtitle: "Authorize material procurement",
+            icon: Icons.inventory_2_rounded,
+            color: Colors.lightGreen[700]!,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -291,133 +447,172 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ),
             ),
           ),
-        ]),
-
-        _buildSectionHeader("Supervisor Incentive Calculator", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
+          SubMenuItem(
             title: "Incentive Calculation",
-            icon: Icons.calculate,
-            iconColor: theme.primaryColor,
+            subtitle: "Process performance-based rewards",
+            icon: Icons.calculate_rounded,
+            color: Colors.purple,
             onTap: () => _navigateToIncentiveCaliculation(context),
-          ),
-        ]),
-
-        _buildSectionHeader("Insights", theme),
-        buildGrid([
-          _buildMenuCard(
-            context,
-            title: "Financial Reports",
-            icon: Icons.analytics,
-            iconColor: theme.primaryColor,
-            onTap: () => _navigateToInsights(context),
-          ),
-          _buildMenuCard(
-            context,
-            title: "Materials Inventory",
-            icon: Icons.inventory_2,
-            iconColor: theme.primaryColor,
-            onTap: () => _navigateToMaterialReport(context),
-          ),
-          _buildMenuCard(
-            context,
-            title: "Tools Inventory",
-            icon: Icons.build,
-            iconColor: theme.primaryColor,
-            onTap: () => _navigateToToolsInventory(context),
-          ),
-        ]),
-        const SizedBox(height: 48),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(String title, ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 40, bottom: 20),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 20,
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title.toUpperCase(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-                letterSpacing: 2.0,
-              ),
-            ),
           ),
         ],
       ),
+      _CategoryData(
+        title: "Reports & Insights",
+        subtitle: "Stock monitoring and tool analytics",
+        icon: Icons.bar_chart_rounded,
+        color: Colors.blueGrey,
+        gradientColors: [Colors.blueGrey, Colors.blueGrey.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: "Advanced Financial Analytics",
+            subtitle: "Detailed performance insights",
+            icon: Icons.query_stats_rounded,
+            color: Colors.blueGrey,
+            onTap: () => _navigateToInsights(context),
+          ),
+          SubMenuItem(
+            title: "Materials Inventory",
+            subtitle: "Real-time stock monitoring",
+            icon: Icons.inventory_rounded,
+            color: Colors.brown,
+            onTap: () => _navigateToMaterialReport(context),
+          ),
+          SubMenuItem(
+            title: "Tools Inventory",
+            subtitle: "Track field equipment usage",
+            icon: Icons.construction_rounded,
+            color: Colors.blue[900]!,
+            onTap: () => _navigateToToolsInventory(context),
+          ),
+        ],
+      ),
+    ];
+
+    return Column(
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final category = entry.value;
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + (index * 50)),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: _buildCategoryTile(context, category: category),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildMenuCard(
+  Widget _buildCategoryTile(
     BuildContext context, {
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onTap,
+    required _CategoryData category,
   }) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.06),
-            blurRadius: 24,
+            color: theme.shadowColor.withOpacity(0.06),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.5),
-          width: 1.5,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrgSubMenuScreen(
+                title: category.title,
+                items: category.items,
+              ),
+            ),
+          ),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.08),
-                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: category.gradientColors,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: category.color.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: colorScheme.primary, size: 28),
+                  child: Icon(category.icon, color: Colors.white, size: 28),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    fontSize: 14,
-                    height: 1.1,
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 17,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        category.subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: category.color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${category.items.length} options',
+                          style: TextStyle(
+                            color: category.color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 16,
                   ),
                 ),
               ],
@@ -428,6 +623,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
+  // Navigation methods remain the same
   void _navigateToConfiguration(BuildContext context) {
     Navigator.push(
       context,
@@ -507,4 +703,22 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       ),
     );
   }
+}
+
+class _CategoryData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<SubMenuItem> items;
+
+  _CategoryData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.items,
+  });
 }

@@ -48,9 +48,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('siteSupervisorMap')
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).limit(100).get();
+      if (!mounted) return;
       setState(() {
         _sites = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -64,13 +65,15 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         _isLoadingSites = false;
       });
     } catch (e) {
-      print('Error loading sites: $e');
-      setState(() {
-        _isLoadingSites = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      debugPrint('Error loading sites: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSites = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      }
     }
   }
 
@@ -80,7 +83,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await FirestoreService.getCollection('workersConfig').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersConfig',
+      ).limit(200).get();
+      if (!mounted) return;
       setState(() {
         _workers = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -95,13 +101,15 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         _isLoadingWorkers = false;
       });
     } catch (e) {
-      print('Error loading workers: $e');
-      setState(() {
-        _isLoadingWorkers = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading workers: $e')));
+      debugPrint('Error loading workers: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingWorkers = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading workers: $e')));
+      }
     }
   }
 
@@ -134,7 +142,9 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Future<void> _loadExistingWorkersForSite(String site) async {
     try {
-      final doc = await FirestoreService.getCollection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(site).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -142,20 +152,22 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           data['workers'] ?? [],
         );
 
-        setState(() {
-          _selectedWorkersList = existingWorkers;
-        });
+        if (mounted) {
+          setState(() {
+            _selectedWorkersList = existingWorkers;
+          });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Loaded ${existingWorkers.length} existing workers for this site',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Loaded ${existingWorkers.length} existing workers for this site',
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
-      print('Error loading existing workers: $e');
+      debugPrint('Error loading existing workers: $e');
     }
   }
 
@@ -256,7 +268,9 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     try {
       // Use site name as document ID
-      final docRef = FirestoreService.getCollection('workerSiteMap').doc(_selectedSite!);
+      final docRef = FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(_selectedSite!);
 
       final docSnapshot = await docRef.get();
 
@@ -311,17 +325,21 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       }
 
       // Reset form
-      setState(() {
-        _selectedSite = null;
-        _selectedSupervisor = null;
-        _selectedProjectName = null;
-        _selectedWorkersList.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _selectedSite = null;
+          _selectedSupervisor = null;
+          _selectedProjectName = null;
+          _selectedWorkersList.clear();
+        });
+      }
     } catch (e) {
-      print('Error mapping workers: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error mapping workers: $e')));
+      debugPrint('Error mapping workers: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error mapping workers: $e')));
+      }
     }
   }
 
@@ -534,9 +552,13 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     icon: const Icon(Icons.add_rounded),
                     label: const Text('Add'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E), // Professional Emerald
+                      backgroundColor: const Color(
+                        0xFF22C55E,
+                      ), // Professional Emerald
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -667,21 +689,16 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(4),
-        
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 16, )),
+          Text(value, style: TextStyle(fontSize: 16)),
         ],
       ),
     );
