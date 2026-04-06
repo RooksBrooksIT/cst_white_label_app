@@ -5,7 +5,6 @@ import 'Organisation_LoginPage.dart';
 import 'config_login.dart';
 import 'customer_login_page.dart';
 import 'supervisor_login_page.dart';
-import '../utils/responsive.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -76,9 +75,7 @@ class _MainDashboardState extends State<MainDashboard> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -86,9 +83,7 @@ class _MainDashboardState extends State<MainDashboard> {
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : Center(
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.isMobile(context) ? 20 : 32,
-                ),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -104,7 +99,10 @@ class _MainDashboardState extends State<MainDashboard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
-                            border: Border.all(color: colorScheme.outline, width: 2),
+                            border: Border.all(
+                              color: colorScheme.outline,
+                              width: 2,
+                            ),
                             image: DecorationImage(
                               image: NetworkImage(_logoUrl!),
                               fit: BoxFit.cover,
@@ -128,13 +126,17 @@ class _MainDashboardState extends State<MainDashboard> {
                       Text(
                         _orgName ?? 'Organization',
                         textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium,
+                        style: textTheme.headlineMedium?.copyWith(
+                          fontSize: 24,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Select your role to continue',
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                        ),
                       ),
                     ] else ...[
                       // Generic Header
@@ -154,13 +156,17 @@ class _MainDashboardState extends State<MainDashboard> {
                       Text(
                         'Select Your Role',
                         textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium,
+                        style: textTheme.headlineMedium?.copyWith(
+                          fontSize: 28,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Choose how you\'d like to sign in',
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                        ),
                       ),
                     ],
 
@@ -263,7 +269,9 @@ class _MainDashboardState extends State<MainDashboard> {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodyMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),

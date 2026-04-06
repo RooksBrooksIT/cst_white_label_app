@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../utils/responsive.dart';
 
 class GlassScaffold extends StatelessWidget {
   final Widget body;
@@ -74,6 +73,7 @@ class GlassScaffold extends StatelessWidget {
                       icon: Icon(
                         Icons.arrow_back_ios_new_rounded,
                         color: effectiveFgColor,
+                        size: 20,
                       ),
                       onPressed: onBack,
                     )
@@ -85,12 +85,7 @@ class GlassScaffold extends StatelessWidget {
       floatingActionButton: floatingActionButton,
       body: SafeArea(
         child: Padding(
-          padding:
-              padding ??
-              EdgeInsets.symmetric(
-                horizontal: Responsive.isMobile(context) ? 16 : 24,
-                vertical: 16,
-              ),
+          padding: padding ?? const EdgeInsets.all(16),
           child: body,
         ),
       ),

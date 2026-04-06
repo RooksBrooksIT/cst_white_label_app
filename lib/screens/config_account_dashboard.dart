@@ -11,7 +11,6 @@ import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
 import 'package:demo_cst/screens/main_dashboard.dart';
-import 'package:demo_cst/screens/manager_config_screen.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/material_screen.dart';
 import 'package:demo_cst/screens/project_category_screen.dart';
@@ -173,13 +172,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.redAccent,
         'Assign supervisors to sites',
         Colors.redAccent,
-      ),
-      DashboardItem(
-        'Manager',
-        Icons.admin_panel_settings_rounded,
-        Colors.indigo,
-        'Manager configurations',
-        Colors.indigo,
       ),
     ],
     "Tools & Equipment": [
@@ -606,7 +598,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                       ),
                     ],
                   ),
-                  child: Icon(firstItem.icon, color: Colors.white, size: 32),
+                  child: Icon(
+                    firstItem.icon,
+                    color: Colors.white,
+                    size: 32,
+                  ),
                 ),
                 const SizedBox(width: 20),
                 // Text Content
@@ -802,7 +798,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Site': const SiteScreen(),
       'Supervisor': const SiteSupervisorConfig(),
       'Site-Supervisor Map': SiteSupervisorMapScreen(),
-      'Manager': const ManagerConfigScreen(),
       'Material': MaterialScreen(),
       'Project': ProjectScreen(),
       'Labour': LabourScreen(),

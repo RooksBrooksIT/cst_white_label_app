@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/responsive.dart';
 import 'migration_screen.dart';
+
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
@@ -37,7 +37,9 @@ class LandingPage extends StatelessWidget {
                 onLongPress: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const MigrationScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const MigrationScreen(),
+                    ),
                   );
                 },
                 child: Container(
@@ -54,30 +56,30 @@ class LandingPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                child: ClipOval(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Image.asset(
-                      'assets/images/construction_hero.png',
-                      fit: BoxFit.contain,
+                  child: ClipOval(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Image.asset(
+                        'assets/images/construction_hero.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
-                ),
-              ), // Close Container
+                ), // Close Container
               ), // Close GestureDetector
-              
+
               const SizedBox(height: 36),
 
               // Headline
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
+                child: const Text(
                   'Manage Your Projects\nLike a Pro',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 30),
+                    fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E293B),
+                    color: Color(0xFF1E293B),
                     height: 1.2,
                     letterSpacing: -0.5,
                   ),
@@ -86,12 +88,12 @@ class LandingPage extends StatelessWidget {
               const SizedBox(height: 14),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 48),
-                child: Text(
+                child: const Text(
                   'Plan, track, and manage your construction\nwork seamlessly.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: const Color(0xFF64748B),
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
                     fontWeight: FontWeight.w500,
                     height: 1.5,
                   ),
