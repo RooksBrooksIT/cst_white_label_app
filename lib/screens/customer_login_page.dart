@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'customer_dashboard.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../utils/responsive.dart';
 import '../utils/firestore_error_handler.dart';
 
@@ -22,12 +23,6 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
   String? _tempOrgName;
   String? _tempLogoUrl;
   String? _actualReferralCode;
-
-  // SharedPreferences keys - CUSTOMER specific
-  static const String _isLoggedInKey = 'cust_isLoggedIn';
-  static const String _ownerNameKey = 'cust_ownerName';
-  static const String _siteIdKey = 'cust_siteId';
-  static const String _orgPathKey = 'cust_org_path';
 
   @override
   void initState() {
@@ -51,11 +46,11 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       }
     });
 
-    final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
-
-    if (isLoggedIn && mounted) {
-      final ownerName = prefs.getString(_ownerNameKey) ?? '';
-      final siteId = prefs.getString(_siteIdKey) ?? '';
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.customer && mounted) {
+      final data = auth.userData;
+      final ownerName = data['ownerName'] ?? '';
+      final siteId = data['siteId'] ?? '';
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -106,7 +101,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         }
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_orgPathKey, orgId);
+        await prefs.setString('cust_org_path', orgId);
         final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
         await prefs.setString('cust_org_doc_path', resolvedPath);
 
@@ -123,15 +118,21 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
           final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
           final siteId = data['siteId'] ?? '';
 
-          await prefs.setBool(_isLoggedInKey, true);
-          await prefs.setString(_ownerNameKey, _usernameController.text.trim());
-          await prefs.setString(_siteIdKey, siteId);
+          await AuthService().login(
+            UserRole.customer,
+            {
+              'ownerName': _usernameController.text.trim(),
+              'siteId': siteId,
+              'orgId': orgId,
+              'cust_org_doc_path': resolvedPath,
+            },
+          );
 
           if (mounted) {
             _showSuccess('Login Successful!');
             Future.delayed(const Duration(milliseconds: 1500), () {
               if (mounted) {
-                Navigator.pushReplacement(
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(
                     builder: (context) => CustomerDashboardPage(
@@ -140,6 +141,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                       siteId: siteId,
                     ),
                   ),
+                  (route) => false,
                 );
               }
             });

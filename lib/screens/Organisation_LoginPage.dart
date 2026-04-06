@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import 'Organization_Dashboard.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -27,11 +28,6 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   String? _tempOrgName;
   String? _tempLogoUrl;
 
-  // SharedPreferences keys - ORGANIZATION specific
-  static const String _isLoggedInKey = 'org_isLoggedIn';
-  static const String _usernameKey = 'org_username';
-  static const String _orgPathKey = 'org_dynamic_path';
-
   @override
   void initState() {
     super.initState();
@@ -49,20 +45,14 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
   // Check if organization is already logged in
   Future<void> _checkLoginStatus() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
-
-      if (isLoggedIn && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const OrganizationDashboard(),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error checking login status: $e');
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.organization && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const OrganizationDashboard(),
+        ),
+      );
     }
   }
 
@@ -110,21 +100,22 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           return;
         }
 
-        // Write organization info to SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
         final String? storedOrgName = userData['orgName'] as String?;
         final String dynamicPath = userData['dynamicPath'] ?? '';
         final String fullConfigPath =
             userData['fullConfigPath'] ??
             'organisation/$dynamicPath/admin/data';
 
-        await prefs.setBool(_isLoggedInKey, true);
-        await prefs.setString(_usernameKey, username);
-        await prefs.setString(_orgPathKey, dynamicPath);
-        if (storedOrgName != null) {
-          await prefs.setString('org_name', storedOrgName);
-        }
-        await prefs.setString('org_doc_path', fullConfigPath);
+        // Write organization info to AuthService
+        await AuthService().login(
+          UserRole.organization,
+          {
+            'username': username,
+            'dynamicPath': dynamicPath,
+            'org_name': storedOrgName,
+            'org_doc_path': fullConfigPath,
+          },
+        );
 
         // Refresh FirestoreService cache
         await FirestoreService.initialize();
@@ -133,12 +124,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         await AppTheme.syncWithFirestore(dynamicPath);
 
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const OrganizationDashboard(),
-            ),
-          );
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/orgDashboard',
+              (route) => false,
+            );
+          }
         }
       } else {
         _showError('Invalid username or password');

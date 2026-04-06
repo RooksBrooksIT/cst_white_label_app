@@ -2,12 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'Customer_insight_dashboard.dart';
-import 'customer_login_page.dart';
 import 'customer_project_details.dart';
 import 'customer_worker_details.dart';
 import 'customer_workers_summary.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
@@ -31,7 +30,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
   String? _storedOwnerName;
   String? _storedOwnerPhoneNumber;
   bool _isLoading = true;
-  DateTime? currentBackPressTime;
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -40,13 +39,15 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
   }
 
   Future<void> _loadStoredUserInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _storedOwnerName = prefs.getString('ownerName') ?? widget.ownerName;
-      _storedOwnerPhoneNumber =
-          prefs.getString('ownerPhoneNumber') ?? widget.ownerPhoneNumber;
-      _siteId = prefs.getString('siteId'); // Load siteId from SharedPreferences
-    });
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.customer) {
+      final data = auth.userData;
+      setState(() {
+        _storedOwnerName = data['ownerName'] ?? widget.ownerName;
+        _storedOwnerPhoneNumber = data['ownerPhoneNumber'] ?? widget.ownerPhoneNumber;
+        _siteId = data['siteId'] ?? _siteId;
+      });
+    }
 
     // Always try to fetch latest siteId from Firestore, but don't clear existing one
     await _fetchSiteId();
@@ -70,10 +71,9 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         final doc = querySnapshot.docs.first;
         final newSiteId = doc['siteId']?.toString() ?? '';
 
-        // Store siteId in SharedPreferences only if we found a valid one
+        // Store siteId in AuthService only if we found a valid one
         if (newSiteId.isNotEmpty) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('siteId', newSiteId);
+          await AuthService().updateUserData({'siteId': newSiteId});
 
           setState(() {
             _siteId = newSiteId;
@@ -188,16 +188,12 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
             ),
             TextButton(
               onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('isLoggedIn', false);
-                await prefs.remove('ownerName');
-                await prefs.remove('ownerPhoneNumber');
-                await prefs.remove('siteId');
+                await AuthService().logout();
 
                 if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
+                  Navigator.pushNamedAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (_) => const CustomerLoginPage()),
+                    '/landing',
                     (route) => false,
                   );
                 }
@@ -242,8 +238,30 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       );
     }
 
-    return GlassScaffold(
-      onBack: () => _showLogoutDialog(context),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Press back again to exit'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: GlassScaffold(
+        onBack: () => _showLogoutDialog(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
             vertical: 24,
@@ -398,6 +416,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }

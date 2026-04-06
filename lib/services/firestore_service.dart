@@ -89,9 +89,13 @@ class FirestoreService {
     return FirebaseFirestore.instance.doc('organisation/$orgId/admin/data');
   }
 
-  /// Gets the organization's branding configuration.
   static DocumentReference<Map<String, dynamic>> get brandingDoc {
     final orgId = _getOrgIdFromPath();
+    return brandingDocWithId(orgId);
+  }
+
+  /// Gets the branding configuration for a specific organization.
+  static DocumentReference<Map<String, dynamic>> brandingDocWithId(String orgId) {
     return FirebaseFirestore.instance.doc('organisation/$orgId/admin/branding');
   }
 

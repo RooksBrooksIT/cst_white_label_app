@@ -1,3 +1,4 @@
+import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
@@ -10,7 +11,7 @@ import 'package:demo_cst/screens/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
-import 'package:demo_cst/screens/manager_config_screen.dart';
+import 'package:demo_cst/screens/main_dashboard.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/material_screen.dart';
 import 'package:demo_cst/screens/project_category_screen.dart';
@@ -30,8 +31,7 @@ import 'package:demo_cst/screens/vehicle_inventory_page.dart';
 import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
-import '../services/auth_service.dart';
-import '../widgets/glass_scaffold.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -44,7 +44,6 @@ class ConfigAccountDashboard extends StatefulWidget {
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerName = 'Manager';
-  DateTime? _lastBackPressTime;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0.0;
 
@@ -66,11 +65,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Future<void> _fetchManagerData() async {
-    final auth = AuthService();
-    if (auth.isLoggedIn && auth.userRole == UserRole.manager) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
       final String? name =
-          auth.userData['username'] ?? auth.userData['org_name'];
-      if (name != null) setState(() => _managerName = name);
+          prefs.getString('manager_name') ?? prefs.getString('org_name');
+      if (name != null && name.isNotEmpty) setState(() => _managerName = name);
+    } catch (e) {
+      debugPrint('Error fetching manager data: $e');
     }
   }
 
@@ -293,75 +294,66 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-
-        // If we can navigate back (e.g. from Organization Dashboard), just pop
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-          return;
-        }
-
-        final now = DateTime.now();
-        if (_lastBackPressTime == null ||
-            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-          _lastBackPressTime = now;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Press back again to exit'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+    return GlassScaffold(
+      title: 'Management Console',
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        PopupMenuButton<String>(
+          icon: const Icon(
+            Icons.account_circle_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+          color: Theme.of(context).cardColor,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: Theme.of(context).dividerColor.withOpacity(0.1),
+            ),
+          ),
+          onSelected: (value) {
+            if (value == 'logout') {
+              _showLogoutConfirmation(context);
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                  const SizedBox(width: 12),
+                  const Text('Logout'),
+                ],
               ),
             ),
-          );
-        } else {
-          SystemNavigator.pop();
-        }
-      },
-      child: GlassScaffold(
-        title: 'Management Console',
-        appBarBackgroundColor: colorScheme.primary,
-        appBarForegroundColor: Colors.white,
-        onBack: Navigator.of(context).canPop()
-            ? () => Navigator.of(context).pop()
-            : () => _showLogoutConfirmation(context),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: () => _showLogoutConfirmation(context),
-            tooltip: 'Logout',
-          ),
-        ],
-        body: _buildBody(context),
-      ),
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeSection(context),
-                const SizedBox(height: 28),
-                _buildQuickStats(context),
-                const SizedBox(height: 32),
-                _buildDashboardSections(context),
-              ],
-            ),
-          ),
+          ],
         ),
       ],
+      body: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildWelcomeSection(context),
+                  const SizedBox(height: 28),
+                  _buildQuickStats(context),
+                  const SizedBox(height: 32),
+                  _buildDashboardSections(context),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -761,14 +753,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             ElevatedButton(
               onPressed: () async {
-                await AuthService().logout();
-                if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/landing',
-                    (route) => false,
-                  );
-                }
+                final navigator = Navigator.of(context);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const MainDashboard(),
+                  ),
+                  (route) => false,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,

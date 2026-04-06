@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
 import '../services/firestore_service.dart';
@@ -27,17 +28,6 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   String? _tempLogoUrl;
   String? _actualReferralCode;
 
-  // SharedPreferences keys - SUPERVISOR specific
-  static const String _isLoggedInKey = 'sup_isLoggedIn';
-  static const String _userTypeKey = 'sup_userType';
-  static const String _usernameKey = 'sup_username';
-  static const String _supervisorIdKey = 'sup_supervisorId';
-  static const String _supervisorNameKey = 'sup_supervisorName';
-  static const String _contractorNameKey = 'sup_contractorName';
-  static const String _contractorFieldKey = 'sup_contractorField';
-  static const String _isContractorKey = 'sup_isContractor';
-  static const String _orgPathKey = 'sup_org_path';
-
   @override
   void initState() {
     super.initState();
@@ -63,17 +53,17 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         }
       });
 
-      final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
-
-      if (isLoggedIn) {
-        final username = prefs.getString(_usernameKey) ?? '';
-        final supervisorId = prefs.getString(_supervisorIdKey) ?? '';
-        final supervisorName = prefs.getString(_supervisorNameKey) ?? '';
-        final isContractor = prefs.getBool(_isContractorKey) ?? false;
+      final auth = AuthService();
+      if (auth.isLoggedIn && auth.userRole == UserRole.supervisor) {
+        final data = auth.userData;
+        final username = data['username'] ?? '';
+        final supervisorId = data['supervisorId'] ?? '';
+        final supervisorName = data['supervisorName'] ?? '';
+        final isContractor = data['isContractor'] ?? false;
 
         if (isContractor) {
-          final contractorName = prefs.getString(_contractorNameKey) ?? '';
-          final contractorField = prefs.getString(_contractorFieldKey) ?? '';
+          final contractorName = data['contractorName'] ?? '';
+          final contractorField = data['contractorField'] ?? '';
 
           if (mounted) {
             Navigator.pushReplacement(
@@ -110,31 +100,29 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
     }
   }
 
-  // Save login data to SharedPreferences
+  // Save login data to AuthService
   Future<void> _saveLoginData({
     required String username,
     required String supervisorId,
     required String supervisorName,
     required bool isContractor,
+    required String orgId,
+    required String resolvedPath,
     String? contractorName,
     String? contractorField,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_isLoggedInKey, true);
-      await prefs.setString(
-        _userTypeKey,
-        isContractor ? 'contractor' : 'supervisor',
-      );
-      await prefs.setString(_usernameKey, username);
-      await prefs.setString(_supervisorIdKey, supervisorId);
-      await prefs.setString(_supervisorNameKey, supervisorName);
-      await prefs.setBool(_isContractorKey, isContractor);
-
-      if (isContractor && contractorName != null) {
-        await prefs.setString(_contractorNameKey, contractorName);
-        await prefs.setString(_contractorFieldKey, contractorField ?? '');
-      }
+      await AuthService().login(UserRole.supervisor, {
+        'username': username,
+        'supervisorId': supervisorId,
+        'supervisorName': supervisorName,
+        'isContractor': isContractor,
+        'userType': isContractor ? 'contractor' : 'supervisor',
+        'contractorName': contractorName,
+        'contractorField': contractorField,
+        'orgId': orgId,
+        'sup_org_doc_path': resolvedPath,
+      });
     } catch (e) {
       debugPrint('Error saving login data: $e');
     }
@@ -142,20 +130,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
   // Clear login data (for logout)
   static Future<void> clearLoginData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_isLoggedInKey, false);
-      await prefs.remove(_userTypeKey);
-      await prefs.remove(_usernameKey);
-      await prefs.remove(_supervisorIdKey);
-      await prefs.remove(_supervisorNameKey);
-      await prefs.remove(_isContractorKey);
-      await prefs.remove(_contractorNameKey);
-      await prefs.remove(_contractorFieldKey);
-      await prefs.remove(_orgPathKey);
-    } catch (e) {
-      debugPrint('Error clearing login data: $e');
-    }
+    await AuthService().logout();
   }
 
   Future<void> _fetchContractorNames() async {
@@ -456,7 +431,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_orgPathKey, orgId);
+        await prefs.setString('sup_org_path', orgId);
         // Default relative path for organization details
         final String resolvedPath = 'organisation/$orgId/admin/data';
         await prefs.setString('sup_org_doc_path', resolvedPath);
@@ -499,10 +474,12 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               isContractor: true,
               contractorName: _selectedSupervisorName!,
               contractorField: contractorField ?? '',
+              orgId: orgId,
+              resolvedPath: resolvedPath,
             );
 
             if (context.mounted) {
-              Navigator.pushReplacement(
+              Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ContractorEntryPage(
@@ -514,6 +491,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                     },
                   ),
                 ),
+                (route) => false,
               );
             }
           } else {
@@ -523,10 +501,12 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               supervisorId: supervisorId,
               supervisorName: supervisorName,
               isContractor: false,
+              orgId: orgId,
+              resolvedPath: resolvedPath,
             );
 
             if (context.mounted) {
-              Navigator.pushReplacement(
+              Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
                   builder: (context) => SupervisorDashboard(
@@ -535,6 +515,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                     username: _usernameController.text.trim(),
                   ),
                 ),
+                (route) => false,
               );
             }
           }

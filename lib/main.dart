@@ -5,6 +5,7 @@ import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/splash_screen.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/main_dashboard.dart';
+import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/screens/Organisation_LoginPage.dart';
 import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/supervisor_login_page.dart';
@@ -22,6 +23,7 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirestoreService.initialize();
   await AppTheme.initialize();
+  await AuthService.initialize();
 
   runApp(const MyApp());
 }

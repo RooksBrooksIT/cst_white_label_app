@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_text_field.dart';
+import 'package:flutter/material.dart';
+import 'package:demo_cst/services/location_service.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'project_screen.dart';
@@ -136,6 +144,9 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<void> _getCurrentLocation() async {
+    final hasPermission = await LocationService.handleLocationPermission(context);
+    if (!hasPermission) return;
+
     setState(() => _isGettingLocation = true);
 
     try {

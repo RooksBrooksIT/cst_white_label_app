@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'Supervisor_material_information.dart';
 import 'material_at_site_entry_page.dart';
 import 'material_request_form.dart';
-import 'supervisor_login_page.dart';
 import 'supervisor_material_view_request_screen.dart';
 import 'supervisor_tool_movement.dart';
 import 'supervisor_verification_page.dart';
 import 'supervisor_view_request_screen.dart';
 import 'supervisor_work_schedule_page.dart';
 import 'supervisor_worker_att_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/glass_scaffold.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
@@ -31,6 +31,7 @@ class SupervisorDashboard extends StatefulWidget {
 
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
   late Map<String, List<DashboardItem>> groupedItems;
+  DateTime? _lastBackPressTime;
 
   @override
   void didChangeDependencies() {
@@ -172,13 +173,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const SupervisorLoginPage()),
-                (route) => false,
-              );
+              await AuthService().logout();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/landing',
+                  (route) => false,
+                );
+              }
             },
             child: const Text("Yes", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
@@ -189,8 +191,32 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      title: 'Supervisor Dashboard',
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Press back again to exit'),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+          }
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: GlassScaffold(
+        title: 'Supervisor Dashboard',
       onBack: () => _showLogoutDialog(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
@@ -215,6 +241,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ],
         ),
       ),
+    ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config_account_dashboard.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
@@ -26,12 +27,6 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
   String? _tempOrgName;
   String? _tempLogoUrl;
   String? _actualReferralCode;
-
-  // SharedPreferences keys - MANAGER/CONFIG specific
-  static const String _isLoggedInKey = 'config_is_logged_in';
-  static const String _usernameKey = 'config_username';
-  static const String _passwordKey = 'config_password';
-  static const String _orgPathKey = 'config_org_path';
 
   @override
   void initState() {
@@ -61,9 +56,8 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       }
     });
 
-    final bool isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
-
-    if (isLoggedIn && mounted) {
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.manager && mounted) {
       // Auto-navigate to dashboard
       Navigator.pushReplacement(
         context,
@@ -77,12 +71,17 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
     String username,
     String password,
     String orgId,
+    String resolvedPath,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_isLoggedInKey, true);
-    await prefs.setString(_usernameKey, username);
-    await prefs.setString(_passwordKey, password);
-    await prefs.setString(_orgPathKey, orgId);
+    await AuthService().login(
+      UserRole.manager,
+      {
+        'username': username,
+        'password': password,
+        'orgId': orgId,
+        'config_org_doc_path': resolvedPath,
+      },
+    );
   }
 
   @override
@@ -158,7 +157,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
         // 2. Save org path temporarily for FirestoreService
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(
-          _orgPathKey,
+          'config_org_path',
           orgId,
         ); // Store the ID for FirestoreService
         final String resolvedPath =
@@ -176,19 +175,23 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
+          final String resolvedPath =
+              fullConfigPath ?? 'organisation/$orgId/admin/data';
           // Save final credentials
           await _saveLoginCredentials(
             _usernameController.text.trim(),
             _passwordController.text.trim(),
             orgId,
+            resolvedPath,
           );
 
           if (mounted) {
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
                 builder: (context) => const ConfigAccountDashboard(),
               ),
+              (route) => false,
             );
           }
         } else {
@@ -489,7 +492,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                       }
 
                                       final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setString(_orgPathKey, orgId);
+                                      await prefs.setString('config_org_path', orgId);
                                       await FirestoreService.initialize();
 
                                       final querySnapshot =

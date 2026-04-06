@@ -1,13 +1,12 @@
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
-import 'organisation_loginPage.dart';
 import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
 
@@ -23,6 +22,7 @@ class OrgMenuScreen extends StatefulWidget {
 }
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
+  String _orgName = '';
   String _orgCode = 'Loading...';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
@@ -36,8 +36,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      // Ensure FirestoreService is fully initialized before fetching
-      await FirestoreService.initialize();
+      final auth = AuthService();
+      if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
+        final String? name = auth.userData['org_name'];
+        if (name != null && mounted) setState(() => _orgName = name);
+      }
 
       // Fetch referal codes using centralized FirestoreService path resolution
       final referalDoc = await FirestoreService.referralDoc.get();
@@ -165,7 +168,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           valueListenable: AppTheme.appName,
           builder: (context, name, _) {
             return Text(
-              name,
+              _orgName.isNotEmpty ? _orgName : name,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: const Color(0xFF1E293B),
@@ -426,17 +429,12 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
 
     if (result == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('org_isLoggedIn');
-      await prefs.remove('org_username');
-      // We keep branding keys so the login screen stays branded for the org
+      await AuthService().logout();
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
+        Navigator.pushNamedAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (context) => const Organisation_LoginPage(),
-          ),
+          '/landing',
           (route) => false,
         );
       }
