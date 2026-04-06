@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:lottie/lottie.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_text_field.dart';
-import 'package:flutter/material.dart';
-import 'package:demo_cst/services/location_service.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'project_screen.dart';
 
 class SiteScreen extends StatefulWidget {
@@ -66,13 +63,13 @@ class _SiteScreenState extends State<SiteScreen>
           _status = data['status'] ?? 'In-Progress';
           _startDate = data['startDate'] != null && data['startDate'] != ''
               ? (data['startDate'] is Timestamp
-                  ? (data['startDate'] as Timestamp).toDate()
-                  : DateFormat('yyyy-MM-dd').parse(data['startDate']))
+                    ? (data['startDate'] as Timestamp).toDate()
+                    : DateFormat('yyyy-MM-dd').parse(data['startDate']))
               : null;
           _endDate = data['endDate'] != null && data['endDate'] != ''
               ? (data['endDate'] is Timestamp
-                  ? (data['endDate'] as Timestamp).toDate()
-                  : DateFormat('yyyy-MM-dd').parse(data['endDate']))
+                    ? (data['endDate'] as Timestamp).toDate()
+                    : DateFormat('yyyy-MM-dd').parse(data['endDate']))
               : null;
         });
       }
@@ -144,9 +141,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<void> _getCurrentLocation() async {
-    final hasPermission = await LocationService.handleLocationPermission(context);
-    if (!hasPermission) return;
-
+    if (!mounted) return;
     setState(() => _isGettingLocation = true);
 
     try {
@@ -294,7 +289,8 @@ class _SiteScreenState extends State<SiteScreen>
                         builder: (context, snapshot) {
                           if (!snapshot.hasData)
                             return const Center(
-                                child: CircularProgressIndicator());
+                              child: CircularProgressIndicator(),
+                            );
 
                           final docs = snapshot.data!.docs;
                           final items = docs.map((d) {
@@ -303,15 +299,18 @@ class _SiteScreenState extends State<SiteScreen>
                           }).toList();
 
                           if (items.isEmpty) {
-                            return const Text('No sites found',
-                                style: TextStyle(color: Colors.red));
+                            return const Text(
+                              'No sites found',
+                              style: TextStyle(color: Colors.red),
+                            );
                           }
 
                           String? dropdownValue;
                           if (selectedSiteId != null) {
                             try {
-                              final doc = docs
-                                  .firstWhere((d) => d.id == selectedSiteId);
+                              final doc = docs.firstWhere(
+                                (d) => d.id == selectedSiteId,
+                              );
                               final data = doc.data() as Map<String, dynamic>;
                               dropdownValue =
                                   "${data['siteName'] ?? ''} (${data['siteId'] ?? ''})";
@@ -390,8 +389,10 @@ class _SiteScreenState extends State<SiteScreen>
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Icon(Icons.gps_fixed,
-                                      color: Colors.white),
+                                  : const Icon(
+                                      Icons.gps_fixed,
+                                      color: Colors.white,
+                                    ),
                               onPressed: _isGettingLocation
                                   ? null
                                   : _getCurrentLocation,
@@ -453,7 +454,8 @@ class _SiteScreenState extends State<SiteScreen>
                       items: [], // Will be populated by FutureBuilder below
                       value: _status,
                       icon: Icons.info_outline,
-                      onChanged: (v) => setState(() => _status = v ?? 'In-Progress'),
+                      onChanged: (v) =>
+                          setState(() => _status = v ?? 'In-Progress'),
                       futureItems: fetchProjectStatus(),
                     ),
                     const SizedBox(height: 16),
@@ -527,7 +529,6 @@ class _SiteScreenState extends State<SiteScreen>
       ),
     );
   }
-
 
   Widget _buildWhiteCard({required Widget child}) {
     return Container(
@@ -634,8 +635,13 @@ class _SiteScreenState extends State<SiteScreen>
     return _buildDropdownInternal(label, value, items, icon, onChanged);
   }
 
-  Widget _buildDropdownInternal(String label, String? value, List<String> items,
-      IconData icon, Function(String?) onChanged) {
+  Widget _buildDropdownInternal(
+    String label,
+    String? value,
+    List<String> items,
+    IconData icon,
+    Function(String?) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -651,11 +657,15 @@ class _SiteScreenState extends State<SiteScreen>
         DropdownButtonFormField<String>(
           value: items.contains(value) ? value : null,
           items: items
-              .map((e) => DropdownMenuItem(
+              .map(
+                (e) => DropdownMenuItem(
                   value: e,
-                  child: Text(e,
-                      style: const TextStyle(
-                          color: Colors.black87, fontSize: 15))))
+                  child: Text(
+                    e,
+                    style: const TextStyle(color: Colors.black87, fontSize: 15),
+                  ),
+                ),
+              )
               .toList(),
           onChanged: onChanged,
           dropdownColor: Colors.white,
@@ -784,8 +794,9 @@ class _SiteScreenState extends State<SiteScreen>
             .set(siteData);
 
         // Auto Create Project
-        final projectsSnapshot =
-            await FirebaseFirestore.instance.collection('projects').get();
+        final projectsSnapshot = await FirebaseFirestore.instance
+            .collection('projects')
+            .get();
         int maxPRNum = 0;
         for (final doc in projectsSnapshot.docs) {
           if (doc.id.startsWith('PR')) {
@@ -795,24 +806,33 @@ class _SiteScreenState extends State<SiteScreen>
         }
         final nextPrId = 'PR${(maxPRNum + 1).toString().padLeft(3, '0')}';
 
-        await FirebaseFirestore.instance.collection('projects').doc(nextPrId).set({
-          'createdAt': FieldValue.serverTimestamp(),
-          'siteId': siteDocId,
-          'siteName': siteName,
-          'plannedStartDate': _startDate != null ? Timestamp.fromDate(_startDate!) : null,
-          'plannedEndDate': _endDate != null ? Timestamp.fromDate(_endDate!) : null,
-          'projectType': projectType,
-          'status': status,
-          'ownerName': '',
-          'projectName': siteName,
-          'amountPaid': 0.0,
-          'projectBudget': 0.0,
-          'amountSpent': 0.0,
-          'amountBalance': 0.0,
-        });
+        await FirebaseFirestore.instance
+            .collection('projects')
+            .doc(nextPrId)
+            .set({
+              'createdAt': FieldValue.serverTimestamp(),
+              'siteId': siteDocId,
+              'siteName': siteName,
+              'plannedStartDate': _startDate != null
+                  ? Timestamp.fromDate(_startDate!)
+                  : null,
+              'plannedEndDate': _endDate != null
+                  ? Timestamp.fromDate(_endDate!)
+                  : null,
+              'projectType': projectType,
+              'status': status,
+              'ownerName': '',
+              'projectName': siteName,
+              'amountPaid': 0.0,
+              'projectBudget': 0.0,
+              'amountSpent': 0.0,
+              'amountBalance': 0.0,
+            });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Site and Project created successfully!')),
+          const SnackBar(
+            content: Text('Site and Project created successfully!'),
+          ),
         );
 
         if (mounted) {
@@ -828,14 +848,14 @@ class _SiteScreenState extends State<SiteScreen>
             .collection('Site')
             .doc(selectedSiteId)
             .update({
-          'siteName': siteName,
-          'location': location,
-          'projectType': projectType,
-          'startDate': startDate,
-          'endDate': endDate,
-          'status': status,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+              'siteName': siteName,
+              'location': location,
+              'projectType': projectType,
+              'startDate': startDate,
+              'endDate': endDate,
+              'status': status,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Site updated successfully!')),
@@ -843,9 +863,9 @@ class _SiteScreenState extends State<SiteScreen>
         _resetForm();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

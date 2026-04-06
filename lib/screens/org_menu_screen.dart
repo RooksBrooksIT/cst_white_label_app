@@ -1,10 +1,11 @@
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 import 'contact_support_screen.dart';
@@ -36,12 +37,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      final auth = AuthService();
-      if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
-        final String? name = auth.userData['org_name'];
-        if (name != null && mounted) setState(() => _orgName = name);
-      }
-
       // Fetch referal codes using centralized FirestoreService path resolution
       final referalDoc = await FirestoreService.referralDoc.get();
 
@@ -429,7 +424,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
 
     if (result == true) {
-      await AuthService().logout();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('org_isLoggedIn');
+      await prefs.remove('org_username');
+      // We keep branding keys so the login screen stays branded for the org
 
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
