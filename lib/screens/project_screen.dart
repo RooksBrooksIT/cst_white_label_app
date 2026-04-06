@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 
 class ProjectScreen extends StatefulWidget {
   final String? projectId;
@@ -62,11 +63,11 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
   Future<void> _fetchUnassignedSiteIds() async {
     final siteSnapshot =
-        await FirebaseFirestore.instance.collection('Site').get();
+        await FirestoreService.getCollection('Site').get();
     final allSiteIds = siteSnapshot.docs.map((doc) => doc.id).toSet();
 
     final assignedSnapshot =
-        await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
+        await FirestoreService.getCollection('siteSupervisorMap').get();
     final assignedSiteIds = assignedSnapshot.docs
         .map((doc) => (doc.data() as Map<String, dynamic>)['site'])
         .where((id) => id != null && id.toString().isNotEmpty)
@@ -76,7 +77,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final unassigned = allSiteIds.difference(assignedSiteIds).toList();
 
     final projectsSnapshot =
-        await FirebaseFirestore.instance.collection('projects').get();
+        await FirestoreService.getCollection('projects').get();
     final Map<String, Map<String, dynamic>> projectsBySiteId = {};
     for (var doc in projectsSnapshot.docs) {
       final data = doc.data();
@@ -105,12 +106,11 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
   Future<void> _syncExpensesForAllProjects() async {
     final projectsSnapshot =
-        await FirebaseFirestore.instance.collection('projects').get();
+        await FirestoreService.getCollection('projects').get();
     for (var doc in projectsSnapshot.docs) {
       final siteId = doc.data()['siteId'];
       if (siteId != null) {
-        final expenseSnapshot = await FirebaseFirestore.instance
-            .collection('totalSiteExpensesPerDay')
+        final expenseSnapshot = await FirestoreService.getCollection('totalSiteExpensesPerDay')
             .doc(siteId)
             .get();
         if (expenseSnapshot.exists) {
@@ -129,8 +129,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
               totalContractorExpense;
           final amountPaid = (doc.data()['amountPaid'] ?? 0).toDouble();
           final balanceAmount = amountPaid - amountSpent;
-          await FirebaseFirestore.instance
-              .collection('projects')
+          await FirestoreService.getCollection('projects')
               .doc(doc.id)
               .update({
             'amountSpent': amountSpent,
@@ -202,8 +201,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   }
 
   Future<String> _generateNextProjectId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('projects')
+    final snapshot = await FirestoreService.getCollection('projects')
         .orderBy(FieldPath.documentId)
         .get();
     int maxNumber = 0;
@@ -229,8 +227,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (sid.isEmpty || stage.isEmpty) return;
 
     try {
-      final qs = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final qs = await FirestoreService.getCollection('siteSupervisorMap')
           .where('site', isEqualTo: sid)
           .get();
 
@@ -256,8 +253,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
     try {
       if (!isUpdateMode) {
-        final query = await FirebaseFirestore.instance
-            .collection('projects')
+        final query = await FirestoreService.getCollection('projects')
             .where('siteId', isEqualTo: _selectedSiteId)
             .limit(1)
             .get();
@@ -265,14 +261,12 @@ class _ProjectScreenState extends State<ProjectScreen> {
         final data = _getProjectDataMap(isNew: query.docs.isEmpty);
 
         if (query.docs.isNotEmpty) {
-          await FirebaseFirestore.instance
-              .collection('projects')
+          await FirestoreService.getCollection('projects')
               .doc(query.docs.first.id)
               .update(data);
         } else {
           final projectId = await _generateNextProjectId();
-          await FirebaseFirestore.instance
-              .collection('projects')
+          await FirestoreService.getCollection('projects')
               .doc(projectId)
               .set(data);
         }
@@ -336,8 +330,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 double.tryParse(_contractorBudgetController.text) ?? 0;
           }
 
-          await FirebaseFirestore.instance
-              .collection('projects')
+          await FirestoreService.getCollection('projects')
               .doc(selectedProjectId)
               .update(updateData);
 
@@ -456,8 +449,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Future<void> _ensureTotalSiteExpensesDoc(String? siteId) async {
     if (siteId == null || siteId.isEmpty) return;
     try {
-      final docRef = FirebaseFirestore.instance
-          .collection('totalSiteExpensesPerDay')
+      final docRef = FirestoreService.getCollection('totalSiteExpensesPerDay')
           .doc(siteId);
       final snap = await docRef.get();
       if (!snap.exists) {
@@ -481,8 +473,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
       return;
     }
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projects')
+      final snapshot = await FirestoreService.getCollection('projects')
           .where('siteId', isEqualTo: siteId)
           .limit(1)
           .get();
@@ -782,8 +773,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   StreamBuilder<QuerySnapshot>(
-                                    stream: FirebaseFirestore.instance
-                                        .collection('projects')
+                                    stream: FirestoreService.getCollection('projects')
                                         .snapshots(),
                                     builder: (context, snapshot) {
                                       if (!snapshot.hasData)
@@ -999,8 +989,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                                       color: primaryColor)),
                               const SizedBox(height: 16),
                               StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectCategories')
+                                stream: FirestoreService.getCollection('projectCategories')
                                     .orderBy('projectCategoryId')
                                     .snapshots(),
                                 builder: (context, snapshot) {
@@ -1033,8 +1022,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               ),
                               const SizedBox(height: 16),
                               StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectSubCategories')
+                                stream: FirestoreService.getCollection('projectSubCategories')
                                     .snapshots(),
                                 builder: (context, snapshot) {
                                   List<String> fetchedSubCategories = [];
@@ -1068,8 +1056,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               ),
                               const SizedBox(height: 16),
                               StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectContracts')
+                                stream: FirestoreService.getCollection('projectContracts')
                                     .snapshots(),
                                 builder: (context, snapshot) {
                                   List<String> fetchedContracts = [];
@@ -1102,8 +1089,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               ),
                               const SizedBox(height: 16),
                               StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectStages')
+                                stream: FirestoreService.getCollection('projectStages')
                                     .orderBy('projectStageId')
                                     .snapshots(),
                                 builder: (context, snapshot) {
@@ -1136,8 +1122,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               ),
                               const SizedBox(height: 20),
                               StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('projectStatus')
+                                stream: FirestoreService.getCollection('projectStatus')
                                     .snapshots(),
                                 builder: (context, snapshot) {
                                   List<String> fetchedStates = [];
@@ -1171,8 +1156,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                               if (_isContractWork) const SizedBox(height: 16),
                               if (_isContractWork)
                                 StreamBuilder<QuerySnapshot>(
-                                  stream: FirebaseFirestore.instance
-                                      .collection('contractors')
+                                  stream: FirestoreService.getCollection('contractors')
                                       .snapshots(),
                                   builder: (context, snapshot) {
                                     final docs = snapshot.hasData
@@ -1512,8 +1496,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
       _balanceAmountController.text = '';
       return;
     }
-    final expenseSnapshot = await FirebaseFirestore.instance
-        .collection('totalSiteExpensesPerDay')
+    final expenseSnapshot = await FirestoreService.getCollection('totalSiteExpensesPerDay')
         .doc(siteId)
         .get();
     if (expenseSnapshot.exists) {

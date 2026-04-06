@@ -759,7 +759,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 if (context.mounted) {
                   Navigator.pushNamedAndRemoveUntil(
                     context,
-                    '/landing',
+                    '/authSelection',
                     (route) => false,
                   );
                 }

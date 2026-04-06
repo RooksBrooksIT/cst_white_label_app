@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 import 'contact_support_screen.dart';
@@ -422,6 +423,9 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
 
     if (result == true) {
+      // Clear global auth state
+      await AuthService().logout();
+      
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('org_isLoggedIn');
       await prefs.remove('org_username');
@@ -430,7 +434,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/landing',
+          '/authSelection',
           (route) => false,
         );
       }
