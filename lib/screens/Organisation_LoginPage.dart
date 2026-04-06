@@ -69,7 +69,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
     );
   }
@@ -152,6 +154,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       onBack: () => Navigator.pop(context),
       body: Center(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -187,13 +190,17 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
               Text(
                 _tempOrgName ?? 'Organization Login',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 28,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
                 'Enter your credentials to continue',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 48),
 
@@ -234,7 +241,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 children: [
                   Text(
                     "Don't have an account? ",
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
@@ -251,6 +260,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                       style: TextStyle(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
                   ),

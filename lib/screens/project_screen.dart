@@ -1,15 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/firestore_service.dart';
-import '../widgets/glass_button.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 
 class ProjectScreen extends StatefulWidget {
-  const ProjectScreen({super.key});
+  final String? projectId;
+  const ProjectScreen({super.key, this.projectId});
 
   @override
   State<ProjectScreen> createState() => _ProjectScreenState();
@@ -17,34 +13,27 @@ class ProjectScreen extends StatefulWidget {
 
 class _ProjectScreenState extends State<ProjectScreen> {
   final _mainFormKey = GlobalKey<FormState>();
-  bool isUpdateMode = false;
 
-  // Form Controllers
-  final _projectNameController = TextEditingController();
-  final _ownerNameController = TextEditingController();
-  final _ownerPhoneNumberController = TextEditingController();
-  final _projectBudgetController = TextEditingController();
-  final _amountPaidController = TextEditingController();
-  final _amountSpentController = TextEditingController();
-  final _balanceAmountController = TextEditingController();
-  final _updateSiteIdController = TextEditingController();
-  final _contractorNameController = TextEditingController();
-  final _contractorBudgetController = TextEditingController();
+  final TextEditingController _projectNameController = TextEditingController();
+  final TextEditingController _ownerNameController = TextEditingController();
+  final TextEditingController _amountPaidController = TextEditingController();
+  final TextEditingController _amountSpentController = TextEditingController();
+  final TextEditingController _balanceAmountController =
+      TextEditingController();
+  final TextEditingController _projectBudgetController =
+      TextEditingController();
+  final TextEditingController _updateSiteIdController = TextEditingController();
+  final TextEditingController _contractorNameController =
+      TextEditingController();
+  final TextEditingController _contractorBudgetController =
+      TextEditingController();
 
-  // Selection state
-  String? selectedProjectId;
-  Map<String, dynamic>? selectedProjectData;
-  String? _updateAppBarSiteId;
-
-  // Dropdown values
+  bool _isContractWork = false;
   String? projectCategory;
   String? projectSubCategory;
   String? projectContract;
   String? projectStage;
   String? currentStatus;
-  bool _isContractWork = false;
-
-  // Dates
   DateTime? plannedStartDate;
   DateTime? plannedEndDate;
   DateTime? actualStartDate;
@@ -52,299 +41,557 @@ class _ProjectScreenState extends State<ProjectScreen> {
   DateTime? contractStartDate;
   DateTime? contractEndDate;
 
-  // Theme support
-  late Color primaryColor;
-  late Color textColor;
-  late Color labelColor;
-  late Color borderColor;
-  late Color successColor;
+  List<String> _unassignedSiteIds = [];
+  String? _selectedSiteId;
+  bool isUpdateMode = false;
+  Map<String, dynamic>? selectedProjectData;
+  String? selectedProjectId;
+
+  final Color purple = const Color(0xFF9C27B0);
+  final Color bgColor = const Color(
+    0xFFF1F5F9,
+  ); // More visible gray (Slate 100)
+  final Color borderColor = const Color.fromARGB(255, 169, 172, 175);
+  final Color textColor = const Color(0xFF64748B);
 
   @override
   void initState() {
     super.initState();
-    _resetForm();
+    _setupAmountListeners();
+    _fetchUnassignedSiteIds();
+    _syncExpensesForAllProjects();
+
+    if (widget.projectId != null) {
+      isUpdateMode = true;
+      selectedProjectId = widget.projectId;
+      _loadProjectData(widget.projectId!);
+    }
   }
 
-  @override
-  void dispose() {
-    _projectNameController.dispose();
-    _ownerNameController.dispose();
-    _ownerPhoneNumberController.dispose();
-    _projectBudgetController.dispose();
-    _amountPaidController.dispose();
-    _amountSpentController.dispose();
-    _balanceAmountController.dispose();
-    _updateSiteIdController.dispose();
-    _contractorNameController.dispose();
-    _contractorBudgetController.dispose();
-    super.dispose();
+  void _setupAmountListeners() {
+    _amountPaidController.addListener(_updateBalanceAmount);
+    _amountSpentController.addListener(_updateBalanceAmount);
+  }
+
+  void _updateBalanceAmount() {
+    final paid = double.tryParse(_amountPaidController.text) ?? 0;
+    final spent = double.tryParse(_amountSpentController.text) ?? 0;
+    _balanceAmountController.text = (paid - spent).toStringAsFixed(2);
+  }
+
+  Future<void> _fetchUnassignedSiteIds() async {
+    try {
+      final siteSnapshot = await FirestoreService.sites.get();
+      final allSiteIds = siteSnapshot.docs.map((doc) => doc.id).toSet();
+
+      final assignedSnapshot = await FirestoreService.siteSupervisorMap.get();
+      final assignedSiteIds = assignedSnapshot.docs
+          .map((doc) => doc.data()['site']?.toString())
+          .whereType<String>()
+          .toSet();
+
+      final unassigned = allSiteIds.difference(assignedSiteIds).toList();
+
+      setState(() {
+        _unassignedSiteIds = unassigned;
+        if (_unassignedSiteIds.isNotEmpty &&
+            _selectedSiteId == null &&
+            !isUpdateMode) {
+          _selectedSiteId = _unassignedSiteIds.first;
+          _loadPlannedDatesForSite(_selectedSiteId);
+        }
+      });
+    } catch (e) {
+      debugPrint('Error fetching sites: $e');
+    }
+  }
+
+  Future<void> _syncExpensesForAllProjects() async {
+    try {
+      final projectsSnapshot = await FirestoreService.projects.get();
+      for (var doc in projectsSnapshot.docs) {
+        final siteId = doc.data()['siteId'];
+        if (siteId != null) {
+          final expenseSnapshot = await FirestoreService.totalSiteExpensesPerDay
+              .doc(siteId)
+              .get();
+          if (expenseSnapshot.exists) {
+            final data = expenseSnapshot.data()!;
+            final total =
+                (data['totalMgrExpense'] ?? 0).toDouble() +
+                (data['totalOrgExpense'] ?? 0).toDouble() +
+                (data['totalSiteExpense'] ?? 0).toDouble() +
+                (data['totalIncentiveExpenses'] ?? 0).toDouble() +
+                (data['totalContractorExpense'] ?? 0).toDouble();
+
+            final paid = (doc.data()['amountPaid'] ?? 0).toDouble();
+            await FirestoreService.projects.doc(doc.id).update({
+              'amountSpent': total,
+              'amountBalance': paid - total,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing expenses: $e');
+    }
+  }
+
+  Future<void> _loadPlannedDatesForSite(String? siteId) async {
+    if (siteId == null || siteId.isEmpty) return;
+    try {
+      final snapshot = await FirestoreService.projects
+          .where('siteId', isEqualTo: siteId)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        setState(() {
+          plannedStartDate = data['plannedStartDate'] != null
+              ? (data['plannedStartDate'] as Timestamp).toDate()
+              : null;
+          plannedEndDate = data['plannedEndDate'] != null
+              ? (data['plannedEndDate'] as Timestamp).toDate()
+              : null;
+        });
+      }
+    } catch (e) {}
+  }
+
+  Future<void> _loadProjectData(String projectId) async {
+    try {
+      final doc = await FirestoreService.projects.doc(projectId).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        setState(() {
+          _projectNameController.text = data['projectName'] ?? '';
+          _ownerNameController.text = data['ownerName'] ?? '';
+          _amountPaidController.text = (data['amountPaid'] ?? '').toString();
+          _projectBudgetController.text = (data['projectBudget'] ?? '')
+              .toString();
+          projectCategory = data['projectCategory'];
+          projectSubCategory = data['projectSubCategory'];
+          projectContract = data['projectContract'];
+          projectStage = data['projectStage'];
+          _isContractWork = data['isContractWork'] == true;
+          _contractorNameController.text =
+              data['contractorName']?.toString() ?? '';
+          _contractorBudgetController.text =
+              data['contractorBudget']?.toString() ?? '';
+          currentStatus = data['currentStatus'] ?? data['status'];
+          plannedStartDate = data['plannedStartDate'] != null
+              ? (data['plannedStartDate'] as Timestamp).toDate()
+              : null;
+          plannedEndDate = data['plannedEndDate'] != null
+              ? (data['plannedEndDate'] as Timestamp).toDate()
+              : null;
+          _selectedSiteId = data['siteId'];
+        });
+        _fetchAndSetAmountSpentAndBalance(data['siteId']);
+      }
+    } catch (e) {
+      debugPrint('Error loading project: $e');
+    }
   }
 
   void _resetForm() {
     _projectNameController.clear();
     _ownerNameController.clear();
-    _ownerPhoneNumberController.clear();
-    _projectBudgetController.clear();
     _amountPaidController.clear();
     _amountSpentController.clear();
     _balanceAmountController.clear();
-    _updateSiteIdController.clear();
+    _projectBudgetController.clear();
     _contractorNameController.clear();
     _contractorBudgetController.clear();
     setState(() {
+      projectCategory = projectSubCategory = projectContract = projectStage =
+          currentStatus = null;
+      plannedStartDate = plannedEndDate = actualStartDate = actualEndDate =
+          contractStartDate = contractEndDate = null;
+      _isContractWork = false;
       selectedProjectId = null;
       selectedProjectData = null;
-      _updateAppBarSiteId = null;
-      projectCategory = null;
-      projectSubCategory = null;
-      projectContract = null;
-      projectStage = null;
-      currentStatus = null;
-      _isContractWork = false;
-      plannedStartDate = null;
-      plannedEndDate = null;
-      actualStartDate = null;
-      actualEndDate = null;
-      contractStartDate = null;
-      contractEndDate = null;
+      if (!isUpdateMode) {
+        _selectedSiteId = _unassignedSiteIds.isNotEmpty
+            ? _unassignedSiteIds.first
+            : null;
+      }
     });
   }
 
-  String formatDate(DateTime? date) {
-    if (date == null) return 'Select Date';
-    return DateFormat('dd MMM yyyy').format(date);
-  }
-
-  Future<void> _selectDate(
-    BuildContext context,
-    DateTime? initialDate,
-    Function(DateTime) onDateSelected,
-  ) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: textColor,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      onDateSelected(picked);
+  Future<String> _generateNextProjectId() async {
+    final snapshot = await FirestoreService.projects
+        .orderBy(FieldPath.documentId)
+        .get();
+    int maxNumber = 0;
+    for (var doc in snapshot.docs) {
+      if (doc.id.startsWith('PR')) {
+        final number = int.tryParse(doc.id.substring(2));
+        if (number != null && number > maxNumber) maxNumber = number;
+      }
     }
+    return 'PR${(maxNumber + 1).toString().padLeft(3, '0')}';
   }
 
   Future<void> _saveForm() async {
-    if (!_mainFormKey.currentState!.validate()) return;
+    if (_mainFormKey.currentState?.validate() != true) return;
 
     try {
       final data = {
         'projectName': _projectNameController.text,
         'ownerName': _ownerNameController.text,
-        'ownerPhoneNumber': _ownerPhoneNumberController.text,
-        'projectBudget': double.tryParse(_projectBudgetController.text),
-        'amountPaid': double.tryParse(_amountPaidController.text),
-        'projectCategory': projectCategory,
-        'projectSubCategory': projectSubCategory,
-        'projectContract': projectContract,
-        'projectStage': projectStage,
-        'currentStatus': currentStatus,
+        'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
+        'projectBudget': double.tryParse(_projectBudgetController.text) ?? 0,
+        'projectCategory': projectCategory ?? '',
+        'projectSubCategory': projectSubCategory ?? '',
+        'projectContract': projectContract ?? '',
+        'projectStage': projectStage ?? '',
+        'currentStatus': currentStatus ?? 'Planning',
         'isContractWork': _isContractWork,
         'contractorName': _isContractWork
             ? _contractorNameController.text
             : null,
         'contractorBudget': _isContractWork
-            ? double.tryParse(_contractorBudgetController.text)
+            ? double.tryParse(_contractorBudgetController.text) ?? 0
             : null,
-        'plannedStartDate': plannedStartDate,
-        'plannedEndDate': plannedEndDate,
-        'actualStateDate': actualStartDate,
-        'actualEndDate': actualEndDate,
-        'contractStartDate': contractStartDate,
-        'contractEndDate': contractEndDate,
+        'plannedStartDate': plannedStartDate != null
+            ? Timestamp.fromDate(plannedStartDate!)
+            : null,
+        'plannedEndDate': plannedEndDate != null
+            ? Timestamp.fromDate(plannedEndDate!)
+            : null,
+        'actualStateDate': actualStartDate != null
+            ? Timestamp.fromDate(actualStartDate!)
+            : null,
+        'actualEndDate': actualEndDate != null
+            ? Timestamp.fromDate(actualEndDate!)
+            : null,
+        'contractStartDate': contractStartDate != null
+            ? Timestamp.fromDate(contractStartDate!)
+            : null,
+        'contractEndDate': contractEndDate != null
+            ? Timestamp.fromDate(contractEndDate!)
+            : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (isUpdateMode && selectedProjectId != null) {
-        await FirestoreService.getCollection(
-          'projects',
-        ).doc(selectedProjectId).update(data);
-      } else {
+      if (!isUpdateMode) {
+        data['siteId'] = _selectedSiteId ?? '';
         data['createdAt'] = FieldValue.serverTimestamp();
-        data['siteId'] = 'SITE_${DateTime.now().millisecondsSinceEpoch}';
-        await FirestoreService.getCollection('projects').add(data);
+        final id = await _generateNextProjectId();
+        await FirestoreService.projects.doc(id).set(data);
+      } else if (selectedProjectId != null) {
+        await FirestoreService.projects.doc(selectedProjectId).update(data);
       }
 
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => _buildSuccessModal(context),
-        );
-        _resetForm();
-      }
+      await showDialog(
+        context: context,
+        builder: (_) => _buildSuccessModal(context),
+      );
+      _resetForm();
+      _fetchUnassignedSiteIds();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    primaryColor = theme.primaryColor;
-    textColor = colorScheme.onSurface;
-    labelColor = colorScheme.onSurfaceVariant;
-    borderColor = colorScheme.outlineVariant;
-    successColor = const Color(0xFF10B981);
-
-    return GlassScaffold(
-      title: isUpdateMode ? 'Update Project' : 'Add New Project',
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC), // Fixed Slate 50
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(100),
+        child: Container(
+          decoration: BoxDecoration(
+            color: purple,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(30),
+            ),
+          ),
+          child: SafeArea(
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Expanded(
+                  child: Text(
+                    "Project Config",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Form(
           key: _mainFormKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Toggle Section
-              GlassCard(
-                child: Column(
+              _buildWhiteCard(
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GlassButton(
-                            label: 'NEW PROJECT',
-                            onPressed: () {
-                              if (isUpdateMode) {
-                                setState(() {
-                                  isUpdateMode = false;
-                                  _resetForm();
-                                });
-                              }
-                            },
-                            isSecondary: isUpdateMode,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: GlassButton(
-                            label: 'UPDATE PROJECT',
-                            onPressed: () {
-                              if (!isUpdateMode) {
-                                setState(() {
-                                  isUpdateMode = true;
-                                  _resetForm();
-                                });
-                              }
-                            },
-                            isSecondary: !isUpdateMode,
-                          ),
-                        ),
-                      ],
+                    Expanded(
+                      child: _buildToggleButton(
+                        label: 'New Project',
+                        isActive: !isUpdateMode,
+                        onTap: () => setState(() {
+                          isUpdateMode = false;
+                          _resetForm();
+                        }),
+                      ),
                     ),
-                    if (isUpdateMode) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildToggleButton(
+                        label: 'Update Project',
+                        isActive: isUpdateMode,
+                        onTap: () => setState(() {
+                          isUpdateMode = true;
+                          _resetForm();
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              if (isUpdateMode)
+                _buildWhiteCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Project',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: purple,
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       StreamBuilder<QuerySnapshot>(
-                        stream: FirestoreService.getCollection(
-                          'projects',
-                        ).snapshots(),
+                        stream: FirestoreService.projects.snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData)
-                            return const CircularProgressIndicator();
-                          final projects = snapshot.data!.docs;
-                          return DropdownButtonFormField<String>(
-                            value: selectedProjectId,
-                            decoration: InputDecoration(
-                              labelText: 'Select Project to Update',
-                              prefixIcon: const Icon(
-                                Icons.location_city_rounded,
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+
+                          final docs = snapshot.data!.docs;
+                          final items = docs.map((d) {
+                            final data = d.data() as Map<String, dynamic>;
+                            return "${data['projectName'] ?? ''} (${data['ownerName'] ?? ''})";
+                          }).toList();
+
+                          if (items.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'No projects found to update',
+                                style: TextStyle(color: Colors.red),
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: theme.cardColor,
-                            ),
-                            items: projects.map((doc) {
-                              final data = doc.data() as Map<String, dynamic>;
-                              return DropdownMenuItem(
-                                value: doc.id,
-                                child: Text(
-                                  "${data['projectName']} (${data['ownerName']})",
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) async {
-                              final doc = projects.firstWhere(
-                                (d) => d.id == value,
+                            );
+                          }
+
+                          String? dropdownValue;
+                          if (selectedProjectId != null) {
+                            try {
+                              final doc = docs.firstWhere(
+                                (d) => d.id == selectedProjectId,
                               );
                               final data = doc.data() as Map<String, dynamic>;
-                              setState(() {
-                                selectedProjectId = doc.id;
-                                selectedProjectData = data;
-                                _projectNameController.text =
-                                    data['projectName'] ?? '';
-                                _ownerNameController.text =
-                                    data['ownerName'] ?? '';
-                                _ownerPhoneNumberController.text =
-                                    data['ownerPhoneNumber'] ?? '';
-                                _projectBudgetController.text =
-                                    (data['projectBudget'] ?? '').toString();
-                                _amountPaidController.text =
-                                    (data['amountPaid'] ?? '').toString();
-                                projectCategory = data['projectCategory'];
-                                projectSubCategory = data['projectSubCategory'];
-                                projectContract = data['projectContract'];
-                                projectStage = data['projectStage'];
-                                _isContractWork =
-                                    data['isContractWork'] == true;
-                                _contractorNameController.text =
-                                    data['contractorName'] ?? '';
-                                _contractorBudgetController.text =
-                                    (data['contractorBudget'] ?? '').toString();
-                                currentStatus = data['currentStatus'];
-                                plannedStartDate =
-                                    (data['plannedStartDate'] as Timestamp?)
-                                        ?.toDate();
-                                plannedEndDate =
-                                    (data['plannedEndDate'] as Timestamp?)
-                                        ?.toDate();
-                                actualStartDate =
-                                    (data['actualStateDate'] as Timestamp?)
-                                        ?.toDate();
-                                actualEndDate =
-                                    (data['actualEndDate'] as Timestamp?)
-                                        ?.toDate();
-                                contractStartDate =
-                                    (data['contractStartDate'] as Timestamp?)
-                                        ?.toDate();
-                                contractEndDate =
-                                    (data['contractEndDate'] as Timestamp?)
-                                        ?.toDate();
-                                _updateSiteIdController.text =
-                                    data['siteId'] ?? '';
+                              dropdownValue =
+                                  "${data['projectName'] ?? ''} (${data['ownerName'] ?? ''})";
+                            } catch (e) {
+                              dropdownValue = null;
+                            }
+                          }
+
+                          return _buildModernDropdown(
+                            label: 'Project to Update',
+                            value: items.contains(dropdownValue)
+                                ? dropdownValue
+                                : null,
+                            items: items,
+                            icon: Icons.location_city,
+                            onChanged: (val) {
+                              final doc = docs.firstWhere((d) {
+                                final data = d.data() as Map<String, dynamic>;
+                                return "${data['projectName'] ?? ''} (${data['ownerName'] ?? ''})" ==
+                                    val;
                               });
-                              await _fetchAndSetAmountSpentAndBalance(
-                                data['siteId'],
-                              );
+                              _loadProjectData(doc.id);
+                              setState(() => selectedProjectId = doc.id);
                             },
                           );
                         },
+                      ),
+                    ],
+                  ),
+                ),
+
+              _buildWhiteCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Basic Information',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: purple,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModernTextField(
+                      controller: _projectNameController,
+                      label: 'Project Name',
+                      icon: Icons.title,
+                      validator: (v) => v?.isEmpty == true ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModernTextField(
+                      controller: _ownerNameController,
+                      label: 'Owner Name',
+                      icon: Icons.person_outline,
+                      validator: (v) => v?.isEmpty == true ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModernDropdown(
+                      label: 'Site Id',
+                      value: _selectedSiteId,
+                      items:
+                          (_selectedSiteId != null &&
+                              !_unassignedSiteIds.contains(_selectedSiteId))
+                          ? [_selectedSiteId!, ..._unassignedSiteIds]
+                          : _unassignedSiteIds,
+                      icon: Icons.location_on_outlined,
+                      enabled: !isUpdateMode,
+                      onChanged: (v) {
+                        setState(() => _selectedSiteId = v);
+                        _loadPlannedDatesForSite(v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              _buildWhiteCard(
+                child: Column(
+                  children: [
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirestoreService.projectCategories
+                          .orderBy('projectCategoryId')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map((d) => d['projectCategory'].toString())
+                                  .toList()
+                            : <String>[];
+                        return _buildModernDropdown(
+                          label: 'Project Category',
+                          value: items.contains(projectCategory)
+                              ? projectCategory
+                              : null,
+                          items: items,
+                          icon: Icons.category,
+                          onChanged: (v) => setState(() => projectCategory = v),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirestoreService.projectStages
+                          .orderBy('projectStageId')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map((d) => d['projectStage'].toString())
+                                  .toList()
+                            : <String>[];
+                        return _buildModernDropdown(
+                          label: 'Stage',
+                          value: items.contains(projectStage)
+                              ? projectStage
+                              : null,
+                          items: items,
+                          icon: Icons.flag,
+                          onChanged: (v) => setState(() => projectStage = v),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirestoreService.projectStatus.snapshots(),
+                      builder: (context, snapshot) {
+                        final items = snapshot.hasData
+                            ? snapshot.data!.docs
+                                  .map((d) => d['projectState'].toString())
+                                  .toList()
+                            : <String>[];
+                        return _buildModernDropdown(
+                          label: 'Project Status',
+                          value: items.contains(currentStatus)
+                              ? currentStatus
+                              : null,
+                          items: items,
+                          icon: Icons.info_outline,
+                          onChanged: (v) => setState(() => currentStatus = v),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              _buildWhiteCard(
+                child: Column(
+                  children: [
+                    CheckboxListTile(
+                      value: _isContractWork,
+                      onChanged: (v) =>
+                          setState(() => _isContractWork = v ?? false),
+                      title: Text(
+                        'Contract Work',
+                        style: TextStyle(
+                          color: purple,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      activeColor: purple,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    if (_isContractWork) ...[
+                      const SizedBox(height: 16),
+                      _buildModernTextField(
+                        controller: _contractorNameController,
+                        label: 'Contractor Name',
+                        icon: Icons.engineering,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildModernTextField(
+                        controller: _contractorBudgetController,
+                        label: 'Contract Budget',
+                        icon: Icons.currency_rupee,
+                        keyboardType: TextInputType.number,
                       ),
                     ],
                   ],
@@ -352,226 +599,107 @@ class _ProjectScreenState extends State<ProjectScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Basic Info Card
-              GlassCard(
+              _buildWhiteCard(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'General Information',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    _buildModernDatePicker(
+                      label: 'Planned Start',
+                      date: plannedStartDate,
+                      onTap: !isUpdateMode
+                          ? () => _selectDate(
+                              (d) => setState(() => plannedStartDate = d),
+                              plannedStartDate,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModernDatePicker(
+                      label: 'Planned End',
+                      date: plannedEndDate,
+                      onTap: () => _selectDate(
+                        (d) => setState(() => plannedEndDate = d),
+                        plannedEndDate,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildTextFormField(
-                      context,
-                      controller: _projectNameController,
-                      label: 'Project Name',
-                      icon: Icons.business_rounded,
-                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                    _buildModernDatePicker(
+                      label: 'Actual Start',
+                      date: actualStartDate,
+                      onTap: () => _selectDate(
+                        (d) => setState(() => actualStartDate = d),
+                        actualStartDate,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextFormField(
-                      context,
-                      controller: _ownerNameController,
-                      label: 'Owner Name',
-                      icon: Icons.person_outline_rounded,
-                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextFormField(
-                      context,
-                      controller: _ownerPhoneNumberController,
-                      label: 'Owner Phone Number',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                    const SizedBox(height: 16),
+                    _buildModernDatePicker(
+                      label: 'Actual End',
+                      date: actualEndDate,
+                      onTap: () => _selectDate(
+                        (d) => setState(() => actualEndDate = d),
+                        actualEndDate,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Project Categorization
-              GlassCard(
+              _buildWhiteCard(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Categorization',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection(
-                        'projectCategories',
-                      ).snapshots(),
-                      builder: (context, snapshot) {
-                        final items = snapshot.hasData
-                            ? snapshot.data!.docs
-                                  .map((d) => d['projectCategory'].toString())
-                                  .toList()
-                            : <String>[];
-                        return _buildDropdownField(
-                          context,
-                          value: projectCategory,
-                          label: 'Category',
-                          items: items,
-                          icon: Icons.category_outlined,
-                          onChanged: (v) => setState(() => projectCategory = v),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection(
-                        'projectSubCategories',
-                      ).snapshots(),
-                      builder: (context, snapshot) {
-                        final items = snapshot.hasData
-                            ? snapshot.data!.docs
-                                  .map(
-                                    (d) => d['projectSubCategory'].toString(),
-                                  )
-                                  .toList()
-                            : <String>[];
-                        return _buildDropdownField(
-                          context,
-                          value: projectSubCategory,
-                          label: 'Sub Category',
-                          items: items,
-                          icon: Icons.subdirectory_arrow_right_rounded,
-                          onChanged: (v) =>
-                              setState(() => projectSubCategory = v),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirestoreService.getCollection(
-                        'projectStages',
-                      ).snapshots(),
-                      builder: (context, snapshot) {
-                        final items = snapshot.hasData
-                            ? snapshot.data!.docs
-                                  .map((d) => d['projectStage'].toString())
-                                  .toList()
-                            : <String>[];
-                        return _buildDropdownField(
-                          context,
-                          value: projectStage,
-                          label: 'Current Stage',
-                          items: items,
-                          icon: Icons.flag_outlined,
-                          onChanged: (v) => setState(() => projectStage = v),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Timeline
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Timeline',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDatePicker(
-                      context,
-                      'Planned Start Date',
-                      plannedStartDate,
-                      (d) => setState(() => plannedStartDate = d),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDatePicker(
-                      context,
-                      'Planned End Date',
-                      plannedEndDate,
-                      (d) => setState(() => plannedEndDate = d),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDatePicker(
-                      context,
-                      'Actual Start Date',
-                      actualStartDate,
-                      (d) => setState(() => actualStartDate = d),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDatePicker(
-                      context,
-                      'Actual End Date',
-                      actualEndDate,
-                      (d) => setState(() => actualEndDate = d),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Financials
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Financials',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextFormField(
-                      context,
+                    _buildModernTextField(
                       controller: _projectBudgetController,
                       label: 'Project Budget',
-                      icon: Icons.currency_rupee_rounded,
+                      icon: Icons.account_balance_wallet,
                       keyboardType: TextInputType.number,
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextFormField(
-                      context,
+                    const SizedBox(height: 16),
+                    _buildModernTextField(
                       controller: _amountPaidController,
                       label: 'Amount Received',
-                      icon: Icons.account_balance_wallet_outlined,
+                      icon: Icons.payments,
                       keyboardType: TextInputType.number,
-                      onChanged: (v) => _fetchAndSetAmountSpentAndBalance(
-                        _updateSiteIdController.text,
-                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextFormField(
-                      context,
+                    const SizedBox(height: 16),
+                    _buildModernTextField(
                       controller: _amountSpentController,
                       label: 'Amount Spent',
-                      icon: Icons.payments_outlined,
+                      icon: Icons.trending_up,
                       readOnly: true,
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextFormField(
-                      context,
+                    const SizedBox(height: 16),
+                    _buildModernTextField(
                       controller: _balanceAmountController,
                       label: 'Balance Amount',
-                      icon: Icons.hourglass_empty_rounded,
+                      icon: Icons.account_balance,
                       readOnly: true,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              // Actions
-              _buildActionButtons(context),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: purple,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _saveForm,
+                  child: Text(
+                    isUpdateMode ? 'Update Project' : 'Save Project',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -579,145 +707,244 @@ class _ProjectScreenState extends State<ProjectScreen> {
     );
   }
 
-  Future<void> _fetchAndSetAmountSpentAndBalance(String? siteId) async {
-    if (siteId == null || siteId.isEmpty) return;
-    try {
-      final expenseSnapshot = await FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).doc(siteId).get();
-      if (expenseSnapshot.exists) {
-        final data = expenseSnapshot.data()!;
-        final amountSpent =
-            (data['totalMgrExpense'] ?? 0.0) +
-            (data['totalOrgExpense'] ?? 0.0) +
-            (data['totalSiteExpense'] ?? 0.0) +
-            (data['totalIncentiveExpenses'] ?? 0.0) +
-            (data['totalContractorExpense'] ?? 0.0);
-
-        _amountSpentController.text = amountSpent.toStringAsFixed(2);
-        final paid = double.tryParse(_amountPaidController.text) ?? 0.0;
-        _balanceAmountController.text = (paid - amountSpent).toStringAsFixed(2);
-      }
-    } catch (e) {
-      debugPrint('Error fetching expenses: $e');
-    }
+  Widget _buildWhiteCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: child,
+    );
   }
 
-  Widget _buildTextFormField(
-    BuildContext context, {
+  Widget _buildModernTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    TextInputType? keyboardType,
+    TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
     bool readOnly = false,
-    Function(String)? onChanged,
   }) {
-    return GlassTextField(
-      controller: controller,
-      label: label,
-      icon: icon,
-      keyboardType: keyboardType ?? TextInputType.text,
-      readOnly: readOnly,
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildDropdownField(
-    BuildContext context, {
-    required String? value,
-    required String label,
-    required List<String> items,
-    required IconData icon,
-    required Function(String?) onChanged,
-  }) {
-    final theme = Theme.of(context);
-    return DropdownButtonFormField<String>(
-      value: (value != null && items.contains(value)) ? value : null,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: theme.cardColor,
-      ),
-      items: items
-          .toSet()
-          .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildDatePicker(
-    BuildContext context,
-    String label,
-    DateTime? date,
-    Function(DateTime) onDateSelected,
-  ) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => _selectDate(context, date, onDateSelected),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          filled: true,
-          fillColor: theme.cardColor,
-        ),
-        child: Text(formatDate(date), style: theme.textTheme.bodyLarge),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: GlassButton(
-            label: isUpdateMode ? 'Update Project' : 'Save Project',
-            onPressed: _saveForm,
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: GlassButton(
-            label: 'Reset',
-            onPressed: _resetForm,
-            isSecondary: true,
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: Colors.black87, fontSize: 16),
+          readOnly: readOnly,
+          validator: validator,
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: textColor),
+            fillColor: bgColor,
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: purple, width: 2),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSuccessModal(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle, color: successColor, size: 64),
-            const SizedBox(height: 24),
-            Text(
-              'Success',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: successColor,
-              ),
+  Widget _buildModernDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required IconData icon,
+    required Function(String?) onChanged,
+    bool enabled = true,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: items.contains(value) ? value : null,
+          items: items
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(
+                    e,
+                    style: const TextStyle(color: Colors.black87, fontSize: 15),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: enabled ? onChanged : null,
+          iconEnabledColor: enabled ? textColor : Colors.grey,
+          dropdownColor: Colors.white,
+          style: const TextStyle(color: Colors.black87, fontSize: 16),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: enabled ? textColor : Colors.grey),
+            fillColor: enabled ? bgColor : Colors.grey.shade100,
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor),
             ),
-            const SizedBox(height: 16),
-            GlassButton(
-              label: 'Close',
-              onPressed: () => Navigator.pop(context),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor),
             ),
-          ],
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: purple, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModernDatePicker({
+    required String label,
+    required DateTime? date,
+    required VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  date == null
+                      ? "Select $label"
+                      : DateFormat('yyyy-MM-dd').format(date),
+                  style: TextStyle(
+                    color: date == null ? Colors.grey : Colors.black87,
+                  ),
+                ),
+                Icon(Icons.calendar_today, color: textColor, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildToggleButton({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? purple : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isActive ? purple : borderColor),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? Colors.white : textColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  Future<void> _selectDate(
+    Function(DateTime) onSelected,
+    DateTime? initialDate,
+  ) async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initialDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d != null) onSelected(d);
+  }
+
+  Future<void> _fetchAndSetAmountSpentAndBalance(String? siteId) async {
+    if (siteId == null || siteId.isEmpty) return;
+    try {
+      final doc = await FirestoreService.totalSiteExpensesPerDay
+          .doc(siteId)
+          .get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final total =
+            (data['totalMgrExpense'] ?? 0).toDouble() +
+            (data['totalOrgExpense'] ?? 0).toDouble() +
+            (data['totalSiteExpense'] ?? 0).toDouble();
+        setState(() => _amountSpentController.text = total.toString());
+      }
+    } catch (e) {}
+  }
+
+  Widget _buildSuccessModal(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Success'),
+      content: const Text('Saved successfully'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'OK',
+            style: TextStyle(color: purple, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -19,6 +19,7 @@ import '../widgets/glass_scaffold.dart';
 import '../utils/app_theme.dart';
 import 'org_sub_menu_screen.dart';
 import 'org_menu_screen.dart';
+import 'manager_config_screen.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -351,6 +352,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             color: theme.primaryColor,
             onTap: () => _navigateToConfiguration(context),
           ),
+          SubMenuItem(
+            title: "Manager Config",
+            subtitle: "Create and manage manager profiles",
+            icon: Icons.manage_accounts_rounded,
+            color: theme.primaryColor,
+            onTap: () => _navigateToManagerConfig(context),
+          ),
         ],
       ),
       _CategoryData(
@@ -625,6 +633,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ConfigAccountDashboard()),
+    );
+  }
+
+  void _navigateToManagerConfig(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
     );
   }
 

@@ -38,3 +38,4 @@ class Responsive {
     return baseSize * 1.3;
   }
 }
+
