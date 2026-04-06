@@ -48,18 +48,17 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).limit(100).get();
+      // Fetch sites from the 'Site' collection (doc.id = site identifier)
+      final siteSnapshot = await FirestoreService.getCollection('Site').get();
       if (!mounted) return;
+
       setState(() {
-        _sites = querySnapshot.docs.map((doc) {
+        _sites = siteSnapshot.docs.map((doc) {
           final data = doc.data();
           return {
             'id': doc.id,
-            'site': data['site'] ?? '',
-            'supervisor': data['supervisor'] ?? '',
-            'projectName': data['projectName'] ?? '',
+            'site': doc.id,
+            'siteName': data['siteName'] ?? doc.id,
           };
         }).toList();
         _isLoadingSites = false;
@@ -122,21 +121,43 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     if (site != null) {
-      // Find the selected site details
-      final selectedSiteData = _sites.firstWhere(
-        (siteData) => siteData['site'] == site,
-        orElse: () => {},
-      );
+      // Look up supervisor and project info from siteSupervisorMap
+      _loadSiteDetails(site);
+      // Load existing workers for this site if any
+      _loadExistingWorkersForSite(site);
+    }
+  }
 
-      if (selectedSiteData.isNotEmpty) {
+  Future<void> _loadSiteDetails(String siteId) async {
+    try {
+      // Query siteSupervisorMap for this site's supervisor and project name
+      final mapSnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('site', isEqualTo: siteId).limit(1).get();
+
+      if (!mounted) return;
+
+      if (mapSnapshot.docs.isNotEmpty) {
+        final data = mapSnapshot.docs.first.data();
         setState(() {
-          _selectedSupervisor = selectedSiteData['supervisor'];
-          _selectedProjectName = selectedSiteData['projectName'];
+          _selectedSupervisor = data['supervisor'] ?? 'Not available';
+          _selectedProjectName = data['projectName'] ?? 'Not available';
         });
-
-        // Load existing workers for this site if any
-        _loadExistingWorkersForSite(site);
+      } else {
+        // Fallback: try to get project name from Site collection
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(siteId).get();
+        if (!mounted) return;
+        if (siteDoc.exists) {
+          final data = siteDoc.data()!;
+          setState(() {
+            _selectedProjectName = data['siteName'] ?? 'Not available';
+          });
+        }
       }
+    } catch (e) {
+      debugPrint('Error loading site details: $e');
     }
   }
 

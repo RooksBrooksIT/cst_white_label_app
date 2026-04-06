@@ -129,7 +129,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   @override
   void dispose() {
     _contractorNameController.dispose();
-    _projectFieldController.dispose();
+  _projectFieldController.dispose();
     _dateController.dispose();
     materialQtyController.dispose();
     labourQtyController.dispose();
