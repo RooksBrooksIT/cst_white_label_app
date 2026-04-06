@@ -25,7 +25,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   final Color _textColor = const Color(0xFF1E293B);
   final Color _labelColor = const Color(0xFF64748B);
   final Color _borderColor = const Color(0xFFE2E8F0);
-  final Color _secondaryColor = const Color(0xFF94A3B8); // Standard secondary slate
+  final Color _secondaryColor = const Color(
+    0xFF94A3B8,
+  ); // Standard secondary slate
   final Color _sectionBgColor = const Color(0xFFF8FAFC); // Main background
   final Color _actionTextColor = Colors.white; // Text on primary background
   final Color _successColor = const Color(0xFF10B981);
@@ -129,7 +131,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   @override
   void dispose() {
     _contractorNameController.dispose();
-  _projectFieldController.dispose();
+    _projectFieldController.dispose();
     _dateController.dispose();
     materialQtyController.dispose();
     labourQtyController.dispose();
@@ -167,8 +169,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       }
       setState(() {
         siteIdOptions = ids;
-        selectedSiteIdForEntry =
-            siteIdOptions.isNotEmpty ? siteIdOptions.first : null;
+        selectedSiteIdForEntry = siteIdOptions.isNotEmpty
+            ? siteIdOptions.first
+            : null;
         isLoadingSiteIds = false;
       });
       if (siteIdOptions.isNotEmpty) {
@@ -230,8 +233,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       materialError = null;
     });
     try {
-      final snapshot =
-          await FirestoreService.getCollection('materials').get();
+      final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -254,8 +256,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial =
-            materialOptions.isNotEmpty ? materialOptions.first : null;
+        selectedMaterial = materialOptions.isNotEmpty
+            ? materialOptions.first
+            : null;
         isLoadingMaterials = false;
       });
     } catch (e) {
@@ -272,8 +275,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       labourError = null;
     });
     try {
-      final snapshot =
-          await FirestoreService.getCollection('labours').get();
+      final snapshot = await FirestoreService.getCollection('labours').get();
       final options = <String>[];
       final salaries = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -289,7 +291,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             } else if (salaryRaw is String)
               salary =
                   num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                      0;
+                  0;
             salaries[designation] = salary;
           }
         }
@@ -519,12 +521,14 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
       final totalAmount = _getTotalAmount().toInt();
       final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate!);
-      final contractorNameForId = _selectedContractorName!
-          .trim()
-          .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '-');
-      final siteIdForId = (selectedSiteIdForEntry ?? '')
-          .trim()
-          .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '-');
+      final contractorNameForId = _selectedContractorName!.trim().replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]'),
+        '-',
+      );
+      final siteIdForId = (selectedSiteIdForEntry ?? '').trim().replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]'),
+        '-',
+      );
       final docId = '${contractorNameForId}_$dateStr$siteIdForId';
 
       // Check for duplicate entry for this contractor, site, and date
@@ -540,7 +544,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Entry for this contractor, site, and date already exists.'),
+              'Entry for this contractor, site, and date already exists.',
+            ),
             backgroundColor: _errorColor,
           ),
         );
@@ -570,10 +575,12 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
       try {
         await ExpenseService.recalcTotalsAndSyncProject(
-            selectedSiteIdForEntry!);
+          selectedSiteIdForEntry!,
+        );
       } catch (e) {
         debugPrint(
-            'Failed to update totals for siteId $selectedSiteIdForEntry: $e');
+          'Failed to update totals for siteId $selectedSiteIdForEntry: $e',
+        );
       }
 
       if (!mounted) return;
@@ -658,7 +665,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   }
 
   Widget _buildCostInput(
-      String label, TextEditingController controller, IconData icon) {
+    String label,
+    TextEditingController controller,
+    IconData icon,
+  ) {
     return _buildInputField(
       label: label,
       child: TextField(
@@ -704,68 +714,195 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             ...materials.asMap().entries.map((entry) {
               int idx = entry.key;
               var m = entry.value;
-              return DataRow(cells: [
-                DataCell(Text('Material', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text(m['type']?.toString() ?? '', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text('${m['quantity'] ?? 0}', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text(
-                  _calculateMaterialAmount(m['type']?.toString() ?? '', m['quantity'] ?? 0),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor),
-                )),
-                DataCell(IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: _errorColor, size: 20),
-                  onPressed: () => _removeMaterial(idx),
-                )),
-              ]);
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      'Material',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      m['type']?.toString() ?? '',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${m['quantity'] ?? 0}',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      _calculateMaterialAmount(
+                        m['type']?.toString() ?? '',
+                        m['quantity'] ?? 0,
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _textColor,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: _errorColor,
+                        size: 20,
+                      ),
+                      onPressed: () => _removeMaterial(idx),
+                    ),
+                  ),
+                ],
+              );
             }),
             ...labours.asMap().entries.map((entry) {
               int idx = entry.key;
               var l = entry.value;
-              return DataRow(cells: [
-                DataCell(Text('Labour', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text(l['type']?.toString() ?? '', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text('${l['count'] ?? 0}', style: TextStyle(fontSize: 12, color: _textColor))),
-                DataCell(Text(
-                  _calculateLabourAmount(l['type']?.toString() ?? '', l['count'] ?? 0),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor),
-                )),
-                DataCell(IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: _errorColor, size: 20),
-                  onPressed: () => _removeLabour(idx),
-                )),
-              ]);
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      'Labour',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      l['type']?.toString() ?? '',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${l['count'] ?? 0}',
+                      style: TextStyle(fontSize: 12, color: _textColor),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      _calculateLabourAmount(
+                        l['type']?.toString() ?? '',
+                        l['count'] ?? 0,
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _textColor,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: _errorColor,
+                        size: 20,
+                      ),
+                      onPressed: () => _removeLabour(idx),
+                    ),
+                  ),
+                ],
+              );
             }),
-            DataRow(cells: [
-              DataCell(Text('Food', style: TextStyle(fontSize: 12, color: _labelColor))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('₹${foodCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
-              DataCell(const SizedBox.shrink()),
-            ]),
-            DataRow(cells: [
-              DataCell(Text('Transport', style: TextStyle(fontSize: 12, color: _labelColor))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('₹${transportCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
-              DataCell(const SizedBox.shrink()),
-            ]),
-            DataRow(cells: [
-              DataCell(Text('Fuel', style: TextStyle(fontSize: 12, color: _labelColor))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('-', style: TextStyle(fontSize: 12))),
-              DataCell(Text('₹${fuelCost.text}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textColor))),
-              DataCell(const SizedBox.shrink()),
-            ]),
+            DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    'Food',
+                    style: TextStyle(fontSize: 12, color: _labelColor),
+                  ),
+                ),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(
+                  Text(
+                    '₹${foodCost.text}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _textColor,
+                    ),
+                  ),
+                ),
+                DataCell(const SizedBox.shrink()),
+              ],
+            ),
+            DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    'Transport',
+                    style: TextStyle(fontSize: 12, color: _labelColor),
+                  ),
+                ),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(
+                  Text(
+                    '₹${transportCost.text}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _textColor,
+                    ),
+                  ),
+                ),
+                DataCell(const SizedBox.shrink()),
+              ],
+            ),
+            DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    'Fuel',
+                    style: TextStyle(fontSize: 12, color: _labelColor),
+                  ),
+                ),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                DataCell(
+                  Text(
+                    '₹${fuelCost.text}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _textColor,
+                    ),
+                  ),
+                ),
+                DataCell(const SizedBox.shrink()),
+              ],
+            ),
             DataRow(
               color: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
               cells: [
                 const DataCell(SizedBox.shrink()),
                 const DataCell(SizedBox.shrink()),
-                const DataCell(Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
-                DataCell(Text(
-                  '₹${_getTotalAmount()}',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _primaryColor),
-                )),
+                const DataCell(
+                  Text(
+                    'TOTAL',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '₹${_getTotalAmount()}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: _primaryColor,
+                    ),
+                  ),
+                ),
                 const DataCell(SizedBox.shrink()),
               ],
             ),
@@ -786,8 +923,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                      size: 20, color: Color(0xFF1E293B)),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 20,
+                    color: Color(0xFF1E293B),
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
                 Expanded(
@@ -817,7 +957,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      
+
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -825,8 +965,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('Contractor Details', Icons.engineering,
-                color: _primaryColor),
+            _buildSectionHeader(
+              'Contractor Details',
+              Icons.engineering,
+              color: _primaryColor,
+            ),
             const SizedBox(height: 18),
             _buildInputField(
               label: 'Contractor Name',
@@ -858,61 +1001,64 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 onTap: _pickDate,
                 decoration: InputDecoration(
                   border: InputBorder.none,
-                  suffixIcon:
-                      Icon(Icons.calendar_today, color: _secondaryColor),
+                  suffixIcon: Icon(
+                    Icons.calendar_today,
+                    color: _secondaryColor,
+                  ),
                 ),
               ),
             ),
             isLoadingSiteIds
                 ? Center(child: CircularProgressIndicator(color: _primaryColor))
                 : siteIdError != null
-                    ? Text(siteIdError!, style: TextStyle(color: _errorColor))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                ? Text(siteIdError!, style: TextStyle(color: _errorColor))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInputField(
+                        label: 'Site ID',
+                        child: DropdownButtonFormField<String>(
+                          value: selectedSiteIdForEntry,
+                          items: siteIdOptions
+                              .map(
+                                (id) => DropdownMenuItem<String>(
+                                  value: id,
+                                  child: Text(id),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) async {
+                            setState(() => selectedSiteIdForEntry = val);
+                            await _fetchContractDates(val);
+                          },
+                          decoration: InputDecoration(border: InputBorder.none),
+                        ),
+                      ),
+                      Row(
                         children: [
-                          _buildInputField(
-                            label: 'Site ID',
-                            child: DropdownButtonFormField<String>(
-                              value: selectedSiteIdForEntry,
-                              items: siteIdOptions
-                                  .map((id) => DropdownMenuItem<String>(
-                                        value: id,
-                                        child: Text(id),
-                                      ))
-                                  .toList(),
-                              onChanged: (val) async {
-                                setState(() => selectedSiteIdForEntry = val);
-                                await _fetchContractDates(val);
-                              },
-                              decoration:
-                                  InputDecoration(border: InputBorder.none),
+                          Expanded(
+                            child: _buildInputField(
+                              label: 'Contract Start Date',
+                              child: Text(
+                                _formatDate(contractStartDate),
+                                style: TextStyle(fontSize: 14),
+                              ),
                             ),
                           ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildInputField(
-                                  label: 'Contract Start Date',
-                                  child: Text(
-                                    _formatDate(contractStartDate),
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildInputField(
+                              label: 'Contract End Date',
+                              child: Text(
+                                _formatDate(contractEndDate),
+                                style: TextStyle(fontSize: 14),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildInputField(
-                                  label: 'Contract End Date',
-                                  child: Text(
-                                    _formatDate(contractEndDate),
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
+                    ],
+                  ),
           ],
         ),
       ),
@@ -923,7 +1069,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      
+
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -931,94 +1077,105 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('Material Details', Icons.add_box,
-                color: Colors.brown),
+            _buildSectionHeader(
+              'Material Details',
+              Icons.add_box,
+              color: Colors.brown,
+            ),
             const SizedBox(height: 16),
             isLoadingMaterials
                 ? Center(child: CircularProgressIndicator(color: _primaryColor))
                 : materialError != null
-                    ? Text(materialError!, style: TextStyle(color: _errorColor))
-                    : Column(
+                ? Text(materialError!, style: TextStyle(color: _errorColor))
+                : Column(
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: 'Search Material...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: _secondaryColor,
+                          ),
+                        ),
+                        onChanged: (query) {
+                          setState(() {
+                            final q = query.toLowerCase();
+                            final filtered = materialOptions
+                                .where((item) => item.toLowerCase().contains(q))
+                                .toList();
+                            _filteredMaterialOptions = filtered;
+                            if (filtered.isNotEmpty &&
+                                !filtered.contains(selectedMaterial)) {
+                              selectedMaterial = filtered.first;
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          TextField(
+                          DropdownButtonFormField<String>(
+                            value: selectedMaterial,
                             decoration: InputDecoration(
-                              labelText: 'Search Material...',
+                              labelText: 'Material',
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              prefixIcon:
-                                  Icon(Icons.search, color: _secondaryColor),
-                            ),
-                            onChanged: (query) {
-                              setState(() {
-                                final q = query.toLowerCase();
-                                final filtered = materialOptions
-                                    .where((item) =>
-                                        item.toLowerCase().contains(q))
-                                    .toList();
-                                _filteredMaterialOptions = filtered;
-                                if (filtered.isNotEmpty &&
-                                    !filtered.contains(selectedMaterial)) {
-                                  selectedMaterial = filtered.first;
-                                }
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              DropdownButtonFormField<String>(
-                                value: selectedMaterial,
-                                decoration: InputDecoration(
-                                  labelText: 'Material',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                items: (_filteredMaterialOptions ??
-                                        materialOptions)
-                                    .map((item) => DropdownMenuItem(
-                                          value: item,
-                                          child: Text(item),
-                                        ))
-                                    .toList(),
-                                onChanged: (value) =>
-                                    setState(() => selectedMaterial = value),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: materialQtyController,
-                                decoration: InputDecoration(
-                                  labelText: 'Qty',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            icon: Icon(Icons.add, size: 18),
-                            onPressed: _addMaterial,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
                             ),
-                            label: Text('Add Material'),
+                            items: (_filteredMaterialOptions ?? materialOptions)
+                                .map(
+                                  (item) => DropdownMenuItem(
+                                    value: item,
+                                    child: Text(item),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) =>
+                                setState(() => selectedMaterial = value),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: materialQtyController,
+                            decoration: InputDecoration(
+                              labelText: 'Qty',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.add, size: 18),
+                        onPressed: _addMaterial,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        label: Text('Add Material'),
+                      ),
+                    ],
+                  ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => setState(
-                  () => _showCustomMaterialFields = !_showCustomMaterialFields),
+                () => _showCustomMaterialFields = !_showCustomMaterialFields,
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _secondaryColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: Text('Custom Material'),
             ),
@@ -1029,7 +1186,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 decoration: InputDecoration(
                   labelText: 'Material Name',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1041,7 +1199,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       decoration: InputDecoration(
                         labelText: 'Qty',
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       keyboardType: TextInputType.number,
                     ),
@@ -1053,7 +1212,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       decoration: InputDecoration(
                         labelText: 'Unit Price (₹)',
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       keyboardType: TextInputType.number,
                     ),
@@ -1094,7 +1254,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      
+
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -1102,93 +1262,105 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('Labour Details', Icons.groups,
-                color: Colors.teal[700]),
+            _buildSectionHeader(
+              'Labour Details',
+              Icons.groups,
+              color: Colors.teal[700],
+            ),
             const SizedBox(height: 16),
             isLoadingLabours
                 ? Center(child: CircularProgressIndicator(color: _primaryColor))
                 : labourError != null
-                    ? Text(labourError!, style: TextStyle(color: _errorColor))
-                    : Column(
+                ? Text(labourError!, style: TextStyle(color: _errorColor))
+                : Column(
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: 'Search Labour...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: _secondaryColor,
+                          ),
+                        ),
+                        onChanged: (query) {
+                          setState(() {
+                            final q = query.toLowerCase();
+                            final filtered = labourOptions
+                                .where((item) => item.toLowerCase().contains(q))
+                                .toList();
+                            _filteredLabourOptions = filtered;
+                            if (filtered.isNotEmpty &&
+                                !filtered.contains(selectedLabour)) {
+                              selectedLabour = filtered.first;
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          TextField(
+                          DropdownButtonFormField<String>(
+                            value: selectedLabour,
                             decoration: InputDecoration(
-                              labelText: 'Search Labour...',
+                              labelText: 'Labour',
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              prefixIcon:
-                                  Icon(Icons.search, color: _secondaryColor),
-                            ),
-                            onChanged: (query) {
-                              setState(() {
-                                final q = query.toLowerCase();
-                                final filtered = labourOptions
-                                    .where((item) =>
-                                        item.toLowerCase().contains(q))
-                                    .toList();
-                                _filteredLabourOptions = filtered;
-                                if (filtered.isNotEmpty &&
-                                    !filtered.contains(selectedLabour)) {
-                                  selectedLabour = filtered.first;
-                                }
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              DropdownButtonFormField<String>(
-                                value: selectedLabour,
-                                decoration: InputDecoration(
-                                  labelText: 'Labour',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                items: (_filteredLabourOptions ?? labourOptions)
-                                    .map((item) => DropdownMenuItem(
-                                          value: item,
-                                          child: Text(item),
-                                        ))
-                                    .toList(),
-                                onChanged: (value) =>
-                                    setState(() => selectedLabour = value),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: labourQtyController,
-                                decoration: InputDecoration(
-                                  labelText: 'Count',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            icon: Icon(Icons.add, size: 18),
-                            onPressed: _addLabour,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
                             ),
-                            label: Text('Add Labour'),
+                            items: (_filteredLabourOptions ?? labourOptions)
+                                .map(
+                                  (item) => DropdownMenuItem(
+                                    value: item,
+                                    child: Text(item),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) =>
+                                setState(() => selectedLabour = value),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: labourQtyController,
+                            decoration: InputDecoration(
+                              labelText: 'Count',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.add, size: 18),
+                        onPressed: _addLabour,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        label: Text('Add Labour'),
+                      ),
+                    ],
+                  ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => setState(
-                  () => _showCustomLabourFields = !_showCustomLabourFields),
+                () => _showCustomLabourFields = !_showCustomLabourFields,
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _secondaryColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: Text('Custom Labour'),
             ),
@@ -1199,7 +1371,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 decoration: InputDecoration(
                   labelText: 'Labour Type',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1208,7 +1381,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 decoration: InputDecoration(
                   labelText: 'Salary',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 keyboardType: TextInputType.number,
               ),
@@ -1218,7 +1392,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                 decoration: InputDecoration(
                   labelText: 'Count',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 keyboardType: TextInputType.number,
               ),
@@ -1256,7 +1431,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     return Card(
       elevation: 3,
       shadowColor: Colors.black12,
-      
+
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       child: Padding(
@@ -1264,12 +1439,18 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('Additional Costs', Icons.attach_money,
-                color: Colors.deepOrange),
+            _buildSectionHeader(
+              'Additional Costs',
+              Icons.attach_money,
+              color: Colors.deepOrange,
+            ),
             const SizedBox(height: 16),
             _buildCostInput('Food Cost', foodCost, Icons.fastfood),
             _buildCostInput(
-                'Transport Cost', transportCost, Icons.directions_car),
+              'Transport Cost',
+              transportCost,
+              Icons.directions_car,
+            ),
             _buildCostInput('Fuel Cost', fuelCost, Icons.local_gas_station),
           ],
         ),
@@ -1280,7 +1461,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSummarySection() {
     return Container(
       width: double.infinity,
-      
+
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: EdgeInsets.zero,
       child: Column(
@@ -1291,8 +1472,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSectionHeader('Summary', Icons.summarize,
-                    color: _primaryColor),
+                _buildSectionHeader(
+                  'Summary',
+                  Icons.summarize,
+                  color: _primaryColor,
+                ),
                 Text(
                   'Total: ₹${_getTotalAmount()}',
                   style: TextStyle(
@@ -1305,10 +1489,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             ),
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: _buildSummaryTable(),
-          ),
+          SizedBox(width: double.infinity, child: _buildSummaryTable()),
         ],
       ),
     );
@@ -1321,18 +1502,18 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     final double sectionSpacing = width < 400
         ? 8
         : width < 600
-            ? 12
-            : 18;
+        ? 12
+        : 18;
     final double cardPadding = width < 400
         ? 10
         : width < 600
-            ? 14
-            : 18;
+        ? 14
+        : 18;
     final double fontSize = width < 400
         ? 12
         : width < 600
-            ? 14
-            : 16;
+        ? 14
+        : 16;
     return Scaffold(
       backgroundColor: _sectionBgColor,
       body: Column(
@@ -1341,7 +1522,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                  horizontal: hPad, vertical: sectionSpacing),
+                horizontal: hPad,
+                vertical: sectionSpacing,
+              ),
               child: Column(
                 children: [
                   Padding(
@@ -1377,10 +1560,12 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                         backgroundColor: _primaryColor,
                         // Save button text color as per your requirement
                         foregroundColor: _actionTextColor,
-                        padding:
-                            EdgeInsets.symmetric(vertical: sectionSpacing + 2),
+                        padding: EdgeInsets.symmetric(
+                          vertical: sectionSpacing + 2,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         textStyle: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: fontSize,
@@ -1391,13 +1576,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                           ? SizedBox(
                               height: fontSize + 10,
                               width: fontSize + 10,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(
-                              'Save Entry',
-                              style: TextStyle(),
-                            ),
+                          : Text('Save Entry', style: TextStyle()),
                     ),
                   ),
                   SizedBox(height: sectionSpacing * 2),

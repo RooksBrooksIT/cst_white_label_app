@@ -138,7 +138,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/landing',
+          '/authSelection',
           (route) => false,
         );
       }

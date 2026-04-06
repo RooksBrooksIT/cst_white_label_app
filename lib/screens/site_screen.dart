@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../services/firestore_service.dart';
 import 'project_screen.dart';
 
 class SiteScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _SiteScreenState extends State<SiteScreen>
 
   DateTime? _startDate;
   DateTime? _endDate;
-  String? _projectType;
+  String? _projectCategory;
   String _status = 'In-Progress';
   bool _isGettingLocation = false;
   bool _isSaving = false; // disables Save button for 3 seconds when true
@@ -49,9 +50,9 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectCategories() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectCategories')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectCategories',
+      ).get();
       final categories = snapshot.docs
           .map((doc) => doc['projectCategory']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
@@ -65,9 +66,9 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectStatus() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStatus')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectStatus',
+      ).get();
       final statusList = snapshot.docs
           .map((doc) => doc['projectState']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
@@ -121,7 +122,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<String> _getNextSiteId(String siteName) async {
-    final snapshot = await FirebaseFirestore.instance.collection('Site').get();
+    final snapshot = await FirestoreService.getCollection('Site').get();
     int maxSiteNum = 0;
     for (final doc in snapshot.docs) {
       if (doc.data().containsKey('siteId')) {
@@ -180,7 +181,6 @@ class _SiteScreenState extends State<SiteScreen>
         });
       }
     } catch (e) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error getting location: $e'),
@@ -337,17 +337,23 @@ class _SiteScreenState extends State<SiteScreen>
                   return _buildErrorWidget('No project categories available');
                 }
                 final categories = snapshot.data!;
-                if (_projectType == null && categories.isNotEmpty) {
+                // Ensure _projectCategory is valid for the current categories list
+                String currentValue = _projectCategory ?? categories.first;
+                if (!categories.contains(currentValue)) {
+                  currentValue = categories.first;
+                  // Use addPostFrameCallback to update state safely after build
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted)
-                      setState(() => _projectType = categories.first);
+                      setState(() => _projectCategory = categories.first);
                   });
                 }
+
                 return _buildDropdown(
-                  value: _projectType ?? categories.first,
+                  value: currentValue,
                   items: categories,
                   label: 'Project Category',
-                  onChanged: (value) => setState(() => _projectType = value),
+                  onChanged: (value) =>
+                      setState(() => _projectCategory = value),
                 );
               },
             ),
@@ -382,8 +388,18 @@ class _SiteScreenState extends State<SiteScreen>
                   return _buildErrorWidget('No status options available');
                 }
                 final statusList = snapshot.data!;
+                // Ensure _status is valid for the current statusList
+                String currentStatus = _status;
+                if (!statusList.contains(currentStatus)) {
+                  currentStatus = statusList.first;
+                  // Use addPostFrameCallback to update state safely after build
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _status = statusList.first);
+                  });
+                }
+
                 return _buildDropdown(
-                  value: _status,
+                  value: currentStatus,
                   items: statusList,
                   label: 'Project Status',
                   onChanged: (value) => setState(() => _status = value!),
@@ -404,7 +420,7 @@ class _SiteScreenState extends State<SiteScreen>
     final primaryColor = theme.primaryColor;
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('Site').snapshots(),
+      stream: FirestoreService.getCollection('Site').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -422,7 +438,7 @@ class _SiteScreenState extends State<SiteScreen>
           scrollDirection: Axis.horizontal,
           child: DataTable(
             columnSpacing: 26,
-            headingRowColor: WidgetStateProperty.all(
+            headingRowColor: MaterialStateProperty.all(
               primaryColor.withOpacity(0.1),
             ),
             headingTextStyle: TextStyle(
@@ -443,18 +459,19 @@ class _SiteScreenState extends State<SiteScreen>
               final siteId = (data['siteId'] as String?) ?? site.id;
               final siteName = (data['siteName'] as String?) ?? '';
               final location = (data['location'] as String?) ?? '';
-              final projectType = (data['projectType'] as String?) ?? '';
+              final projectCategory =
+                  (data['projectCategory'] as String?) ?? '';
               final status = (data['status'] as String?) ?? '';
 
               return DataRow(
-                color: WidgetStateProperty.resolveWith<Color?>(
+                color: MaterialStateProperty.resolveWith<Color?>(
                   (states) => index % 2 == 0 ? Colors.white : Colors.grey[50],
                 ),
                 cells: [
                   DataCell(Text(siteId)),
                   DataCell(Text(siteName)),
                   DataCell(Text(location)),
-                  DataCell(Text(projectType)),
+                  DataCell(Text(projectCategory)),
                   DataCell(Text(status)),
                 ],
               );
@@ -768,20 +785,18 @@ class _SiteScreenState extends State<SiteScreen>
     final endDate = _endDate != null
         ? DateFormat('yyyy-MM-dd').format(_endDate!)
         : '';
-    final projectType = _projectType ?? '';
+    final projectCategory = _projectCategory ?? '';
     final status = _status.isNotEmpty ? _status : 'In-Progress';
 
     try {
       // Deduplication: check if a Site with same siteName and location already exists
-      final dupQuery = await FirebaseFirestore.instance
-          .collection('Site')
+      final dupQuery = await FirestoreService.getCollection('Site')
           .where('siteName', isEqualTo: siteName)
           .where('location', isEqualTo: location)
           .limit(1)
           .get();
       if (dupQuery.docs.isNotEmpty) {
         setState(() => _isSaving = false);
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Duplicate detected. Value already exists.'),
@@ -803,23 +818,20 @@ class _SiteScreenState extends State<SiteScreen>
         'location': location,
         'latitude': latitude.isNotEmpty ? double.tryParse(latitude) : null,
         'longitude': longitude.isNotEmpty ? double.tryParse(longitude) : null,
-        'projectType': projectType,
+        'projectCategory': projectCategory,
         'startDate': startDate,
         'endDate': endDate,
         'status': status,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      final siteDocId = '${nextId}_${siteName.replaceAll(' ', '')}';
-      await FirebaseFirestore.instance
-          .collection('Site')
-          .doc(siteDocId)
-          .set(siteData);
+      final siteDocId = nextId + '_' + siteName.replaceAll(' ', '');
+      await FirestoreService.getCollection('Site').doc(siteDocId).set(siteData);
 
       // Create project with dedupe on name+siteId combination as well
-      final projectsSnapshot = await FirebaseFirestore.instance
-          .collection('projects')
-          .get();
+      final projectsSnapshot = await FirestoreService.getCollection(
+        'projects',
+      ).get();
       int maxPRNum = 0;
       for (final doc in projectsSnapshot.docs) {
         final docId = doc.id;
@@ -841,19 +853,18 @@ class _SiteScreenState extends State<SiteScreen>
 
       final projectData = {
         'createdAt': FieldValue.serverTimestamp(),
-        'siteId': '${nextId}_${siteName.replaceAll(' ', '')}',
+        'siteId': nextId + '_' + siteName.replaceAll(' ', ''),
         'siteName': siteName,
         'plannedStartDate': plannedStartDateTs,
         'plannedEndDate': plannedEndDateTs,
-        'projectType': projectType,
+        'projectCategory': projectCategory,
         'status': status,
         'siteLocation': location,
       };
 
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(nextPrDocId)
-          .set(projectData);
+      await FirestoreService.getCollection(
+        'projects',
+      ).doc(nextPrDocId).set(projectData);
 
       // Success message then navigate to ProjectScreen
       _showSuccessDialog(nextId, nextPrDocId);
@@ -862,7 +873,6 @@ class _SiteScreenState extends State<SiteScreen>
     } catch (e, stack) {
       print('Error saving site/project: $e');
       print(stack);
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to save: ${e.toString()}'),
@@ -882,8 +892,8 @@ class _SiteScreenState extends State<SiteScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        final primaryColor = Theme.of(context).primaryColor;
+      builder: (BuildContext dialogContext) {
+        final primaryColor = Theme.of(dialogContext).primaryColor;
         return Center(
           child: Container(
             width: 280,
@@ -930,7 +940,7 @@ class _SiteScreenState extends State<SiteScreen>
                     elevation: 5,
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.of(dialogContext).pop();
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -960,7 +970,7 @@ class _SiteScreenState extends State<SiteScreen>
       _longitudeController.clear();
       _startDate = null;
       _endDate = null;
-      _projectType = null;
+      _projectCategory = null;
       _status = 'In-Progress';
     });
   }

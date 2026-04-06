@@ -34,6 +34,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   // Loading states
   bool _isLoadingSites = false;
   bool _isLoadingWorkers = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -149,15 +150,27 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           'Site',
         ).doc(siteId).get();
         if (!mounted) return;
-        if (siteDoc.exists) {
-          final data = siteDoc.data()!;
-          setState(() {
+        setState(() {
+          _selectedSupervisor = 'Not available';
+          if (siteDoc.exists) {
+            final data = siteDoc.data()!;
             _selectedProjectName = data['siteName'] ?? 'Not available';
-          });
-        }
+          } else {
+            _selectedProjectName = 'Not available';
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error loading site details: $e');
+      if (mounted) {
+        setState(() {
+          _selectedSupervisor = 'Error loading';
+          _selectedProjectName = 'Error loading';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading site details: $e')),
+        );
+      }
     }
   }
 
@@ -189,6 +202,11 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       }
     } catch (e) {
       debugPrint('Error loading existing workers: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading existing workers: $e')),
+        );
+      }
     }
   }
 
@@ -271,21 +289,22 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Future<void> _submitMapping() async {
     // Validation
-    if (_selectedSite == null ||
-        _selectedSupervisor == null ||
-        _selectedProjectName == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please select a site first')));
+    if (!_isFormComplete) {
+      String missing = '';
+      if (_selectedSite == null)
+        missing = 'site selection';
+      else if (_selectedSupervisor == null || _selectedProjectName == null)
+        missing = 'site details (waiting for fetch)';
+      else if (_selectedWorkersList.isEmpty)
+        missing = 'at least one worker';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please complete the form: missing $missing')),
+      );
       return;
     }
 
-    if (_selectedWorkersList.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please add at least one worker')));
-      return;
-    }
+    setState(() => _isSubmitting = true);
 
     try {
       // Use site name as document ID
@@ -348,6 +367,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       // Reset form
       if (mounted) {
         setState(() {
+          _isSubmitting = false;
           _selectedSite = null;
           _selectedSupervisor = null;
           _selectedProjectName = null;
@@ -357,6 +377,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     } catch (e) {
       debugPrint('Error mapping workers: $e');
       if (mounted) {
+        setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error mapping workers: $e')));
@@ -486,9 +507,12 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                       ),
                     ]
                   : _sites.map<DropdownMenuItem<String>>((site) {
+                      final displayName = site['siteName'] != site['site']
+                          ? '${site['site']} (${site['siteName']})'
+                          : site['site'] ?? '';
                       return DropdownMenuItem<String>(
                         value: site['site'] as String?,
-                        child: Text(site['site'] ?? ''),
+                        child: Text(displayName),
                       );
                     }).toList(),
               onChanged: _onSiteSelected,
@@ -726,23 +750,65 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _isFormComplete ? _submitMapping : null,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        child: const Text(
-          'SAVE SITE MAPPING',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
+    return Column(
+      children: [
+        if (!_isFormComplete && _selectedSite != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.orange[800]),
+                  SizedBox(width: 8),
+                  Text(
+                    _selectedWorkersList.isEmpty
+                        ? 'Add at least one worker to save mapping'
+                        : 'Waiting for site details...',
+                    style: TextStyle(
+                      color: Colors.orange[900],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: (_isFormComplete && !_isSubmitting)
+                ? _submitMapping
+                : null,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              disabledBackgroundColor: Colors.grey[200],
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  )
+                : const Text(
+                    'SAVE SITE MAPPING',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
