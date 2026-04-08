@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -31,26 +32,43 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   final billVendorController = TextEditingController();
   final billAmountController = TextEditingController();
 
+  String? managerId;
   List<Map<String, String>> bills = [];
 
   @override
   void initState() {
     super.initState();
+    _loadManagerData();
     _loadSiteIds();
+  }
+
+  void _loadManagerData() {
+    final userData = AuthService().userData;
+    setState(() {
+      managerId = userData['username'] ?? userData['UserName'] ?? 'UNKNOWN_MANAGER';
+    });
   }
 
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      final snapshot = await FirestoreService.managerExpenses.get();
+      final fetchedSiteIds = snapshot.docs
+          .map((doc) => doc.data()['siteId'] as String?)
+          .where((site) => site != null && site.isNotEmpty)
+          .toSet()
+          .cast<String>()
+          .toList();
+          
       setState(() {
-        siteIds = snapshot.docs
-            .map((doc) => doc.data()['site'] as String?)
-            .where((site) => site != null && site.isNotEmpty)
-            .toSet()
-            .cast<String>()
-            .toList();
+        siteIds = fetchedSiteIds;
         isLoadingSites = false;
+        
+        // Auto-select if only one site ID exists
+        if (siteIds.length == 1) {
+          selectedSiteId = siteIds.first;
+          _loadSiteDetails(selectedSiteId!);
+        }
       });
     } catch (e) {
       setState(() => isLoadingSites = false);
@@ -59,17 +77,30 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   Future<void> _loadSiteDetails(String siteId) async {
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap
+      // 1. Fetch Supervisor and Phase from siteSupervisorMap
+      final supervisorSnapshot = await FirestoreService.siteSupervisorMap
           .where('site', isEqualTo: siteId)
           .limit(1)
           .get();
           
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
+      if (supervisorSnapshot.docs.isNotEmpty) {
+        final data = supervisorSnapshot.docs.first.data();
         setState(() {
           selectedSupervisorId = data['supervisor'] as String?;
           selectedProjectPhase = data['projectStage'] as String?;
-          selectedProjectName = data['projectName'] as String?;
+        });
+      }
+
+      // 2. Fetch Project Name from projects collection
+      final projectSnapshot = await FirestoreService.projects
+          .where('siteId', isEqualTo: siteId)
+          .limit(1)
+          .get();
+
+      if (projectSnapshot.docs.isNotEmpty) {
+        final projectData = projectSnapshot.docs.first.data();
+        setState(() {
+          selectedProjectName = projectData['projectName'] as String?;
         });
       }
     } catch (e) {
@@ -156,6 +187,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           GlassTextField(controller: TextEditingController(text: selectedSupervisorId ?? ''), label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
           const SizedBox(height: 12),
           GlassTextField(controller: TextEditingController(text: selectedProjectPhase ?? ''), label: 'Project Phase', icon: Icons.timeline_outlined, readOnly: true),
+          const SizedBox(height: 12),
+          GlassTextField(controller: TextEditingController(text: selectedProjectName ?? ''), label: 'Project Name', icon: Icons.assignment_outlined, readOnly: true),
           const SizedBox(height: 12),
           _buildDatePicker(theme),
         ],
@@ -301,7 +334,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       final docId = 'EXP-${DateTime.now().millisecondsSinceEpoch}';
       await FirestoreService.managerExpenses.doc(docId).set({
         'expenseId': docId,
-        'managerId': 'TODO_MANAGER_ID',
+        'managerId': managerId ?? 'UNKNOWN_MANAGER',
         'siteId': selectedSiteId,
         'projectName': selectedProjectName,
         'date': DateFormat('dd/MM/yy').format(selectedDate),

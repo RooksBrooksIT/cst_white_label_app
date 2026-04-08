@@ -485,6 +485,8 @@ class _ProjectScreenState extends State<ProjectScreen>
       setState(() {
         plannedStartDate = null;
         plannedEndDate = null;
+        projectCategory = null;
+        currentStatus = null;
       });
       return;
     }
@@ -501,11 +503,19 @@ class _ProjectScreenState extends State<ProjectScreen>
           plannedEndDate = data['plannedEndDate'] != null
               ? (data['plannedEndDate'] as Timestamp).toDate()
               : null;
+          // Auto-fill Project Category and Status from existing project data
+          final cat = data['projectCategory']?.toString().trim();
+          projectCategory = (cat != null && cat.isNotEmpty) ? cat : null;
+          final status =
+              (data['currentStatus'] ?? data['status'])?.toString().trim();
+          currentStatus = (status != null && status.isNotEmpty) ? status : null;
         });
       } else {
         setState(() {
           plannedStartDate = null;
           plannedEndDate = null;
+          projectCategory = null;
+          currentStatus = null;
         });
       }
     } catch (e) {}
