@@ -30,6 +30,7 @@ import 'package:demo_cst/screens/vehicle_inventory_page.dart';
 import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
+import 'package:demo_cst/screens/workers_availability_report_page.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 
@@ -233,6 +234,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFFF57C00),
         'Assign workers to sites',
         const Color(0xFFF57C00),
+      ),
+      DashboardItem(
+        'Workers Availability',
+        Icons.assessment_rounded,
+        Colors.indigo,
+        'Site worker availability report',
+        Colors.indigo,
       ),
       DashboardItem(
         'Workers Attendance',
@@ -812,6 +820,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Material Config': MaterialScreen(),
       'Workers Configuration': WorkersConfigPage(),
       'Workers Site Mapping': WorkerMappingPage(),
+      'Workers Availability': const WorkersAvailabilityReportPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),
       'Vehicle Configuration': AddVehicleLogPage(),
       'Vehicle Driver Configuration': VehicleDriverConfigPage(),
