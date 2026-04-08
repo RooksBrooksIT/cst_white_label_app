@@ -180,36 +180,66 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final docId =
-          '${_selectedSite!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
-      final summaryDocId = '${_selectedSite!}_$_currentMonth';
-
-      // Prepare workers data for daily attendance
-      final Map<String, dynamic> workersData = {};
+      final String month = _currentMonth;
+      final String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final batch = FirebaseFirestore.instance.batch();
 
       for (final worker in _workers) {
         final workerName = worker['workerName']?.toString() ?? '';
         final attendanceStatus = _attendanceStatus[workerName] ?? '';
+        if (attendanceStatus.isEmpty) continue;
 
-        workersData[workerName] = {
-          'designation': worker['workerDesignation'] ?? '',
-          'salary': worker['workerSalary'] ?? '',
-          'attendance': attendanceStatus,
+        // Ensure we utilize workerId if available, fallback to a name-site combination
+        final String workerId = worker['workerId']?.toString() ?? '${workerName}_${_selectedSite}';
+        final String workerDocId = '${workerId}_$month';
+        final docRef = FirestoreService.getCollection('WorkerMonthlyAttendance').doc(workerDocId);
+
+        // Daily attendance data as per requirements
+        final Map<String, dynamic> todayAttendance = {
+          'status': attendanceStatus.toLowerCase(),
+          'markedAt': FieldValue.serverTimestamp(),
+          'salaryPerDay': double.tryParse(worker['workerSalary']?.toString() ?? '0') ?? 0,
         };
+
+        // Update the monthly document with a nested map key update
+        batch.set(docRef, {
+          'workerId': workerId,
+          'workerName': workerName,
+          'designation': worker['workerDesignation'] ?? '',
+          'site': _selectedSite,
+          'month': month,
+          'baseSalary': worker['workerSalary'] ?? '0',
+          'status': 'draft',
+          'attendanceData': {
+            todayDate: todayAttendance,
+          },
+        }, SetOptions(merge: true));
       }
 
-      // Submit to workersAttendance collection
-      await FirestoreService.getCollection('workersAttendance').doc(docId).set({
+      // Legacy daily log (optional, kept for audit trail)
+      final dailyDocId = '${_selectedSite!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
+      final Map<String, dynamic> workersDataLog = {};
+      for (final worker in _workers) {
+        final name = worker['workerName']?.toString() ?? '';
+        workersDataLog[name] = {
+          'designation': worker['workerDesignation'] ?? '',
+          'salary': worker['workerSalary'] ?? '',
+          'attendance': _attendanceStatus[name] ?? '',
+        };
+      }
+      
+      batch.set(FirestoreService.getCollection('workersAttendance').doc(dailyDocId), {
         'Day': _currentDate,
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-        'month': _currentMonth,
+        'month': month,
         'site': _selectedSite,
-        'workers': workersData,
+        'workers': workersDataLog,
       }, SetOptions(merge: true));
 
-      // Update workersSummary collection
-      await _updateWorkersSummary(summaryDocId, workersData);
+      await batch.commit();
+
+      // Recalculate monthly totals for summaries
+      await _recalculateMonthlySalaries();
 
       if (!mounted) return;
       setState(() {
@@ -234,263 +264,51 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     }
   }
 
-  Future<void> _updateWorkersSummary(
-    String docId,
-    Map<String, dynamic> dailyAttendance,
-  ) async {
+  Future<void> _recalculateMonthlySalaries() async {
     try {
-      final doc = await FirestoreService
-          .getCollection('workersSummary')
-          .doc(docId)
+      final String month = _currentMonth;
+      final querySnapshot = await FirestoreService.getCollection('WorkerMonthlyAttendance')
+          .where('month', isEqualTo: month)
+          .where('site', isEqualTo: _selectedSite)
           .get();
 
-      if (doc.exists) {
-        final existingData = doc.data() as Map<String, dynamic>;
-        final existingWorkers =
-            existingData['workers'] as Map<String, dynamic>? ?? {};
+      final batch = FirebaseFirestore.instance.batch();
 
-        final updatedWorkers = Map<String, dynamic>.from(existingWorkers);
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final Map<String, dynamic> attendanceMap = data['attendanceData'] as Map<String, dynamic>? ?? {};
 
-        dailyAttendance.forEach((workerName, dailyData) {
-          final attendanceStatus = dailyData['attendance'] as String;
-          final designation = dailyData['designation'] as String;
-          final salary = dailyData['salary'] as String;
+        double totalSalary = 0.0;
+        int presentDays = 0;
 
-          if (updatedWorkers.containsKey(workerName)) {
-            final existingWorker =
-                updatedWorkers[workerName] as Map<String, dynamic>;
-            final existingAttendance =
-                existingWorker['attendance'] as Map<String, dynamic>? ?? {};
+        attendanceMap.forEach((date, details) {
+          if (details is Map) {
+            final String status = details['status']?.toString().toLowerCase() ?? '';
+            final double salaryPerDay = double.tryParse(details['salaryPerDay']?.toString() ?? '0') ?? 0.0;
 
-            final presentDays =
-                int.tryParse(
-                  existingAttendance['presentDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final absentDays =
-                int.tryParse(
-                  existingAttendance['absentDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final overtimeDays =
-                int.tryParse(
-                  existingAttendance['overtimeDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final halfDays =
-                int.tryParse(
-                  existingAttendance['halfDays']?.toString().split(' ').first ??
-                      '0',
-                ) ??
-                0;
-
-            switch (attendanceStatus.toLowerCase()) {
-              case 'present':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '${presentDays + 1} days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + 1 + overtimeDays + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'absent':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '${absentDays + 1} days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + overtimeDays + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'overtime':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '${overtimeDays + 1} days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + (overtimeDays + 1) + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'half day':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '${halfDays + 1} days',
-                    'totalWorkingDays':
-                        '${presentDays + overtimeDays + ((halfDays + 1) * 0.5).round()} days',
-                  },
-                };
-                break;
-            }
-          } else {
-            switch (attendanceStatus.toLowerCase()) {
-              case 'present':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '1 day',
-                    'absentDays': '0 days',
-                    'overtimeDays': '0 days',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '1 day',
-                  },
-                };
-                break;
-              case 'absent':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '1 day',
-                    'overtimeDays': '0 days',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '0 days',
-                  },
-                };
-                break;
-              case 'overtime':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '0 days',
-                    'overtimeDays': '1 day',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '1 day',
-                  },
-                };
-                break;
-              case 'half day':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '0 days',
-                    'overtimeDays': '0 days',
-                    'halfDays': '1 day',
-                    'totalWorkingDays': '0.5 day',
-                  },
-                };
-                break;
+            if (status == 'present' || status == 'overtime') {
+              totalSalary += salaryPerDay;
+              presentDays += 1;
+            } else if (status == 'half day') {
+              totalSalary += (salaryPerDay / 2.0);
+              presentDays += 1; // Or increment by 0.5 depending on policy
             }
           }
         });
 
-        await FirestoreService.getCollection('workersSummary').doc(docId).set({
+        batch.update(doc.reference, {
+          'calculatedSalary': totalSalary,
+          'totalPresentDays': presentDays,
           'updatedAt': FieldValue.serverTimestamp(),
-          'month': _currentMonth,
-          'site': _selectedSite,
-          'workers': updatedWorkers,
-        }, SetOptions(merge: true));
-      } else {
-        final Map<String, dynamic> summaryWorkersData = {};
-
-        dailyAttendance.forEach((workerName, dailyData) {
-          final attendanceStatus = dailyData['attendance'] as String;
-          final designation = dailyData['designation'] as String;
-          final salary = dailyData['salary'] as String;
-
-          switch (attendanceStatus.toLowerCase()) {
-            case 'present':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '1 day',
-                  'absentDays': '0 days',
-                  'overtimeDays': '0 days',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '1 day',
-                },
-              };
-              break;
-            case 'absent':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '1 day',
-                  'overtimeDays': '0 days',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '0 days',
-                },
-              };
-              break;
-            case 'overtime':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '0 days',
-                  'overtimeDays': '1 day',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '1 day',
-                },
-              };
-              break;
-            case 'half day':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '0 days',
-                  'overtimeDays': '0 days',
-                  'halfDays': '1 day',
-                  'totalWorkingDays': '0.5 day',
-                },
-              };
-              break;
-          }
-        });
-
-        await FirestoreService.getCollection('workersSummary').doc(docId).set({
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'month': _currentMonth,
-          'site': _selectedSite,
-          'workers': summaryWorkersData,
         });
       }
+
+      await batch.commit();
     } catch (e) {
-      print('Error updating workers summary: $e');
-      rethrow;
+      debugPrint('Error in salary recalculation: $e');
     }
   }
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
