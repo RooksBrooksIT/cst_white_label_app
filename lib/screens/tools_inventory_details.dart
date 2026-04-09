@@ -22,6 +22,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
   String? errorMessage;
   String toolName = "";
   String toolCategory = "";
+  Map<String, String> siteNameMap = {};
 
   @override
   void initState() {
@@ -44,7 +45,14 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
         final doc = query.docs.first;
         final sites = doc.data()['sites'] as List<dynamic>? ?? [];
 
-        // Aggregate counts by siteId to avoid duplicates
+        // 1. Fetch site names for lookup
+        final sitesSnapshot = await FirestoreService.sites.get();
+        final names = {
+          for (var s in sitesSnapshot.docs)
+            s.id: s.data()['siteName']?.toString() ?? 'Unnamed Site'
+        };
+
+        // 2. Aggregate counts by siteId to avoid duplicates
         Map<String, int> siteCounts = {};
 
         for (var site in sites) {
@@ -57,21 +65,25 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
           }
         }
 
-        // ✅ Filter out entries where count == 0
-        inventoryData = siteCounts.entries
-            .where((entry) => entry.value > 0) // only keep non-zero counts
-            .map((entry) {
-              return {'siteId': entry.key, 'toolsCount': entry.value};
-            })
-            .toList();
-
-        // toolName = doc.data()['name'] ?? 'Unknown Tool';
-        // toolCategory = doc.data()['category'] ?? 'Uncategorized';
+        setState(() {
+          siteNameMap = names;
+          // ✅ Filter out entries where count == 0
+          inventoryData = siteCounts.entries
+              .where((entry) => entry.value > 0)
+              .map((entry) {
+                return {'siteId': entry.key, 'toolsCount': entry.value};
+              })
+              .toList();
+        });
       } else {
-        inventoryData = [];
+        setState(() {
+          inventoryData = [];
+        });
       }
     } catch (e) {
-      errorMessage = 'Failed to load data: ${e.toString()}';
+      setState(() {
+        errorMessage = 'Failed to load data: ${e.toString()}';
+      });
     }
     setState(() {
       isLoading = false;
@@ -80,6 +92,9 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
 
   Future<void> _generatePdf(BuildContext context) async {
     final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -93,7 +108,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 style: pw.TextStyle(
                   fontSize: 28,
                   fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
+                  color: pdfPrimaryColor,
                 ),
               ),
               pw.SizedBox(height: 10),
@@ -104,7 +119,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 style: pw.TextStyle(
                   fontSize: 20,
                   fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
+                  color: pdfPrimaryColor,
                 ),
               ),
               pw.SizedBox(height: 8),
@@ -126,7 +141,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 style: pw.TextStyle(
                   fontSize: 20,
                   fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
+                  color: pdfPrimaryColor,
                 ),
               ),
               pw.SizedBox(height: 10),
@@ -134,7 +149,10 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 headers: ['Site ID', 'Tools Count'],
                 data: inventoryData
                     .map(
-                      (item) => [item['siteId'], item['toolsCount'].toString()],
+                      (item) => [
+                        '${item['siteId']} - ${siteNameMap[item['siteId']] ?? "Unnamed Site"}',
+                        item['toolsCount'].toString()
+                      ],
                     )
                     .toList(),
                 headerStyle: pw.TextStyle(
@@ -145,11 +163,11 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                 cellAlignment: pw.Alignment.centerLeft,
                 cellPadding: const pw.EdgeInsets.all(8),
                 border: pw.TableBorder.all(
-                  color: PdfColor.fromInt(0xFF0B3470),
+                  color: pdfPrimaryColor,
                   width: 1,
                 ),
                 headerDecoration: pw.BoxDecoration(
-                  color: PdfColor.fromInt(0xFF0B3470),
+                  color: pdfPrimaryColor,
                 ),
               ),
               pw.Spacer(),
@@ -161,7 +179,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                   style: pw.TextStyle(
                     fontSize: 16,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF0B3470),
+                    color: pdfPrimaryColor,
                   ),
                 ),
               ),
@@ -287,7 +305,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                 columnSpacing: 30,
                                 horizontalMargin: 20,
                                 columns: const [
-                                  DataColumn(label: Text('SITE')),
+                                  DataColumn(label: Text('SITE (ID - Name)')),
                                   DataColumn(
                                     label: Text('COUNT'),
                                     numeric: true,
@@ -299,7 +317,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                         cells: [
                                           DataCell(
                                             Text(
-                                              data['siteId'],
+                                              '${data['siteId']} - ${siteNameMap[data['siteId']] ?? "Unnamed Site"}',
                                               style: TextStyle(
                                                 color: colorScheme.primary,
                                                 fontWeight: FontWeight.w500,

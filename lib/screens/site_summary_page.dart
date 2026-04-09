@@ -21,13 +21,13 @@ class SiteSummaryPage extends StatefulWidget {
 }
 
 class _SiteSummaryPageState extends State<SiteSummaryPage> {
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF4a7cda);
-  static const Color backgroundColor = Color(0xFFf8f9fa);
-  static const Color textColor = Color(0xFF2c3e50);
-  static const Color cardColor = Colors.white;
-  static const Color successColor = Color(0xFF2e7d32);
-  static const Color warningColor = Color(0xFFed6c02);
+  Color get primaryColor => Theme.of(context).primaryColor;
+  Color get accentColor => Theme.of(context).colorScheme.secondary;
+  Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
+  Color get textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
+  Color get cardColor => Theme.of(context).cardColor;
+  Color get successColor => const Color(0xFF2e7d32);
+  Color get warningColor => const Color(0xFFed6c02);
 
   bool _isSaving = false;
 
@@ -251,7 +251,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
-        iconTheme: IconThemeData(),
+        iconTheme: IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: Padding(

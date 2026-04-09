@@ -13,10 +13,11 @@ class SiteStatusReportPage extends StatelessWidget {
     required this.budgetData,
   });
 
-  Color getStatusColor(String status) {
+  Color getStatusColor(BuildContext context, String status) {
+    final theme = Theme.of(context);
     switch (status.toLowerCase()) {
       case 'in-progress':
-        return const Color(0xFF0b3470); // Navy blue
+        return theme.primaryColor;
       case 'pending':
         return const Color(0xFFFFA000); // Amber
       case 'planning':
@@ -26,13 +27,13 @@ class SiteStatusReportPage extends StatelessWidget {
       case 'complete':
         return const Color(0xFF388E3C); // Green
       default:
-        return const Color(0xFF0b3470); // Navy blue as default
+        return theme.primaryColor;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = getStatusColor(status);
+    final statusColor = getStatusColor(context, status);
 
     return Scaffold(
       appBar: AppBar(
@@ -387,20 +388,21 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color iconColor;
+  final Color? iconColor;
 
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
-    this.iconColor = const Color(0xFF0b3470),
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveIconColor = iconColor ?? Theme.of(context).primaryColor;
     return Row(
       children: [
-        Icon(icon, size: 20, color: iconColor),
+        Icon(icon, size: 20, color: effectiveIconColor),
         const SizedBox(width: 12),
         Expanded(
           child: Text(

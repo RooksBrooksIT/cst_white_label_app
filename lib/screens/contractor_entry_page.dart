@@ -21,17 +21,15 @@ class ContractorEntryPage extends StatefulWidget {
 class _ContractorEntryPageState extends State<ContractorEntryPage> {
   // --- Color Configuration and Utilities ---
   // Professional slate colors
-  final Color _primaryColor = const Color(0xFF0b3470);
-  final Color _textColor = const Color(0xFF1E293B);
-  final Color _labelColor = const Color(0xFF64748B);
-  final Color _borderColor = const Color(0xFFE2E8F0);
-  final Color _secondaryColor = const Color(
-    0xFF94A3B8,
-  ); // Standard secondary slate
-  final Color _sectionBgColor = const Color(0xFFF8FAFC); // Main background
-  final Color _actionTextColor = Colors.white; // Text on primary background
-  final Color _successColor = const Color(0xFF10B981);
-  final Color _errorColor = const Color(0xFFEF4444);
+  Color get _primaryColor => Theme.of(context).primaryColor;
+  Color get _textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF1E293B);
+  Color get _labelColor => const Color(0xFF64748B);
+  Color get _borderColor => Theme.of(context).dividerColor;
+  Color get _secondaryColor => Theme.of(context).colorScheme.secondary;
+  Color get _sectionBgColor => Theme.of(context).scaffoldBackgroundColor;
+  Color get _actionTextColor => Colors.white;
+  Color get _successColor => const Color(0xFF10B981);
+  Color get _errorColor => Theme.of(context).colorScheme.error;
 
   double getPad(double w) {
     if (w < 400) return 8;
@@ -62,6 +60,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   final TextEditingController _dateController = TextEditingController();
 
   List<String> siteIdOptions = [];
+  Map<String, String> siteNameMap = {};
   String? selectedSiteIdForEntry;
   bool isLoadingSiteIds = true;
   String? siteIdError;
@@ -154,6 +153,14 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       siteIdError = null;
     });
     try {
+      // 1. Fetch site names from FirestoreService.sites
+      final sitesSnapshot = await FirestoreService.sites.get();
+      final Map<String, String> names = {
+        for (var doc in sitesSnapshot.docs)
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+      };
+
+      // 2. Fetch projects matching contractor
       final contractor =
           _selectedContractorName ?? widget.userDetails['contractorName'];
       final snapshot = await FirebaseFirestore.instance
@@ -168,6 +175,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         if (id.isNotEmpty) ids.add(id);
       }
       setState(() {
+        siteNameMap = names;
         siteIdOptions = ids;
         selectedSiteIdForEntry = siteIdOptions.isNotEmpty
             ? siteIdOptions.first
@@ -184,7 +192,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       }
     } catch (e) {
       setState(() {
-        siteIdError = 'Failed to load Site IDs';
+        siteIdError = 'Failed to load Site IDs: $e';
         isLoadingSiteIds = false;
       });
     }
@@ -1023,7 +1031,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                               .map(
                                 (id) => DropdownMenuItem<String>(
                                   value: id,
-                                  child: Text(id),
+                                  child: Text('$id - ${siteNameMap[id] ?? "Unnamed Site"}'),
                                 ),
                               )
                               .toList(),

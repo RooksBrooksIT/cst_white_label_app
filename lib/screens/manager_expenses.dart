@@ -34,6 +34,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   String? managerId;
   List<Map<String, String>> bills = [];
+  Map<String, String> siteNameMap = {};
 
   @override
   void initState() {
@@ -52,18 +53,27 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
-      final snapshot = await FirestoreService.managerExpenses.get();
+      // 1. Fetch site names from the master Site collection
+      final sitesSnapshot = await FirestoreService.sites.get();
+      final Map<String, String> names = {
+        for (var doc in sitesSnapshot.docs)
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+      };
+
+      // 2. Fetch sites from mapping
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
       final fetchedSiteIds = snapshot.docs
-          .map((doc) => doc.data()['siteId'] as String?)
+          .map((doc) => doc.data()['site'] as String?)
           .where((site) => site != null && site.isNotEmpty)
           .toSet()
           .cast<String>()
           .toList();
-          
+
       setState(() {
+        siteNameMap = names;
         siteIds = fetchedSiteIds;
         isLoadingSites = false;
-        
+
         // Auto-select if only one site ID exists
         if (siteIds.length == 1) {
           selectedSiteId = siteIds.first;
@@ -71,6 +81,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         }
       });
     } catch (e) {
+      debugPrint('Error loading site IDs: $e');
       setState(() => isLoadingSites = false);
     }
   }
@@ -288,7 +299,17 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       ),
       dropdownColor: theme.cardColor,
       style: TextStyle(color: colorScheme.onSurface),
-      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      items: items.map((id) {
+        final name = siteNameMap[id] ?? 'Unnamed Site';
+        return DropdownMenuItem(
+          value: id,
+          child: Text(
+            '$id - $name',
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14),
+          ),
+        );
+      }).toList(),
       onChanged: onChanged,
     );
   }

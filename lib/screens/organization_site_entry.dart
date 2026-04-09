@@ -90,17 +90,27 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       isLoadingSites = true;
     });
     try {
+      // 1. Fetch site names from the master Site collection
+      final sitesSnapshot = await FirestoreService.sites.get();
+      final Map<String, String> siteNames = {
+        for (var doc in sitesSnapshot.docs)
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+      };
+
+      // 2. Fetch site mappings using FirestoreService
       final snapshot = await FirestoreService.siteSupervisorMap.get();
 
       siteList = snapshot.docs
           .map((doc) {
             final data = doc.data();
+            final sId = data['site']?.toString() ?? '';
             return {
-              'siteId': data['site']?.toString() ?? '',
-              'supervisor': data['supervisor']?.toString() ?? '',
-              'supervisorId': data['Supervisor ID']?.toString() ?? '',
-              'location': data['location']?.toString() ?? '',
-              'projectStage': data['projectStage']?.toString() ?? '',
+              'siteId': sId,
+              'siteName': siteNames[sId] ?? 'Unnamed Site',
+              'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+              'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
+              'location': data['location']?.toString() ?? 'Not Available',
+              'projectStage': data['projectStage']?.toString() ?? 'Not Available',
             };
           })
           .where((site) => site['siteId']!.isNotEmpty)
@@ -110,6 +120,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         selectedSiteId = siteList.first['siteId'];
         _onSiteSelected(selectedSiteId!);
       }
+    } catch (e) {
+      debugPrint('Error fetching sites: $e');
     } finally {
       if (!mounted) return;
       setState(() {
@@ -987,9 +999,12 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                                 (site) => DropdownMenuItem(
                                                   value: site['siteId'],
                                                   child: Text(
-                                                    site['siteId'] ?? '',
+                                                    '${site['siteId']} - ${site['siteName']}',
                                                     overflow:
                                                         TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                    ),
                                                   ),
                                                 ),
                                               )

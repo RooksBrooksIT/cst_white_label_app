@@ -4,6 +4,7 @@ import 'manager_site_entry_page.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
+import '../services/auth_service.dart';
 
 class ManagerExpensesHomeScreen extends StatelessWidget {
   const ManagerExpensesHomeScreen({super.key});
@@ -12,6 +13,8 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isSmallScreen = Responsive.isMobile(context);
     final theme = Theme.of(context);
+    final userData = AuthService().userData;
+    final userName = userData['username'] ?? userData['org_name'] ?? 'Manager';
 
     return GlassScaffold(
       title: 'Manager Expenses',
@@ -26,9 +29,9 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ManagerSiteEntryPage(
-                      userName: '',
-                      userDetails: {},
+                    builder: (context) => ManagerSiteEntryPage(
+                      userName: userName,
+                      userDetails: userData,
                     ),
                   ),
                 );

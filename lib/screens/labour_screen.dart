@@ -52,8 +52,7 @@ class _LabourScreenState extends State<LabourScreen> {
 
   Future<void> _getNextLabourId() async {
     setState(() => isLoading = true);
-    final QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('labours')
+    final QuerySnapshot snapshot = await FirestoreService.getCollection('labours')
         .orderBy('labourId', descending: true)
         .limit(1)
         .get();
@@ -75,8 +74,7 @@ class _LabourScreenState extends State<LabourScreen> {
   }
 
   Future<void> _fetchAllLabours() async {
-    final QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('labours')
+    final QuerySnapshot snapshot = await FirestoreService.getCollection('labours')
         .orderBy('designation')
         .get();
     setState(() {
@@ -122,19 +120,34 @@ class _LabourScreenState extends State<LabourScreen> {
 
     try {
       // Check for duplicate labour designation
-      final duplicateQuery = await FirebaseFirestore.instance
-          .collection('labours')
+      final duplicateQuery = await FirestoreService.getCollection('labours')
           .where('designation', isEqualTo: designationController.text.trim())
           .get();
 
       if (duplicateQuery.docs.isNotEmpty) {
+        final existingDoc = duplicateQuery.docs.first;
+        final existingData = existingDoc.data();
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Labour designation already exists.'),
-            backgroundColor: Colors.red,
+            content: Text(
+              'Labour designation already exists. Switching to update view.',
+            ),
+            backgroundColor: Colors.orange,
           ),
         );
-        setState(() => isLoading = false);
+
+        setState(() {
+          mode = LabourMode.updateLabour;
+          selectedLabourId = existingData['labourId'];
+          selectedDesignation = existingData['designation'];
+          selectedSalary = existingData['salary'];
+          updateSalaryController.text = existingData['salary'] ?? '';
+          updateDesignationController.text = existingData['designation'] ?? '';
+          isSalaryEditable = false;
+          isLoading = false;
+        });
         return;
       }
 
@@ -205,8 +218,7 @@ class _LabourScreenState extends State<LabourScreen> {
             onPressed: () async {
               setState(() => isLoading = true);
               try {
-                await FirebaseFirestore.instance
-                    .collection('labours')
+                await FirestoreService.getCollection('labours')
                     .doc(selectedLabourId)
                     .update({'salary': updateSalaryController.text.trim()});
                 if (!mounted) return;
@@ -445,8 +457,7 @@ class _LabourScreenState extends State<LabourScreen> {
                   ),
                   SizedBox(height: 16),
                   StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('labours')
+                    stream: FirestoreService.getCollection('labours')
                         .orderBy('labourId')
                         .snapshots(),
                     builder: (context, snapshot) {

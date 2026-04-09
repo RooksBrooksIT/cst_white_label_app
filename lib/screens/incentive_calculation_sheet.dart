@@ -37,11 +37,11 @@ class IncentiveCalculationSheet extends StatefulWidget {
 }
 
 class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
-  final Color _primaryColor = const Color(0xFF0b3470);
-  final Color _accentColor = const Color(0xFF4a86e8);
-  final Color _backgroundColor = const Color(0xFFf8f9fa);
-  final Color _cardColor = Colors.white;
-  final Color _textColor = const Color(0xFF2d3748);
+  Color get _primaryColor => Theme.of(context).primaryColor;
+  Color get _accentColor => Theme.of(context).colorScheme.secondary;
+  Color get _backgroundColor => Theme.of(context).scaffoldBackgroundColor;
+  Color get _cardColor => Theme.of(context).cardColor;
+  Color get _textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2d3748);
 
   List<LabourData> _labourData = [];
   double _incentivePercentage = 10.0;
