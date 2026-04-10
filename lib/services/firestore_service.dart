@@ -225,6 +225,9 @@ class FirestoreService {
       getCollection('siteMaterialsRequest');
   static CollectionReference<Map<String, dynamic>> get projectStages =>
       getCollection('projectStages');
+  static CollectionReference<Map<String, dynamic>> get siteSupervisorPayments =>
+      getCollection('siteSupervisorPayments');
+
 
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {

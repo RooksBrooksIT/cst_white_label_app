@@ -20,6 +20,8 @@ import '../utils/app_theme.dart';
 import 'org_sub_menu_screen.dart';
 import 'org_menu_screen.dart';
 import 'manager_config_screen.dart';
+import 'org_subscription_page.dart';
+
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -57,8 +59,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       builder: (context, appName, _) {
         return GlassScaffold(
           title: appName.isNotEmpty ? appName : 'Organization Dashboard',
-          onBack: () => _showLogoutConfirmation(context),
           actions: [
+
             IconButton(
               icon: const Icon(Icons.menu_rounded),
               tooltip: 'Menu',
@@ -66,9 +68,142 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               onPressed: () => _navigateToOrgMenu(context),
             ),
           ],
+          drawer: _buildDrawer(context),
           body: _buildBody(context),
         );
       },
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return Drawer(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          _buildDrawerHeader(context),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.dashboard_customize_rounded,
+                  title: 'Dashboard',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: 'Manage Subscription',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const OrganizationSubscriptionPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.person_rounded,
+                  title: 'Profile Settings',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToOrgMenu(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          _buildDrawerItem(
+            context,
+            icon: Icons.logout_rounded,
+            title: 'Logout',
+            color: Colors.red,
+            onTap: () {
+              Navigator.pop(context);
+              _showLogoutConfirmation(context);
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: const BorderRadius.only(
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.business_rounded, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 16),
+          ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, name, _) {
+              return Text(
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            },
+          ),
+          const Text(
+            'Organization Admin',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? Theme.of(context).primaryColor),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: color ?? const Color(0xFF1E293B),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
     );
   }
 

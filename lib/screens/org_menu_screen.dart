@@ -11,6 +11,8 @@ import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
+import 'org_subscription_page.dart';
+
 
 class OrgMenuScreen extends StatefulWidget {
   /// When [standalone] is true (default), the screen is shown as a separate
@@ -355,9 +357,15 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
                 : 'Current: $_subscriptionPlan (Inactive)',
             onTap: () {
-              // Future: Subscription management screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrganizationSubscriptionPage(),
+                ),
+              );
             },
           ),
+
         ],
       ),
     );

@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
-import '../utils/responsive.dart';
+import '../services/firestore_service.dart';
+import 'package:demo_cst/utils/responsive.dart';
 
 class SitePaymentScreen extends StatefulWidget {
+
   const SitePaymentScreen({super.key});
 
   @override
@@ -94,8 +96,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchProjectStages() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStages')
+      final snapshot = await FirestoreService.projectStages
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -106,6 +107,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               );
             },
           );
+
 
       if (!mounted) return;
 
@@ -129,8 +131,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchSiteIds() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.siteSupervisorMap
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -141,6 +142,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               );
             },
           );
+
 
       if (!mounted) return;
 
@@ -165,10 +167,10 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchSupervisorForSite(String siteId) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final doc = await FirestoreService.siteSupervisorMap
           .doc(siteId)
           .get();
+
       if (doc.exists) {
         setState(() {
           supervisor = doc.data()?['supervisor'] ?? '';
@@ -244,9 +246,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       final paymentPeriod = '${year}_${monthStr}_Week$weekIndex';
       final docId = '${siteDisplay}_$paymentPeriod';
 
-      final paymentDocRef = FirebaseFirestore.instance
-          .collection('siteSupervisorPayments')
-          .doc(docId);
+      final paymentDocRef = FirestoreService.siteSupervisorPayments.doc(docId);
+
 
       final paymentDocSnap = await paymentDocRef.get();
       List<dynamic> payments = [];
