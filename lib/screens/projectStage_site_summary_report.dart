@@ -137,10 +137,17 @@ class _ProjectstageSiteSummaryReportState extends State<ProjectstageSiteSummaryR
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
@@ -157,10 +164,18 @@ class _ProjectstageSiteSummaryReportState extends State<ProjectstageSiteSummaryR
           const Text('STAGE FINANCE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Spent: ₹ ${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('Budget: ₹ ${budget.toStringAsFixed(0)}', style: const TextStyle(color: Colors.grey)),
+              Expanded(
+                child: Text(
+                  'Spent: ₹ ${grandTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Budget: ₹ ${budget.toStringAsFixed(0)}',
+                style: const TextStyle(color: Colors.grey),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -181,10 +196,18 @@ class _ProjectstageSiteSummaryReportState extends State<ProjectstageSiteSummaryR
           child: GlassCard(
             padding: const EdgeInsets.all(16),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(e.key, style: const TextStyle(fontWeight: FontWeight.w500)),
-                Text('₹ ${e.value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    e.key,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '₹ ${e.value.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           ),

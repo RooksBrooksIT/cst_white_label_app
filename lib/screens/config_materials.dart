@@ -409,6 +409,8 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
           if (_entries.isNotEmpty) _buildEntriesList('category'),
           const SizedBox(height: 16),
           _buildFormActionButtons(),
+          const SizedBox(height: 32),
+          _buildExistingValuesSection('category'),
         ],
       ),
     );
@@ -469,6 +471,8 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
           if (_entries.isNotEmpty) _buildEntriesList('unit'),
           const SizedBox(height: 16),
           _buildFormActionButtons(),
+          const SizedBox(height: 32),
+          _buildExistingValuesSection('unit'),
         ],
       ),
     );
@@ -479,9 +483,9 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'New Entries to Save:',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Text(
+            'New ${type[0].toUpperCase() + type.substring(1)}s to Save:',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           ListView.builder(
@@ -490,11 +494,8 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
             itemCount: _entries.length,
             itemBuilder: (context, index) {
               final entry = _entries[index];
-              final value = type == 'category'
-                  ? entry['category']
-                  : entry['unit'];
-              if (value == null || value.isEmpty)
-                return const SizedBox.shrink();
+              final value = type == 'category' ? entry['category'] : entry['unit'];
+              if (value == null || value.isEmpty) return const SizedBox.shrink();
               return ListTile(
                 title: Text(value),
                 contentPadding: EdgeInsets.zero,
@@ -510,6 +511,93 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildExistingValuesSection(String type) {
+    final collectionName = type == 'category' ? 'materialCategories' : 'materialUnits';
+    final fieldName = type == 'category' ? 'matCategory' : 'matUnit';
+    final color = type == 'category' 
+        ? Theme.of(context).colorScheme.primary 
+        : Theme.of(context).colorScheme.secondary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Existing ${type[0].toUpperCase() + type.substring(1)}s',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirestoreService.getCollection(collectionName).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return GlassCard(
+                child: Center(
+                  child: Text(
+                    'No existing ${type}s found.',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+              );
+            }
+
+            final docs = snapshot.data!.docs;
+            // Sort alphabetically by the field name
+            docs.sort((a, b) {
+              final valA = (a.data() as Map<String, dynamic>)[fieldName]?.toString() ?? '';
+              final valB = (b.data() as Map<String, dynamic>)[fieldName]?.toString() ?? '';
+              return valA.toLowerCase().compareTo(valB.toLowerCase());
+            });
+
+            return GlassCard(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: docs.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final value = data[fieldName]?.toString() ?? 'N/A';
+                  final id = docs[index].id;
+
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      value,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      'ID: $id',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: color.withOpacity(0.1),
+                      child: Text(
+                        (index + 1).toString(),
+                        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

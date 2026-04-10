@@ -519,23 +519,24 @@ class _MaterialScreenState extends State<MaterialScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Autocomplete<Map<String, dynamic>>(
-                    optionsBuilder: (v) => materials.where(
-                      (m) => m['materialName']
-                          .toString()
-                          .toLowerCase()
-                          .contains(v.text.toLowerCase()),
-                    ),
-                    displayStringForOption: (m) => m['materialName'].toString(),
-                    fieldViewBuilder: (ctx, ctrl, node, onSub) {
-                      return GlassTextField(
-                        controller: ctrl,
-                        node: node,
-                        label: 'Material Name',
-                        icon: Icons.search,
+                  _buildDropdown(
+                    label: 'Material Name',
+                    value: selectedMaterialRef?.path,
+                    items: materials
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: (m['ref'] as DocumentReference).path,
+                            child: Text(m['materialName'].toString()),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      final mat = materials.firstWhere(
+                        (m) => (m['ref'] as DocumentReference).path == v,
                       );
+                      _onMaterialSelected(mat);
                     },
-                    onSelected: _onMaterialSelected,
                   ),
                   const SizedBox(height: 12),
                   GlassTextField(

@@ -4,6 +4,7 @@ import 'package:demo_cst/screens/daily_site_report.dart';
 import 'package:demo_cst/screens/site_expenses_reportpage.dart';
 import 'package:demo_cst/screens/site_summary_page.dart';
 import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 import '../utils/list_extensions.dart';
 
 import '../widgets/glass_scaffold.dart';
@@ -77,9 +78,7 @@ class _OrganizationInsightsScreenState
   }
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
-        .get();
+    final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries').get();
     return querySnapshot.docs
         .map((doc) => SupervisorEntry.fromFirestore(doc))
         .toList();
@@ -231,7 +230,7 @@ class _OrganizationInsightsScreenState
     final colorScheme = theme.colorScheme;
 
     return GlassScaffold(
-      title: 'Insights Dashboard',
+      title: 'Expenses Report',
       appBarBackgroundColor: Theme.of(context).colorScheme.primary,
       appBarForegroundColor: Theme.of(context).colorScheme.onPrimary,
       onBack: () => Navigator.pop(context),

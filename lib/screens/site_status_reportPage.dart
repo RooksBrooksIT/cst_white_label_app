@@ -401,25 +401,27 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveIconColor = iconColor ?? Theme.of(context).primaryColor;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 20, color: effectiveIconColor),
         const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-              color: Color(0xFF7f8c8d),
-            ),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            color: Color(0xFF7f8c8d),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: Color(0xFF2c3e50),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFF2c3e50),
+            ),
           ),
         ),
       ],

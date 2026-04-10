@@ -600,7 +600,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
@@ -609,11 +609,15 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               color: textColor.withOpacity(0.7),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: textColor,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ),
         ],
