@@ -22,7 +22,6 @@ import 'org_menu_screen.dart';
 import 'manager_config_screen.dart';
 import 'org_subscription_page.dart';
 
-
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
 
@@ -60,7 +59,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         return GlassScaffold(
           title: appName.isNotEmpty ? appName : 'Organization Dashboard',
           actions: [
-
             IconButton(
               icon: const Icon(Icons.menu_rounded),
               tooltip: 'Menu',
@@ -68,7 +66,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               onPressed: () => _navigateToOrgMenu(context),
             ),
           ],
-          drawer: _buildDrawer(context),
           body: _buildBody(context),
         );
       },
@@ -78,7 +75,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Widget _buildDrawer(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Drawer(
       backgroundColor: theme.scaffoldBackgroundColor,
       child: Column(
@@ -103,7 +100,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const OrganizationSubscriptionPage(),
+                        builder: (context) =>
+                            const OrganizationSubscriptionPage(),
                       ),
                     );
                   },
@@ -144,9 +142,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
       decoration: BoxDecoration(
         color: theme.primaryColor,
-        borderRadius: const BorderRadius.only(
-          bottomRight: Radius.circular(32),
-        ),
+        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(32)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,7 +153,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.business_rounded, color: Colors.white, size: 30),
+            child: const Icon(
+              Icons.business_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
           const SizedBox(height: 16),
           ValueListenableBuilder<String>(
@@ -175,10 +175,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ),
           const Text(
             'Organization Admin',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),
