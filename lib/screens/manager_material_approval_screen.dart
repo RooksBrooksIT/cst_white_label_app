@@ -163,10 +163,13 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          Expanded(
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ],
       ),
     );

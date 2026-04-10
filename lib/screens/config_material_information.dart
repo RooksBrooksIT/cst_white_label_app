@@ -181,15 +181,18 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       final Map<String, Map<String, dynamic>> latestByName = {};
       for (final doc in querySnapshot.docs) {
         final data = doc.data();
-        final name = (data['materialname'] ?? '').toString().trim();
+        // Check for both materialName and materialname
+        final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
         if (name.isEmpty) continue;
+        
         final count = _parseCount(data['count']);
-        final lastUpdatedMs = _tsMillis(data['lastupdated']);
+        // Check for both lastupdated and lastUpdated
+        final lastUpdatedMs = _tsMillis(data['lastupdated'] ?? data['lastUpdated']);
 
         if (!latestByName.containsKey(name)) {
           latestByName[name] = {
             'docId': doc.id,
-            'materialName': name, // use field value as the logical key
+            'materialName': name,
             'displayName': name,
             'count': count,
             'lastupdatedMillis': lastUpdatedMs,
@@ -197,7 +200,6 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         } else {
           final existing = latestByName[name]!;
           final existingTs = existing['lastupdatedMillis'];
-          // Replace if this doc has a newer timestamp in millis
           final isNewer = lastUpdatedMs > (existingTs as int? ?? -1);
           if (isNewer) {
             latestByName[name] = {
@@ -256,7 +258,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           querySnapshot.docs
               .map((doc) {
                 final data = doc.data();
-                final name = (data['materialname'] ?? '').toString().trim();
+                // Check for both materialName and materialname
+                final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
                 if (name.isEmpty) return null;
                 final count = _parseCount(data['count']);
                 return {

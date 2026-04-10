@@ -148,10 +148,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           ),
           const Divider(height: 24),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Client Name', style: theme.textTheme.bodySmall),
-              Text(widget.ownerName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.ownerName,
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
         ],
@@ -212,12 +218,19 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Text(label, style: theme.textTheme.bodySmall),
-          const Spacer(),
-          Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
@@ -228,6 +241,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
@@ -236,8 +250,14 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           ),
           const SizedBox(width: 16),
           Text(label, style: theme.textTheme.bodyMedium),
-          const Spacer(),
-          Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: color),
+            ),
+          ),
         ],
       ),
     );

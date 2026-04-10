@@ -19,11 +19,9 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
   static const double cardElevation = 4.0; // subtle shadow uplift
 
   // Firestore references
-  final _categoriesRef =
-      FirestoreService.getCollection('materialCategories');
+  final _categoriesRef = FirestoreService.getCollection('materialCategories');
   final _unitsRef = FirestoreService.getCollection('materialUnits');
-  final _subCatRef =
-      FirestoreService.getCollection('materialSubCategories');
+  final _subCatRef = FirestoreService.getCollection('materialSubCategories');
 
   // Dropdown data
   List<DocumentSnapshot> _categories = [];
@@ -100,8 +98,9 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
 
       await _subCatRef.doc(subCatId).set({
         // Store as Firestore reference
-        'matCategory':
-            FirestoreService.getCollection('materialCategories').doc(category.id),
+        'matCategory': FirestoreService.getCollection(
+          'materialCategories',
+        ).doc(category.id),
         'matUnit': FirestoreService.getCollection('materialUnits').doc(unit.id),
         'matSubCategory': subCategory,
         'created_at': FieldValue.serverTimestamp(),
@@ -163,9 +162,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
         content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -176,9 +173,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
         content: Text(message),
         backgroundColor: Colors.orange,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -189,9 +184,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
         content: Text(message),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -210,145 +203,351 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
     return GlassScaffold(
       title: 'Material Sub Category Master',
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(defaultPadding),
-              child: GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Add New Sub Category',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Material Category',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<DocumentSnapshot>(
-                      value: _selectedCategory,
-                      decoration: InputDecoration(
-                        hintText: 'Select category',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(borderRadius),
-                        ),
-                        filled: true,
-                        prefixIcon: Icon(Icons.category, color: primaryColor),
-                      ),
-                      isExpanded: true,
-                      dropdownColor: theme.cardColor,
-                      items: _categories.map((cat) {
-                        final data = cat.data() as Map<String, dynamic>? ?? {};
-                        final displayName =
-                            data['matCategory']?.toString() ?? cat.id;
-                        return DropdownMenuItem(
-                          value: cat,
-                          child: Text(
-                            displayName,
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) =>
-                          setState(() => _selectedCategory = value),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Material Unit',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<DocumentSnapshot>(
-                      value: _selectedUnit,
-                      decoration: InputDecoration(
-                        hintText: 'Select unit',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(borderRadius),
-                        ),
-                        filled: true,
-                        prefixIcon: Icon(Icons.straighten, color: primaryColor),
-                      ),
-                      isExpanded: true,
-                      dropdownColor: theme.cardColor,
-                      items: _units.map((unit) {
-                        final data = unit.data() as Map<String, dynamic>? ?? {};
-                        final displayName =
-                            data['matUnit']?.toString() ?? unit.id;
-                        return DropdownMenuItem(
-                          value: unit,
-                          child: Text(
-                            displayName,
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) => setState(() => _selectedUnit = value),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Material Sub Category',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _subCategoryController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter sub category',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(borderRadius),
-                        ),
-                        filled: true,
-                        prefixIcon:
-                            Icon(Icons.label_important, color: primaryColor),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
+              child: Column(
+                children: [
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: GlassButton(
-                            label: 'SAVE',
-                            onPressed:
-                                _loading ? null : _showSaveConfirmationDialog,
+                        Text(
+                          'Add New Sub Category',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: primaryColor,
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: GlassButton(
-                            label: 'CANCEL',
-                            onPressed: _loading
-                                ? null
-                                : () {
-                                    _cancel();
-                                    Navigator.of(context).pop();
-                                  },
-                            isSecondary: true,
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Material Category',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<DocumentSnapshot>(
+                          value: _selectedCategory,
+                          decoration: InputDecoration(
+                            hintText: 'Select category',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(borderRadius),
+                            ),
+                            filled: true,
+                            prefixIcon: Icon(
+                              Icons.category,
+                              color: primaryColor,
+                            ),
+                          ),
+                          isExpanded: true,
+                          dropdownColor: theme.cardColor,
+                          items: _categories.map((cat) {
+                            final data =
+                                cat.data() as Map<String, dynamic>? ?? {};
+                            final displayName =
+                                data['matCategory']?.toString() ?? cat.id;
+                            return DropdownMenuItem(
+                              value: cat,
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) =>
+                              setState(() => _selectedCategory = value),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Material Unit',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<DocumentSnapshot>(
+                          value: _selectedUnit,
+                          decoration: InputDecoration(
+                            hintText: 'Select unit',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(borderRadius),
+                            ),
+                            filled: true,
+                            prefixIcon: Icon(
+                              Icons.straighten,
+                              color: primaryColor,
+                            ),
+                          ),
+                          isExpanded: true,
+                          dropdownColor: theme.cardColor,
+                          items: _units.map((unit) {
+                            final data =
+                                unit.data() as Map<String, dynamic>? ?? {};
+                            final displayName =
+                                data['matUnit']?.toString() ?? unit.id;
+                            return DropdownMenuItem(
+                              value: unit,
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) =>
+                              setState(() => _selectedUnit = value),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Material Sub Category',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _subCategoryController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter sub category',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(borderRadius),
+                            ),
+                            filled: true,
+                            prefixIcon: Icon(
+                              Icons.label_important,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GlassButton(
+                                label: 'SAVE',
+                                onPressed: _loading
+                                    ? null
+                                    : _showSaveConfirmationDialog,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: GlassButton(
+                                label: 'CANCEL',
+                                onPressed: _loading
+                                    ? null
+                                    : () {
+                                        _cancel();
+                                        Navigator.of(context).pop();
+                                      },
+                                isSecondary: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildExistingValuesSection(),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildExistingValuesSection() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Existing Sub Categories',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot>(
+          stream: _subCatRef.snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return GlassCard(
+                child: Center(
+                  child: Text(
+                    'No existing sub categories found.',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+              );
+            }
+
+            final docs = snapshot.data!.docs;
+            // Sort alphabetically by the sub-category name
+            docs.sort((a, b) {
+              final valA =
+                  (a.data() as Map<String, dynamic>)['matSubCategory']
+                      ?.toString() ??
+                  '';
+              final valB =
+                  (b.data() as Map<String, dynamic>)['matSubCategory']
+                      ?.toString() ??
+                  '';
+              return valA.toLowerCase().compareTo(valB.toLowerCase());
+            });
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final data = docs[index].data() as Map<String, dynamic>;
+                final subCategory = data['matSubCategory']?.toString() ?? 'N/A';
+                final catRef = data['matCategory'] as DocumentReference?;
+                final unitRef = data['matUnit'] as DocumentReference?;
+                final id = docs[index].id;
+
+                return GlassCard(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      subCategory,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.category,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            _ReferenceText(
+                              reference: catRef,
+                              fieldName: 'matCategory',
+                              fallback: 'Unknown Category',
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(
+                              Icons.straighten,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            _ReferenceText(
+                              reference: unitRef,
+                              fieldName: 'matUnit',
+                              fallback: 'Unknown Unit',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID: $id',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-            ),
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: primaryColor.withOpacity(0.1),
+                      child: Text(
+                        (index + 1).toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// A small helper widget to resolve a Firestore reference to a name string
+class _ReferenceText extends StatelessWidget {
+  final DocumentReference? reference;
+  final String fieldName;
+  final String fallback;
+
+  const _ReferenceText({
+    required this.reference,
+    required this.fieldName,
+    required this.fallback,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (reference == null) {
+      return Text(
+        fallback,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: reference!.get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(strokeWidth: 1),
+          );
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Text(
+            fallback,
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          );
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        final value = data?[fieldName]?.toString() ?? fallback;
+
+        return Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.black87,
+            fontWeight: FontWeight.w500,
+          ),
+        );
+      },
     );
   }
 }

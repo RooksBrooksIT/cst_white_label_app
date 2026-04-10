@@ -658,18 +658,20 @@ class _SiteScreenState extends State<SiteScreen>
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  date == null
-                      ? 'Select $label'
-                      : DateFormat('MMM d, yyyy').format(date),
-                  style: TextStyle(
-                    color: date == null ? Colors.grey.shade600 : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                Expanded(
+                  child: Text(
+                    date == null
+                        ? 'Select $label'
+                        : DateFormat('MMM d, yyyy').format(date),
+                    style: TextStyle(
+                      color: date == null ? Colors.grey.shade600 : Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Icon(Icons.calendar_today, color: primaryColor, size: 22),
               ],
             ),
