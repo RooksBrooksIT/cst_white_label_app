@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../services/firestore_service.dart';
 import 'dart:async';
+
 
 class DailySitePaymentReportScreen extends StatefulWidget {
   const DailySitePaymentReportScreen({super.key});
@@ -47,54 +49,62 @@ class _DailySitePaymentReportScreenState
 
   Future<void> _fetchSiteIdsAndDetails() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorPayments')
+      // 1. Fetch all site mappings
+      final mappingSnapshot = await FirestoreService.siteSupervisorMap
           .get()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException(
-                'Site details query timeout',
-                const Duration(seconds: 10),
-              );
-            },
-          );
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
       final ids = <String>{};
       final details = <String, Map<String, String>>{};
-      for (var doc in snapshot.docs) {
+      
+      for (var doc in mappingSnapshot.docs) {
         final data = doc.data();
-        final siteId = data['siteId']?.toString();
-        if (siteId != null && siteId.isNotEmpty) {
+        final siteId = data['site']?.toString() ?? doc.id;
+        if (siteId.isNotEmpty) {
           ids.add(siteId);
           details[siteId] = {
-            'project': data['projectName']?.toString() ?? '',
-            'supervisor': data['supervisorName']?.toString() ?? '',
+            'project': '', // Will be filled from siteId parsing or projects collection
+            'supervisor': data['supervisor']?.toString() ?? '',
           };
+          
+          // Try to extract project name from siteId if it follows the pattern siteName_projectName
+          if (siteId.contains('_')) {
+            final parts = siteId.split('_');
+            if (parts.length > 1) {
+              details[siteId]!['project'] = parts.sublist(1).join('_');
+            }
+          }
+        }
+      }
+
+      // 2. Fetch Projects to possibly get better project names
+      final projectsSnapshot = await FirestoreService.projects.get();
+      for (var doc in projectsSnapshot.docs) {
+        final data = doc.data();
+        final siteId = data['siteId']?.toString();
+        if (siteId != null && details.containsKey(siteId)) {
+          details[siteId]!['project'] = data['projectName']?.toString() ?? details[siteId]!['project']!;
         }
       }
 
       if (mounted) {
         setState(() {
-          siteIds = ids.toList();
+          siteIds = ids.toList()..sort();
           siteDetails = details;
         });
       }
-    } on TimeoutException catch (e) {
-      print('Timeout fetching site details: $e');
+    } catch (e) {
+      debugPrint('Error fetching site IDs and details: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to load site data. Please retry.'),
-          ),
+          const SnackBar(content: Text('Failed to load site data')),
         );
       }
-    } catch (e) {
-      print('Error fetching site IDs and details: $e');
     }
   }
+
 
   void _updateProjectAndSupervisor() {
     if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
@@ -178,11 +188,11 @@ class _DailySitePaymentReportScreenState
       'MMM',
     ).format(DateTime(selectedYear, selectedMonth));
     String period = '${selectedYear}_${monthStr}_Week${selectedWeekIndex! + 1}';
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorPayments')
+    final snapshot = await FirestoreService.siteSupervisorPayments
         .where('siteId', isEqualTo: selectedSiteId)
         .where('paymentPeriod', isEqualTo: period)
         .get();
+
     List<Map<String, dynamic>> paymentsList = [];
     double sum = 0.0;
     for (var doc in snapshot.docs) {

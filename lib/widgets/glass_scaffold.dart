@@ -11,6 +11,9 @@ class GlassScaffold extends StatelessWidget {
   final Color? appBarBackgroundColor;
   final Color? appBarForegroundColor;
   final Widget? bottomNavigationBar;
+  final Widget? drawer;
+  final Widget? endDrawer;
+
 
   const GlassScaffold({
     super.key,
@@ -24,7 +27,10 @@ class GlassScaffold extends StatelessWidget {
     this.appBarBackgroundColor,
     this.appBarForegroundColor,
     this.bottomNavigationBar,
+    this.drawer,
+    this.endDrawer,
   });
+
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +89,10 @@ class GlassScaffold extends StatelessWidget {
             )
           : null,
       floatingActionButton: floatingActionButton,
+      drawer: drawer,
+      endDrawer: endDrawer,
       body: SafeArea(
+
         child: Padding(
           padding: padding ?? const EdgeInsets.all(16),
           child: body,
