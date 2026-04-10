@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/widgets/glass_card.dart';
 import '../widgets/glass_scaffold.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
-  const SupervisorWorkSchedulePage(
-      {super.key, required this.supervisorId, required this.supervisorName});
+  const SupervisorWorkSchedulePage({
+    super.key,
+    required this.supervisorId,
+    required this.supervisorName,
+  });
 
   @override
   _SupervisorWorkSchedulePageState createState() =>
@@ -46,6 +53,12 @@ class _SupervisorWorkSchedulePageState
   final List<Map<String, dynamic>> _addedLabours = [];
   int _selectedLabourCount = 1;
 
+  // Calendar and Availability state
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedStartDate;
+  Map<String, List<String>> _busyWorkersByDate = {}; // dateStr -> [workerIds]
+  bool _isLoadingAvailability = false;
+
   Color get mainColor => Theme.of(context).colorScheme.primary;
 
   @override
@@ -54,11 +67,51 @@ class _SupervisorWorkSchedulePageState
     _fetchSitesForSupervisor();
     _fetchProjectPhases();
     _fetchLabours();
+    _fetchAvailabilityForMonth(_focusedDay);
+  }
+
+  Future<void> _fetchAvailabilityForMonth(DateTime monthDate) async {
+    setState(() => _isLoadingAvailability = true);
+    final monthStr = DateFormat('yyyy-MM').format(monthDate);
+
+    try {
+      final snapshot = await FirestoreService.getCollection(
+        'WorkerMonthlyAttendance',
+      ).where('month', isEqualTo: monthStr).get();
+
+      Map<String, List<String>> newBusyMap = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final workerId = data['workerId']?.toString() ?? doc.id;
+        final attendanceData =
+            data['attendanceData'] as Map<String, dynamic>? ?? {};
+
+        attendanceData.forEach((dateStr, details) {
+          if (details is Map) {
+            final status = details['status']?.toString().toLowerCase() ?? '';
+            if (status == 'present' ||
+                status == 'overtime' ||
+                status == 'half day') {
+              newBusyMap.putIfAbsent(dateStr, () => []).add(workerId);
+            }
+          }
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _busyWorkersByDate = newBusyMap;
+        _isLoadingAvailability = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching availability: $e');
+      if (mounted) setState(() => _isLoadingAvailability = false);
+    }
   }
 
   Future<void> _fetchLabours() async {
-    final snapshot =
-        await FirestoreService.getCollection('labours').get();
+    final snapshot = await FirestoreService.getCollection('labours').get();
     setState(() {
       _labours = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -79,8 +132,9 @@ class _SupervisorWorkSchedulePageState
     setState(() {
       _loadingPhases = true;
     });
-    final snapshot =
-        await FirestoreService.getCollection('projectStages').get();
+    final snapshot = await FirestoreService.getCollection(
+      'projectStages',
+    ).get();
     final phases = snapshot.docs
         .map((doc) => doc['projectStage']?.toString() ?? '')
         .where((s) => s.isNotEmpty)
@@ -104,24 +158,24 @@ class _SupervisorWorkSchedulePageState
       _supervisorSiteError = null;
     });
     try {
-      final querySnapshot = await FirestoreService
-          .getCollection('siteSupervisorMap')
-          .where('Supervisor ID', isEqualTo: widget.supervisorId)
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('Supervisor ID', isEqualTo: widget.supervisorId).get();
 
       if (querySnapshot.docs.isNotEmpty) {
         List<Map<String, dynamic>> tempSiteMaps = [];
         for (var d in querySnapshot.docs) {
           final data = d.data();
           data['id'] = d['site'];
-          final siteDoc = await FirestoreService
-              .getCollection('sites')
-              .doc(d['site'])
-              .get();
-          final siteName =
-              siteDoc.exists ? (siteDoc.data()?['siteName'] ?? '') : '';
-          data['displayName'] =
-              siteName.isNotEmpty ? '${d['site']}_$siteName' : d['site'];
+          final siteDoc = await FirestoreService.getCollection(
+            'sites',
+          ).doc(d['site']).get();
+          final siteName = siteDoc.exists
+              ? (siteDoc.data()?['siteName'] ?? '')
+              : '';
+          data['displayName'] = siteName.isNotEmpty
+              ? '${d['site']}_$siteName'
+              : d['site'];
           tempSiteMaps.add(data);
         }
         _siteMaps = tempSiteMaps;
@@ -149,8 +203,10 @@ class _SupervisorWorkSchedulePageState
 
   void _updateSiteDetails(String? siteId) {
     if (siteId == null) return;
-    final site =
-        _siteMaps.firstWhere((s) => s['id'] == siteId, orElse: () => {});
+    final site = _siteMaps.firstWhere(
+      (s) => s['id'] == siteId,
+      orElse: () => {},
+    );
     setState(() {
       _siteLocation = site['location'] as String?;
       _projectStage = site['projectStage'] as String?;
@@ -164,8 +220,8 @@ class _SupervisorWorkSchedulePageState
       _projectPhaseController.text = site['projectStage'] ?? '';
       _selectedProjectPhase =
           (_projectStage != null && _projectPhases.contains(_projectStage))
-              ? _projectStage
-              : null;
+          ? _projectStage
+          : null;
     });
   }
 
@@ -206,10 +262,11 @@ class _SupervisorWorkSchedulePageState
         _supervisorController.text.trim().isEmpty ||
         _projectNameController.text.trim().isEmpty ||
         _projectPhaseController.text.trim().isEmpty ||
+        _selectedStartDate == null ||
         int.tryParse(_daysController.text.trim()) == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please fill all fields and enter number of days.'),
+          content: Text('Please select a Start Date and fill all fields.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -222,20 +279,17 @@ class _SupervisorWorkSchedulePageState
     });
 
     try {
-      final grandTotal = _addedLabours.fold<int>(
-        0,
-        (sum, labour) {
-          final countRaw = labour['count'];
-          final count = (countRaw is int)
-              ? countRaw
-              : int.tryParse(countRaw?.toString() ?? '1') ?? 1;
-          final salaryRaw = labour['salary'];
-          final salary = (salaryRaw is int)
-              ? salaryRaw
-              : int.tryParse(salaryRaw?.toString() ?? '0') ?? 0;
-          return sum + (salary * count);
-        },
-      );
+      final grandTotal = _addedLabours.fold<int>(0, (sum, labour) {
+        final countRaw = labour['count'];
+        final count = (countRaw is int)
+            ? countRaw
+            : int.tryParse(countRaw?.toString() ?? '1') ?? 1;
+        final salaryRaw = labour['salary'];
+        final salary = (salaryRaw is int)
+            ? salaryRaw
+            : int.tryParse(salaryRaw?.toString() ?? '0') ?? 0;
+        return sum + (salary * (count as int));
+      });
       final numberOfDays = _numberOfDays ?? 1;
       final grandTotalWithDays = grandTotal * numberOfDays;
       final estimatedPayment = grandTotalWithDays;
@@ -244,18 +298,16 @@ class _SupervisorWorkSchedulePageState
         return {
           'labourDesignation': labour['designation'] ?? '',
           'labourCount': (labour['count'] is int)
-              ? labour['count']
+              ? labour['count'] as int
               : int.tryParse(labour['count']?.toString() ?? '1') ?? 1,
         };
       }).toList();
 
       String wsReqId = 'WSR001';
       try {
-        final querySnapshot = await FirestoreService
-            .getCollection('siteSupervisorProjectStageSchedule')
-            .orderBy('wsReqId', descending: true)
-            .limit(1)
-            .get();
+        final querySnapshot = await FirestoreService.getCollection(
+          'siteSupervisorProjectStageSchedule',
+        ).orderBy('wsReqId', descending: true).limit(1).get();
         if (querySnapshot.docs.isNotEmpty) {
           final lastId = querySnapshot.docs.first['wsReqId'] as String?;
           if (lastId != null && lastId.startsWith('WSR')) {
@@ -275,10 +327,9 @@ class _SupervisorWorkSchedulePageState
 
       final docId = '${siteId}_${supervisorName}_$projectStage';
 
-      await FirestoreService
-          .getCollection('siteSupervisorProjectStageSchedule')
-          .doc(docId)
-          .set({
+      await FirestoreService.getCollection(
+        'siteSupervisorProjectStageSchedule',
+      ).doc(docId).set({
         'wsReqId': wsReqId,
         'siteId': siteId,
         'projectName': projectName,
@@ -288,6 +339,9 @@ class _SupervisorWorkSchedulePageState
         'estimatedPayment': estimatedPayment,
         'reqDays': reqDays,
         'reqLabours': reqLabours,
+        'startDate': _selectedStartDate != null
+            ? Timestamp.fromDate(_selectedStartDate!)
+            : null,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -316,8 +370,9 @@ class _SupervisorWorkSchedulePageState
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Submit for Approval', style: TextStyle(color: mainColor)),
-        content:
-            Text('Are you sure you want to submit this schedule for approval?'),
+        content: Text(
+          'Are you sure you want to submit this schedule for approval?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -343,497 +398,757 @@ class _SupervisorWorkSchedulePageState
       body: _isLoadingSupervisorSite
           ? Center(child: CircularProgressIndicator(color: mainColor))
           : _supervisorSiteError != null
-              ? Center(
-                  child: Text(_supervisorSiteError!,
-                      style: TextStyle(color: Colors.red, fontSize: 16)),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ? Center(
+              child: Text(
+                _supervisorSiteError!,
+                style: TextStyle(color: Colors.red, fontSize: 16),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: 24.0, horizontal: 20.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.person, color: mainColor, size: 36),
-                                  SizedBox(height: 10),
-                                  Text(
-                                    widget.supervisorName,
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: mainColor,
-                                      letterSpacing: 1.2,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'ID: ${widget.supervisorId}',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        ],
-                      ),
-                      SizedBox(height: 20),
                       Card(
                         elevation: 4,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        color: Theme.of(context).colorScheme.primaryContainer,
                         child: Padding(
-                          padding: EdgeInsets.all(20.0),
+                          padding: EdgeInsets.symmetric(
+                            vertical: 24.0,
+                            horizontal: 20.0,
+                          ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              DropdownButtonFormField<String>(
-                                value: _selectedSiteId,
-                                decoration: InputDecoration(
-                                  labelText: 'Site ID',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide:
-                                        BorderSide(color: Colors.grey),
-                                  ),
-                                  prefixIcon:
-                                      Icon(Icons.location_on_outlined, color: mainColor),
-                                  filled: true,
-                                  fillColor: Colors.grey[50],
+                              Icon(Icons.person, color: mainColor, size: 36),
+                              SizedBox(height: 10),
+                              Text(
+                                widget.supervisorName,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: mainColor,
+                                  letterSpacing: 1.2,
                                 ),
-                                items: _siteMaps.map((site) {
-                                  final siteId = site['id']?.toString() ?? '';
-                                  final displayName =
-                                      site['displayName']?.toString() ?? siteId;
-                                  return DropdownMenuItem(
-                                    value: siteId,
-                                    child: Text(
-                                      displayName,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedSiteId = value;
-                                    _updateSiteDetails(value);
-                                  });
-                                },
+                                textAlign: TextAlign.center,
                               ),
-                              SizedBox(height: 20),
-                              Text('Project Stage: ${_projectStage ?? "-"}',
-                                  style: TextStyle(fontSize: 16)),
-                              Text('Location: ${_siteLocation ?? "-"}',
-                                  style: TextStyle(fontSize: 16)),
-                              SizedBox(height: 20),
-                              _buildTextField(_locationController, 'Location',
-                                  Icons.map_outlined),
-                              SizedBox(height: 20),
-                              _buildTextField(_supervisorController, 'Supervisor',
-                                  Icons.person_outline),
-                              SizedBox(height: 20),
-                              _buildTextField(_projectNameController, 'Project Name',
-                                  Icons.work_outline),
-                              SizedBox(height: 20),
-                              _buildTextField(_projectPhaseController, 'Project Stage',
-                                  Icons.work_outline),
-                              SizedBox(height: 20),
-                              TextField(
-                                controller: _daysController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Number of Days',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide:
-                                        BorderSide(color: Colors.grey),
-                                  ),
-                                  prefixIcon:
-                                      Icon(Icons.calendar_today, color: mainColor),
-                                  filled: true,
-                                  fillColor: Colors.grey[50],
-                                ),
+                              SizedBox(height: 6),
+                              Text(
+                                'ID: ${widget.supervisorId}',
+                                style: TextStyle(fontSize: 16),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      SizedBox(height: 20),
-                      Card(
-                        elevation: 6,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
+                    ],
+                  ),
+                  SizedBox(height: 20),
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: _selectedSiteId,
+                            decoration: InputDecoration(
+                              labelText: 'Site ID',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.location_on_outlined,
                                 color: mainColor,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(18),
-                                  topRight: Radius.circular(18),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            items: _siteMaps.map((site) {
+                              final siteId = site['id']?.toString() ?? '';
+                              final displayName =
+                                  site['displayName']?.toString() ?? siteId;
+                              return DropdownMenuItem(
+                                value: siteId,
+                                child: Text(
+                                  displayName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedSiteId = value;
+                                _updateSiteDetails(value);
+                              });
+                            },
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            'Project Stage: ${_projectStage ?? "-"}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Text(
+                            'Location: ${_siteLocation ?? "-"}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          SizedBox(height: 20),
+                          _buildTextField(
+                            _locationController,
+                            'Location',
+                            Icons.map_outlined,
+                          ),
+                          SizedBox(height: 20),
+                          _buildTextField(
+                            _supervisorController,
+                            'Supervisor',
+                            Icons.person_outline,
+                          ),
+                          SizedBox(height: 20),
+                          _buildTextField(
+                            _projectNameController,
+                            'Project Name',
+                            Icons.work_outline,
+                          ),
+                          SizedBox(height: 20),
+                          _buildTextField(
+                            _projectPhaseController,
+                            'Project Stage',
+                            Icons.work_outline,
+                          ),
+                          SizedBox(height: 20),
+                          TextField(
+                            controller: _daysController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Number of Days',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.calendar_today,
+                                color: mainColor,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  _buildCalendar(),
+                  SizedBox(height: 20),
+                  Card(
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: mainColor,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(18),
+                              topRight: Radius.circular(18),
+                            ),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.group_add, size: 26),
+                              SizedBox(width: 10),
+                              Text(
+                                'Add Labour',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              padding: EdgeInsets.symmetric(
-                                  vertical: 16, horizontal: 20),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.group_add,
-                                       size: 26),
-                                  SizedBox(width: 10),
-                                  Text('Add Labour',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        
-                                      )),
-                                ],
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _labours.isEmpty
-                                      ? Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'No labours found. Please add labours in Firestore.',
-                                              style:
-                                                  TextStyle(color: Colors.red),
-                                            ),
-                                            SizedBox(height: 10),
-                                          ],
-                                        )
-                                      : DropdownButtonFormField<
-                                          Map<String, dynamic>>(
-                                          value: _selectedLabour,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: 'Select Labour',
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              borderSide:
-                                                  BorderSide(color: mainColor),
-                                            ),
-                                            prefixIcon:
-                                                Icon(Icons.person, color: mainColor),
-                                            filled: true,
-                                            
-                                          ),
-                                          items: _labours.map((labour) {
-                                            final designation =
-                                                labour['designation'] ?? '';
-                                            final labourId =
-                                                labour['labourId'] ?? '';
-                                            return DropdownMenuItem(
-                                              value: labour,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.badge,
-                                                      color: mainColor, size: 18),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    '${labour['name'] ?? ''} ',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        ),
-                                                  ),
-                                                  if (designation.isNotEmpty)
-                                                    ...[
-                                                      SizedBox(width: 8),
-                                                      Container(
-                                                        padding:
-                                                            EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 2),
-                                                        decoration: BoxDecoration(
-                                                          color:
-                                                              Theme.of(context).colorScheme.secondaryContainer,
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                  8),
-                                                        ),
-                                                        child: Text(
-                                                            designation,
-                                                            style: TextStyle(
-                                                                fontSize: 12,
-                                                                color: mainColor)),
-                                                      ),
-                                                    ],
-                                                  if (labourId.isNotEmpty)
-                                                    ...[
-                                                      SizedBox(width: 8),
-                                                      Text('($labourId)',
-                                                          style: TextStyle(
-                                                              fontSize: 12,
-                                                              )),
-                                                    ],
-                                                ],
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _selectedLabour = value;
-                                            });
-                                          },
-                                        ),
-                                  SizedBox(height: 20),
-                                  if (_selectedLabour != null) ...[
-                                    Card(
-                                      elevation: 2,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                                      child: Padding(
-                                        padding: EdgeInsets.all(14),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Icon(Icons.assignment_ind,
-                                                    color: mainColor),
-                                                SizedBox(width: 8),
-                                                Text('Designation:',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold)),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                    _selectedLabour![
-                                                            'designation'] ??
-                                                        '-',
-                                                    style: TextStyle(
-                                                        fontSize: 16)),
-                                              ],
-                                            ),
-                                            SizedBox(height: 12),
-                                            Row(
-                                              children: [
-                                                Icon(Icons.confirmation_num,
-                                                    color: mainColor),
-                                                SizedBox(width: 8),
-                                                Text('Count:',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold)),
-                                                SizedBox(width: 8),
-                                                Container(
-                                                  decoration: BoxDecoration(
-                                                    
-                                                    border: Border.all(
-                                                        color: mainColor),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      IconButton(
-                                                        icon: Icon(Icons.remove,
-                                                            size: 18),
-                                                        onPressed:
-                                                            _selectedLabourCount >
-                                                                    1
-                                                                ? () {
-                                                                    setState(() {
-                                                                      _selectedLabourCount--;
-                                                                    });
-                                                                  }
-                                                                : null,
-                                                      ),
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                                horizontal: 8.0),
-                                                        child: Text(
-                                                            '$_selectedLabourCount',
-                                                            style: TextStyle(
-                                                                fontSize: 16)),
-                                                      ),
-                                                      IconButton(
-                                                        icon: Icon(Icons.add,
-                                                            size: 18),
-                                                        onPressed: () {
-                                                          setState(() {
-                                                            _selectedLabourCount++;
-                                                          });
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  SizedBox(height: 20),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      ElevatedButton.icon(
-                                        onPressed: _selectedLabour == null
-                                            ? null
-                                            : () {
-                                                setState(() {
-                                                  final labourToAdd =
-                                                      Map<String, dynamic>.from(
-                                                          _selectedLabour!);
-                                                  labourToAdd['count'] =
-                                                      _selectedLabourCount;
-                                                  _addedLabours.add(labourToAdd);
-                                                  _selectedLabourCount = 1;
-                                                });
-                                              },
-                                        icon: Icon(Icons.add, ),
-                                        label: Text('Add Labours',
-                                            style:
-                                                TextStyle()),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: mainColor,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 24, vertical: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 30),
-                                  if (_addedLabours.isNotEmpty)
-                                    Column(
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _labours.isEmpty
+                                  ? Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text('Added Labours:',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                        SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                        Text(
+                                          'No labours found. Please add labours in Firestore.',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        SizedBox(height: 10),
+                                      ],
+                                    )
+                                  : DropdownButtonFormField<
+                                      Map<String, dynamic>
+                                    >(
+                                      value: _selectedLabour,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: 'Select Labour',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: mainColor,
+                                          ),
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.person,
+                                          color: mainColor,
+                                        ),
+                                        filled: true,
+                                      ),
+                                      items: _labours.map((labour) {
+                                        final designation =
+                                            labour['designation'] ?? '';
+                                        final labourId =
+                                            labour['labourId'] ?? '';
+                                        return DropdownMenuItem(
+                                          value: labour,
+                                          child: Row(
                                             children: [
-                                              DataTable(
-                                                columns: [
-                                                  DataColumn(
-                                                      label:
-                                                          Text('Designation')),
-                                                  DataColumn(label: Text('Count')),
-                                                ],
-                                                rows:
-                                                    _addedLabours.map((labour) {
-                                                  final count =
-                                                      labour['count'] ?? 1;
-                                                  return DataRow(cells: [
-                                                    DataCell(Text(
-                                                        labour['designation'] ??
-                                                            '')),
-                                                    DataCell(
-                                                        Text(count.toString())),
-                                                  ]);
-                                                }).toList(),
+                                              Icon(
+                                                Icons.badge,
+                                                color: mainColor,
+                                                size: 18,
                                               ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                '${labour['name'] ?? ''} ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              if (designation.isNotEmpty) ...[
+                                                SizedBox(width: 8),
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .secondaryContainer,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    designation,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: mainColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                              if (labourId.isNotEmpty) ...[
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  '($labourId)',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
                                             ],
                                           ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedLabour = value;
+                                        });
+                                      },
+                                    ),
+                              SizedBox(height: 20),
+                              if (_selectedLabour != null) ...[
+                                Card(
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerLow,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.assignment_ind,
+                                              color: mainColor,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Designation:',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              _selectedLabour!['designation'] ??
+                                                  '-',
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.confirmation_num,
+                                              color: mainColor,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Count:',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: mainColor,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      Icons.remove,
+                                                      size: 18,
+                                                    ),
+                                                    onPressed:
+                                                        _selectedLabourCount > 1
+                                                        ? () {
+                                                            setState(() {
+                                                              _selectedLabourCount--;
+                                                            });
+                                                          }
+                                                        : null,
+                                                  ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8.0,
+                                                        ),
+                                                    child: Text(
+                                                      '$_selectedLabourCount',
+                                                      style: TextStyle(
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      Icons.add,
+                                                      size: 18,
+                                                    ),
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _selectedLabourCount++;
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
+                                  ),
+                                ),
+                              ],
+                              SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: _selectedLabour == null
+                                        ? null
+                                        : () {
+                                            setState(() {
+                                              final labourToAdd =
+                                                  Map<String, dynamic>.from(
+                                                    _selectedLabour!,
+                                                  );
+                                              labourToAdd['count'] =
+                                                  _selectedLabourCount;
+                                              _addedLabours.add(labourToAdd);
+                                              _selectedLabourCount = 1;
+                                            });
+                                          },
+                                    icon: Icon(Icons.add),
+                                    label: Text(
+                                      'Add Labours',
+                                      style: TextStyle(),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: mainColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 30),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton(
-                            onPressed: _isSubmitting ? null : _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey[600],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 32, vertical: 15),
-                            ),
-                            child: Text('Reset',
-                                style: TextStyle()),
-                          ),
-                          ElevatedButton(
-                            onPressed:
-                                _isSubmitting ? null : _submitForApproval,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: mainColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 32, vertical: 15),
-                            ),
-                            child: _isSubmitting
-                                ? SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      
-                                      strokeWidth: 2,
+                              SizedBox(height: 30),
+                              if (_addedLabours.isNotEmpty)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Added Labours:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  )
-                                : Text('Send for Approval',
-                                    style: TextStyle()),
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          DataTable(
+                                            columns: [
+                                              DataColumn(
+                                                label: Text('Designation'),
+                                              ),
+                                              DataColumn(label: Text('Count')),
+                                            ],
+                                            rows: _addedLabours.map((labour) {
+                                              final count =
+                                                  labour['count'] ?? 1;
+                                              return DataRow(
+                                                cells: [
+                                                  DataCell(
+                                                    Text(
+                                                      labour['designation'] ??
+                                                          '',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    Text(count.toString()),
+                                                  ),
+                                                ],
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
-                        ],
-                      )
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _isSubmitting ? null : _resetForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[600],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 15,
+                          ),
+                        ),
+                        child: Text('Reset', style: TextStyle()),
+                      ),
+                      ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submitForApproval,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: mainColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 15,
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text('Send for Approval', style: TextStyle()),
+                      ),
                     ],
                   ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildCalendar() {
+    return GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.calendar_month, color: mainColor),
+                SizedBox(width: 8),
+                Text(
+                  'Select Start Date',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: mainColor,
+                  ),
                 ),
+                if (_isLoadingAvailability) ...[
+                  SizedBox(width: 12),
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: mainColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(height: 10),
+            TableCalendar(
+              firstDay: DateTime.now().subtract(Duration(days: 30)),
+              lastDay: DateTime.now().add(Duration(days: 365)),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) => isSameDay(_selectedStartDate, day),
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedStartDate = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+              },
+              onPageChanged: (focusedDay) {
+                _focusedDay = focusedDay;
+                _fetchAvailabilityForMonth(focusedDay);
+              },
+              calendarStyle: CalendarStyle(
+                selectedDecoration: BoxDecoration(
+                  color: mainColor,
+                  shape: BoxShape.circle,
+                ),
+                todayDecoration: BoxDecoration(
+                  color: mainColor.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              headerStyle: HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+              ),
+              calendarBuilders: CalendarBuilders(
+                defaultBuilder: (context, day, focusedDay) {
+                  return _buildDayWithAvailability(day);
+                },
+                outsideBuilder: (context, day, focusedDay) {
+                  return Opacity(
+                    opacity: 0.5,
+                    child: _buildDayWithAvailability(day),
+                  );
+                },
+              ),
+            ),
+            if (_selectedStartDate != null) ...[
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'Selected: ${DateFormat('dd MMM yyyy').format(_selectedStartDate!)}',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+            SizedBox(height: 10),
+            Row(
+              children: [
+                _buildLegendItem(Colors.green, 'High Availability'),
+                SizedBox(width: 15),
+                _buildLegendItem(Colors.orange, 'Limited'),
+                SizedBox(width: 15),
+                _buildLegendItem(Colors.red, 'Unavailable'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+      ],
+    );
+  }
+
+  Widget _buildDayWithAvailability(DateTime day) {
+    if (day.isBefore(DateTime.now().subtract(Duration(days: 1)))) {
+      return Center(
+        child: Text('${day.day}', style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(day);
+    final isSelected = isSameDay(_selectedStartDate, day);
+    final isToday = isSameDay(DateTime.now(), day);
+
+    // Calculate availability percentage
+    double availabilityScore = 1.0;
+    if (_addedLabours.isNotEmpty) {
+      int totalRequired = 0;
+      int totalAvailable = 0;
+
+      for (var labour in _addedLabours) {
+        final designation = labour['designation'] ?? '';
+        final count = (labour['count'] is int)
+            ? labour['count'] as int
+            : int.tryParse(labour['count']?.toString() ?? '1') ?? 1;
+        totalRequired += count;
+
+        // Count workers of this designation who are NOT busy
+        final totalWorkersOfDesignation = _labours
+            .where((l) => l['designation'] == designation)
+            .length;
+
+        final busyWorkersOnDate = _busyWorkersByDate[dateStr] ?? [];
+        final busyWorkersOfDesignation = _labours.where((l) {
+          final isSameDesignation = l['designation'] == designation;
+          final workerId =
+              l['labourId']?.toString() ?? l['id']?.toString() ?? '';
+          return isSameDesignation && busyWorkersOnDate.contains(workerId);
+        }).length;
+
+        totalAvailable +=
+            (totalWorkersOfDesignation - busyWorkersOfDesignation);
+      }
+
+      if (totalRequired > 0) {
+        availabilityScore = totalAvailable / totalRequired;
+      }
+    }
+
+    Color highlightColor = Colors.transparent;
+    if (_addedLabours.isEmpty) {
+      highlightColor = Colors.transparent;
+    } else if (availabilityScore >= 1.0) {
+      highlightColor = Colors.green.withOpacity(0.2);
+    } else if (availabilityScore > 0.5) {
+      highlightColor = Colors.orange.withOpacity(0.2);
+    } else {
+      highlightColor = Colors.red.withOpacity(0.2);
+    }
+
+    return Center(
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isSelected ? mainColor : highlightColor,
+          shape: BoxShape.circle,
+          border: isToday ? Border.all(color: mainColor, width: 1) : null,
+        ),
+        child: Center(
+          child: Text(
+            '${day.day}',
+            style: TextStyle(
+              color: isSelected ? Colors.white : (isToday ? mainColor : null),
+              fontWeight: isSelected || isToday
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildTextField(
-      TextEditingController controller, String label, IconData icon) {
+    TextEditingController controller,
+    String label,
+    IconData icon,
+  ) {
     return TextField(
       controller: controller,
       decoration: InputDecoration(

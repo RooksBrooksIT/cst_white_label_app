@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
+import 'worker_calendar_availability_page.dart';
 
 class WorkersAvailabilityReportPage extends StatefulWidget {
   const WorkersAvailabilityReportPage({super.key});
@@ -200,10 +201,31 @@ class _WorkersAvailabilityReportPageState
       itemCount: workers.length,
       itemBuilder: (context, index) {
         final worker = workers[index];
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: GlassCard(
             child: ListTile(
+              onTap: () {
+                final mapping = _selectedMapping;
+                final workerName = worker['workerName'] ?? 'Unnamed worker';
+                final siteId = mapping?['site'] ?? mapping?['id'] ?? 'Unknown';
+                final workerId =
+                    worker['workerId']?.toString() ?? '${workerName}_$siteId';
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WorkerCalendarAvailabilityPage(
+                      workerId: workerId,
+                      workerName: workerName,
+                      workerDesignation:
+                          worker['workerDesignation'] ?? 'Worker',
+                      siteId: siteId.toString(),
+                    ),
+                  ),
+                );
+              },
               leading: CircleAvatar(
                 backgroundColor: colorScheme.primary.withOpacity(0.1),
                 child: Text(
