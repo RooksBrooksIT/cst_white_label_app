@@ -72,28 +72,56 @@ class _SupervisorWorkSchedulePageState
 
   Future<void> _fetchAvailabilityForMonth(DateTime monthDate) async {
     setState(() => _isLoadingAvailability = true);
-    final monthStr = DateFormat('yyyy-MM').format(monthDate);
+    final monthStr = DateFormat('MM-yyyy').format(monthDate);
 
     try {
       final snapshot = await FirestoreService.getCollection(
-        'WorkerMonthlyAttendance',
+        'workersAttendance',
       ).where('month', isEqualTo: monthStr).get();
 
       Map<String, List<String>> newBusyMap = {};
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final workerId = data['workerId']?.toString() ?? doc.id;
-        final attendanceData =
-            data['attendanceData'] as Map<String, dynamic>? ?? {};
+        final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
 
-        attendanceData.forEach((dateStr, details) {
+        String? formattedDate;
+
+        // Priority 1: Use 'day' and 'month' fields (e.g., day: "31", month: "03-2026")
+        final dayField = data['day']?.toString();
+        final monthField = data['month']?.toString();
+
+        if (dayField != null && monthField != null) {
+          final monthParts = monthField.split('-');
+          if (monthParts.length == 2) {
+            formattedDate =
+                '${monthParts[1]}-${monthParts[0]}-${dayField.padLeft(2, '0')}';
+          }
+        }
+
+        // Priority 2: Use legacy 'Day' field (dd/MM/yyyy)
+        if (formattedDate == null) {
+          final legacyDay = data['Day']?.toString() ?? data['day']?.toString();
+          if (legacyDay != null && legacyDay.contains('/')) {
+            final parts = legacyDay.split('/');
+            if (parts.length == 3) {
+              formattedDate = '${parts[2]}-${parts[1]}-${parts[0]}';
+            }
+          }
+        }
+
+        if (formattedDate == null) continue;
+
+        workersMap.forEach((workerIdOrName, details) {
           if (details is Map) {
-            final status = details['status']?.toString().toLowerCase() ?? '';
+            final status =
+                details['attendance']?.toString().toLowerCase() ?? '';
             if (status == 'present' ||
                 status == 'overtime' ||
                 status == 'half day') {
-              newBusyMap.putIfAbsent(dateStr, () => []).add(workerId);
+              newBusyMap
+                  .putIfAbsent(formattedDate!, () => [])
+                  .add(workerIdOrName);
             }
           }
         });
@@ -109,6 +137,7 @@ class _SupervisorWorkSchedulePageState
       if (mounted) setState(() => _isLoadingAvailability = false);
     }
   }
+
 
   Future<void> _fetchLabours() async {
     final snapshot = await FirestoreService.getCollection('labours').get();
@@ -1064,9 +1093,9 @@ class _SupervisorWorkSchedulePageState
   }
 
   Widget _buildDayWithAvailability(DateTime day) {
-    if (day.isBefore(DateTime.now().subtract(Duration(days: 1)))) {
+    if (day.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
       return Center(
-        child: Text('${day.day}', style: TextStyle(color: Colors.grey)),
+        child: Text('${day.day}', style: const TextStyle(color: Colors.grey)),
       );
     }
 
@@ -1076,9 +1105,14 @@ class _SupervisorWorkSchedulePageState
 
     // Calculate availability percentage
     double availabilityScore = 1.0;
+    int busyCount = 0;
+    
+    final busyWorkersOnDate = _busyWorkersByDate[dateStr] ?? [];
+    busyCount = busyWorkersOnDate.length;
+
     if (_addedLabours.isNotEmpty) {
       int totalRequired = 0;
-      int totalAvailable = 0;
+      int totalAvailableForAdded = 0;
 
       for (var labour in _addedLabours) {
         final designation = labour['designation'] ?? '';
@@ -1092,7 +1126,6 @@ class _SupervisorWorkSchedulePageState
             .where((l) => l['designation'] == designation)
             .length;
 
-        final busyWorkersOnDate = _busyWorkersByDate[dateStr] ?? [];
         final busyWorkersOfDesignation = _labours.where((l) {
           final isSameDesignation = l['designation'] == designation;
           final workerId =
@@ -1100,46 +1133,92 @@ class _SupervisorWorkSchedulePageState
           return isSameDesignation && busyWorkersOnDate.contains(workerId);
         }).length;
 
-        totalAvailable +=
+        totalAvailableForAdded +=
             (totalWorkersOfDesignation - busyWorkersOfDesignation);
       }
 
       if (totalRequired > 0) {
-        availabilityScore = totalAvailable / totalRequired;
+        availabilityScore = totalAvailableForAdded / totalRequired;
       }
     }
 
     Color highlightColor = Colors.transparent;
+    Color dotColor = Colors.transparent;
+    
     if (_addedLabours.isEmpty) {
       highlightColor = Colors.transparent;
+      if (busyCount > 0) dotColor = Colors.grey.withOpacity(0.5);
     } else if (availabilityScore >= 1.0) {
-      highlightColor = Colors.green.withOpacity(0.2);
-    } else if (availabilityScore > 0.5) {
-      highlightColor = Colors.orange.withOpacity(0.2);
+      highlightColor = Colors.green.withOpacity(0.12);
+      dotColor = Colors.green;
+    } else if (availabilityScore > 0.0) {
+      highlightColor = Colors.orange.withOpacity(0.12);
+      dotColor = Colors.orange;
     } else {
-      highlightColor = Colors.red.withOpacity(0.2);
+      highlightColor = Colors.red.withOpacity(0.12);
+      dotColor = Colors.red;
     }
 
     return Center(
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: isSelected ? mainColor : highlightColor,
-          shape: BoxShape.circle,
-          border: isToday ? Border.all(color: mainColor, width: 1) : null,
-        ),
-        child: Center(
-          child: Text(
-            '${day.day}',
-            style: TextStyle(
-              color: isSelected ? Colors.white : (isToday ? mainColor : null),
-              fontWeight: isSelected || isToday
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isSelected ? mainColor : highlightColor,
+              shape: BoxShape.circle,
+              border: isToday
+                  ? Border.all(color: mainColor, width: 2)
+                  : isSelected
+                      ? Border.all(color: Colors.white24, width: 1)
+                      : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: mainColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Text(
+                '${day.day}',
+                style: TextStyle(
+                  color: isSelected
+                      ? Colors.white
+                      : (isToday ? mainColor : const Color(0xFF1E293B)),
+                  fontWeight: isSelected || isToday
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 2),
+          if (busyCount > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                busyCount > 3 ? 3 : busyCount,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isSelected ? mainColor : dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: 4),
+        ],
       ),
     );
   }

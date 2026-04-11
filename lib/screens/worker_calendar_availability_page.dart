@@ -41,26 +41,64 @@ class _WorkerCalendarAvailabilityPageState
 
   Future<void> _loadMonthlyAttendance(DateTime monthDate) async {
     setState(() => _isLoading = true);
-    final monthStr = DateFormat('yyyy-MM').format(monthDate);
-    final docId = '${widget.workerId}_$monthStr';
+    final monthStr = DateFormat('MM-yyyy').format(monthDate);
 
     try {
-      final doc = await FirestoreService.getCollection(
-        'WorkerMonthlyAttendance',
-      ).doc(docId).get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        setState(() {
-          _attendanceData =
-              data['attendanceData'] as Map<String, dynamic>? ?? {};
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _attendanceData = {};
-          _isLoading = false;
-        });
+      final snapshot = await FirestoreService.getCollection(
+        'workersAttendance',
+      ).where('month', isEqualTo: monthStr).get();
+
+      Map<String, dynamic> attendance = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
+
+        if (workersMap.containsKey(widget.workerName) ||
+            workersMap.containsKey(widget.workerId)) {
+          final workerInfo =
+              workersMap[widget.workerName] ?? workersMap[widget.workerId];
+
+          String? formattedDate;
+
+          // Priority 1: Use 'day' and 'month' fields (e.g., day: "31", month: "03-2026")
+          final dayField = data['day']?.toString();
+          final monthField = data['month']?.toString();
+
+          if (dayField != null && monthField != null) {
+            final monthParts = monthField.split('-');
+            if (monthParts.length == 2) {
+              formattedDate =
+                  '${monthParts[1]}-${monthParts[0]}-${dayField.padLeft(2, '0')}';
+            }
+          }
+
+          // Priority 2: Use legacy 'Day' field (dd/MM/yyyy)
+          if (formattedDate == null) {
+            final legacyDay = data['Day']?.toString();
+            if (legacyDay != null) {
+              final parts = legacyDay.split('/');
+              if (parts.length == 3) {
+                formattedDate = '${parts[2]}-${parts[1]}-${parts[0]}';
+              }
+            }
+          }
+
+          if (formattedDate != null) {
+            attendance[formattedDate] = {
+              'status': workerInfo['attendance'] ?? 'None',
+              'salaryPerDay': workerInfo['salary'] ?? '0',
+              'markedAt': data['updatedAt'],
+              'site': data['site'],
+            };
+          }
+        }
       }
+
+      setState(() {
+        _attendanceData = attendance;
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('Error loading attendance: $e');
       setState(() => _isLoading = false);
@@ -284,41 +322,60 @@ class _WorkerCalendarAvailabilityPageState
 
       return Center(
         child: Container(
-          width: 38,
-          height: 38,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: isSelected
                 ? colorScheme.primary
                 : isToday
-                ? colorScheme.primary.withOpacity(0.1)
-                : color.withOpacity(0.15),
+                ? colorScheme.primary.withOpacity(0.15)
+                : color.withOpacity(0.25),
             shape: BoxShape.circle,
+            boxShadow: [
+              if (hasStatus && !isOutside && !isSelected)
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              if (isSelected)
+                BoxShadow(
+                  color: colorScheme.primary.withOpacity(0.4),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+            ],
             border: Border.all(
               color: isSelected
-                  ? Colors.white24
-                  : color.withOpacity(isOutside ? 0.1 : 0.4),
-              width: 1.5,
+                  ? Colors.white
+                  : isToday
+                  ? colorScheme.primary.withOpacity(0.5)
+                  : color.withOpacity(isOutside ? 0.2 : 0.6),
+              width: isSelected || isToday ? 2 : 1.5,
             ),
           ),
           child: Center(
             child: Text(
               '${day.day}',
               style: TextStyle(
-                fontWeight: hasStatus ? FontWeight.bold : FontWeight.normal,
+                fontWeight: hasStatus || isToday
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                fontSize: isSelected ? 15 : 14,
                 color: isSelected
                     ? Colors.white
                     : isToday
                     ? colorScheme.primary
                     : isOutside
                     ? Colors.grey.withOpacity(0.5)
-                    : null,
+                    : const Color(0xFF1E293B),
               ),
             ),
           ),
         ),
       );
     }
-    return null; // Standard rendering for non-attendance days
+    return null;
   }
 
   Widget _buildDayDetails(

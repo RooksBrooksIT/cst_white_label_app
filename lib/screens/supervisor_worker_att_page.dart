@@ -132,13 +132,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         if (workersData != null) {
           setState(() {
             workersData.forEach((workerName, workerData) {
-              _attendanceStatus[workerName] = workerData['attendance'] ?? '';
+              // Ensure we check for 'attendance' field in the worker data map
+              _attendanceStatus[workerName] =
+                  workerData['attendance']?.toString() ?? '';
             });
           });
         }
       }
     } catch (e) {
-      print('Error loading existing attendance: $e');
+      debugPrint('Error loading existing attendance: $e');
     }
   }
 
@@ -254,11 +256,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       batch.set(
         FirestoreService.getCollection('workersAttendance').doc(dailyDocId),
         {
-          'Day': _currentDate,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'month': month,
+          'day': DateFormat('dd').format(DateTime.now()), // dd
+          'month': DateFormat(
+            'MM-yyyy',
+          ).format(DateTime.now()), // MM-yyyy as per user spec
           'site': _selectedSiteName,
+          'updatedAt': FieldValue.serverTimestamp(),
           'workers': workersDataLog,
+          'Day':
+              _currentDate, // Keep for backward compatibility if needed, but 'day' is primary now
         },
         SetOptions(merge: true),
       );

@@ -19,7 +19,6 @@ import 'package:demo_cst/screens/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding_edit_screen.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

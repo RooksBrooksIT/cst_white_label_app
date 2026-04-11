@@ -19,6 +19,8 @@ class _WorkersAvailabilityReportPageState
   int _totalWorkersCount = 0;
 
   String? _selectedSiteId;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -29,23 +31,58 @@ class _WorkersAvailabilityReportPageState
   Future<void> _loadReportData() async {
     setState(() => _isLoading = true);
     try {
+      // Order by updatedAt descending to get most recent data first
       final snapshot = await FirestoreService.getCollection(
-        'workerSiteMap',
-      ).get();
+        'workersAttendance',
+      ).orderBy('updatedAt', descending: true).get();
 
-      int totalCount = 0;
-      final mappings = snapshot.docs.map((doc) {
+      Map<String, Map<String, dynamic>> sitesMap = {};
+      int totalWorkers = 0;
+      Set<String> uniqueWorkerNames = {};
+
+      for (var doc in snapshot.docs) {
         final data = doc.data();
-        final workers = List<Map<String, dynamic>>.from(data['workers'] ?? []);
-        totalCount += workers.length;
+        final siteName = data['site'] ?? data['siteName'] ?? 'Unknown Site';
+        final workersData = data['workers'] as Map<String, dynamic>? ?? {};
 
-        return {'id': doc.id, ...data, 'workers': workers};
-      }).toList();
+        if (!sitesMap.containsKey(siteName)) {
+          sitesMap[siteName] = {
+            'id': siteName,
+            'site': siteName,
+            'projectName': 'Attendance Records',
+            'supervisor': 'Various',
+            'workers': <Map<String, dynamic>>[],
+          };
+        }
+
+        workersData.forEach((workerId, workerInfo) {
+          final workersList =
+              sitesMap[siteName]!['workers'] as List<Map<String, dynamic>>;
+
+          // Check if worker already added to this site
+          bool exists = workersList.any((w) => w['workerId'] == workerId);
+          if (!exists) {
+            workersList.add({
+              'workerName':
+                  workerId, // In the provided example, the key is the identifier
+              'workerDesignation': workerInfo['designation'] ?? 'Worker',
+              'workerSalary': workerInfo['salary'] ?? '0',
+              'workerId': workerId,
+              'lastAttendance': workerInfo['attendance'],
+              'lastUpdated': data['updatedAt'],
+            });
+            uniqueWorkerNames.add(workerId);
+          }
+        });
+      }
+
+      final mappings = sitesMap.values.toList();
+      totalWorkers = uniqueWorkerNames.length;
 
       if (!mounted) return;
       setState(() {
         _siteMappings = mappings;
-        _totalWorkersCount = totalCount;
+        _totalWorkersCount = totalWorkers;
         _isLoading = false;
         if (_siteMappings.isNotEmpty) {
           _selectedSiteId = _siteMappings.first['id'];
@@ -86,57 +123,84 @@ class _WorkersAvailabilityReportPageState
           : Column(
               children: [
                 _buildSummaryHeader(colorScheme),
-                _buildSiteDropdown(colorScheme),
+                _buildSearchAndFilter(colorScheme),
                 if (selectedMapping != null && selectedMapping.isNotEmpty)
                   _buildSiteInfoSection(selectedMapping, colorScheme),
                 Expanded(
                   child: selectedMapping == null || selectedMapping.isEmpty
                       ? _buildEmptyState()
-                      : _buildWorkerList(workers, colorScheme),
+                      : _buildWorkerList(
+                          workers.where((w) {
+                            final name =
+                                w['workerName']?.toString().toLowerCase() ?? '';
+                            return name.contains(_searchQuery.toLowerCase());
+                          }).toList(),
+                          colorScheme,
+                        ),
                 ),
               ],
             ),
     );
   }
 
-  Widget _buildSiteDropdown(ColorScheme colorScheme) {
+  Widget _buildSearchAndFilter(ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: DropdownButtonFormField<String>(
-        value: _selectedSiteId,
-        decoration: InputDecoration(
-          labelText: 'Select Site',
-          prefixIcon: Icon(
-            Icons.location_on_rounded,
-            color: colorScheme.primary,
-          ),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-        ),
-        items: _siteMappings.map((m) {
-          final projectName = m['projectName'] ?? 'No Project Name';
-          final siteId = m['site'] ?? m['id'];
-          return DropdownMenuItem<String>(
-            value: m['id'] as String?,
-            child: Text(
-              '$siteId ($projectName)',
-              style: const TextStyle(fontSize: 13),
-              overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: _buildSiteDropdown(colorScheme)),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search worker...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
-          );
-        }).toList(),
-        onChanged: (v) => setState(() => _selectedSiteId = v),
-        dropdownColor: Colors.white,
-        isExpanded: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteDropdown(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.5),
         borderRadius: BorderRadius.circular(20),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButtonFormField<String>(
+          value: _selectedSiteId,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+          ),
+          hint: const Text('Site', style: TextStyle(fontSize: 13)),
+          items: _siteMappings.map((m) {
+            final siteId = m['site'] ?? m['id'];
+            return DropdownMenuItem<String>(
+              value: m['id'] as String?,
+              child: Text('$siteId', style: const TextStyle(fontSize: 13)),
+            );
+          }).toList(),
+          onChanged: (v) => setState(() => _selectedSiteId = v),
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(20),
+        ),
       ),
     );
   }
@@ -236,9 +300,16 @@ class _WorkersAvailabilityReportPageState
                   ),
                 ),
               ),
-              title: Text(
-                worker['workerName'] ?? 'Unnamed worker',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      worker['workerName'] ?? 'Unnamed worker',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  _buildStatusBadge(worker['lastAttendance'] ?? ''),
+                ],
               ),
               subtitle: Text(worker['workerDesignation'] ?? 'Worker'),
               trailing: Column(
@@ -262,6 +333,47 @@ class _WorkersAvailabilityReportPageState
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color color;
+    String text = status.toUpperCase();
+    if (status.isEmpty) {
+      color = Colors.grey;
+      text = "NO DATA";
+    } else {
+      switch (status.toLowerCase()) {
+        case 'present':
+          color = Colors.green;
+          break;
+        case 'absent':
+          color = Colors.red;
+          break;
+        case 'half day':
+        case 'half-day':
+          color = Colors.orange;
+          break;
+        default:
+          color = Colors.blue;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
