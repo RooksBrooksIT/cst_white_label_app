@@ -39,8 +39,9 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
       final companyData = results[0].docs
           .map((doc) => ToolInventory.fromMap(doc.data()))
           .toList();
-      final siteData =
-          results[1].docs.map((doc) => ToolInventory.fromMap(doc.data())).toList();
+      final siteData = results[1].docs
+          .map((doc) => ToolInventory.fromMap(doc.data()))
+          .toList();
       final toolCodes = results[2].docs
           .map((doc) => doc.data()['toolCode']?.toString() ?? '')
           .where((code) => code.isNotEmpty)
@@ -69,10 +70,16 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
 
     return allToolCodes.map((code) {
       final companyCount = _toolsAtCompany
-          .firstWhere((e) => e.toolCode == code, orElse: () => ToolInventory.empty())
+          .firstWhere(
+            (e) => e.toolCode == code,
+            orElse: () => ToolInventory.empty(),
+          )
           .availableCount;
       final siteCount = _toolsAtSite
-          .firstWhere((e) => e.toolCode == code, orElse: () => ToolInventory.empty())
+          .firstWhere(
+            (e) => e.toolCode == code,
+            orElse: () => ToolInventory.empty(),
+          )
           .availableCount;
 
       return ToolInventorySummary(
@@ -87,8 +94,10 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     if (_searchQuery.isEmpty) return _mergedInventory;
 
     return _mergedInventory
-        .where((tool) =>
-            tool.toolCode.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where(
+          (tool) =>
+              tool.toolCode.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
         .toList();
   }
 
@@ -96,7 +105,8 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ToolsInventoryDetailsPage(toolCode: tool.toolCode),
+        builder: (context) =>
+            ToolsInventoryDetailsPage(toolCode: tool.toolCode),
       ),
     );
   }
@@ -130,15 +140,18 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 48),
-              const SizedBox(height: 16),
-              Text(_errorMessage ?? 'Unknown error',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              const SizedBox(height: 16),
-              GlassButton(
-                label: 'RETRY',
-                onPressed: _loadInventoryData,
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.error,
+                size: 48,
               ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage ?? 'Unknown error',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 16),
+              GlassButton(label: 'RETRY', onPressed: _loadInventoryData),
             ],
           ),
         );
@@ -169,9 +182,9 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                       return _ToolInventoryCard(
                         tool: tool,
                         onTap: () => _navigateToToolDetails(tool),
-                        isHighlighted: tool.toolCode
-                            .toLowerCase()
-                            .contains(_searchQuery.toLowerCase()),
+                        isHighlighted: tool.toolCode.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ),
                       );
                     },
                   ),
@@ -210,10 +223,14 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
   }
 
   Widget _buildSummaryCards() {
-    final totalAtCompany =
-        _toolsAtCompany.fold(0, (sum, tool) => sum + tool.availableCount);
-    final totalAtSite =
-        _toolsAtSite.fold(0, (sum, tool) => sum + tool.availableCount);
+    final totalAtCompany = _toolsAtCompany.fold(
+      0,
+      (sum, tool) => sum + tool.availableCount,
+    );
+    final totalAtSite = _toolsAtSite.fold(
+      0,
+      (sum, tool) => sum + tool.availableCount,
+    );
     final totalTools = totalAtCompany + totalAtSite;
 
     return LayoutBuilder(
@@ -294,7 +311,10 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           hintText: 'Search tools...',
           prefixIcon: Icon(Icons.search, color: colorScheme.primary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear),
@@ -308,7 +328,10 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
               : null,
         ),
         cursorColor: colorScheme.primary,
-        style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
         onChanged: (value) {
           setState(() {
             _searchQuery = value;
@@ -405,37 +428,45 @@ class _ToolInventoryCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    tool.toolCode,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
+                  Expanded(
+                    child: Text(
+                      tool.toolCode,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Icon(Icons.chevron_right, color: Colors.grey),
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _InventoryBadge(
                     label: 'Company',
                     count: tool.atCompany,
                     color: Colors.blue.shade700,
                   ),
-                  const SizedBox(width: 12),
                   _InventoryBadge(
                     label: 'Site',
                     count: tool.atSite,
                     color: Colors.green.shade700,
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 4),
                   TextButton(
                     onPressed: onTap,
                     style: TextButton.styleFrom(
                       foregroundColor: colorScheme.primary,
                       textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     child: const Text('View Details'),
                   ),
@@ -503,10 +534,7 @@ class ToolInventory {
   final String toolCode;
   final int availableCount;
 
-  const ToolInventory({
-    required this.toolCode,
-    required this.availableCount,
-  });
+  const ToolInventory({required this.toolCode, required this.availableCount});
 
   factory ToolInventory.fromMap(Map<String, dynamic> map) {
     return ToolInventory(

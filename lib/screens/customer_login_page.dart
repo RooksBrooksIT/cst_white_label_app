@@ -82,27 +82,19 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       try {
         final referralCode = _actualReferralCode ?? _referralController.text.trim();
         
-        // Validate referral code globally using the new top-level mapping
-        final referralDoc = await FirebaseFirestore.instance
-            .collection('globalReferrals')
-            .doc(referralCode)
-            .get();
+        // Validate referral code by searching across all admin/referal documents
+        final orgId = await FirestoreService.findOrgIdByReferralCode(
+          referralCode,
+        );
 
-        if (!referralDoc.exists) {
-          if (context.mounted) _showError('Invalid Referral Code');
-          return;
-        }
-
-        final orgId = referralDoc.data()?['dynamicPath'] as String?;
-        final fullConfigPath = referralDoc.data()?['fullConfigPath'] as String?;
         if (orgId == null) {
-          if (context.mounted) _showError('Organization configuration error');
+          if (context.mounted) _showError('Invalid Referral Code');
           return;
         }
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cust_org_path', orgId);
-        final String resolvedPath = fullConfigPath ?? 'organisation/$orgId/admin/data';
+        final String resolvedPath = 'organisation/$orgId/admin/data';
         await prefs.setString('cust_org_doc_path', resolvedPath);
 
         

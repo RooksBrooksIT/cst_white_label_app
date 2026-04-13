@@ -65,8 +65,25 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
           }
         }
 
+        // 3. Fetch tool metadata (name/category)
+        final toolQuery = await FirestoreService.getCollection('tools')
+            .where('toolCode', isEqualTo: widget.toolCode)
+            .limit(1)
+            .get();
+
+        String fetchedName = "";
+        String fetchedCategory = "";
+
+        if (toolQuery.docs.isNotEmpty) {
+          final toolData = toolQuery.docs.first.data();
+          fetchedName = toolData['toolName']?.toString() ?? "";
+          fetchedCategory = toolData['toolOwner']?.toString() ?? ""; // Using owner as category if category not found
+        }
+
         setState(() {
           siteNameMap = names;
+          toolName = fetchedName;
+          toolCategory = fetchedCategory;
           // ✅ Filter out entries where count == 0
           inventoryData = siteCounts.entries
               .where((entry) => entry.value > 0)
@@ -271,6 +288,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: GlassCard(
+                      mainAxisSize: MainAxisSize.max,
                       child: Column(
                         children: [
                           Container(
@@ -294,7 +312,9 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                           Expanded(
                             child: SingleChildScrollView(
                               scrollDirection: Axis.vertical,
-                              child: DataTable(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
                                 headingRowColor: WidgetStateProperty.all(
                                   colorScheme.primary,
                                 ),
@@ -351,6 +371,7 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
                                       ),
                                     )
                                     .toList(),
+                                ),
                               ),
                             ),
                           ),

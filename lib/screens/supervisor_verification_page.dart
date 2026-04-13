@@ -5,7 +5,6 @@ import 'package:demo_cst/screens/site_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
 import 'dart:io';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';

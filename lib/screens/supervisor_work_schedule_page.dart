@@ -141,6 +141,7 @@ class _SupervisorWorkSchedulePageState
 
   Future<void> _fetchLabours() async {
     final snapshot = await FirestoreService.getCollection('labours').get();
+    if (!mounted) return;
     setState(() {
       _labours = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -174,6 +175,7 @@ class _SupervisorWorkSchedulePageState
     if (newSelectedPhase == null || !phases.contains(newSelectedPhase)) {
       newSelectedPhase = null;
     }
+    if (!mounted) return;
     setState(() {
       _projectPhases = phases;
       _selectedProjectPhase = newSelectedPhase;
@@ -212,10 +214,12 @@ class _SupervisorWorkSchedulePageState
         _selectedSiteId = _siteMaps[0]['id'] as String?;
         _updateSiteDetails(_selectedSiteId);
 
+        if (!mounted) return;
         setState(() {
           _isLoadingSupervisorSite = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingSupervisorSite = false;
           _supervisorSiteError =
@@ -223,6 +227,7 @@ class _SupervisorWorkSchedulePageState
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingSupervisorSite = false;
         _supervisorSiteError = 'Error loading site assignment: $e';
@@ -388,9 +393,11 @@ class _SupervisorWorkSchedulePageState
         ),
       );
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 

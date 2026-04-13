@@ -51,14 +51,17 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Colors.white));
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
                       'No worker data found',
-                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 16),
+                        color: const Color(0xFF64748B),
+                      ),
                     ),
                   );
                 }
@@ -72,7 +75,10 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   return Center(
                     child: Text(
                       'No data found for selected filter',
-                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 16),
+                        color: const Color(0xFF64748B),
+                      ),
                     ),
                   );
                 }
@@ -108,97 +114,101 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             style: TextStyle(
               fontSize: Responsive.fontSize(context, 16),
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: const Color(0xFF1E293B),
             ),
           ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                // Date Picker
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today, size: 16),
-                    label: Text(
-                      _selectedDate != null
-                          ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
-                          : 'Select Date',
-                    ),
-                    onPressed: _showDatePicker,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white24),
-                    ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Date Picker
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(
+                    _selectedDate != null
+                        ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
+                        : 'Select Date',
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Clear Date Filter
-                if (_selectedDate != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear, size: 20, color: Colors.white60),
-                    onPressed: _clearDateFilter,
-                    tooltip: 'Clear date filter',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                // Month Dropdown
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Month',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    items: _getMonths(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedMonth = value!;
-                        _selectedDate =
-                            null; // Clear date when month is selected
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Year Dropdown
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedYear.isNotEmpty ? _selectedYear : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Year',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    items: _getYears(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedYear = value!;
-                        _selectedDate =
-                            null; // Clear date when year is selected
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Clear All Filters
-            if (_selectedDate != null ||
-                _selectedMonth.isNotEmpty ||
-                _selectedYear.isNotEmpty)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _clearAllFilters,
-                  child: Text(
-                    'Clear All Filters',
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                  onPressed: _showDatePicker,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              // Clear Date Filter
+              if (_selectedDate != null)
+                IconButton(
+                  icon: const Icon(
+                    Icons.clear,
+                    size: 20,
+                    color: Color(0xFF64748B),
+                  ),
+                  onPressed: _clearDateFilter,
+                  tooltip: 'Clear date filter',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Month Dropdown
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Month',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  items: _getMonths(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMonth = value!;
+                      _selectedDate = null; // Clear date when month is selected
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Year Dropdown
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Year',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  items: _getYears(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedYear = value!;
+                      _selectedDate = null; // Clear date when year is selected
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Clear All Filters
+          if (_selectedDate != null ||
+              _selectedMonth.isNotEmpty ||
+              _selectedYear.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _clearAllFilters,
+                child: Text(
+                  'Clear All Filters',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -340,26 +350,29 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${workers.length} Workers',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
           ),
-            const Divider(color: Colors.white12, height: 24),
-            const SizedBox(height: 8),
-            ...workers.entries.map((workerEntry) {
-              final workerName = workerEntry.key;
-              final workerData = workerEntry.value as Map<String, dynamic>;
+          const Divider(color: Color(0xFFE2E8F0), height: 24),
+          const SizedBox(height: 8),
+          ...workers.entries.map((workerEntry) {
+            final workerName = workerEntry.key;
+            final workerData = workerEntry.value as Map<String, dynamic>;
 
-              return _buildWorkerTile(workerName, workerData);
-            }).toList(),
-          ],
-        ),
+            return _buildWorkerTile(workerName, workerData);
+          }).toList(),
+        ],
+      ),
     );
   }
 
@@ -379,18 +392,23 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
           // Worker avatar/icon
           CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.2),
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -404,13 +422,16 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: const Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   designation,
-                  style: const TextStyle(fontSize: 14, color: Colors.white60),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
@@ -441,7 +462,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.greenAccent,
+                  color: Color(0xFF10B981),
                 ),
               ),
             ],

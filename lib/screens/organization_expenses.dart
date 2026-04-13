@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../services/expense_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import 'supervisor_dashboard.dart';
 
 class OrganizationExpenses extends StatefulWidget {
   const OrganizationExpenses({super.key});
@@ -158,6 +162,9 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Confirm Submission'),
           content: SingleChildScrollView(
             child: ListBody(
@@ -183,6 +190,9 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('OK'),
               onPressed: () {
@@ -198,6 +208,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   Future<void> _submitExpenseData() async {
     if (isSubmitting) return;
+    if (!mounted) return;
     setState(() {
       isSubmitting = true;
     });
@@ -206,6 +217,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         selectedSupervisorId == null ||
         selectedProjectPhase == null ||
         bills.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill all details and add at least one bill.'),
@@ -237,6 +249,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       // 1. Save/merge to organizationEntries
       final entryRef = FirestoreService.organizationEntries.doc(newDocId);
       final entrySnap = await entryRef.get();
+      if (!mounted) return;
 
       List<dynamic> existingBills = [];
       double existingTotal = 0;
@@ -279,10 +292,12 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       };
 
       await entryRef.set(entry);
+      if (!mounted) return;
 
       // 2. Save/update summary in organizationExpenseSummary
       double orgExpenseTotalAmount = 0;
       final allEntrySnap = await entryRef.get();
+      if (!mounted) return;
       if (allEntrySnap.exists) {
         final data = allEntrySnap.data() as Map<String, dynamic>;
         final billsList = data['bills'] as List<dynamic>? ?? [];
@@ -303,9 +318,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       await FirestoreService.organizationExpenseSummary
           .doc(newDocId)
           .set(summary);
+      if (!mounted) return;
 
       // Update totalOrgExpense in totalSiteExpensesPerDay
       await ExpenseService.updateTotalOrgExpenseForSite(selectedSiteId!);
+      if (!mounted) return;
 
       // Immediately reset the form after successful submission
       _resetForm();
@@ -341,15 +358,17 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         ),
       );
     } catch (e) {
-      print('Error saving to Firestore:');
-      print(e);
+      debugPrint('Error saving to Firestore: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to submit expense data')),
       );
     } finally {
-      setState(() {
-        isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -370,19 +389,28 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
   }
 
   Future<void> _loadSiteIds() async {
+    if (!mounted) return;
     setState(() {
       isLoadingSites = true;
     });
-    final snapshot = await FirestoreService.siteSupervisorMap.get();
-    siteIds = snapshot.docs
-        .map((doc) => doc.data()['site'] as String?)
-        .where((site) => site != null && site.isNotEmpty)
-        .toSet()
-        .cast<String>()
-        .toList();
-    setState(() {
-      isLoadingSites = false;
-    });
+    try {
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      if (!mounted) return;
+      siteIds = snapshot.docs
+          .map((doc) => doc.data()['site'] as String?)
+          .where((site) => site != null && site.isNotEmpty)
+          .toSet()
+          .cast<String>()
+          .toList();
+    } catch (e) {
+      debugPrint('Error loading site IDs: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingSites = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
@@ -427,245 +455,170 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Organization Expenses',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return GlassScaffold(
+      title: 'Organization Expenses',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: () {
+            // Standard Logout flow
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SupervisorDashboard(
+                  username: '',
+                  supervisorId: '',
+                  supervisorName: '',
+                ),
+              ), // Assuming a dashboard check or login redirect
+              (route) => false,
+            );
+          },
         ),
-        backgroundColor: primaryColor,
-        toolbarHeight: 50,
-        elevation: 2,
-      ),
-      body: Padding(
+      ],
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        child: Column(
           children: [
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Site & Project Info',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    isLoadingSites
-                        ? const Center(child: CircularProgressIndicator())
-                        : DropdownButtonFormField<String>(
-                            value: selectedSiteId,
-                            decoration: const InputDecoration(
-                              labelText: 'Site ID',
-                              border: OutlineInputBorder(),
+            GlassCard(
+              title: 'Site & Project Info',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  isLoadingSites
+                      ? const Center(child: CircularProgressIndicator())
+                      : DropdownButtonFormField<String>(
+                          value: selectedSiteId,
+                          decoration: InputDecoration(
+                            labelText: 'Site ID',
+                            prefixIcon: Icon(
+                              Icons.location_on,
+                              color: primaryColor,
                             ),
-                            items: siteIds
-                                .map(
-                                  (site) => DropdownMenuItem<String>(
-                                    value: site,
-                                    child: Text(site),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedSiteId = value;
-                              });
-                              if (value != null) {
-                                _loadSiteDetails(value);
-                              }
-                            },
-                          ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: supervisorController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Supervisor ID',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: projectPhaseController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Project Phase',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Date:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () => _selectDate(context),
-                          label: Text(
-                            DateFormat('dd/MM/yy').format(selectedDate),
-                            style: const TextStyle(),
-                          ),
+                          items: siteIds
+                              .map(
+                                (site) => DropdownMenuItem<String>(
+                                  value: site,
+                                  child: Text(site),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedSiteId = value;
+                            });
+                            if (value != null) {
+                              _loadSiteDetails(value);
+                            }
+                          },
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.receipt_long, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Add Bill',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLabeledTextField('Bill No', billNoController),
-                    _buildLabeledTextField(
-                      'Bill Date',
-                      TextEditingController(
-                        text: DateFormat('dd/MM/yy').format(selectedDate),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: supervisorController,
+                    enabled: false,
+                    decoration: InputDecoration(
+                      labelText: 'Supervisor ID',
+                      prefixIcon: Icon(Icons.person, color: primaryColor),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      enabled: false,
                     ),
-                    _buildLabeledTextField('Bill Vendor', billVendorController),
-                    _buildLabeledTextField('Bill Amount', billAmountController),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _addBill,
-                          label: const Text("Upload Bill", style: TextStyle()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: _addBill,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.add),
-                              SizedBox(width: 4),
-                              const Text('Add', style: TextStyle()),
-                            ],
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: projectPhaseController,
+                    enabled: false,
+                    decoration: InputDecoration(
+                      labelText: 'Project Phase',
+                      prefixIcon: Icon(Icons.timeline, color: primaryColor),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 20, color: primaryColor),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Date:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          DateFormat('dd MMM yyyy').format(selectedDate),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => _selectDate(context),
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('Change'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.list_alt, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bills List',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+            const SizedBox(height: 16),
+            GlassCard(
+              title: 'Add Bill',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabeledTextField('Bill No', billNoController),
+                  _buildLabeledTextField(
+                    'Bill Date',
+                    TextEditingController(
+                      text: DateFormat('dd/MM/yy').format(selectedDate),
                     ),
-                    const SizedBox(height: 12),
-                    _buildBillTable(),
-                  ],
-                ),
+                    enabled: false,
+                  ),
+                  _buildLabeledTextField('Bill Vendor', billVendorController),
+                  _buildLabeledTextField('Bill Amount', billAmountController),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GlassButton(
+                        label: 'Add Bill',
+                        icon: Icons.add_rounded,
+                        onPressed: _addBill,
+                        isSecondary: true,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 16),
+            if (bills.isNotEmpty)
+              GlassCard(title: 'Bills List', child: _buildBillTable()),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  child: GlassButton(
+                    label: 'Reset',
+                    icon: Icons.refresh_rounded,
                     onPressed: isSubmitting ? null : _resetForm,
-                    child: const Text('Reset', style: TextStyle()),
+                    isSecondary: true,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  child: GlassButton(
+                    label: 'Submit',
+                    icon: Icons.check_circle_outline,
+                    isLoading: isSubmitting,
                     onPressed: isSubmitting
                         ? null
                         : () {
@@ -684,22 +637,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                             }
                             _showConfirmationDialog();
                           },
-                    child: isSubmitting
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text('Submit', style: TextStyle()),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 30),
           ],
         ),
       ),

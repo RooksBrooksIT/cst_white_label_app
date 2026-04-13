@@ -432,13 +432,16 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       child: Row(
         children: [
           Icon(Icons.info_outline, color: primaryColor, size: 20),
-          SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -803,16 +806,19 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                               backgroundColor: primaryColor,
                               foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.send, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  "Submit Request",
-                                  style: TextStyle(),
-                                ),
-                              ],
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.send, size: 20),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    "Submit Request",
+                                    style: TextStyle(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

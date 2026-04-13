@@ -95,13 +95,14 @@ class _WorkerCalendarAvailabilityPageState
         }
       }
 
+      if (!mounted) return;
       setState(() {
         _attendanceData = attendance;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading attendance: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

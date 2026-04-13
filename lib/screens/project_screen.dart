@@ -16,6 +16,7 @@ class _ProjectScreenState extends State<ProjectScreen>
   final _mainFormKey = GlobalKey<FormState>();
   final TextEditingController _projectNameController = TextEditingController();
   final TextEditingController _ownerNameController = TextEditingController();
+  final TextEditingController _ownerPhoneController = TextEditingController();
   final TextEditingController _amountPaidController = TextEditingController();
   final TextEditingController _amountSpentController = TextEditingController();
   final TextEditingController _balanceAmountController =
@@ -96,6 +97,8 @@ class _ProjectScreenState extends State<ProjectScreen>
       if (data == null) return true;
       return !_projectHasAllDetails(data);
     }).toList();
+
+    if (!mounted) return;
 
     setState(() {
       _unassignedSiteIds = filtered;
@@ -184,6 +187,7 @@ class _ProjectScreenState extends State<ProjectScreen>
   void _resetForm() {
     _projectNameController.clear();
     _ownerNameController.clear();
+    _ownerPhoneController.clear();
     _amountPaidController.clear();
     _amountSpentController.clear();
     _balanceAmountController.clear();
@@ -379,6 +383,7 @@ class _ProjectScreenState extends State<ProjectScreen>
     return {
       'projectName': _projectNameController.text,
       'ownerName': _ownerNameController.text,
+      'ownerPhoneNumber': _ownerPhoneController.text,
       'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
       'amountSpent': isNew
           ? 0
@@ -506,8 +511,9 @@ class _ProjectScreenState extends State<ProjectScreen>
           // Auto-fill Project Category and Status from existing project data
           final cat = data['projectCategory']?.toString().trim();
           projectCategory = (cat != null && cat.isNotEmpty) ? cat : null;
-          final status =
-              (data['currentStatus'] ?? data['status'])?.toString().trim();
+          final status = (data['currentStatus'] ?? data['status'])
+              ?.toString()
+              .trim();
           currentStatus = (status != null && status.isNotEmpty) ? status : null;
         });
       } else {
@@ -691,6 +697,14 @@ class _ProjectScreenState extends State<ProjectScreen>
                                 val == null || val.trim().isEmpty
                                 ? 'Required'
                                 : null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextFormField(
+                            context,
+                            controller: _ownerPhoneController,
+                            label: 'Owner Phone Number',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
@@ -900,6 +914,9 @@ class _ProjectScreenState extends State<ProjectScreen>
                                                     data['projectName'] ?? '';
                                                 _ownerNameController.text =
                                                     data['ownerName'] ?? '';
+                                                _ownerPhoneController.text =
+                                                    data['ownerPhoneNumber'] ??
+                                                    '';
                                                 _amountPaidController.text =
                                                     (data['amountPaid'] ?? '')
                                                         .toString();

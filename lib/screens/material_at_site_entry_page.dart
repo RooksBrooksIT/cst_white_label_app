@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import 'supervisor_dashboard.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -90,6 +91,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           .map((doc) => doc['site']?.toString() ?? '')
           .where((siteId) => siteId.isNotEmpty)
           .toList();
+      if (!mounted) return;
       if (assignedSiteIds.isNotEmpty) {
         selectedSiteId = assignedSiteIds.first;
         siteIdController.text = selectedSiteId!;
@@ -98,10 +100,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             firstSiteData['location']?.toString() ?? '';
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         errorMsg = "Failed to load site details: ${e.toString()}";
       });
     } finally {
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
@@ -440,9 +444,11 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         }
       }
 
+      if (!mounted) return;
       _showSnackBar('Materials saved successfully');
       setState(() => materialEntries.clear());
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('Failed to save materials: ${e.toString()}', isError: true);
     }
   }
@@ -1216,6 +1222,26 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       length: 2,
       child: GlassScaffold(
         title: 'Material at Site Entry',
+        onBack: () => Navigator.pop(context),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (_) => SupervisorDashboard(
+                        username: widget.supervisorName,
+                        supervisorId: widget.supervisorId,
+                        supervisorName: widget.supervisorName,
+                      ),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+        ],
         body: Column(
           children: [
             // Tab bar

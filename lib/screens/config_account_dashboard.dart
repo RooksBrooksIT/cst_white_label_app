@@ -307,38 +307,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       actions: [
-        PopupMenuButton<String>(
-          icon: const Icon(
-            Icons.account_circle_rounded,
-            color: Colors.white,
-            size: 28,
-          ),
-          color: Theme.of(context).cardColor,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: Theme.of(context).dividerColor.withOpacity(0.1),
-            ),
-          ),
-          onSelected: (value) {
-            if (value == 'logout') {
-              _showLogoutConfirmation(context);
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout_rounded, color: Colors.red, size: 20),
-                  const SizedBox(width: 12),
-                  const Text('Logout'),
-                ],
-              ),
-            ),
-          ],
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 26),
+          onPressed: () => _showLogoutConfirmation(context),
+          tooltip: 'Logout',
         ),
+        const SizedBox(width: 8),
       ],
       body: CustomScrollView(
         controller: _scrollController,

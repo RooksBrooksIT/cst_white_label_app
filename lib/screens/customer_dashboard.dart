@@ -44,7 +44,8 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       final data = auth.userData;
       setState(() {
         _storedOwnerName = data['ownerName'] ?? widget.ownerName;
-        _storedOwnerPhoneNumber = data['ownerPhoneNumber'] ?? widget.ownerPhoneNumber;
+        _storedOwnerPhoneNumber =
+            data['ownerPhoneNumber'] ?? widget.ownerPhoneNumber;
         _siteId = data['siteId'] ?? _siteId;
       });
     }
@@ -105,8 +106,6 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
     }
   }
 
-
-
   Widget _dashboardButton({
     required String title,
     required String subtitle,
@@ -128,7 +127,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                   color: color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: Colors.white, size: 24),
+                child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -138,7 +137,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     Text(
                       title,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF1E293B),
                         fontSize: Responsive.fontSize(context, 18),
                         fontWeight: FontWeight.bold,
                       ),
@@ -147,16 +146,16 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: const Color(0xFF64748B),
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.white.withOpacity(0.3),
+                color: Color(0xFFCBD5E1),
                 size: 16,
               ),
             ],
@@ -172,19 +171,29 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Logout',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.bold)),
-          content: Text('Are you sure you want to logout?',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Logout',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white60),
+              ),
             ),
             TextButton(
               onPressed: () async {
@@ -200,7 +209,10 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               },
               child: const Text(
                 'Logout',
-                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -226,11 +238,11 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.white),
+              CircularProgressIndicator(),
               SizedBox(height: 24),
               Text(
                 'Loading your dashboard...',
-                style: TextStyle(fontSize: 16, color: Colors.white70),
+                style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -261,162 +273,177 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         }
       },
       child: GlassScaffold(
-        onBack: () => _showLogoutDialog(context),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
+        title: 'Customer Dashboard',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => _showLogoutDialog(context),
+            tooltip: 'Logout',
+          ),
+          const SizedBox(width: 8),
+        ],
+        body: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
             vertical: 24,
-            horizontal: Responsive.isMobile(context) ? 0.0 : 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            horizontal: Responsive.isMobile(context) ? 0.0 : 24.0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
                       'Welcome Back!',
                       style: TextStyle(
                         fontSize: Responsive.fontSize(context, 18),
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: const Color(0xFF64748B),
                       ),
                     ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _displayOwnerName,
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 32),
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    const SizedBox(height: 4),
+                    Text(
+                      _displayOwnerName,
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 32),
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E293B),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Site ID: ',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            _siteId != null && _siteId!.isNotEmpty
-                                ? _siteId!
-                                : 'No project site found',
+                    const SizedBox(height: 16),
+                    GlassCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Site ID: ',
                             style: TextStyle(
                               fontSize: 14,
-                              color: _siteId != null && _siteId!.isNotEmpty
-                                  ? Colors.white
-                                  : Colors.orangeAccent,
-                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                      ],
+                          Expanded(
+                            child: Text(
+                              _siteId != null && _siteId!.isNotEmpty
+                                  ? _siteId!
+                                  : 'No project site found',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _siteId != null && _siteId!.isNotEmpty
+                                    ? const Color(0xFF1E293B)
+                                    : Colors.orangeAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            // Main Dashboard Buttons
-            _dashboardButton(
-              title: "Project Summary",
-              subtitle: "View your project details and progress",
-              icon: Icons.assignment_rounded,
-              color: Colors.blueAccent,
-              onPressed: () {
-                if (_siteId != null && _siteId!.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProjectDetailsPage(
-                        siteId: _siteId!,
-                        ownerName: _displayOwnerName,
-                        ownerPhoneNumber: _displayOwnerPhoneNumber,
+              const SizedBox(height: 32),
+              // Main Dashboard Buttons
+              _dashboardButton(
+                title: "Project Summary",
+                subtitle: "View your project details and progress",
+                icon: Icons.assignment_rounded,
+                color: Colors.blueAccent,
+                onPressed: () {
+                  if (_siteId != null && _siteId!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProjectDetailsPage(
+                          siteId: _siteId!,
+                          ownerName: _displayOwnerName,
+                          ownerPhoneNumber: _displayOwnerPhoneNumber,
+                        ),
                       ),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Project siteId not found')),
-                  );
-                }
-              },
-            ),
-            _dashboardButton(
-              title: "Workers List",
-              subtitle: "Manage your workers and their details",
-              icon: Icons.people_alt_rounded,
-              color: Colors.greenAccent,
-              onPressed: () {
-                if (_siteId != null && _siteId!.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomerWorkerDetails(siteId: _siteId!),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Project siteId not found')),
-                  );
-                }
-              },
-            ),
-            _dashboardButton(
-              title: "Workers Summary",
-              subtitle: "View workers performance and attendance",
-              icon: Icons.summarize_rounded,
-              color: Colors.purpleAccent,
-              onPressed: () {
-                if (_siteId != null && _siteId!.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomerWorkersSummary(siteId: _siteId!),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Project siteId not found')),
-                  );
-                }
-              },
-            ),
-            _dashboardButton(
-              title: "Expenses Summary",
-              subtitle: "View workers performance and attendance",
-              icon: Icons.account_balance_wallet_rounded,
-              color: Colors.orangeAccent,
-              onPressed: () {
-                if (_siteId != null && _siteId!.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomerWorkProgress(
-                        ownername: _displayOwnerName,
-                        ownerphonenumber: _displayOwnerPhoneNumber,
-                        siteId: _siteId!,
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Project siteId not found')),
+                    );
+                  }
+                },
+              ),
+              _dashboardButton(
+                title: "Workers List",
+                subtitle: "Manage your workers and their details",
+                icon: Icons.people_alt_rounded,
+                color: Colors.greenAccent,
+                onPressed: () {
+                  if (_siteId != null && _siteId!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CustomerWorkerDetails(siteId: _siteId!),
                       ),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Project siteId not found')),
-                  );
-                }
-              },
-            ),
-          ],
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Project siteId not found')),
+                    );
+                  }
+                },
+              ),
+              _dashboardButton(
+                title: "Workers Summary",
+                subtitle: "View workers performance and attendance",
+                icon: Icons.summarize_rounded,
+                color: Colors.purpleAccent,
+                onPressed: () {
+                  if (_siteId != null && _siteId!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CustomerWorkersSummary(siteId: _siteId!),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Project siteId not found')),
+                    );
+                  }
+                },
+              ),
+
+              _dashboardButton(
+                title: "Expenses Summary",
+                subtitle: "Track project expenses and budget status",
+                icon: Icons.account_balance_wallet_rounded,
+                color: Colors.orangeAccent,
+                onPressed: () {
+                  if (_siteId != null && _siteId!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomerWorkProgress(
+                          ownername: _displayOwnerName,
+                          ownerphonenumber: _displayOwnerPhoneNumber,
+                          siteId: _siteId!,
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Project siteId not found')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }

@@ -167,7 +167,7 @@ class ProjectDetailsPage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white));
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
@@ -175,11 +175,11 @@ class ProjectDetailsPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.white70, size: 64),
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFF64748B), size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'Error loading project',
-                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: Colors.white),
+                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: const Color(0xFF1E293B)),
                   ),
                 ],
               ),
@@ -191,11 +191,11 @@ class ProjectDetailsPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.find_in_page_rounded, color: Colors.white70, size: 64),
+                  const Icon(Icons.find_in_page_rounded, color: Color(0xFF64748B), size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'Project not found',
-                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: Colors.white),
+                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: const Color(0xFF1E293B)),
                   ),
                 ],
               ),
@@ -301,7 +301,7 @@ class ProjectDetailsPage extends StatelessWidget {
         icon = Icons.schedule_rounded;
         break;
       default:
-        color = Colors.white70;
+        color = const Color(0xFF64748B);
         icon = Icons.help_outline_rounded;
     }
 
@@ -317,7 +317,7 @@ class ProjectDetailsPage extends StatelessWidget {
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 18),
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: const Color(0xFF1E293B),
               ),
             ),
           ),
@@ -339,14 +339,14 @@ class ProjectDetailsPage extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white70, size: 16),
+              Icon(icon, color: const Color(0xFF64748B), size: 16),
               const SizedBox(width: 8),
               Text(
                 title.toUpperCase(),
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 12),
                   fontWeight: FontWeight.bold,
-                  color: Colors.white70,
+                  color: const Color(0xFF64748B),
                   letterSpacing: 1.2,
                 ),
               ),
@@ -380,7 +380,7 @@ class ProjectDetailsPage extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 14),
-                color: Colors.white60,
+                color: const Color(0xFF64748B),
               ),
             ),
           ),
@@ -390,7 +390,7 @@ class ProjectDetailsPage extends StatelessWidget {
               value,
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 15),
-                color: Colors.white,
+                color: const Color(0xFF1E293B),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -456,15 +456,15 @@ class ProjectListPage extends StatelessWidget {
         stream: FirestoreService.getCollection('projects').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white));
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Color(0xFF1E293B))));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No projects found', style: TextStyle(color: Colors.white)));
+            return const Center(child: Text('No projects found', style: TextStyle(color: Color(0xFF64748B))));
           }
 
           final projects = snapshot.data!.docs;
@@ -494,13 +494,13 @@ class ProjectListPage extends StatelessWidget {
                     ),
                     title: Text(
                       projectData['projectName'] ?? 'Unnamed Project',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
                       projectData['projectCategory'] ?? 'No Category',
-                      style: const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Color(0xFF64748B)),
                     ),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+                    trailing: const Icon(Icons.chevron_right, color: Color(0xFFCBD5E1)),
                     onTap: () {
                       Navigator.push(
                         context,

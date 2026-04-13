@@ -89,7 +89,11 @@ class ApprovalList extends StatefulWidget {
   final String status;
   final String supervisorName;
 
-  const ApprovalList({super.key, required this.status, required this.supervisorName});
+  const ApprovalList({
+    super.key,
+    required this.status,
+    required this.supervisorName,
+  });
 
   @override
   _ApprovalListState createState() => _ApprovalListState();
@@ -133,7 +137,10 @@ class _ApprovalListState extends State<ApprovalList> {
               ),
               filled: true,
               fillColor: cs.surface.withOpacity(0.3),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 0,
+                horizontal: 16,
+              ),
             ),
             onChanged: (value) {
               setState(() {
@@ -144,18 +151,27 @@ class _ApprovalListState extends State<ApprovalList> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirestoreService
-                .getCollection('siteSupervisorProjectStageSchedule')
-                .where('approvalStatus', isEqualTo: widget.status)
-                .where('supervisorName', isEqualTo: widget.supervisorName)
-                .snapshots(),
+            stream:
+                FirestoreService.getCollection(
+                      'siteSupervisorProjectStageSchedule',
+                    )
+                    .where('approvalStatus', isEqualTo: widget.status)
+                    .where('supervisorName', isEqualTo: widget.supervisorName)
+                    .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: cs.error)));
+                return Center(
+                  child: Text(
+                    'Error: ${snapshot.error}',
+                    style: TextStyle(color: cs.error),
+                  ),
+                );
               }
 
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator(color: cs.primary));
+                return Center(
+                  child: CircularProgressIndicator(color: cs.primary),
+                );
               }
 
               if (snapshot.data!.docs.isEmpty) {
@@ -163,11 +179,18 @@ class _ApprovalListState extends State<ApprovalList> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inbox_outlined, size: 64, color: cs.onSurface.withOpacity(0.3)),
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 64,
+                        color: cs.onSurface.withOpacity(0.3),
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'No ${widget.status} requests found',
-                        style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 16),
+                        style: TextStyle(
+                          color: cs.onSurface.withOpacity(0.6),
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -178,7 +201,10 @@ class _ApprovalListState extends State<ApprovalList> {
               if (_searchText.isNotEmpty) {
                 final idx = docs.indexWhere((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  return (data['wsReqId'] ?? '').toString().toLowerCase().contains(_searchText.toLowerCase());
+                  return (data['wsReqId'] ?? '')
+                      .toString()
+                      .toLowerCase()
+                      .contains(_searchText.toLowerCase());
                 });
                 if (idx != -1) {
                   final match = docs.removeAt(idx);
@@ -212,7 +238,8 @@ class ApprovalCard extends StatefulWidget {
   final Map<String, dynamic> data;
   final String status;
 
-  const ApprovalCard({super.key, 
+  const ApprovalCard({
+    super.key,
     required this.docId,
     required this.data,
     required this.status,
@@ -269,8 +296,11 @@ class _ApprovalCardState extends State<ApprovalCard>
                     turns: _expanded ? 0.5 : 0.0,
                     duration: const Duration(milliseconds: 300),
                     child: IconButton(
-                      icon: Icon(Icons.keyboard_arrow_down,
-                          size: 32, color: cs.primary),
+                      icon: Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 32,
+                        color: cs.primary,
+                      ),
                       onPressed: () {
                         setState(() {
                           _expanded = !_expanded;
@@ -284,7 +314,10 @@ class _ApprovalCardState extends State<ApprovalCard>
             // Animated details
             if (_expanded)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -292,7 +325,10 @@ class _ApprovalCardState extends State<ApprovalCard>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: widget.status == 'Pending'
                                 ? Colors.orange.withOpacity(0.2)
@@ -323,9 +359,15 @@ class _ApprovalCardState extends State<ApprovalCard>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _buildDaysBox(
-                            'Requested Days', data['reqDays'].toString(), cs),
-                        _buildDaysBox('Approved Days',
-                            data['appDays']?.toString() ?? '-', cs),
+                          'Requested Days',
+                          data['reqDays'].toString(),
+                          cs,
+                        ),
+                        _buildDaysBox(
+                          'Approved Days',
+                          data['appDays']?.toString() ?? '-',
+                          cs,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -333,9 +375,15 @@ class _ApprovalCardState extends State<ApprovalCard>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _buildPaymentBox(
-                            'Estimated', data['estimatedPayment'].toString(), cs),
-                        _buildPaymentBox('Approved',
-                            data['approvedPayment']?.toString() ?? '-', cs),
+                          'Estimated',
+                          data['estimatedPayment'].toString(),
+                          cs,
+                        ),
+                        _buildPaymentBox(
+                          'Approved',
+                          data['approvedPayment']?.toString() ?? '-',
+                          cs,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -364,7 +412,10 @@ class _ApprovalCardState extends State<ApprovalCard>
                             ElevatedButton(
                               onPressed: () {
                                 _updateStatus(
-                                    context, widget.docId, 'Approved');
+                                  context,
+                                  widget.docId,
+                                  'Approved',
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
@@ -373,14 +424,19 @@ class _ApprovalCardState extends State<ApprovalCard>
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 24, vertical: 12),
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
                               ),
                               child: const Text('Approve'),
                             ),
                             ElevatedButton(
                               onPressed: () {
                                 _updateStatus(
-                                    context, widget.docId, 'Rejected');
+                                  context,
+                                  widget.docId,
+                                  'Rejected',
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: cs.error,
@@ -389,7 +445,9 @@ class _ApprovalCardState extends State<ApprovalCard>
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 24, vertical: 12),
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
                               ),
                               child: const Text('Reject'),
                             ),
@@ -413,8 +471,9 @@ class _ApprovalCardState extends State<ApprovalCard>
           Text(
             '$label: ',
             style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: cs.primary.withOpacity(0.8)),
+              fontWeight: FontWeight.bold,
+              color: cs.primary.withOpacity(0.8),
+            ),
           ),
           Text(value, style: TextStyle(color: cs.onSurface)),
         ],
@@ -434,10 +493,7 @@ class _ApprovalCardState extends State<ApprovalCard>
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.primary.withOpacity(0.8),
-            ),
+            style: TextStyle(fontSize: 12, color: cs.primary.withOpacity(0.8)),
           ),
           Text(
             value,
@@ -482,7 +538,11 @@ class _ApprovalCardState extends State<ApprovalCard>
     );
   }
 
-  Widget _buildLabourTable(List<dynamic> labours, String title, ColorScheme cs) {
+  Widget _buildLabourTable(
+    List<dynamic> labours,
+    String title,
+    ColorScheme cs,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -507,9 +567,7 @@ class _ApprovalCardState extends State<ApprovalCard>
           ),
           children: [
             TableRow(
-              decoration: BoxDecoration(
-                color: cs.primary.withOpacity(0.1),
-              ),
+              decoration: BoxDecoration(color: cs.primary.withOpacity(0.1)),
               children: [
                 _buildTableHeaderCell('Designation', cs),
                 _buildTableHeaderCell('Count', cs),
@@ -536,10 +594,7 @@ class _ApprovalCardState extends State<ApprovalCard>
       padding: const EdgeInsets.all(8),
       child: Text(
         text,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-        ),
+        style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
       ),
     );
   }
@@ -552,19 +607,23 @@ class _ApprovalCardState extends State<ApprovalCard>
   }
 
   void _updateStatus(
-      BuildContext context, String docId, String newStatus) async {
+    BuildContext context,
+    String docId,
+    String newStatus,
+  ) async {
     try {
-      await FirestoreService
-          .getCollection('siteSupervisorProjectStageSchedule')
-          .doc(docId)
-          .update({'approvalStatus': newStatus});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $newStatus')),
-      );
+      await FirestoreService.getCollection(
+        'siteSupervisorProjectStageSchedule',
+      ).doc(docId).update({'approvalStatus': newStatus});
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Status updated to $newStatus')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e')),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating status: $e')));
     }
   }
 }

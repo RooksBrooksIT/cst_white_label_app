@@ -5,6 +5,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/list_extensions.dart';
+import 'supervisor_dashboard.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   const AttendanceManagementPage({super.key});
@@ -62,12 +63,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       });
     } catch (e) {
       print('Error loading sites: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingSites = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      }
     }
   }
 
@@ -98,6 +102,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           _isLoadingWorkers = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingWorkers = false;
         });
@@ -130,6 +135,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         final workersData = data['workers'] as Map<String, dynamic>?;
 
         if (workersData != null) {
+          if (!mounted) return;
           setState(() {
             workersData.forEach((workerName, workerData) {
               // Ensure we check for 'attendance' field in the worker data map
@@ -381,6 +387,26 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Attendance Management',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => const SupervisorDashboard(
+                      username: '', // Not available in this context
+                      supervisorId: '',
+                      supervisorName: '',
+                    ),
+              ),
+              (route) => false,
+            );
+          },
+        ),
+      ],
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
