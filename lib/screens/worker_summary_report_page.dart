@@ -10,6 +10,9 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import './pdf_preview_page.dart';
+import './worker_report_pdf_helper.dart';
+import './overall_report_pdf_helper.dart';
 
 class WorkerAttendanceSalaryPage extends StatefulWidget {
   const WorkerAttendanceSalaryPage({super.key});
@@ -27,7 +30,8 @@ class _WorkerAttendanceSalaryPageState
   List<String> _sites = [];
   List<String> _months = [];
   bool _isLoading = true;
-  final Set<String> _selectedWorkerIds = <String>{};
+  String? _expandedWorkerId;
+  double _overallAttendancePercentage = 0.0;
   final String _currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
 
   @override
@@ -35,31 +39,23 @@ class _WorkerAttendanceSalaryPageState
     super.initState();
     _loadInitialData();
   }
-
+  
   Future<void> _loadInitialData() async {
     try {
-      // Load sites from workerSiteMap as the source of truth for populated sites
-      final siteSnapshot = await FirestoreService.getCollection(
-        'workerSiteMap',
+      // 1. Fetch unique sites and months from workersAttendance documents (The collection structure as requested)
+      final attendanceSnapshot = await FirestoreService.getCollection(
+        'workersAttendance',
       ).get();
+
       final Set<String> uniqueSites = {};
+      final Set<String> uniqueMonths = {_currentMonth};
 
-      for (var doc in siteSnapshot.docs) {
+      for (var doc in attendanceSnapshot.docs) {
         final data = doc.data();
-        final site = data['site']?.toString() ?? doc.id;
-        if (site.isNotEmpty) uniqueSites.add(site);
-      }
-
-      // We still query workersSummary to know which months have data
-      final summarySnapshot = await FirestoreService.getCollection(
-        'workersSummary',
-      ).limit(100).get();
-      final Set<String> uniqueMonths = {
-        _currentMonth,
-      }; // Always include current month
-      for (var doc in summarySnapshot.docs) {
-        final data = doc.data();
+        final site = data['site']?.toString();
         final month = data['month']?.toString();
+
+        if (site != null && site.isNotEmpty) uniqueSites.add(site);
         if (month != null && month.isNotEmpty) uniqueMonths.add(month);
       }
 
@@ -89,97 +85,111 @@ class _WorkerAttendanceSalaryPageState
 
     try {
       final String month = _selectedMonth ?? _currentMonth;
-      
-      // 1. Fetch all workers currently mapped to the selected site(s)
-      Query siteQuery = FirestoreService.getCollection('workerSiteMap');
+
+      // 1. Query workersAttendance documents for the selected month (and site if selected)
+      Query<Map<String, dynamic>> attQuery = FirestoreService.getCollection(
+        'workersAttendance',
+      ).where('month', isEqualTo: month);
+
       if (_selectedSite != null) {
-        siteQuery = siteQuery.where('site', isEqualTo: _selectedSite);
+        attQuery = attQuery.where('site', isEqualTo: _selectedSite);
       }
 
-      final siteSnapshot = await siteQuery.get();
-      final List<Map<String, dynamic>> allWorkers = [];
+      final snapshot = await attQuery.get();
 
-      for (var doc in siteSnapshot.docs) {
-        final siteData = doc.data();
-        if (siteData is! Map<String, dynamic>) continue;
+      // 2. Aggregate counts for each worker
+      // Map<workerName, Map<statName, count>>
+      final Map<String, Map<String, dynamic>> workerAggregates = {};
+      double totalPoints = 0;
+      int totalDaysDetected = 0;
 
-        final rawWorkers = siteData['workers'];
-        final siteName = siteData['site']?.toString() ?? doc.id;
-
-        if (rawWorkers is! List) continue;
-
-        for (var rawW in rawWorkers) {
-          if (rawW == null || rawW is! Map) continue;
-
-          final w = Map<String, dynamic>.from(rawW);
-          String workerName = w['workerName']?.toString().trim() ?? '';
-          if (workerName.isEmpty) workerName = 'Unknown Worker ($siteName)';
-
-          // We try to use the workerId if it was stored in the mapping, else fallback
-          final String workerId = w['workerId']?.toString() ?? '${workerName}_$siteName';
-
-          allWorkers.add({
-            'id': workerId,
-            'name': workerName,
-            'designation': w['workerDesignation']?.toString() ?? 'Worker',
-            'baseSalary': w['workerSalary']?.toString() ?? '0',
-            'site': siteName,
-            'month': month,
-            'attendance': <String, dynamic>{}, // Map of date -> status details
-            'calculatedSalary': 0.0,
-            'presentDays': 0,
-          });
-        }
-      }
-
-      // 2. Fetch attendance from the NEW WorkerMonthlyAttendance collection
-      Query<Map<String, dynamic>> monthlyQuery =
-          FirestoreService.getCollection('WorkerMonthlyAttendance');
-      monthlyQuery = monthlyQuery.where('month', isEqualTo: month);
-      if (_selectedSite != null) {
-        monthlyQuery = monthlyQuery.where('site', isEqualTo: _selectedSite);
-      }
-
-      final monthlySnapshot = await monthlyQuery.get();
-
-      // Map workerId to the monthly attendance document data
-      final Map<String, Map<String, dynamic>> attendanceRecords = {};
-
-      for (var doc in monthlySnapshot.docs) {
+      for (var doc in snapshot.docs) {
         final data = doc.data();
-        final wId = data['workerId']?.toString() ?? doc.id.split('_').first;
-        if (wId.isNotEmpty) attendanceRecords[wId] = data;
-      }
+        final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
 
-      // 3. Merge attendance with existing workers
-      for (var i = 0; i < allWorkers.length; i++) {
-        final worker = allWorkers[i];
-        final wId = worker['id'];
+        workersMap.forEach((name, details) {
+          if (details is! Map) return;
 
-        if (attendanceRecords.containsKey(wId)) {
-          final record = attendanceRecords[wId]!;
-          
-          final attendanceMap = record['attendanceData'] as Map<String, dynamic>? ?? {};
-          worker['attendance'] = attendanceMap;
-          
-          // Use pre-calculated salary if available, otherwise calculate client-side
-          if (record.containsKey('calculatedSalary')) {
-            worker['calculatedSalary'] = (record['calculatedSalary'] as num).toDouble();
-            worker['presentDays'] = record['totalPresentDays'] ?? 0;
-          } else {
-            final results = _calculateSalaryFromMap(
-              worker['baseSalary'].toString(),
-              attendanceMap,
-            );
-            worker['calculatedSalary'] = results['salary'];
-            worker['presentDays'] = results['presentDays'];
+          if (!workerAggregates.containsKey(name)) {
+            workerAggregates[name] = {
+              'name': name,
+              'designation': details['designation'] ?? 'Worker',
+              'site': data['site'] ?? 'Unknown',
+              'presentCount': 0,
+              'absentCount': 0,
+              'overtimeCount': 0,
+              'halfDayCount': 0,
+              'notMarkedCount': 0,
+              'totalSalary': 0.0,
+              'attendanceData': <String, dynamic>{},
+              'month': month,
+              'baseSalary': details['salary'] ?? '0',
+            };
           }
-        }
+
+          final stats = workerAggregates[name]!;
+          final String status =
+              details['attendance']?.toString().toLowerCase() ?? '';
+          final String dateStr = data['Day'] ?? 'Unknown Date';
+
+          stats['attendanceData'][dateStr] = details;
+          totalDaysDetected++;
+
+          if (status == 'present') {
+            stats['presentCount']++;
+            totalPoints += 1.0;
+          } else if (status == 'absent') {
+            stats['absentCount']++;
+          } else if (status == 'overtime') {
+            stats['overtimeCount']++;
+            totalPoints += 1.0;
+          } else if (status == 'half day') {
+            stats['halfDayCount']++;
+            totalPoints += 0.5;
+          } else if (status == '' || status == 'not marked') {
+            stats['notMarkedCount']++;
+          }
+
+          // salary calculation
+          final double daySalary =
+              double.tryParse(details['salary']?.toString() ?? '0') ?? 0.0;
+          if (status == 'present' || status == 'overtime') {
+            stats['totalSalary'] += daySalary;
+          } else if (status == 'half day') {
+            stats['totalSalary'] += (daySalary / 2.0);
+          }
+        });
       }
+
+      final double overallPercent = totalDaysDetected > 0
+          ? (totalPoints / totalDaysDetected) * 100
+          : 0.0;
+
+      final List<Map<String, dynamic>> results = workerAggregates.values.map((
+        v,
+      ) {
+        return {
+          'id':
+              v['name'], // Using name as ID for this specific report structure
+          'name': v['name'],
+          'designation': v['designation'],
+          'site': v['site'],
+          'month': v['month'],
+          'baseSalary': v['baseSalary'],
+          'present': v['presentCount'],
+          'absent': v['absentCount'],
+          'overtime': v['overtimeCount'],
+          'halfDay': v['halfDayCount'],
+          'notMarked': v['notMarkedCount'],
+          'calculatedSalary': v['totalSalary'],
+          'attendanceData': v['attendanceData'],
+        };
+      }).toList();
 
       if (mounted) {
         setState(() {
-          _filteredWorkers = allWorkers;
+          _filteredWorkers = results;
+          _overallAttendancePercentage = overallPercent;
           _isLoading = false;
         });
       }
@@ -194,7 +204,10 @@ class _WorkerAttendanceSalaryPageState
     }
   }
 
-  Map<String, dynamic> _calculateSalaryFromMap(String base, Map<String, dynamic> attMap) {
+  Map<String, dynamic> _calculateSalaryFromMap(
+    String base,
+    Map<String, dynamic> attMap,
+  ) {
     final double b = double.tryParse(base) ?? 0.0;
     double totalSalary = 0.0;
     int presentDays = 0;
@@ -202,7 +215,8 @@ class _WorkerAttendanceSalaryPageState
     attMap.forEach((date, details) {
       if (details is Map) {
         final String status = details['status']?.toString().toLowerCase() ?? '';
-        final double salaryPerDay = double.tryParse(details['salaryPerDay']?.toString() ?? base) ?? b;
+        final double salaryPerDay =
+            double.tryParse(details['salaryPerDay']?.toString() ?? base) ?? b;
 
         if (status == 'present' || status == 'overtime') {
           totalSalary += salaryPerDay;
@@ -214,13 +228,8 @@ class _WorkerAttendanceSalaryPageState
       }
     });
 
-    return {
-      'salary': totalSalary,
-      'presentDays': presentDays,
-    };
+    return {'salary': totalSalary, 'presentDays': presentDays};
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -229,13 +238,6 @@ class _WorkerAttendanceSalaryPageState
 
     return GlassScaffold(
       title: 'Worker Attendance & Summary',
-      actions: [
-        if (_selectedWorkerIds.isNotEmpty)
-          IconButton(
-            icon: const Icon(Icons.send_outlined),
-            onPressed: _submitReports,
-          ),
-      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -289,8 +291,24 @@ class _WorkerAttendanceSalaryPageState
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filteredWorkers.length,
-                          itemBuilder: (ctx, i) =>
-                              _buildWorkerCard(_filteredWorkers[i], theme),
+                          itemBuilder: (ctx, i) {
+                            return TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: Duration(milliseconds: 400 + (i * 100)),
+                              builder: (context, value, child) {
+                                return Transform.translate(
+                                  offset: Offset(0, 20 * (1 - value)),
+                                  child: Opacity(
+                                    opacity: value,
+                                    child: _buildWorkerCard(
+                                      _filteredWorkers[i],
+                                      theme,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                 ),
               ],
@@ -353,10 +371,71 @@ class _WorkerAttendanceSalaryPageState
               },
             ),
             if (_selectedMonth != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.primaryColor.withOpacity(0.1),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Overall Attendance',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                        Text(
+                          '${_overallAttendancePercentage.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _overallAttendancePercentage / 100,
+                        minHeight: 8,
+                        backgroundColor: theme.primaryColor.withOpacity(0.1),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          _overallAttendancePercentage > 80
+                              ? Colors.green
+                              : _overallAttendancePercentage > 50
+                                  ? Colors.orange
+                                  : Colors.red,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: GlassButton(
+                        onPressed: _onGenerateOverallReport,
+                        label: 'Download Overall Report',
+                        icon: Icons.summarize_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Current Month: $_selectedMonth',
+                  'Month: $_selectedMonth',
                   style: TextStyle(
                     color: Colors.grey.shade500,
                     fontSize: 12,
@@ -405,55 +484,93 @@ class _WorkerAttendanceSalaryPageState
   }
 
   Widget _buildWorkerCard(Map<String, dynamic> worker, ThemeData theme) {
-    final isSelected = _selectedWorkerIds.contains(worker['id']);
+    final cs = theme.colorScheme;
+    
+    final isExpanded = _expandedWorkerId == worker['id'];
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
-        onTap: () => _toggleSelection(worker['id']),
-        color: isSelected ? theme.primaryColor.withOpacity(0.05) : null,
-        child: Row(
+        onTap: () {
+          setState(() {
+            _expandedWorkerId = isExpanded ? null : worker['id'];
+          });
+        },
+        child: Column(
           children: [
-            Checkbox(
-              value: isSelected,
-              onChanged: (_) => _toggleSelection(worker['id']),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    worker['name'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Text(worker['designation'], style: theme.textTheme.bodySmall),
-                  Text(
-                    worker['site'],
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.primaryColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
               children: [
-                Text(
-                  '₹ ${worker['calculatedSalary'].toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        worker['name'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(worker['designation'],
+                          style: theme.textTheme.bodySmall),
+                      Text(
+                        worker['site'],
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  'Present: ${worker['presentDays'] ?? 0} days',
-                  style: theme.textTheme.bodySmall,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹ ${worker['calculatedSalary'].toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Text(
+                      'Estimated',
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem('Present', worker['present'] ?? 0, Colors.green),
+                _buildStatItem('Absent', worker['absent'] ?? 0, Colors.red),
+                _buildStatItem('Overtime', worker['overtime'] ?? 0, Colors.orange),
+                _buildStatItem('Not Marked', worker['notMarked'] ?? 0, Colors.grey),
+              ],
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: isExpanded
+                  ? Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        AnimatedOpacity(
+                          opacity: isExpanded ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 500),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: GlassButton(
+                              onPressed: () => _onGenerateReport(worker),
+                              label: 'Generate Report',
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -461,89 +578,93 @@ class _WorkerAttendanceSalaryPageState
     );
   }
 
-  void _toggleSelection(String id) {
-    setState(() {
-      if (_selectedWorkerIds.contains(id))
-        _selectedWorkerIds.remove(id);
-      else
-        _selectedWorkerIds.add(id);
-    });
-  }
-
-  void _submitReports() async {
-    if (_selectedWorkerIds.isEmpty) return;
-
+  Future<void> _onGenerateReport(Map<String, dynamic> worker) async {
     setState(() => _isLoading = true);
     try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final workerId in _selectedWorkerIds) {
-        // Find the worker's comprehensive summary
-        final workerData = _filteredWorkers.firstWhere(
-          (w) => w['id'] == workerId,
-          orElse: () => <String, dynamic>{},
-        );
-
-        if (workerData.isEmpty) {
-          debugPrint('Worker data not found for id: $workerId');
-          continue;
-        }
-
-        // 1. Save to WorkerAllDetails (the submitted snapshot)
-        final allDetailsRef = FirestoreService.getCollection(
-          'WorkerAllDetails',
-        ).doc('${workerId}_${workerData['month']}');
-
-        batch.set(allDetailsRef, {
-          'workerId': workerId,
-          'workerName': workerData['name'],
-          'designation': workerData['designation'],
-          'site': workerData['site'],
-          'month': workerData['month'],
-          'baseSalary': workerData['baseSalary'],
-          'calculatedSalary': workerData['calculatedSalary'],
-          'totalPresentDays': workerData['presentDays'] ?? 0,
-          'attendanceData': workerData['attendance'],
-          'status': 'submitted',
-          'submittedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        // 2. Mark the source monthly document as submitted
-        final monthlyDocRef = FirestoreService.getCollection(
-          'WorkerMonthlyAttendance',
-        ).doc('${workerId}_${workerData['month']}');
-
-        batch.update(monthlyDocRef, {
-          'status': 'submitted',
-          'submittedAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully submitted ${_selectedWorkerIds.length} worker reports!',
-            ),
+      final pdfBytes = await WorkerReportPdf.build(worker: worker);
+      if (!mounted) return;
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PdfPreviewPage(
+            pdfBytes: pdfBytes,
+            fileName: 'WorkerReport_${worker['name']}_${worker['month']}.pdf',
           ),
-        );
-        setState(() {
-          _selectedWorkerIds.clear();
-        });
-      }
+        ),
+      );
     } catch (e) {
-      debugPrint('Error saving reports: $e');
+      debugPrint('Error generating PDF: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save to Firebase: $e')),
+          SnackBar(content: Text('Failed to generate report: $e')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _onGenerateOverallReport() async {
+    if (_filteredWorkers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No workers to report for this month.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final pdfBytes = await OverallReportPdf.build(
+        workers: _filteredWorkers,
+        site: _selectedSite ?? 'All Sites',
+        month: _selectedMonth ?? _currentMonth,
+        overallPercentage: _overallAttendancePercentage,
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PdfPreviewPage(
+            pdfBytes: pdfBytes,
+            fileName: 'OverallReport_${_selectedSite ?? 'All'}_${_selectedMonth}.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error generating Overall PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to generate report: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildStatItem(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: color.withOpacity(0.8),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 }

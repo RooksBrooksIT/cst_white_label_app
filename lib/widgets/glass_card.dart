@@ -12,6 +12,7 @@ class GlassCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final BoxBorder? border;
+  final MainAxisSize? mainAxisSize;
 
   const GlassCard({
     super.key,
@@ -25,6 +26,7 @@ class GlassCard extends StatelessWidget {
     this.onTap,
     this.color,
     this.border,
+    this.mainAxisSize,
   });
 
   @override
@@ -43,7 +45,7 @@ class GlassCard extends StatelessWidget {
         border: border ?? Border.all(color: theme.dividerColor, width: 1),
       ),
       child: Material(
-        color: Colors.transparent,
+        type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(borderRadius ?? 12),
@@ -51,7 +53,7 @@ class GlassCard extends StatelessWidget {
             padding: currentPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: mainAxisSize ?? MainAxisSize.min,
               children: [
                 if (title != null) ...[
                   Row(
@@ -83,7 +85,10 @@ class GlassCard extends StatelessWidget {
                   const Divider(height: 1),
                   const SizedBox(height: 16),
                 ],
-                child,
+                if ((mainAxisSize ?? MainAxisSize.min) == MainAxisSize.max)
+                  Expanded(child: child)
+                else
+                  child,
               ],
             ),
           ),

@@ -5,7 +5,6 @@ import 'package:demo_cst/screens/site_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
 import 'dart:io';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
@@ -411,11 +410,13 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       ),
                     ),
                   if (_assignedSites.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Text(
                         'No sites assigned to you.',
-                        style: TextStyle(color: Colors.red, fontSize: 16),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 16),
                       ),
                     ),
                   const SizedBox(height: 20),
@@ -441,7 +442,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                               ? '✅ Location verified'
                               : '❌ Location mismatch',
                           style: TextStyle(
-                            color: _locationValid ? Colors.green : Colors.red,
+                            color: _locationValid ? Colors.green : Theme.of(context).colorScheme.error,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -458,7 +459,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _locationError!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                        style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -490,7 +491,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _photoError!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                        style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
                       ),
                     ),
                   const SizedBox(height: 30),

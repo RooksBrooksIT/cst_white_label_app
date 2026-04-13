@@ -141,9 +141,13 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                 prefixIcon: const Icon(Icons.inventory_2_outlined),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
-                fillColor: theme.cardColor,
+                fillColor: theme.colorScheme.surface,
               ),
-              items: materialNames.map((name) => DropdownMenuItem(value: name, child: Text(name))).toList(),
+              items: materialNames.map((name) => DropdownMenuItem(
+                value: name,
+                child: Text(name, style: TextStyle(color: theme.colorScheme.onSurface)),
+              )).toList(),
+              dropdownColor: theme.colorScheme.surfaceContainerHighest,
               onChanged: (val) {
                 setState(() => selectedMaterial = val);
                 if (val != null) _fetchMaterialReport(val);

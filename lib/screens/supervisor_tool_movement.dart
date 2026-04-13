@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -674,7 +674,7 @@ class _AvailableCountWithWarning extends StatelessWidget {
 
     final cs = Theme.of(context).colorScheme;
     final bool isLow = availableCount! < 5;
-    final Color color = isLow ? cs.error : Colors.green.shade700;
+    final Color color = isLow ? cs.error : Theme.of(context).colorScheme.primary;
 
     return Padding(
       padding: EdgeInsets.only(top: Responsive.scaleV(context, 4)),

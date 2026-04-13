@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -799,7 +799,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       body: _isLoadingSites || _isLoadingMaterials
           ? Center(
               child: CircularProgressIndicator(
-                color: Theme.of(context).primaryColor,
+                color: Theme.of(context).colorScheme.primary,
               ),
             )
           : Column(
@@ -878,17 +878,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 10)),
         decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.transparent,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
           border: isSelected
               ? null
-              : Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+              : Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), width: 1.5),
         ),
         child: Center(
           child: Text(
             title,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.6),
+              color: isSelected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               fontWeight: FontWeight.bold,
               fontSize: Responsive.fontSize(context, 13),
             ),
@@ -1009,7 +1009,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             child: _buildCountBox(
               'Available Count',
               availableCount.toString(),
-              availableCount > 0 ? Colors.green : Colors.red,
+              availableCount > 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
               Icons.inventory,
             ),
           ),
@@ -1157,7 +1157,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             child: _buildCountBox(
               'Available Count',
               availableCount.toString(),
-              availableCount > 0 ? Colors.green : Colors.red,
+              availableCount > 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
               Icons.inventory,
             ),
           ),
@@ -1254,7 +1254,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: Responsive.fontSize(context, 20),
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: Responsive.scaleV(context, 12)),
@@ -1263,7 +1263,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: Responsive.fontSize(context, 14),
-                    color: Colors.white.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
                 SizedBox(height: Responsive.scaleV(context, 24)),
@@ -1309,7 +1309,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: Responsive.fontSize(context, 20),
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: Responsive.scaleV(context, 12)),
@@ -1318,7 +1318,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: Responsive.fontSize(context, 14),
-                    color: Colors.white.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
                 SizedBox(height: Responsive.scaleV(context, 24)),
@@ -1349,12 +1349,12 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           message,
           style: TextStyle(
             fontSize: Responsive.fontSize(context, 14),
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.black.withOpacity(0.8),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
         ),
@@ -1380,7 +1380,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: Responsive.fontSize(context, 18),
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               SizedBox(height: Responsive.scaleV(context, 16)),
@@ -1422,7 +1422,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       children: [
         Icon(
           icon,
-          color: Theme.of(context).primaryColor,
+          color: Theme.of(context).colorScheme.primary,
           size: Responsive.scaleH(context, 20),
         ),
         SizedBox(width: Responsive.scaleH(context, 12)),
@@ -1435,7 +1435,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: Responsive.fontSize(context, 14),
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               SizedBox(height: Responsive.scaleV(context, 2)),
@@ -1443,7 +1443,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 description,
                 style: TextStyle(
                   fontSize: Responsive.fontSize(context, 12),
-                  color: Colors.white.withOpacity(0.6),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],
@@ -1500,11 +1500,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         vertical: Responsive.scaleV(context, 8),
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
         border: Border(
           left: BorderSide(
-            color: Theme.of(context).primaryColor,
+            color: Theme.of(context).colorScheme.primary,
             width: Responsive.scaleH(context, 4),
           ),
         ),
@@ -1514,7 +1514,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         style: TextStyle(
           fontSize: Responsive.fontSize(context, 16),
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).primaryColor,
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.5,
         ),
       ),
@@ -1586,7 +1586,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         children: [
           Icon(
             Icons.info_outline,
-            color: Theme.of(context).primaryColor,
+            color: Theme.of(context).colorScheme.primary,
             size: Responsive.scaleH(context, 20),
           ),
           SizedBox(width: Responsive.scaleH(context, 12)),
@@ -1634,7 +1634,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     border: index < materialsToTransfer.length - 1
                         ? Border(
                             bottom: BorderSide(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                             ),
                           )
                         : null,
@@ -1643,12 +1643,12 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     leading: Container(
                       padding: EdgeInsets.all(Responsive.scaleH(context, 8)),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.inventory,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                         size: Responsive.scaleH(context, 20),
                       ),
                     ),
@@ -1669,7 +1669,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     trailing: IconButton(
                       icon: Icon(
                         Icons.delete_outline,
-                        color: Colors.red.shade400,
+                        color: Theme.of(context).colorScheme.error,
                         size: Responsive.scaleH(context, 20),
                       ),
                       onPressed: () => _removeMaterial(index),
@@ -1705,7 +1705,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             '• ',
             style: TextStyle(
               fontSize: Responsive.fontSize(context, 14),
-              color: Theme.of(context).primaryColor,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           Expanded(
@@ -1713,7 +1713,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               text,
               style: TextStyle(
                 fontSize: Responsive.fontSize(context, 14),
-                color: Colors.white.withOpacity(0.8),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
               ),
             ),
           ),
@@ -1760,14 +1760,14 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                       height: Responsive.scaleH(context, 16),
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     SizedBox(width: Responsive.scaleH(context, 12)),
                     Text(
                       'Loading sites...',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
@@ -1777,11 +1777,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   child: DropdownButton<String>(
                     value: selectedId,
                     isExpanded: true,
-                    dropdownColor: Colors.white,
+                    dropdownColor: Theme.of(context).colorScheme.surface,
                     hint: Text(
                       'Select Site',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.outline,
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
@@ -1792,7 +1792,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                           site['siteName'] ?? site['siteId'],
                           style: TextStyle(
                             fontSize: Responsive.fontSize(context, 14),
-                            color: const Color(0xFF1E293B),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       );
@@ -1838,14 +1838,14 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                       height: Responsive.scaleH(context, 16),
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     SizedBox(width: Responsive.scaleH(context, 12)),
                     Text(
                       'Loading materials...',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
@@ -1855,11 +1855,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                   child: DropdownButton<String>(
                     value: _selectedMaterialName,
                     isExpanded: true,
-                    dropdownColor: Colors.white,
+                    dropdownColor: Theme.of(context).colorScheme.surface,
                     hint: Text(
                       'Select Material',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.outline,
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
@@ -1878,14 +1878,14 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                               displayName ?? materialName,
                               style: TextStyle(
                                 fontSize: Responsive.fontSize(context, 14),
-                                color: const Color(0xFF1E293B),
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             Text(
                               'Available: $count',
                               style: TextStyle(
                                 fontSize: Responsive.fontSize(context, 12),
-                                color: count > 0 ? Colors.green : Colors.red,
+                                color: count > 0 ? Colors.green : Theme.of(context).colorScheme.error,
                               ),
                             ),
                           ],

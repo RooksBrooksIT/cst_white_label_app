@@ -136,22 +136,13 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       try {
         final referralCode = _actualReferralCode ?? _referralController.text.trim();
 
-        // 1. Validate Referral Code globally using the new top-level mapping
-        final referralDoc = await FirebaseFirestore.instance
-            .collection('globalReferrals')
-            .doc(referralCode)
-            .get();
+        // 1. Validate Referral Code by searching across all admin/referal documents
+        final orgId = await FirestoreService.findOrgIdByReferralCode(
+          referralCode,
+        );
 
-        if (!referralDoc.exists) {
-          if (context.mounted) _showErrorDialog('Invalid Referral Code');
-          return;
-        }
-
-        final orgId = referralDoc.data()?['dynamicPath'] as String?;
-        final fullConfigPath = referralDoc.data()?['fullConfigPath'] as String?;
         if (orgId == null) {
-          if (context.mounted)
-            _showErrorDialog('Organization configuration error');
+          if (context.mounted) _showErrorDialog('Invalid Referral Code');
           return;
         }
 
@@ -161,8 +152,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
           'config_org_path',
           orgId,
         ); // Store the ID for FirestoreService
-        final String resolvedPath =
-            fullConfigPath ?? 'organisation/$orgId/admin/data';
+        final String resolvedPath = 'organisation/$orgId/admin/data';
         await prefs.setString('config_org_doc_path', resolvedPath);
 
         // Refresh FirestoreService cache
@@ -176,8 +166,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          final String resolvedPath =
-              fullConfigPath ?? 'organisation/$orgId/admin/data';
+          final String resolvedPath = 'organisation/$orgId/admin/data';
           await _saveLoginCredentials(
             _usernameController.text.trim(),
             _passwordController.text.trim(),
@@ -479,21 +468,13 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                         return;
                                       }
 
-                                      // Temporarily resolve the referral code globally
-                                      final referralDoc = await FirebaseFirestore.instance
-                                          .collection('globalReferrals')
-                                          .doc(_referralController.text.trim())
-                                          .get();
+                                      // Temporarily resolve the referral code
+                                      final orgId = await FirestoreService.findOrgIdByReferralCode(
+                                        _referralController.text.trim(),
+                                      );
 
-                                      if (!referralDoc.exists) {
-                                        _showErrorDialog('Invalid Referral Code on main screen');
-                                        setState(() => isUpdating = false);
-                                        return;
-                                      }
-
-                                      final orgId = referralDoc.data()?['dynamicPath'] as String?;
                                       if (orgId == null) {
-                                        _showErrorDialog('Organization configuration error');
+                                        _showErrorDialog('Invalid Referral Code on main screen');
                                         setState(() => isUpdating = false);
                                         return;
                                       }

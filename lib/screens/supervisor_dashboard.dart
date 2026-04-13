@@ -170,7 +170,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("No", style: TextStyle(color: Colors.grey[600])),
+            child: Text("No", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
           TextButton(
             onPressed: () async {
@@ -184,7 +184,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 );
               }
             },
-            child: const Text("Yes", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: Text("Yes", style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -229,8 +229,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               return Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: Colors.white),
+                    icon: Icon(Icons.notifications_outlined,
+                        color: Theme.of(context).colorScheme.onPrimary),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -247,17 +247,17 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                       top: 6,
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error,
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
                             minWidth: 18, minHeight: 18),
                         child: Text(
                           count > 9 ? '9+' : '$count',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 10,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onError,
                               fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
@@ -320,13 +320,13 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         children: [
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Colors.white24,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.24),
               shape: BoxShape.circle,
             ),
             child: CircleAvatar(
               radius: 30,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               child: Icon(
                 Icons.person_rounded,
                 color: Theme.of(context).colorScheme.primary,
@@ -344,7 +344,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   style: TextStyle(
                     fontSize: Responsive.fontSize(context, 24),
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onPrimary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -353,7 +353,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   'Site Supervisor • ID: ${widget.supervisorId}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),

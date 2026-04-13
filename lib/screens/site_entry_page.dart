@@ -7,6 +7,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import 'supervisor_dashboard.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;
@@ -415,6 +416,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         'siteSupervisorEntries',
       ).doc(docId).get();
       if (existing.exists) {
+        if (!mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -465,21 +467,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       };
       if (actualDoc.exists) {
         int prevDays = (actualDoc.data()?['actDays'] ?? 0) as int;
+        if (!mounted) return;
         await actualColl.doc(actualDocId).update({
           ...actualData,
           "actDays": prevDays + 1,
         });
       } else {
+        if (!mounted) return;
         await actualColl.doc(actualDocId).set({...actualData, "actDays": 1});
       }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entry saved successfully!')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
     } finally {
+      if (!mounted) return;
       setState(() {
         isSaving = false;
       });
@@ -936,6 +943,25 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Daily Site Entry',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SupervisorDashboard(
+                  username: widget.userName,
+                  supervisorId: supervisorId ?? '',
+                  supervisorName: widget.userName,
+                ),
+              ),
+              (route) => false,
+            );
+          },
+        ),
+      ],
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(

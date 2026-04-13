@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/expense_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../services/auth_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class ContractorEntryPage extends StatefulWidget {
   final String userName;
@@ -22,12 +26,13 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   // --- Color Configuration and Utilities ---
   // Professional slate colors
   Color get _primaryColor => Theme.of(context).primaryColor;
-  Color get _textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF1E293B);
+  Color get _textColor =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF1E293B);
   Color get _labelColor => const Color(0xFF64748B);
-  Color get _borderColor => Theme.of(context).dividerColor;
+  Color get _borderColor => const Color.fromARGB(255, 76, 86, 99);
   Color get _secondaryColor => Theme.of(context).colorScheme.secondary;
   Color get _sectionBgColor => Theme.of(context).scaffoldBackgroundColor;
-  Color get _actionTextColor => Colors.white;
+  Color get _actionTextColor => const Color.fromARGB(255, 0, 0, 0);
   Color get _successColor => const Color(0xFF10B981);
   Color get _errorColor => Theme.of(context).colorScheme.error;
 
@@ -157,7 +162,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       final sitesSnapshot = await FirestoreService.sites.get();
       final Map<String, String> names = {
         for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
 
       // 2. Fetch projects matching contractor
@@ -611,6 +616,37 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     }
   }
 
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Logout', style: TextStyle(color: _errorColor)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await AuthService().logout();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/landing',
+          (route) => false,
+        );
+      }
+    }
+  }
+
   // ------------------
   // Section Headers
   // ------------------
@@ -658,9 +694,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.white.withOpacity(0.4),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _borderColor),
+            border: Border.all(color: _borderColor.withOpacity(0.3)),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -695,9 +731,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSummaryTable() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _borderColor),
+        border: Border.all(color: _borderColor.withOpacity(0.2)),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -920,558 +956,461 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     );
   }
 
-  Widget _buildHeaderSection(BuildContext context, bool isDark, double hPad) {
-    return Container(
-      color: Colors.white,
-      child: SafeArea(
-        child: SizedBox(
-          height: kToolbarHeight,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: hPad),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 20,
-                    color: Color(0xFF1E293B),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'CONTRACTOR ENTRY',
-                      style: TextStyle(
-                        color: _primaryColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 48), // Spacer for balance
-              ],
+  // --------- Section Cards -----------
+  Widget _buildContractorDetailsCard() {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            'Contractor Details',
+            Icons.engineering,
+            color: _primaryColor,
+          ),
+          const SizedBox(height: 18),
+          _buildInputField(
+            label: 'Contractor Name',
+            child: TextField(
+              controller: _contractorNameController,
+              readOnly: true,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Enter contractor name',
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  // --------- Section Cards -----------
-  Widget _buildContractorDetailsCard(bool isDark) {
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.black12,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(
-              'Contractor Details',
-              Icons.engineering,
-              color: _primaryColor,
-            ),
-            const SizedBox(height: 18),
-            _buildInputField(
-              label: 'Contractor Name',
-              child: TextField(
-                controller: _contractorNameController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Enter contractor name',
-                ),
+          _buildInputField(
+            label: 'Project Field',
+            child: TextField(
+              controller: _projectFieldController,
+              readOnly: true,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Enter project field',
               ),
             ),
-            _buildInputField(
-              label: 'Project Field',
-              child: TextField(
-                controller: _projectFieldController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Enter project field',
-                ),
+          ),
+          _buildInputField(
+            label: 'Date',
+            child: TextField(
+              controller: _dateController,
+              readOnly: true,
+              onTap: _pickDate,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                suffixIcon: Icon(Icons.calendar_today, color: _secondaryColor),
               ),
             ),
-            _buildInputField(
-              label: 'Date',
-              child: TextField(
-                controller: _dateController,
-                readOnly: true,
-                onTap: _pickDate,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  suffixIcon: Icon(
-                    Icons.calendar_today,
-                    color: _secondaryColor,
-                  ),
-                ),
-              ),
-            ),
-            isLoadingSiteIds
-                ? Center(child: CircularProgressIndicator(color: _primaryColor))
-                : siteIdError != null
-                ? Text(siteIdError!, style: TextStyle(color: _errorColor))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInputField(
-                        label: 'Site ID',
-                        child: DropdownButtonFormField<String>(
-                          value: selectedSiteIdForEntry,
-                          items: siteIdOptions
-                              .map(
-                                (id) => DropdownMenuItem<String>(
-                                  value: id,
-                                  child: Text('$id - ${siteNameMap[id] ?? "Unnamed Site"}'),
+          ),
+          isLoadingSiteIds
+              ? Center(child: CircularProgressIndicator(color: _primaryColor))
+              : siteIdError != null
+              ? Text(siteIdError!, style: TextStyle(color: _errorColor))
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInputField(
+                      label: 'Site ID',
+                      child: DropdownButtonFormField<String>(
+                        value: selectedSiteIdForEntry,
+                        items: siteIdOptions
+                            .map(
+                              (id) => DropdownMenuItem<String>(
+                                value: id,
+                                child: Text(
+                                  '$id - ${siteNameMap[id] ?? "Unnamed Site"}',
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (val) async {
-                            setState(() => selectedSiteIdForEntry = val);
-                            await _fetchContractDates(val);
-                          },
-                          decoration: InputDecoration(border: InputBorder.none),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) async {
+                          setState(() => selectedSiteIdForEntry = val);
+                          await _fetchContractDates(val);
+                        },
+                        decoration: InputDecoration(border: InputBorder.none),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Contract Start Date',
+                            child: Text(
+                              _formatDate(contractStartDate),
+                              style: TextStyle(fontSize: 14),
+                            ),
+                          ),
                         ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInputField(
-                              label: 'Contract Start Date',
-                              child: Text(
-                                _formatDate(contractStartDate),
-                                style: TextStyle(fontSize: 14),
-                              ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Contract End Date',
+                            child: Text(
+                              _formatDate(contractEndDate),
+                              style: TextStyle(fontSize: 14),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildInputField(
-                              label: 'Contract End Date',
-                              child: Text(
-                                _formatDate(contractEndDate),
-                                style: TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-          ],
-        ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ],
       ),
     );
   }
 
   Widget _buildMaterialSection() {
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.black12,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(
-              'Material Details',
-              Icons.add_box,
-              color: Colors.brown,
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            'Material Details',
+            Icons.add_box,
+            color: Colors.brown,
+          ),
+          const SizedBox(height: 16),
+          isLoadingMaterials
+              ? Center(child: CircularProgressIndicator(color: _primaryColor))
+              : materialError != null
+              ? Text(materialError!, style: TextStyle(color: _errorColor))
+              : Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        labelText: 'Search Material...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: Icon(Icons.search, color: _secondaryColor),
+                      ),
+                      onChanged: (query) {
+                        setState(() {
+                          final q = query.toLowerCase();
+                          final filtered = materialOptions
+                              .where((item) => item.toLowerCase().contains(q))
+                              .toList();
+                          _filteredMaterialOptions = filtered;
+                          if (filtered.isNotEmpty &&
+                              !filtered.contains(selectedMaterial)) {
+                            selectedMaterial = filtered.first;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: selectedMaterial,
+                          decoration: InputDecoration(
+                            labelText: 'Material',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          items: (_filteredMaterialOptions ?? materialOptions)
+                              .map(
+                                (item) => DropdownMenuItem(
+                                  value: item,
+                                  child: Text(item),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => selectedMaterial = value),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: materialQtyController,
+                          decoration: InputDecoration(
+                            labelText: 'Qty',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      onPressed: _addMaterial,
+                      label: 'Add Material',
+                      icon: Icons.add,
+                    ),
+                  ],
+                ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => setState(
+              () => _showCustomMaterialFields = !_showCustomMaterialFields,
             ),
-            const SizedBox(height: 16),
-            isLoadingMaterials
-                ? Center(child: CircularProgressIndicator(color: _primaryColor))
-                : materialError != null
-                ? Text(materialError!, style: TextStyle(color: _errorColor))
-                : Column(
-                    children: [
-                      TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search Material...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: _secondaryColor,
-                          ),
-                        ),
-                        onChanged: (query) {
-                          setState(() {
-                            final q = query.toLowerCase();
-                            final filtered = materialOptions
-                                .where((item) => item.toLowerCase().contains(q))
-                                .toList();
-                            _filteredMaterialOptions = filtered;
-                            if (filtered.isNotEmpty &&
-                                !filtered.contains(selectedMaterial)) {
-                              selectedMaterial = filtered.first;
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            value: selectedMaterial,
-                            decoration: InputDecoration(
-                              labelText: 'Material',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            items: (_filteredMaterialOptions ?? materialOptions)
-                                .map(
-                                  (item) => DropdownMenuItem(
-                                    value: item,
-                                    child: Text(item),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) =>
-                                setState(() => selectedMaterial = value),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: materialQtyController,
-                            decoration: InputDecoration(
-                              labelText: 'Qty',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        icon: Icon(Icons.add, size: 18),
-                        onPressed: _addMaterial,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        label: Text('Add Material'),
-                      ),
-                    ],
-                  ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => setState(
-                () => _showCustomMaterialFields = !_showCustomMaterialFields,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _secondaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _secondaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
+            ),
+            child: Text('Custom Material'),
+          ),
+          if (_showCustomMaterialFields) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _customMaterialNameController,
+              decoration: InputDecoration(
+                labelText: 'Material Name',
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text('Custom Material'),
             ),
-            if (_showCustomMaterialFields) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _customMaterialNameController,
-                decoration: InputDecoration(
-                  labelText: 'Material Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _customMaterialQtyController,
+                    decoration: InputDecoration(
+                      labelText: 'Qty',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _customMaterialQtyController,
-                      decoration: InputDecoration(
-                        labelText: 'Qty',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _customMaterialPriceController,
+                    decoration: InputDecoration(
+                      labelText: 'Unit Price (₹)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      keyboardType: TextInputType.number,
                     ),
+                    keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _customMaterialPriceController,
-                      decoration: InputDecoration(
-                        labelText: 'Unit Price (₹)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _addCustomMaterial,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
                     ),
+                    child: Text('Add'),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _addCustomMaterial,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: Text('Add'),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        setState(() => _showCustomMaterialFields = false),
+                    child: Text('Cancel'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () =>
-                          setState(() => _showCustomMaterialFields = false),
-                      child: Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildLabourSection() {
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.black12,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(
-              'Labour Details',
-              Icons.groups,
-              color: Colors.teal[700],
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            'Labour Details',
+            Icons.groups,
+            color: Colors.teal[700],
+          ),
+          const SizedBox(height: 16),
+          isLoadingLabours
+              ? Center(child: CircularProgressIndicator(color: _primaryColor))
+              : labourError != null
+              ? Text(labourError!, style: TextStyle(color: _errorColor))
+              : Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        labelText: 'Search Labour...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: Icon(Icons.search, color: _secondaryColor),
+                      ),
+                      onChanged: (query) {
+                        setState(() {
+                          final q = query.toLowerCase();
+                          final filtered = labourOptions
+                              .where((item) => item.toLowerCase().contains(q))
+                              .toList();
+                          _filteredLabourOptions = filtered;
+                          if (filtered.isNotEmpty &&
+                              !filtered.contains(selectedLabour)) {
+                            selectedLabour = filtered.first;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: selectedLabour,
+                          decoration: InputDecoration(
+                            labelText: 'Labour',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          items: (_filteredLabourOptions ?? labourOptions)
+                              .map(
+                                (item) => DropdownMenuItem(
+                                  value: item,
+                                  child: Text(item),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => selectedLabour = value),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: labourQtyController,
+                          decoration: InputDecoration(
+                            labelText: 'Count',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      onPressed: _addLabour,
+                      label: 'Add Labour',
+                      icon: Icons.add,
+                    ),
+                  ],
+                ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => setState(
+              () => _showCustomLabourFields = !_showCustomLabourFields,
             ),
-            const SizedBox(height: 16),
-            isLoadingLabours
-                ? Center(child: CircularProgressIndicator(color: _primaryColor))
-                : labourError != null
-                ? Text(labourError!, style: TextStyle(color: _errorColor))
-                : Column(
-                    children: [
-                      TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search Labour...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: _secondaryColor,
-                          ),
-                        ),
-                        onChanged: (query) {
-                          setState(() {
-                            final q = query.toLowerCase();
-                            final filtered = labourOptions
-                                .where((item) => item.toLowerCase().contains(q))
-                                .toList();
-                            _filteredLabourOptions = filtered;
-                            if (filtered.isNotEmpty &&
-                                !filtered.contains(selectedLabour)) {
-                              selectedLabour = filtered.first;
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            value: selectedLabour,
-                            decoration: InputDecoration(
-                              labelText: 'Labour',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            items: (_filteredLabourOptions ?? labourOptions)
-                                .map(
-                                  (item) => DropdownMenuItem(
-                                    value: item,
-                                    child: Text(item),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) =>
-                                setState(() => selectedLabour = value),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: labourQtyController,
-                            decoration: InputDecoration(
-                              labelText: 'Count',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        icon: Icon(Icons.add, size: 18),
-                        onPressed: _addLabour,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        label: Text('Add Labour'),
-                      ),
-                    ],
-                  ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => setState(
-                () => _showCustomLabourFields = !_showCustomLabourFields,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _secondaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _secondaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
+            ),
+            child: Text('Custom Labour'),
+          ),
+          if (_showCustomLabourFields) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _customLabourNameController,
+              decoration: InputDecoration(
+                labelText: 'Labour Type',
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text('Custom Labour'),
             ),
-            if (_showCustomLabourFields) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _customLabourNameController,
-                decoration: InputDecoration(
-                  labelText: 'Labour Type',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _customLabourSalaryController,
+              decoration: InputDecoration(
+                labelText: 'Salary',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _customLabourSalaryController,
-                decoration: InputDecoration(
-                  labelText: 'Salary',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: labourQtyController,
+              decoration: InputDecoration(
+                labelText: 'Count',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: labourQtyController,
-                decoration: InputDecoration(
-                  labelText: 'Count',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _addCustomLabour,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: Text('Add'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _addCustomLabour,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
                     ),
+                    child: Text('Add'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () =>
-                          setState(() => _showCustomLabourFields = false),
-                      child: Text('Cancel'),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        setState(() => _showCustomLabourFields = false),
+                    child: Text('Cancel'),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildAdditionalCostsSection() {
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.black12,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(
-              'Additional Costs',
-              Icons.attach_money,
-              color: Colors.deepOrange,
-            ),
-            const SizedBox(height: 16),
-            _buildCostInput('Food Cost', foodCost, Icons.fastfood),
-            _buildCostInput(
-              'Transport Cost',
-              transportCost,
-              Icons.directions_car,
-            ),
-            _buildCostInput('Fuel Cost', fuelCost, Icons.local_gas_station),
-          ],
-        ),
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            'Additional Costs',
+            Icons.attach_money,
+            color: Colors.deepOrange,
+          ),
+          const SizedBox(height: 16),
+          _buildCostInput('Food Cost', foodCost, Icons.fastfood),
+          _buildCostInput(
+            'Transport Cost',
+            transportCost,
+            Icons.directions_car,
+          ),
+          _buildCostInput('Fuel Cost', fuelCost, Icons.local_gas_station),
+        ],
       ),
     );
   }
 
   Widget _buildSummarySection() {
-    return Container(
-      width: double.infinity,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: EdgeInsets.zero,
+    return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1512,89 +1451,41 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         : width < 600
         ? 12
         : 18;
-    final double cardPadding = width < 400
-        ? 10
-        : width < 600
-        ? 14
-        : 18;
-    final double fontSize = width < 400
-        ? 12
-        : width < 600
-        ? 14
-        : 16;
-    return Scaffold(
-      backgroundColor: _sectionBgColor,
-      body: Column(
-        children: [
-          _buildHeaderSection(context, false, hPad),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: hPad,
-                vertical: sectionSpacing,
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(cardPadding),
-                    child: _buildContractorDetailsCard(false),
-                  ),
-                  SizedBox(height: sectionSpacing),
-                  Padding(
-                    padding: EdgeInsets.all(cardPadding),
-                    child: _buildMaterialSection(),
-                  ),
-                  SizedBox(height: sectionSpacing),
-                  Padding(
-                    padding: EdgeInsets.all(cardPadding),
-                    child: _buildLabourSection(),
-                  ),
-                  SizedBox(height: sectionSpacing),
-                  Padding(
-                    padding: EdgeInsets.all(cardPadding),
-                    child: _buildAdditionalCostsSection(),
-                  ),
-                  SizedBox(height: sectionSpacing),
-                  Padding(
-                    padding: EdgeInsets.all(cardPadding),
-                    child: _buildSummarySection(),
-                  ),
-                  SizedBox(height: sectionSpacing * 1.5),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : _saveToFirestore,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        // Save button text color as per your requirement
-                        foregroundColor: _actionTextColor,
-                        padding: EdgeInsets.symmetric(
-                          vertical: sectionSpacing + 2,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: fontSize,
-                        ),
-                        elevation: 2,
-                      ),
-                      child: isSaving
-                          ? SizedBox(
-                              height: fontSize + 10,
-                              width: fontSize + 10,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text('Save Entry', style: TextStyle()),
-                    ),
-                  ),
-                  SizedBox(height: sectionSpacing * 2),
-                ],
-              ),
+
+    return GlassScaffold(
+      title: 'CONTRACTOR ENTRY',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded),
+          onPressed: _handleLogout,
+          tooltip: 'Logout',
+        ),
+      ],
+      body: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(
+          horizontal: hPad,
+          vertical: sectionSpacing,
+        ),
+        child: Column(
+          children: [
+            _buildContractorDetailsCard(),
+            SizedBox(height: sectionSpacing),
+            _buildMaterialSection(),
+            SizedBox(height: sectionSpacing),
+            _buildLabourSection(),
+            SizedBox(height: sectionSpacing),
+            _buildAdditionalCostsSection(),
+            SizedBox(height: sectionSpacing),
+            _buildSummarySection(),
+            const SizedBox(height: 32),
+            GlassButton(
+              onPressed: isSaving ? null : _saveToFirestore,
+              label: 'SAVE ENTRY',
+              isLoading: isSaving,
             ),
-          ),
-        ],
+            SizedBox(height: sectionSpacing * 2),
+          ],
+        ),
       ),
     );
   }

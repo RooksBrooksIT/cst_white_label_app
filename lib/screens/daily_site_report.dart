@@ -185,14 +185,15 @@ class _DailySiteExpensesReportPageState
   }
 
   Widget _buildSummaryHeader(ThemeData theme, String date, num total) {
+    final cs = theme.colorScheme;
     return GlassCard(
-      color: theme.primaryColor,
+      color: cs.primary,
       child: Column(
         children: [
           Text(
             'TOTAL DAILY EXPENDITURE',
             style: theme.textTheme.labelMedium?.copyWith(
-              color: Colors.white70,
+              color: cs.onPrimary.withOpacity(0.7),
               letterSpacing: 1.2,
             ),
           ),
@@ -200,7 +201,7 @@ class _DailySiteExpensesReportPageState
           Text(
             '₹ ${total.toStringAsFixed(2)}',
             style: theme.textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
+              color: cs.onPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -208,22 +209,22 @@ class _DailySiteExpensesReportPageState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: cs.onPrimary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.calendar_today,
                   size: 14,
-                  color: Colors.white70,
+                  color: cs.onPrimary.withOpacity(0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   date,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: cs.onPrimary.withOpacity(0.7),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),

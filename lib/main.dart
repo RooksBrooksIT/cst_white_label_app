@@ -18,6 +18,7 @@ import 'package:demo_cst/screens/join_by_referral_page.dart';
 import 'package:demo_cst/screens/landing_page.dart';
 import 'package:demo_cst/screens/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding_edit_screen.dart';
+import 'package:demo_cst/screens/contact_support_screen.dart';
 
 /// Global navigator key — used by NotificationService to show foreground banners.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -72,6 +73,7 @@ class MyApp extends StatelessWidget {
                 '/joinByReferral': (context) => const JoinByReferralPage(),
                 '/orgMenu': (context) => const OrgMenuScreen(),
                 '/branding': (context) => const BrandingEditScreen(),
+                '/contactSupport': (context) => const ContactSupportScreen(),
               },
             );
           },

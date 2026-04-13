@@ -395,18 +395,18 @@ class _RequestCard extends StatelessWidget {
     required this.materials,
   });
 
-  Color _statusColor(String s) {
+  Color _statusColor(BuildContext context, String s) {
     switch (s.toLowerCase()) {
       case 'approved':
-        return Colors.green;
+        return Colors.green; // Semantic success
       case 'rejected':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'immediate':
-        return Colors.orange;
+        return Colors.orange; // Semantic warning
       case 'processing':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.secondary;
       default:
-        return Colors.blueGrey;
+        return Colors.grey;
     }
   }
 
@@ -622,7 +622,7 @@ class _MaterialItem extends StatelessWidget {
             width: 4,
             height: 40,
             decoration: BoxDecoration(
-              color: _getPriorityColor(priority),
+              color: _getPriorityColor(context, priority),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -655,14 +655,14 @@ class _MaterialItem extends StatelessWidget {
     );
   }
 
-  Color _getPriorityColor(String priority) {
+  Color _getPriorityColor(BuildContext context, String priority) {
     switch (priority.toLowerCase()) {
       case 'immediate':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'high':
         return Colors.orange;
       case 'medium':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.secondary;
       case 'low':
         return Colors.green;
       default:

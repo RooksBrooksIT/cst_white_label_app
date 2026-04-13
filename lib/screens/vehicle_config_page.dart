@@ -99,6 +99,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     try {
       final snapshot = await FirestoreService.getCollection('projects').get();
 
+      if (!mounted) return;
       setState(() {
         _siteNames = snapshot.docs
             .map((doc) {
@@ -144,6 +145,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
       vehicles.sort((a, b) => a['id'].compareTo(b['id']));
 
+      if (!mounted) return;
       setState(() {
         _vehicles = vehicles;
       });
@@ -184,6 +186,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         });
       }
 
+      if (!mounted) return;
       setState(() {
         _materials = materialsWithUnits;
       });
@@ -349,9 +352,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       print('Error saving movement: $e');
       _showErrorSnackBar('Failed to save movement: ${e.toString()}');
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -390,6 +395,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -400,6 +406,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

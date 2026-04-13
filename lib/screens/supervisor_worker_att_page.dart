@@ -5,6 +5,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/list_extensions.dart';
+import 'supervisor_dashboard.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   const AttendanceManagementPage({super.key});
@@ -16,7 +17,8 @@ class AttendanceManagementPage extends StatefulWidget {
 
 class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   // Selected values
-  String? _selectedSite;
+  String? _selectedSiteId;
+  String? _selectedSiteName;
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
 
@@ -42,14 +44,16 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final querySnapshot = await FirestoreService.getCollection('workerSiteMap').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workerSiteMap',
+      ).get();
       if (!mounted) return;
       setState(() {
         _sites = querySnapshot.docs.map((doc) {
           final data = doc.data();
           return {
             'id': doc.id,
-            'site': data['site'] ?? '',
+            'site': data['site'] ?? 'Unnamed Site',
             'supervisor': data['supervisor'] ?? '',
             'projectName': data['projectName'] ?? '',
             'totalWorkers': data['totalWorkers'] ?? 0,
@@ -59,16 +63,19 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       });
     } catch (e) {
       print('Error loading sites: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingSites = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      }
     }
   }
 
-  Future<void> _loadWorkersForSite(String site) async {
+  Future<void> _loadWorkersForSite(String siteId, String siteName) async {
     setState(() {
       _isLoadingWorkers = true;
       _workers = [];
@@ -76,7 +83,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final doc = await FirestoreService.getCollection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(siteId).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -85,7 +94,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         );
 
         // Load existing attendance for today if any
-        await _loadExistingAttendance(site);
+        await _loadExistingAttendance(siteName);
 
         if (!mounted) return;
         setState(() {
@@ -93,6 +102,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           _isLoadingWorkers = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingWorkers = false;
         });
@@ -116,34 +126,49 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     try {
       final docId =
           '${site}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
-      final doc = await FirestoreService.getCollection('WorkerSummary').doc(docId).get();
+      final doc = await FirestoreService.getCollection(
+        'workersAttendance',
+      ).doc(docId).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         final workersData = data['workers'] as Map<String, dynamic>?;
 
         if (workersData != null) {
+          if (!mounted) return;
           setState(() {
             workersData.forEach((workerName, workerData) {
-              _attendanceStatus[workerName] = workerData['attendance'] ?? '';
+              // Ensure we check for 'attendance' field in the worker data map
+              _attendanceStatus[workerName] =
+                  workerData['attendance']?.toString() ?? '';
             });
           });
         }
       }
     } catch (e) {
-      print('Error loading existing attendance: $e');
+      debugPrint('Error loading existing attendance: $e');
     }
   }
 
-  void _onSiteSelected(String? site) {
+  void _onSiteSelected(String? siteId) {
+    String? siteName;
+    if (siteId != null) {
+      final site = _sites.firstWhere(
+        (s) => s['id'] == siteId,
+        orElse: () => {},
+      );
+      siteName = site['site'];
+    }
+
     setState(() {
-      _selectedSite = site;
+      _selectedSiteId = siteId;
+      _selectedSiteName = siteName;
       _workers.clear();
       _attendanceStatus.clear();
     });
 
-    if (site != null) {
-      _loadWorkersForSite(site);
+    if (siteId != null && siteName != null) {
+      _loadWorkersForSite(siteId, siteName);
     }
   }
 
@@ -154,7 +179,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Future<void> _submitAttendance() async {
-    if (_selectedSite == null || _workers.isEmpty) {
+    if (_selectedSiteId == null ||
+        _selectedSiteName == null ||
+        _workers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a site with workers')),
       );
@@ -190,15 +217,20 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         if (attendanceStatus.isEmpty) continue;
 
         // Ensure we utilize workerId if available, fallback to a name-site combination
-        final String workerId = worker['workerId']?.toString() ?? '${workerName}_${_selectedSite}';
+        final String workerId =
+            worker['workerId']?.toString() ??
+            '${workerName}_${_selectedSiteName}';
         final String workerDocId = '${workerId}_$month';
-        final docRef = FirestoreService.getCollection('WorkerMonthlyAttendance').doc(workerDocId);
+        final docRef = FirestoreService.getCollection(
+          'WorkerMonthlyAttendance',
+        ).doc(workerDocId);
 
         // Daily attendance data as per requirements
         final Map<String, dynamic> todayAttendance = {
           'status': attendanceStatus.toLowerCase(),
           'markedAt': FieldValue.serverTimestamp(),
-          'salaryPerDay': double.tryParse(worker['workerSalary']?.toString() ?? '0') ?? 0,
+          'salaryPerDay':
+              double.tryParse(worker['workerSalary']?.toString() ?? '0') ?? 0,
         };
 
         // Update the monthly document with a nested map key update
@@ -206,18 +238,17 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           'workerId': workerId,
           'workerName': workerName,
           'designation': worker['workerDesignation'] ?? '',
-          'site': _selectedSite,
+          'site': _selectedSiteName,
           'month': month,
           'baseSalary': worker['workerSalary'] ?? '0',
           'status': 'draft',
-          'attendanceData': {
-            todayDate: todayAttendance,
-          },
+          'attendanceData': {todayDate: todayAttendance},
         }, SetOptions(merge: true));
       }
 
       // Legacy daily log (optional, kept for audit trail)
-      final dailyDocId = '${_selectedSite!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
+      final dailyDocId =
+          '${_selectedSiteName!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
       final Map<String, dynamic> workersDataLog = {};
       for (final worker in _workers) {
         final name = worker['workerName']?.toString() ?? '';
@@ -227,14 +258,22 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           'attendance': _attendanceStatus[name] ?? '',
         };
       }
-      
-      batch.set(FirestoreService.getCollection('workersAttendance').doc(dailyDocId), {
-        'Day': _currentDate,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'month': month,
-        'site': _selectedSite,
-        'workers': workersDataLog,
-      }, SetOptions(merge: true));
+
+      batch.set(
+        FirestoreService.getCollection('workersAttendance').doc(dailyDocId),
+        {
+          'day': DateFormat('dd').format(DateTime.now()), // dd
+          'month': DateFormat(
+            'MM-yyyy',
+          ).format(DateTime.now()), // MM-yyyy as per user spec
+          'site': _selectedSiteName,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'workers': workersDataLog,
+          'Day':
+              _currentDate, // Keep for backward compatibility if needed, but 'day' is primary now
+        },
+        SetOptions(merge: true),
+      );
 
       await batch.commit();
 
@@ -267,24 +306,29 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   Future<void> _recalculateMonthlySalaries() async {
     try {
       final String month = _currentMonth;
-      final querySnapshot = await FirestoreService.getCollection('WorkerMonthlyAttendance')
-          .where('month', isEqualTo: month)
-          .where('site', isEqualTo: _selectedSite)
-          .get();
+      final querySnapshot =
+          await FirestoreService.getCollection('WorkerMonthlyAttendance')
+              .where('month', isEqualTo: month)
+              .where('site', isEqualTo: _selectedSiteName)
+              .get();
 
       final batch = FirebaseFirestore.instance.batch();
 
       for (var doc in querySnapshot.docs) {
         final data = doc.data();
-        final Map<String, dynamic> attendanceMap = data['attendanceData'] as Map<String, dynamic>? ?? {};
+        final Map<String, dynamic> attendanceMap =
+            data['attendanceData'] as Map<String, dynamic>? ?? {};
 
         double totalSalary = 0.0;
         int presentDays = 0;
 
         attendanceMap.forEach((date, details) {
           if (details is Map) {
-            final String status = details['status']?.toString().toLowerCase() ?? '';
-            final double salaryPerDay = double.tryParse(details['salaryPerDay']?.toString() ?? '0') ?? 0.0;
+            final String status =
+                details['status']?.toString().toLowerCase() ?? '';
+            final double salaryPerDay =
+                double.tryParse(details['salaryPerDay']?.toString() ?? '0') ??
+                0.0;
 
             if (status == 'present' || status == 'overtime') {
               totalSalary += salaryPerDay;
@@ -309,17 +353,16 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     }
   }
 
-
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'present':
-        return Colors.green;
+        return Colors.green; // Semantic success
       case 'absent':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'overtime':
-        return Colors.orange;
+        return Colors.orange; // Semantic warning
       case 'half day':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.secondary;
       default:
         return Colors.grey;
     }
@@ -344,6 +387,26 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Attendance Management',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.logout_rounded, color: Theme.of(context).colorScheme.onPrimary),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => const SupervisorDashboard(
+                      username: '', // Not available in this context
+                      supervisorId: '',
+                      supervisorName: '',
+                    ),
+              ),
+              (route) => false,
+            );
+          },
+        ),
+      ],
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -356,7 +419,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             const SizedBox(height: 24),
 
             // Workers Attendance Table
-            if (_selectedSite != null) _buildAttendanceSection(),
+            if (_selectedSiteId != null) _buildAttendanceSection(),
 
             if (_workers.isNotEmpty) const SizedBox(height: 24),
 
@@ -391,7 +454,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         child: Column(
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedSite,
+              value: _selectedSiteId,
               dropdownColor: cs.surfaceContainerHighest,
               style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
@@ -417,14 +480,19 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                   ? [
                       DropdownMenuItem(
                         value: null,
-                        child: Text('Loading sites...', style: TextStyle(color: cs.onSurface.withOpacity(0.5))),
+                        child: Text(
+                          'Loading sites...',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ),
                       ),
                     ]
                   : _sites.map<DropdownMenuItem<String>>((site) {
                       return DropdownMenuItem<String>(
-                        value: site['site'] as String?,
+                        value: site['id'] as String?,
                         child: Text(
-                          site['site'] ?? '',
+                          site['site'] ?? 'Unnamed Site',
                           style: TextStyle(color: cs.onSurface),
                         ),
                       );
@@ -432,16 +500,19 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
               onChanged: _onSiteSelected,
             ),
 
-            if (_selectedSite != null) const SizedBox(height: 12),
+            if (_selectedSiteId != null) const SizedBox(height: 12),
 
-            if (_selectedSite != null)
+            if (_selectedSiteId != null)
               Row(
                 children: [
                   Icon(Icons.calendar_today, size: 16, color: cs.primary),
                   const SizedBox(width: 8),
                   Text(
                     'Date: $_currentDate',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ],
               ),
@@ -455,6 +526,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GlassCard(
+        mainAxisSize: MainAxisSize.max,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -473,7 +545,10 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                   ),
                   if (_workers.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primary.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -492,107 +567,159 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
               const SizedBox(height: 16),
 
               if (_isLoadingWorkers)
-                Center(child: CircularProgressIndicator(color: cs.primary))
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
               else if (_workers.isEmpty)
                 Center(
-                  child: Text(
-                    'No workers found for this site',
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.5)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.person_off,
+                          size: 48,
+                          color: cs.onSurface.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No workers found for this site',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else
                 Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          cs.primary.withOpacity(0.1),
-                        ),
-                        dataRowColor: WidgetStateProperty.all(Colors.transparent),
-                        columns: [
-                          DataColumn(label: Text('No.', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Worker Name', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Designation', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Attendance Status', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Actions', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold))),
-                        ],
-                        rows: _workers.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final worker = entry.value;
-                          final workerName =
-                              worker['workerName']?.toString() ?? '';
-                          final currentStatus =
-                              _attendanceStatus[workerName] ?? '';
+                  child: ListView.builder(
+                    itemCount: _workers.length,
+                    padding: const EdgeInsets.only(top: 8),
+                    itemBuilder: (context, index) {
+                      final worker = _workers[index];
+                      final workerName = worker['workerName']?.toString() ?? '';
+                      final designation =
+                          worker['workerDesignation']?.toString() ?? '';
+                      final currentStatus = _attendanceStatus[workerName] ?? '';
 
-                          return DataRow(
-                            cells: [
-                              DataCell(Text('${index + 1}', style: TextStyle(color: cs.onSurface))),
-                              DataCell(
-                                Text(
-                                  workerName,
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface),
-                                ),
-                              ),
-                              DataCell(Text(worker['workerDesignation'] ?? '', style: TextStyle(color: cs.onSurface))),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(
-                                      currentStatus,
-                                    ).withOpacity(0.1),
-                                    border: Border.all(
-                                      color: _getStatusColor(currentStatus),
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _getStatusText(currentStatus),
-                                    style: TextStyle(
-                                      color: _getStatusColor(currentStatus),
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: cs.surface.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: cs.primary.withOpacity(0.1),
+                                child: Text(
+                                  (index + 1).toString(),
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    _buildAttendanceButton(
+                              title: Text(
+                                workerName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text(
+                                designation,
+                                style: TextStyle(
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              trailing: currentStatus.isNotEmpty
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(
+                                          currentStatus,
+                                        ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _getStatusColor(
+                                            currentStatus,
+                                          ).withOpacity(0.5),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _getStatusText(currentStatus),
+                                        style: TextStyle(
+                                          color: _getStatusColor(currentStatus),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const Divider(height: 1),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Present',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    const SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Absent',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    const SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Overtime',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    const SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Half Day',
                                       workerName,
                                       currentStatus,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -610,23 +737,36 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     final isSelected = currentStatus.toLowerCase() == status.toLowerCase();
     final color = _getStatusColor(status);
 
-    return Tooltip(
-      message: status,
-      child: GestureDetector(
-        onTap: () => _setAttendance(workerName, status),
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: isSelected ? color : color.withOpacity(0.1),
-            border: Border.all(color: color),
-            borderRadius: BorderRadius.circular(6),
+    return InkWell(
+      onTap: () => _setAttendance(workerName, status),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withOpacity(0.05),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
           ),
-          child: Center(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              status[0].toUpperCase(),
+              status,
               style: TextStyle(
-                color: isSelected ? Colors.white : color,
+                color: isSelected ? Theme.of(context).colorScheme.onPrimary : color,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -650,9 +790,13 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       child: ElevatedButton(
         onPressed: allMarked && !_isSubmitting ? _submitAttendance : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: allMarked ? Colors.green : cs.onSurface.withOpacity(0.3),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: allMarked
+              ? Theme.of(context).colorScheme.primary
+              : cs.onSurface.withOpacity(0.3),
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         child: _isSubmitting
             ? Row(
@@ -674,7 +818,10 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                 allMarked
                     ? 'Submit Attendance for $_currentDate'
                     : 'Mark All Attendance to Submit ($markedCount/${_workers.length})',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
       ),
     );

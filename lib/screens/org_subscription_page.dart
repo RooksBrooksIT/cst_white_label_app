@@ -11,10 +11,12 @@ class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
 
   @override
-  State<OrganizationSubscriptionPage> createState() => _OrganizationSubscriptionPageState();
+  State<OrganizationSubscriptionPage> createState() =>
+      _OrganizationSubscriptionPageState();
 }
 
-class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionPage> {
+class _OrganizationSubscriptionPageState
+    extends State<OrganizationSubscriptionPage> {
   bool _isLoading = true;
   String _planName = 'Loading...';
   String _status = 'Loading...';
@@ -36,7 +38,7 @@ class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionP
           _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Unknown');
           _isActive = data['isSubscriptionActive'] ?? false;
           _status = _isActive ? 'Active' : 'Inactive';
-          
+
           final expiry = data['subscriptionEndDate'];
           if (expiry is Timestamp) {
             _expiryDate = DateFormat('dd MMM yyyy').format(expiry.toDate());
@@ -60,7 +62,10 @@ class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionP
   }
 
   String _formatPlanName(String raw) {
-    return raw.split('_').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ');
+    return raw
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   @override
@@ -97,7 +102,9 @@ class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionP
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: (_isActive ? Colors.green : Colors.orange).withOpacity(0.1),
+              color: (_isActive ? Colors.green : Colors.orange).withOpacity(
+                0.1,
+              ),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -118,7 +125,9 @@ class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionP
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: (_isActive ? Colors.green : Colors.orange).withOpacity(0.1),
+              color: (_isActive ? Colors.green : Colors.orange).withOpacity(
+                0.1,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -228,7 +237,7 @@ class _OrganizationSubscriptionPageState extends State<OrganizationSubscriptionP
             label: 'CONTACT SUPPORT',
             onPressed: () {
               // Navigate to support screen if available
-               Navigator.pushNamed(context, '/contactSupport');
+              Navigator.pushNamed(context, '/contactSupport');
             },
             isSecondary: true,
           ),

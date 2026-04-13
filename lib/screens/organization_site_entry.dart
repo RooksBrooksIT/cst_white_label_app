@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
-import 'package:demo_cst/screens/supervisor_dashboard.dart';
-import 'package:demo_cst/services/expense_service.dart';
+import 'supervisor_dashboard.dart';
+import '../services/expense_service.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class OrganizationSiteEntry extends StatefulWidget {
   final String userName;
@@ -163,8 +166,6 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       final options = <String>[];
       final prices = <String, num>{};
 
-      print('Found ${snapshot.docs.length} material documents');
-
       for (var doc in snapshot.docs) {
         final data = doc.data();
         if (data.containsKey('materialName')) {
@@ -176,25 +177,14 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
             if (priceRaw is num) {
               price = priceRaw;
-              print('Material: $name, Price (numeric): $price');
             } else if (priceRaw is String) {
-              // Remove any non-numeric characters except decimal point
               final cleanPrice = priceRaw.replaceAll(RegExp(r'[^\d.]'), '');
               price = num.tryParse(cleanPrice) ?? 0;
-              print(
-                'Material: $name, Price (string): $priceRaw -> cleaned: $cleanPrice -> parsed: $price',
-              );
-            } else {
-              print(
-                'Material: $name, Price type unknown: ${priceRaw.runtimeType}, Value: $priceRaw',
-              );
             }
             prices[name] = price;
           }
         }
       }
-
-      print('Loaded ${options.length} materials with prices: $prices');
 
       if (!mounted) return;
       setState(() {
@@ -206,7 +196,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         isLoadingMaterials = false;
       });
     } catch (e) {
-      print('Error loading materials: $e');
+      if (!mounted) return;
       setState(() {
         materialError = 'Failed to load materials: $e';
         isLoadingMaterials = false;
@@ -224,8 +214,6 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       final options = <String>[];
       final salaries = <String, num>{};
 
-      print('Found ${snapshot.docs.length} labour documents');
-
       for (var doc in snapshot.docs) {
         final data = doc.data();
         if (data.containsKey('designation')) {
@@ -237,25 +225,14 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
             if (salaryRaw is num) {
               salary = salaryRaw;
-              print('Labour: $designation, Salary (numeric): $salary');
             } else if (salaryRaw is String) {
-              // Remove any non-numeric characters except decimal point
               final cleanSalary = salaryRaw.replaceAll(RegExp(r'[^\d.]'), '');
               salary = num.tryParse(cleanSalary) ?? 0;
-              print(
-                'Labour: $designation, Salary (string): $salaryRaw -> cleaned: $cleanSalary -> parsed: $salary',
-              );
-            } else {
-              print(
-                'Labour: $designation, Salary type unknown: ${salaryRaw.runtimeType}, Value: $salaryRaw',
-              );
             }
             salaries[designation] = salary;
           }
         }
       }
-
-      print('Loaded ${options.length} labour types with salaries: $salaries');
 
       if (!mounted) return;
       setState(() {
@@ -265,7 +242,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         isLoadingLabours = false;
       });
     } catch (e) {
-      print('Error loading labours: $e');
+      if (!mounted) return;
       setState(() {
         labourError = 'Failed to load labours: $e';
         isLoadingLabours = false;
@@ -529,6 +506,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           .doc(docId)
           .get();
       if (existing.exists) {
+        if (!mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -542,7 +520,6 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             ],
           ),
         );
-        if (!mounted) return;
         setState(() {
           isSaving = false;
         });
@@ -551,11 +528,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       // Update total site expense aggregation
       await ExpenseService.updateTotalSiteExpense(siteCode);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entry saved successfully!')),
       );
       _resetForm();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
@@ -912,1006 +891,511 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onTap: () {
-            Navigator.push(
+
+    return GlassScaffold(
+      title: 'Organiser Daily Site Entry',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
-                builder: (_) => SupervisorDashboard(
-                  username: widget.userName,
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
+                builder:
+                    (_) => SupervisorDashboard(
+                      username: widget.userName,
+                      supervisorId: supervisorId ?? '',
+                      supervisorName: supervisorName ?? '',
+                    ),
               ),
+              (route) => false,
             );
           },
-          child: const Text(
-            'Organiser Daily Site Entry',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
         ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        elevation: 0,
-      ),
+      ],
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8.0,
-              vertical: 12.0,
-            ),
+            padding: const EdgeInsets.all(16.0),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 600,
+                  maxWidth: 800,
                   minHeight: constraints.maxHeight,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Site info card
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.construction,
-                                  size: 22,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: isLoadingSites
-                                      ? const Center(
-                                          child: CircularProgressIndicator(),
-                                        )
-                                      : DropdownButtonFormField<String>(
-                                          value: selectedSiteId,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: 'Site ID',
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            filled: true,
-                                            fillColor: Colors.grey[50],
-                                            isDense: true,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  vertical: 8,
-                                                  horizontal: 12,
-                                                ),
-                                          ),
-                                          items: siteList
-                                              .map(
-                                                (site) => DropdownMenuItem(
-                                                  value: site['siteId'],
-                                                  child: Text(
-                                                    '${site['siteId']} - ${site['siteName']}',
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: (value) {
-                                            if (value != null) {
-                                              _onSiteSelected(value);
-                                            }
-                                          },
-                                        ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 20,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Supervisor: ${supervisorName ?? '-'}',
-                                        style: const TextStyle(fontSize: 16),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        'Supervisor ID: ${supervisorId ?? '-'}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 20,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Location: ${siteLocation ?? '-'}',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.timeline,
-                                  size: 20,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Project Stage: ${projectStage ?? '-'}',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  size: 20,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    selectedDate != null
-                                        ? DateFormat(
-                                            'yyyy-MM-dd',
-                                          ).format(selectedDate!)
-                                        : 'No date chosen',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Spacer(),
-                                TextButton.icon(
-                                  onPressed: _pickDate,
-                                  icon: const Icon(Icons.edit, size: 16),
-                                  label: const Text('Change'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).primaryColor,
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Add Entry title
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        'Add Entry',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-                    const Divider(height: 16),
-
-                    // Material Section Card
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Material Details'),
-                            const SizedBox(height: 8),
-
-                            // Existing material selection UI with search and dropdown
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingMaterials
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : materialError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
-                                              ),
-                                              child: Text(
-                                                materialError!,
-                                                style: const TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Material...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          materialOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .contains(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedMaterial =
-                                                            filtered.contains(
-                                                              selectedMaterial,
-                                                            )
-                                                            ? selectedMaterial
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedMaterial = null;
-                                                      }
-                                                      _filteredMaterialOptions =
-                                                          filtered;
-                                                    });
-                                                  },
-                                                ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedMaterial,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Material',
-                                                    prefixIcon: Icon(
-                                                      Icons.category_outlined,
-                                                      color: Theme.of(
-                                                        context,
-                                                      ).primaryColor,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
-                                                  ),
-                                                  items:
-                                                      (_filteredMaterialOptions ??
-                                                              materialOptions)
-                                                          .map(
-                                                            (
-                                                              item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                              ),
-                                                            ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedMaterial =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
-                                        controller: materialQtyController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Qty',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          isDense: true,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                vertical: 8,
-                                                horizontal: 12,
-                                              ),
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            materialQty =
-                                                int.tryParse(value) ?? 0;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Add Material button
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingMaterials ||
-                                        materialOptions.isEmpty
-                                    ? null
-                                    : _addMaterial,
-                                label: const Text(
-                                  'Add Material',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Other Materials button (toggle)
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomMaterialFields =
-                                      !_showCustomMaterialFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Custom Material Fields (shown when toggled)
-                            if (_showCustomMaterialFields) ...[
-                              TextField(
-                                controller: _customMaterialNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Material Name',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customMaterialQtyController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Qty',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller:
-                                          _customMaterialPriceController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Unit Price (₹)',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomMaterial,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(
-                                          Theme.of(context).primaryColor.value,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Material'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomMaterialFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey[300],
-                                        foregroundColor: Colors.black,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Labour Section Card
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Labour Details'),
-                            const SizedBox(height: 8),
-
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingLabours
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : labourError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
-                                              ),
-                                              child: Text(
-                                                labourError!,
-                                                style: const TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Labour...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          labourOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .contains(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedLabour =
-                                                            filtered.contains(
-                                                              selectedLabour,
-                                                            )
-                                                            ? selectedLabour
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedLabour = null;
-                                                      }
-                                                      _filteredLabourOptions =
-                                                          filtered;
-                                                    });
-                                                  },
-                                                ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedLabour,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Labour',
-                                                    prefixIcon: Icon(
-                                                      Icons.group,
-                                                      color: Theme.of(
-                                                        context,
-                                                      ).primaryColor,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
-                                                  ),
-                                                  items:
-                                                      (_filteredLabourOptions ??
-                                                              labourOptions)
-                                                          .map(
-                                                            (
-                                                              item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                              ),
-                                                            ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedLabour =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
-                                        controller: labourQtyController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Count',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          isDense: true,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                vertical: 8,
-                                                horizontal: 12,
-                                              ),
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            labourQty =
-                                                int.tryParse(value) ?? 0;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Add Labour button
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingLabours || labourOptions.isEmpty
-                                    ? null
-                                    : _addLabour,
-                                label: const Text(
-                                  'Add Labour',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Add Custom Labour button (toggle)
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomLabourFields =
-                                      !_showCustomLabourFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Custom Labour Fields (shown when toggled)
-                            if (_showCustomLabourFields) ...[
-                              TextField(
-                                controller: _customLabourNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Labour Type',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _customLabourSalaryController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Salary',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: labourQtyController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Count',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                                keyboardType: TextInputType.number,
-                                onChanged: (value) {
-                                  setState(() {
-                                    labourQty = int.tryParse(value) ?? 0;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomLabour,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(
-                                          Theme.of(context).primaryColor.value,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Labour'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomLabourFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey[300],
-                                        foregroundColor: Colors.black,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Additional Costs Card
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Additional Costs'),
-                            const SizedBox(height: 12),
-                            _buildCostInput(
-                              'Food Cost',
-                              foodCost,
-                              Icons.fastfood,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Transport Cost',
-                              transportCost,
-                              Icons.directions_car,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Fuel Cost',
-                              fuelCost,
-                              Icons.local_gas_station,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Summary Card
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildSectionHeader('Summary'),
-                                Text(
-                                  'Total: ₹${_getTotalAmount()}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            _buildSummaryTable(),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Save and Reset Buttons
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
+                    GlassCard(
+                      title: 'Site Information',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isSaving
-                                  ? null
-                                  : () => _showConfirmationDialog(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Save Entry',
-                                      style: TextStyle(fontSize: 16),
+                          isLoadingSites
+                              ? const Center(child: CircularProgressIndicator())
+                              : DropdownButtonFormField<String>(
+                                  value: selectedSiteId,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Site ID',
+                                    prefixIcon: Icon(
+                                      Icons.construction,
+                                      color: theme.primaryColor,
                                     ),
-                            ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.05),
+                                  ),
+                                  items: siteList
+                                      .map(
+                                        (site) => DropdownMenuItem(
+                                          value: site['siteId'],
+                                          child: Text(
+                                            '${site['siteId']} - ${site['siteName']}',
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      _onSiteSelected(value);
+                                    }
+                                  },
+                                ),
+                          const SizedBox(height: 16),
+                          _buildModernInfoRow(
+                            Icons.person,
+                            'Supervisor',
+                            '${supervisorName ?? '-'} (${supervisorId ?? '-'})',
+                            theme,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _resetForm,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                          _buildModernInfoRow(
+                            Icons.location_on,
+                            'Location',
+                            siteLocation ?? '-',
+                            theme,
+                          ),
+                          _buildModernInfoRow(
+                            Icons.timeline,
+                            'Project Stage',
+                            projectStage ?? '-',
+                            theme,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: 20,
+                                color: theme.primaryColor,
                               ),
-                              child: const Text(
-                                'Reset',
-                                style: TextStyle(fontSize: 16),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Date:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              Text(
+                                selectedDate != null
+                                    ? DateFormat('dd MMM yyyy').format(selectedDate!)
+                                    : 'No date chosen',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: _pickDate,
+                                icon: const Icon(Icons.edit, size: 16),
+                                label: const Text('Change'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+
+                    const SizedBox(height: 24),
+
+                    // Material Details Card
+                    GlassCard(
+                      title: 'Material Details',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (isLoadingMaterials)
+                            const Center(child: CircularProgressIndicator())
+                          else if (materialError != null)
+                            Text(
+                              materialError!,
+                              style: const TextStyle(color: Colors.red),
+                            )
+                          else ...[
+                            DropdownButtonFormField<String>(
+                              value: selectedMaterial,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Select Material',
+                                prefixIcon: Icon(
+                                  Icons.category_outlined,
+                                  color: theme.primaryColor,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                              ),
+                              items: (_filteredMaterialOptions ?? materialOptions)
+                                  .map(
+                                    (item) => DropdownMenuItem(
+                                      value: item,
+                                      child: Text(
+                                        item,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) =>
+                                  setState(() => selectedMaterial = value),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: materialQtyController,
+                              decoration: InputDecoration(
+                                labelText: 'Quantity',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                              ),
+                              keyboardType: TextInputType.number,
+                              onChanged: (value) {
+                                setState(() {
+                                  materialQty = int.tryParse(value) ?? 0;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GlassButton(
+                                    label: 'Add Material',
+                                    icon: Icons.add,
+                                    onPressed: materialOptions.isEmpty
+                                        ? null
+                                        : _addMaterial,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GlassButton(
+                                    label:
+                                        _showCustomMaterialFields
+                                            ? 'Hide Others'
+                                            : 'Others',
+                                    icon: Icons.more_horiz,
+                                    onPressed: () => setState(
+                                      () =>
+                                          _showCustomMaterialFields =
+                                              !_showCustomMaterialFields,
+                                    ),
+                                    isSecondary: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    if (_showCustomMaterialFields) ...[
+                      const SizedBox(height: 16),
+                      GlassCard(
+                        title: 'Custom Material',
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _customMaterialNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Material Name',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customMaterialQtyController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Qty',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customMaterialPriceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Unit Price (₹)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            GlassButton(
+                              label: 'Add Custom',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomMaterial,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+
+                    // Labour Details Card
+                    GlassCard(
+                      title: 'Labour Details',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (isLoadingLabours)
+                            const Center(child: CircularProgressIndicator())
+                          else if (labourError != null)
+                            Text(
+                              labourError!,
+                              style: const TextStyle(color: Colors.red),
+                            )
+                          else ...[
+                            DropdownButtonFormField<String>(
+                              value: selectedLabour,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Select Labour',
+                                prefixIcon: Icon(
+                                  Icons.group,
+                                  color: theme.primaryColor,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                              ),
+                              items: (_filteredLabourOptions ?? labourOptions)
+                                  .map(
+                                    (item) => DropdownMenuItem(
+                                      value: item,
+                                      child: Text(
+                                        item,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) =>
+                                  setState(() => selectedLabour = value),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: labourQtyController,
+                              decoration: InputDecoration(
+                                labelText: 'Count',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                              ),
+                              keyboardType: TextInputType.number,
+                              onChanged: (value) => setState(
+                                () => labourQty = int.tryParse(value) ?? 0,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GlassButton(
+                                    label: 'Add Labour',
+                                    icon: Icons.person_add,
+                                    onPressed: labourOptions.isEmpty
+                                        ? null
+                                        : _addLabour,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GlassButton(
+                                    label:
+                                        _showCustomLabourFields
+                                            ? 'Hide Others'
+                                            : 'Others',
+                                    icon: Icons.more_horiz,
+                                    onPressed: () => setState(
+                                      () =>
+                                          _showCustomLabourFields =
+                                              !_showCustomLabourFields,
+                                    ),
+                                    isSecondary: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    if (_showCustomLabourFields) ...[
+                      const SizedBox(height: 16),
+                      GlassCard(
+                        title: 'Custom Labour',
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _customLabourNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Designation Name',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _customLabourSalaryController,
+                              decoration: const InputDecoration(
+                                labelText: 'Salary (₹)',
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 16),
+                            GlassButton(
+                              label: 'Add Custom',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomLabour,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+
+                    // Additional Costs
+                    GlassCard(
+                      title: 'Additional Costs',
+                      child: Column(
+                        children: [
+                          _buildCostInput(
+                            'Food Cost',
+                            foodCost,
+                            Icons.restaurant,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCostInput(
+                            'Transport Cost',
+                            transportCost,
+                            Icons.local_shipping,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCostInput(
+                            'Fuel Cost',
+                            fuelCost,
+                            Icons.local_gas_station,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Summary Section
+                    if (materials.isNotEmpty || labours.isNotEmpty) ...[
+                      GlassCard(
+                        title: 'Daily Summary',
+                        child: _buildSummaryTable(),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Reset',
+                            icon: Icons.refresh,
+                            onPressed: _resetForm,
+                            isSecondary: true,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Save Entry',
+                            icon: Icons.save,
+                            onPressed: isSaving
+                                ? null
+                                : _showConfirmationDialog,
+                            isLoading: isSaving,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildModernInfoRow(
+    IconData icon,
+    String label,
+    String value,
+    ThemeData theme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.primaryColor),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -81,9 +81,18 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       supervisorError = null;
     });
     try {
-      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
-          .where('supervisor', isEqualTo: widget.supervisorName)
-          .get();
+      final collection = FirestoreService.getCollection('siteSupervisorMap');
+      
+      // Try querying by Supervisor ID first
+      var query = collection.where('Supervisor ID', isEqualTo: widget.supervisorId);
+      var snapshot = await query.get();
+
+      // Fallback to name if not found by ID
+      if (snapshot.docs.isEmpty) {
+        query = collection.where('supervisor', isEqualTo: widget.supervisorName);
+        snapshot = await query.get();
+      }
+
       if (snapshot.docs.isNotEmpty) {
         siteDropdownItems = snapshot.docs
             .map((doc) => doc.data()['site']?.toString() ?? '')
@@ -213,13 +222,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       lastDate: DateTime(2100),
       builder: (BuildContext context, Widget? child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
               primary: primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ), dialogTheme: DialogThemeData(),
+              onPrimary: Theme.of(context).colorScheme.onPrimary,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -420,7 +429,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      dropdownColor: Colors.white,
+      dropdownColor: Theme.of(context).colorScheme.surface,
       icon: Icon(Icons.arrow_drop_down, color: primaryColor),
       items: items.map((T item) {
         return DropdownMenuItem<T>(
@@ -447,13 +456,16 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       child: Row(
         children: [
           Icon(Icons.info_outline, color: primaryColor, size: 20),
-          SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -634,7 +646,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                         elevation: 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.grey.shade200),
+                          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
                         ),
                         child: Padding(
                           padding: EdgeInsets.all(8),
@@ -713,17 +725,16 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                                                 color:
                                                     entry.value['priority'] ==
                                                             'Immediate'
-                                                        ? Colors.red.shade50
-                                                        : Colors.orange.shade50,
+                                                        ? Theme.of(context).colorScheme.error.withOpacity(0.1)
+                                                        : Theme.of(context).colorScheme.secondary.withOpacity(0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                                 border: Border.all(
                                                   color:
                                                       entry.value['priority'] ==
                                                               'Immediate'
-                                                          ? Colors.red.shade100
-                                                          : Colors
-                                                              .orange.shade100,
+                                                          ? Theme.of(context).colorScheme.error.withOpacity(0.3)
+                                                          : Theme.of(context).colorScheme.secondary.withOpacity(0.3),
                                                 ),
                                               ),
                                               child: Text(
@@ -732,9 +743,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                                                   color:
                                                       entry.value['priority'] ==
                                                               'Immediate'
-                                                          ? Colors.red.shade800
-                                                          : Colors
-                                                              .orange.shade800,
+                                                          ? Theme.of(context).colorScheme.error
+                                                          : Theme.of(context).colorScheme.secondary,
                                                 ),
                                               ),
                                             ),
@@ -758,7 +768,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                       Text(
                         'Total Items: ${addedMaterials.length}',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontStyle: FontStyle.italic,
                         ),
                       ),
@@ -768,12 +778,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                         child: Column(
                           children: [
                             Icon(Icons.inventory_2_outlined,
-                                size: 60, color: Colors.grey.shade400),
+                                size: 60, color: Theme.of(context).colorScheme.outline),
                             SizedBox(height: 8),
                             Text(
                               'No materials added yet',
                               style: TextStyle(
-                                color: Colors.grey.shade600,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 fontSize: 16,
                               ),
                             ),
@@ -781,7 +791,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                             Text(
                               'Add materials using the form above',
                               style: TextStyle(
-                                color: Colors.grey.shade500,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],

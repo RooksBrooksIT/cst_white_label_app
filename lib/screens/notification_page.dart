@@ -1,7 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 class NotificationPage extends StatefulWidget {
   final String supervisorName;
@@ -33,47 +35,39 @@ class _NotificationPageState extends State<NotificationPage>
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Notifications',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: primary,
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Approval Updates'),
-            Tab(text: 'My Requests'),
-          ],
-        ),
+    return GlassScaffold(
+      title: 'Notifications',
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: cs.onPrimary,
+        unselectedLabelColor: cs.onPrimary.withOpacity(0.6),
+        indicatorColor: cs.onPrimary,
+        indicatorWeight: 3,
+        tabs: const [
+          Tab(text: 'Approval Updates'),
+          Tab(text: 'My Requests'),
+        ],
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildApprovalNotifications(primary),
-          _buildMaterialRequestsList(primary),
+          _buildApprovalNotifications(cs),
+          _buildMaterialRequestsList(cs),
         ],
       ),
     );
   }
 
   // TAB 1 — Approval/rejection notifications from the notifications collection
-  Widget _buildApprovalNotifications(Color primary) {
+  Widget _buildApprovalNotifications(ColorScheme cs) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: NotificationService.streamForSupervisor(widget.supervisorName),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
-              child: CircularProgressIndicator(color: primary));
+              child: CircularProgressIndicator(color: cs.primary));
         }
 
         final docs = snapshot.data?.docs ?? [];
@@ -107,7 +101,7 @@ class _NotificationPageState extends State<NotificationPage>
             final statusColor = isApproval
                 ? Colors.green
                 : isRejection
-                    ? Colors.red
+                    ? cs.error
                     : Colors.orange;
             final statusIcon = isApproval
                 ? Icons.check_circle_rounded
@@ -122,10 +116,10 @@ class _NotificationPageState extends State<NotificationPage>
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 16),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: cs.error.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(Icons.delete_outline, color: Colors.red.shade700),
+                child: Icon(Icons.delete_outline, color: cs.error),
               ),
               onDismissed: (_) =>
                   NotificationService.markAsRead(docId),
@@ -134,17 +128,17 @@ class _NotificationPageState extends State<NotificationPage>
                 child: Container(
                   decoration: BoxDecoration(
                     color: isRead
-                        ? Colors.white
+                        ? cs.surface
                         : statusColor.withOpacity(0.06),
                     border: Border.all(
                       color: isRead
-                          ? Colors.grey.shade200
+                          ? cs.outlineVariant
                           : statusColor.withOpacity(0.3),
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: cs.shadow.withOpacity(0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -182,7 +176,7 @@ class _NotificationPageState extends State<NotificationPage>
                           const SizedBox(height: 4),
                           Text(dateStr,
                               style: TextStyle(
-                                  color: Colors.grey.shade400,
+                                  color: cs.onSurfaceVariant.withOpacity(0.6),
                                   fontSize: 11)),
                         ],
                       ],
@@ -208,7 +202,7 @@ class _NotificationPageState extends State<NotificationPage>
   }
 
   // TAB 2 — Material requests submitted by this supervisor
-  Widget _buildMaterialRequestsList(Color primary) {
+  Widget _buildMaterialRequestsList(ColorScheme cs) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('siteMaterialsRequest')
@@ -216,7 +210,7 @@ class _NotificationPageState extends State<NotificationPage>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator(color: primary));
+          return Center(child: CircularProgressIndicator(color: cs.primary));
         }
 
         final docs = snapshot.data?.docs ?? [];
@@ -241,16 +235,16 @@ class _NotificationPageState extends State<NotificationPage>
               }
             }
             final status = data['status'] ?? 'Processing';
-            final statusColor = _statusColor(status);
+            final statusColor = _statusColor(status, cs);
 
             return Material(
               elevation: 1,
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cs.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: ExpansionTile(
                   leading: Container(
@@ -271,7 +265,7 @@ class _NotificationPageState extends State<NotificationPage>
                   subtitle: Text(
                     'Site: ${data['siteId'] ?? 'N/A'}  •  ${data['projectName'] ?? ''}',
                     style:
-                        TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
                   trailing: _statusChip(status, statusColor),
                   children: [
@@ -280,9 +274,9 @@ class _NotificationPageState extends State<NotificationPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _detailRow(Icons.calendar_today_outlined, date),
+                          _detailRow(Icons.calendar_today_outlined, date, cs),
                           _detailRow(Icons.person_outline,
-                              data['supervisorName'] ?? 'N/A'),
+                              data['supervisorName'] ?? 'N/A', cs),
                           const Divider(height: 20),
                           const Text('Materials:',
                               style: TextStyle(fontWeight: FontWeight.bold)),
@@ -294,7 +288,7 @@ class _NotificationPageState extends State<NotificationPage>
                                     child: Row(
                                       children: [
                                         Icon(Icons.arrow_right,
-                                            color: primary, size: 18),
+                                            color: cs.primary, size: 18),
                                         Expanded(
                                           child: Text(
                                             '${mat['materialName']}  •  '
@@ -320,38 +314,39 @@ class _NotificationPageState extends State<NotificationPage>
   }
 
   Widget _buildEmpty(String title, String subtitle) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.notifications_off_outlined,
-              size: 64, color: Colors.grey.shade300),
+              size: 64, color: cs.outlineVariant),
           const SizedBox(height: 16),
           Text(title,
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade500)),
+                  color: cs.onSurface.withOpacity(0.5))),
           const SizedBox(height: 6),
           Text(subtitle,
               textAlign: TextAlign.center,
               style:
-                  TextStyle(fontSize: 13, color: Colors.grey.shade400)),
+                  TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
         ],
       ),
     );
   }
 
-  Widget _detailRow(IconData icon, String value) {
+  Widget _detailRow(IconData icon, String value, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [
-        Icon(icon, size: 16, color: Colors.grey.shade500),
+        Icon(icon, size: 16, color: cs.onSurfaceVariant),
         const SizedBox(width: 8),
         Expanded(
             child: Text(value,
                 style: TextStyle(
-                    color: Colors.grey.shade700, fontSize: 13))),
+                    color: cs.onSurface, fontSize: 13))),
       ]),
     );
   }
@@ -372,18 +367,18 @@ class _NotificationPageState extends State<NotificationPage>
     );
   }
 
-  Color _statusColor(String status) {
+  Color _statusColor(String status, ColorScheme cs) {
     switch (status.toLowerCase()) {
       case 'approved':
         return Colors.green;
       case 'rejected':
-        return Colors.red;
+        return cs.error;
       case 'processing':
         return Colors.orange;
       case 'delivered':
         return Colors.teal;
       default:
-        return Colors.grey;
+        return cs.outlineVariant;
     }
   }
 

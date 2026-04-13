@@ -222,12 +222,12 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       'Reset Password',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -249,7 +249,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           ),
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -555,9 +555,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF1E293B),
+            color: Theme.of(context).colorScheme.onSurface,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
@@ -609,10 +609,10 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               Text(
                 _tempOrgName ?? 'Supervisor Login',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: Theme.of(context).colorScheme.onSurface,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -627,12 +627,12 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                 ),
               ],
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Sign in to your dashboard',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF64748B),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -650,7 +650,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                       offset: const Offset(0, 10),
                     ),
                   ],
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                 ),
                 child: Form(
                   key: _formKey,
@@ -670,8 +670,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.outlineVariant,
                             ),
                           ),
                           filled: true,
@@ -695,8 +695,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.outlineVariant,
                             ),
                           ),
                           filled: true,
@@ -721,8 +721,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.outlineVariant,
                             ),
                           ),
                           filled: true,
@@ -740,10 +740,10 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: CheckboxListTile(
-                          title: const Text(
+                          title: Text(
                             'Is Contractor',
                             style: TextStyle(
-                              color: Color(0xFF1E293B),
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w500,
                             ),
                           ),

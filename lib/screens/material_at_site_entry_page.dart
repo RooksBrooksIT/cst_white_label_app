@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../services/firestore_service.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -25,11 +26,19 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
   Color get cardColor => Theme.of(context).colorScheme.surface;
   Color get errorColor => Theme.of(context).colorScheme.error;
-  Color get successColor => Colors.green;
+  Color get successColor => Colors.green; // Standard green for success, or use theme color if available
 
   // Form State
   final TextEditingController siteIdController = TextEditingController();
   final TextEditingController siteLocationController = TextEditingController();
+  final TextEditingController projectNameController = TextEditingController();
+  final TextEditingController projectStageController = TextEditingController();
+  final TextEditingController startDateController = TextEditingController();
+  final TextEditingController endDateController = TextEditingController();
+  final TextEditingController joinedOnController = TextEditingController();
+  final TextEditingController siteCommentsController = TextEditingController();
+  final TextEditingController supervisorIdController_Internal =
+      TextEditingController();
   final TextEditingController supervisorNameController =
       TextEditingController();
   final TextEditingController quantityController = TextEditingController();
@@ -38,6 +47,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   // New state for site dropdown
   List<String> assignedSiteIds = [];
+  List<Map<String, dynamic>> siteMappings = [];
   String? selectedSiteId;
 
   // For update, available existing dates
@@ -76,26 +86,54 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       errorMsg = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
-          .where('supervisor', isEqualTo: widget.supervisorName)
+      // Try querying by Supervisor ID first if it's likely an ID format
+      final query = FirestoreService.siteSupervisorMap;
+
+      // Query by Supervisor ID field which is more robust
+      var snapshot = await query
+          .where('Supervisor ID', isEqualTo: widget.supervisorId)
           .get();
+
+      // If nothing found by ID, fallback to searching by name
+      if (snapshot.docs.isEmpty) {
+        snapshot = await query
+            .where('supervisor', isEqualTo: widget.supervisorName)
+            .get();
+      }
+
       if (snapshot.docs.isEmpty) {
         setState(() {
           errorMsg = "No site mapping found for this supervisor";
         });
         return;
       }
-      assignedSiteIds = snapshot.docs
-          .map((doc) => doc['site']?.toString() ?? '')
+      siteMappings = snapshot.docs.map((doc) => doc.data()).toList();
+      assignedSiteIds = siteMappings
+          .map((data) => data['site']?.toString() ?? '')
           .where((siteId) => siteId.isNotEmpty)
           .toList();
       if (assignedSiteIds.isNotEmpty) {
         selectedSiteId = assignedSiteIds.first;
         siteIdController.text = selectedSiteId!;
-        final firstSiteData = snapshot.docs.first.data();
+        final firstSiteData = siteMappings.firstWhere(
+          (m) => m['site'] == selectedSiteId,
+          orElse: () => {},
+        );
         siteLocationController.text =
             firstSiteData['location']?.toString() ?? '';
+        projectNameController.text =
+            firstSiteData['projectName']?.toString() ?? '';
+        projectStageController.text =
+            firstSiteData['projectStage']?.toString() ?? '';
+        startDateController.text = _formatDate(firstSiteData['startDate']);
+        endDateController.text = _formatDate(firstSiteData['endDate']);
+        joinedOnController.text = _formatDate(firstSiteData['joinedOn']);
+        siteCommentsController.text =
+            firstSiteData['siteComments']?.toString() ?? '';
+        supervisorIdController_Internal.text =
+            firstSiteData['Supervisor ID']?.toString() ?? widget.supervisorId;
+        supervisorNameController.text =
+            firstSiteData['supervisor']?.toString() ?? widget.supervisorName;
       }
     } catch (e) {
       setState(() {
@@ -108,14 +146,25 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     }
   }
 
+  String _formatDate(dynamic date) {
+    if (date == null) return '';
+    try {
+      if (date is String) {
+        final dt = DateTime.parse(date);
+        return DateFormat('yyyy-MM-dd').format(dt);
+      } else if (date is Timestamp) {
+        return DateFormat('yyyy-MM-dd').format(date.toDate());
+      }
+      return date.toString();
+    } catch (_) {
+      return date.toString();
+    }
+  }
+
   Future<void> fetchDropdownOptions() async {
     try {
-      final materialsSnapshot = await FirebaseFirestore.instance
-          .collection('materials')
-          .get();
-      final unitsSnapshot = await FirebaseFirestore.instance
-          .collection('materialUnits')
-          .get();
+      final materialsSnapshot = await FirestoreService.materials.get();
+      final unitsSnapshot = await FirestoreService.materialUnits.get();
 
       setState(() {
         materialOptions = materialsSnapshot.docs
@@ -149,15 +198,16 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Future<void> fetchAvailableUpdateDates() async {
-    if (selectedSiteId == null) return;
+    final siteId = selectedSiteId;
+    if (siteId == null) return;
+
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('materialsAtSite')
-          .where('siteId', isEqualTo: selectedSiteId)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'materialsAtSite',
+      ).where('siteId', isEqualTo: siteId).get();
 
       setState(() {
-        availableUpdateDates = querySnapshot.docs.map((doc) {
+        availableUpdateDates = snapshot.docs.map((doc) {
           final Timestamp? ts = doc['date'] as Timestamp?;
           return ts?.toDate() ?? DateTime.now();
         }).toList();
@@ -179,7 +229,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
           'No dates available for update',
-          style: TextStyle(color: Colors.grey.shade600),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
     }
@@ -203,7 +253,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         labelText: 'Select Date to Update',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         filled: true,
-        
+
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 14,
@@ -213,6 +263,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Future<void> fetchMaterialsForUpdate() async {
+    final siteId = selectedSiteId;
+    if (siteId == null) return;
+
     setState(() {
       isUpdateLoading = true;
       updateErrorMsg = null;
@@ -221,21 +274,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     });
 
     try {
-      final siteId = selectedSiteId?.trim() ?? '';
-      if (siteId.isEmpty) {
-        setState(() => updateErrorMsg = 'Site ID is required');
-        return;
-      }
-
-      await fetchAvailableUpdateDates();
-
       final docId = '${siteId}_${DateFormat('yyyyMMdd').format(selectedDate)}';
       updateDocId = docId;
 
-      final docSnap = await FirebaseFirestore.instance
-          .collection('materialsAtSite')
-          .doc(docId)
-          .get();
+      final docSnap = await FirestoreService.getCollection(
+        'materialsAtSite',
+      ).doc(docId).get();
 
       if (!docSnap.exists ||
           docSnap.data() == null ||
@@ -270,9 +314,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     }
 
     try {
-      final docRef = FirebaseFirestore.instance
-          .collection('materialsAtSite')
-          .doc(updateDocId);
+      final docRef = FirestoreService.getCollection(
+        'materialsAtSite',
+      ).doc(updateDocId);
       final updatedMaterials = List<Map<String, dynamic>>.from(updateMaterials);
       updatedMaterials[index]['materialQty'] = newQty;
 
@@ -283,9 +327,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       final siteId = selectedSiteId ?? '';
       final materialName = updatedMaterials[index]['materialName'] ?? '';
 
-      final invDocRef = FirebaseFirestore.instance
-          .collection('materialsInventory')
-          .doc(materialName);
+      final invDocRef = FirestoreService.getCollection(
+        'materialsInventory',
+      ).doc(materialName);
       final invDocSnap = await invDocRef.get();
 
       if (invDocSnap.exists) {
@@ -381,9 +425,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           .toList();
 
       final docId = '${siteId}_${DateFormat('yyyyMMdd').format(selectedDate)}';
-      final docRef = FirebaseFirestore.instance
-          .collection('materialsAtSite')
-          .doc(docId);
+      final docRef = FirestoreService.getCollection(
+        'materialsAtSite',
+      ).doc(docId);
       final docSnap = await docRef.get();
       if (docSnap.exists) {
         await docRef.update({
@@ -406,9 +450,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         final String materialName = entry['materialName'] ?? '';
         final int materialQty = entry['materialQty'] ?? 0;
         if (materialName.isEmpty) continue;
-        final invDocRef = FirebaseFirestore.instance
-            .collection('materialsInventory')
-            .doc(materialName);
+        final invDocRef = FirestoreService.getCollection(
+          'materialsInventory',
+        ).doc(materialName);
         final invDocSnap = await invDocRef.get();
         final siteObj = {'materialQty': materialQty, 'siteId': siteId};
         if (invDocSnap.exists) {
@@ -504,11 +548,28 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
             const SizedBox(height: 16),
             _buildSiteIdDropdown(),
-            const SizedBox(height: 12),
-            _buildReadOnlyField('Site Location', siteLocationController),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Project Name', projectNameController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Project Stage', projectStageController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Start Date', startDateController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('End Date', endDateController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Joined On', joinedOnController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Location', siteLocationController),
+            const SizedBox(height: 16),
+            _buildReadOnlyField(
+              'Supervisor ID',
+              supervisorIdController_Internal,
+            ),
+            const SizedBox(height: 16),
             _buildReadOnlyField('Supervisor Name', supervisorNameController),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            _buildReadOnlyField('Site Comments', siteCommentsController),
+            const SizedBox(height: 24),
             _buildDateField(),
           ],
         ),
@@ -548,7 +609,37 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             setState(() {
               selectedSiteId = val;
               siteIdController.text = val ?? '';
-              siteLocationController.clear();
+              if (val != null) {
+                final mapping = siteMappings.firstWhere(
+                  (m) => m['site'] == val,
+                  orElse: () => {},
+                );
+                siteLocationController.text =
+                    mapping['location']?.toString() ?? '';
+                projectNameController.text =
+                    mapping['projectName']?.toString() ?? '';
+                projectStageController.text =
+                    mapping['projectStage']?.toString() ?? '';
+                startDateController.text = _formatDate(mapping['startDate']);
+                endDateController.text = _formatDate(mapping['endDate']);
+                joinedOnController.text = _formatDate(mapping['joinedOn']);
+                siteCommentsController.text =
+                    mapping['siteComments']?.toString() ?? '';
+                supervisorIdController_Internal.text =
+                    mapping['Supervisor ID']?.toString() ?? widget.supervisorId;
+                supervisorNameController.text =
+                    mapping['supervisor']?.toString() ?? widget.supervisorName;
+              } else {
+                siteLocationController.clear();
+                projectNameController.clear();
+                projectStageController.clear();
+                startDateController.clear();
+                endDateController.clear();
+                joinedOnController.clear();
+                siteCommentsController.clear();
+                supervisorIdController_Internal.clear();
+                supervisorNameController.clear();
+              }
               errorMsg = null;
               updateMaterials.clear();
               updateQuantityControllers.clear();
@@ -556,24 +647,6 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             });
 
             if (val != null) {
-              try {
-                final snapshot = await FirebaseFirestore.instance
-                    .collection('siteSupervisorMap')
-                    .where('supervisor', isEqualTo: widget.supervisorName)
-                    .where('site', isEqualTo: val)
-                    .limit(1)
-                    .get();
-
-                if (snapshot.docs.isNotEmpty) {
-                  final data = snapshot.docs.first.data();
-                  setState(() {
-                    siteLocationController.text =
-                        data['location']?.toString() ?? '';
-                  });
-                }
-              } catch (e) {
-                // Ignore or handle fetch error
-              }
               await fetchAvailableUpdateDates();
             }
           },
@@ -594,7 +667,10 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             fillColor: cs.surface.withOpacity(0.1),
           ),
           isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: cs.onSurface.withOpacity(0.6)),
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: cs.onSurface.withOpacity(0.6),
+          ),
           style: TextStyle(fontSize: 15, color: cs.onSurface),
           dropdownColor: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
@@ -655,11 +731,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_today,
-                  size: 20,
-                  color: cs.primary,
-                ),
+                Icon(Icons.calendar_today, size: 20, color: cs.primary),
                 const SizedBox(width: 12),
                 Text(
                   DateFormat('MMMM d, yyyy').format(selectedDate),
@@ -697,13 +769,13 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
                 ),
-                child: const Text(
+                child: Text(
                   'No materials or units available. Please add them in Firestore.',
-                  style: TextStyle(color: Colors.orange),
+                  style: TextStyle(color: Theme.of(context).colorScheme.primary),
                 ),
               )
             else
@@ -737,13 +809,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                               horizontal: 16,
                               vertical: 14,
                             ),
-                            labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                            labelStyle: TextStyle(
+                              color: cs.onSurface.withOpacity(0.6),
+                            ),
                           ),
                           keyboardType: TextInputType.number,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: cs.onSurface,
-                          ),
+                          style: TextStyle(fontSize: 15, color: cs.onSurface),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -781,7 +852,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           'Material',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -795,7 +866,10 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     mat,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 ),
               )
@@ -808,19 +882,26 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide:
+                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide:
+                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             filled: true,
-            
           ),
           isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-          style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-          dropdownColor: Colors.white,
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          style: TextStyle(
+            fontSize: 15,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          dropdownColor: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
         ),
       ],
@@ -835,7 +916,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           'Unit',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -849,7 +930,10 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     unit,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 ),
               )
@@ -862,19 +946,26 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide:
+                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide:
+                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             filled: true,
-            
           ),
           isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-          style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-          dropdownColor: Colors.white,
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          style: TextStyle(
+            fontSize: 15,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          dropdownColor: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
         ),
       ],
@@ -886,9 +977,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 32),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200, width: 1),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -896,17 +987,17 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             Icon(
               Icons.inventory_2_outlined,
               size: 48,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: 12),
             Text(
               'No materials added yet',
-              style: TextStyle(color: Colors.grey.shade500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Text(
               'Add materials using the form above',
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
             ),
           ],
         ),
@@ -921,7 +1012,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 1.2,
           ),
         ),
@@ -936,7 +1027,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             return Material(
               elevation: 0,
               borderRadius: BorderRadius.circular(8),
-              
+
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Row(
@@ -1033,7 +1124,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             onPressed: fetchMaterialsForUpdate,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               elevation: 0,
               minimumSize: const Size(double.infinity, 48),
               shape: RoundedRectangleBorder(
@@ -1064,7 +1155,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -1080,7 +1171,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                     return Material(
                       elevation: 0,
                       borderRadius: BorderRadius.circular(8),
-                      
+
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
@@ -1120,7 +1211,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                                             vertical: 14,
                                           ),
                                       labelStyle: TextStyle(
-                                        color: Colors.grey.shade600,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
@@ -1136,7 +1227,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                                       updateMaterialQuantity(index),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: primaryColor,
-                                    foregroundColor: Colors.white,
+                                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -1251,7 +1342,11 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline, size: 48, color: cs.error),
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: cs.error,
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               errorMsg!,
