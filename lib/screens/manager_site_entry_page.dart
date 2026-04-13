@@ -1535,7 +1535,16 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                                     isExpanded: true,
                                                     decoration: InputDecoration(
                                                       labelText: 'Site ID',
+                                                      labelStyle: TextStyle(
+                                                        color: primaryColor,
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
                                                       border: InputBorder.none,
+                                                      contentPadding: const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 10,
+                                                      ),
                                                       isDense: true,
                                                     ),
                                                     items: siteList
@@ -1550,9 +1559,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                                               overflow:
                                                                   TextOverflow
                                                                       .ellipsis,
-                                                              style:
-                                                                  const TextStyle(
+                                                              style: const TextStyle(
                                                                 fontSize: 14,
+                                                                color: Colors.black87,
+                                                                fontWeight: FontWeight.w500,
                                                               ),
                                                             ),
                                                           ),

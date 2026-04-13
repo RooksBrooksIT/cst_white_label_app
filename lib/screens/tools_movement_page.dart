@@ -102,9 +102,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   }
 
   Future<void> _fetchSiteIds() async {
-    final snapshot = await FirestoreService
-        .getCollection('siteSupervisorMap')
-        .get();
+    final snapshot = await FirestoreService.getCollection(
+      'siteSupervisorMap',
+    ).get();
     final siteSet = <String>{};
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -259,9 +259,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     required String siteId,
     required int count,
   }) async {
-    final docRef = FirestoreService
-        .getCollection('toolsInventory')
-        .doc(toolCode);
+    final docRef = FirestoreService.getCollection(
+      'toolsInventory',
+    ).doc(toolCode);
 
     final now = DateTime.now();
     final isoString = now.toIso8601String();
@@ -310,11 +310,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       });
       return;
     }
-    final snapshot = await FirestoreService
-        .getCollection('toolsAtCompany')
-        .where('toolCode', isEqualTo: toolCode)
-        .limit(1)
-        .get();
+    final snapshot = await FirestoreService.getCollection(
+      'toolsAtCompany',
+    ).where('toolCode', isEqualTo: toolCode).limit(1).get();
     int? count;
     if (snapshot.docs.isNotEmpty) {
       count = snapshot.docs.first['availableCount'] as int?;
@@ -342,10 +340,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       });
       return;
     }
-    final docSnap = await FirestoreService
-        .getCollection('toolsInventory')
-        .doc(toolCode)
-        .get();
+    final docSnap = await FirestoreService.getCollection(
+      'toolsInventory',
+    ).doc(toolCode).get();
     int? count;
     if (docSnap.exists) {
       final data = docSnap.data() as Map<String, dynamic>;
@@ -392,10 +389,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-        ),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
         tabs: const [
           Tab(text: 'Company to Site'),
@@ -416,11 +410,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     String projectName = '';
     String supervisorName = '';
     if (siteId != null && siteId.trim().isNotEmpty) {
-      final snapshot = await FirestoreService
-          .getCollection('siteSupervisorMap')
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('site', isEqualTo: siteId).limit(1).get();
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data();
         projectName = data['projectName'] ?? '';
@@ -560,7 +552,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         horizontal: 16,
                       ),
                       filled: true,
-                      
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -837,7 +828,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         horizontal: 16,
                       ),
                       filled: true,
-                      
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -997,11 +987,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final docId = '${_returnSelectedSiteId}_$dateStr';
     String trId = 'TR001';
     try {
-      final snapshot = await FirestoreService
-          .getCollection('toolsReturn')
-          .orderBy('trId', descending: true)
-          .limit(1)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'toolsReturn',
+      ).orderBy('trId', descending: true).limit(1).get();
       if (snapshot.docs.isNotEmpty) {
         final lastTrId = snapshot.docs.first['trId'] as String?;
         if (lastTrId != null && lastTrId.startsWith('TR')) {
@@ -1041,11 +1029,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final enteredCount = tool['count'] as int;
 
         // Site: DECREMENT
-        final siteQuery = await FirestoreService
-            .getCollection('toolsAtSite')
-            .where('toolCode', isEqualTo: toolCode)
-            .limit(1)
-            .get();
+        final siteQuery = await FirestoreService.getCollection(
+          'toolsAtSite',
+        ).where('toolCode', isEqualTo: toolCode).limit(1).get();
         if (siteQuery.docs.isNotEmpty) {
           final docRef = siteQuery.docs.first.reference;
           await docRef.update({
@@ -1054,11 +1040,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         }
 
         // Company: INCREMENT
-        final companyQuery = await FirestoreService
-            .getCollection('toolsAtCompany')
-            .where('toolCode', isEqualTo: toolCode)
-            .limit(1)
-            .get();
+        final companyQuery = await FirestoreService.getCollection(
+          'toolsAtCompany',
+        ).where('toolCode', isEqualTo: toolCode).limit(1).get();
         if (companyQuery.docs.isNotEmpty) {
           final docRef = companyQuery.docs.first.reference;
           await docRef.update({
@@ -1071,10 +1055,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           count: -enteredCount,
         );
       }
-      await FirestoreService
-          .getCollection('toolsReturn')
-          .doc(docId)
-          .set(data);
+      await FirestoreService.getCollection('toolsReturn').doc(docId).set(data);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Tools returned successfully'),
@@ -1106,11 +1087,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final docId = '${_selectedSiteId}_$dateStr';
     String tmId = 'TM001';
     try {
-      final snapshot = await FirestoreService
-          .getCollection('toolsMovement')
-          .orderBy('tmId', descending: true)
-          .limit(1)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'toolsMovement',
+      ).orderBy('tmId', descending: true).limit(1).get();
       if (snapshot.docs.isNotEmpty) {
         final lastTmId = snapshot.docs.first['tmId'] as String?;
         if (lastTmId != null && lastTmId.startsWith('TM')) {
@@ -1150,11 +1129,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final enteredCount = tool['count'] as int;
 
         // Company: DECREMENT
-        final companyQuery = await FirestoreService
-            .getCollection('toolsAtCompany')
-            .where('toolCode', isEqualTo: toolCode)
-            .limit(1)
-            .get();
+        final companyQuery = await FirestoreService.getCollection(
+          'toolsAtCompany',
+        ).where('toolCode', isEqualTo: toolCode).limit(1).get();
         if (companyQuery.docs.isNotEmpty) {
           final docRef = companyQuery.docs.first.reference;
           await docRef.update({
@@ -1163,9 +1140,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         }
 
         // Site: INCREMENT, create if not exist
-        final siteDocRef = FirestoreService
-            .getCollection('toolsAtSite')
-            .doc(toolCode);
+        final siteDocRef = FirestoreService.getCollection(
+          'toolsAtSite',
+        ).doc(toolCode);
         await siteDocRef.set({'toolCode': toolCode}, SetOptions(merge: true));
         await siteDocRef.update({
           'availableCount': FieldValue.increment(enteredCount),
@@ -1178,10 +1155,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         );
       }
 
-      await FirestoreService
-          .getCollection('toolsMovement')
-          .doc(docId)
-          .set(data);
+      await FirestoreService.getCollection(
+        'toolsMovement',
+      ).doc(docId).set(data);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Tools moved successfully'),
@@ -1265,7 +1241,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           borderSide: BorderSide(color: _primaryColor),
         ),
         filled: true,
-        
+
         contentPadding: const EdgeInsets.symmetric(
           vertical: 14,
           horizontal: 16,
@@ -1309,7 +1285,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             borderSide: BorderSide(color: _primaryColor.withOpacity(0.3)),
           ),
           filled: true,
-          
+
           contentPadding: const EdgeInsets.symmetric(
             vertical: 14,
             horizontal: 16,
