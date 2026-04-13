@@ -9,6 +9,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
 import '../utils/firestore_error_handler.dart';
+import '../services/notification_service.dart';
 
 class ConfigLoginPage extends StatefulWidget {
   const ConfigLoginPage({super.key});
@@ -177,12 +178,18 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
         if (querySnapshot.docs.isNotEmpty) {
           final String resolvedPath =
               fullConfigPath ?? 'organisation/$orgId/admin/data';
-          // Save final credentials
           await _saveLoginCredentials(
             _usernameController.text.trim(),
             _passwordController.text.trim(),
             orgId,
             resolvedPath,
+          );
+
+          // Save FCM token for push notifications
+          await NotificationService.saveToken(
+            userId: _usernameController.text.trim(),
+            userType: 'manager',
+            userName: _usernameController.text.trim(),
           );
 
           if (mounted) {

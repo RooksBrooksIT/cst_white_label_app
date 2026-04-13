@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'Supervisor_material_information.dart';
 import 'material_at_site_entry_page.dart';
 import 'material_request_form.dart';
+import 'notification_page.dart';
 import 'supervisor_material_view_request_screen.dart';
 import 'supervisor_tool_movement.dart';
 import 'supervisor_verification_page.dart';
@@ -11,6 +12,7 @@ import 'supervisor_work_schedule_page.dart';
 import 'supervisor_worker_att_page.dart';
 import '../widgets/glass_scaffold.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
@@ -217,7 +219,55 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       },
       child: GlassScaffold(
         title: 'Supervisor Dashboard',
-      onBack: () => _showLogoutDialog(context),
+        onBack: () => _showLogoutDialog(context),
+        actions: [
+          StreamBuilder<int>(
+            stream: NotificationService.unreadCountForSupervisor(
+                widget.supervisorName),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NotificationPage(
+                              supervisorName: widget.supervisorName),
+                        ),
+                      );
+                    },
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                            minWidth: 18, minHeight: 18),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
           horizontal: Responsive.isMobile(context) ? 16 : 32,

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import '../widgets/glass_scaffold.dart';
 
 class MaterialRequestForm extends StatefulWidget {
@@ -80,8 +81,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       supervisorError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
           .where('supervisor', isEqualTo: widget.supervisorName)
           .get();
       if (snapshot.docs.isNotEmpty) {
@@ -334,6 +334,21 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       }
       final docId = "${siteId}_$datePart";
       await reqCollection.doc(docId).set(data);
+
+      // Build a string of requested materials
+      final materialNames = addedMaterials.map((mat) => mat['material']).join(', ');
+
+      // Notify the organisation about the new material request
+      await NotificationService.notifyOrganisation(
+        title: '📦 New Material Request',
+        body: '$supervisorName (Site: $siteId) requested $matReqId. Items: $materialNames',
+        data: {
+          'type': 'material_request',
+          'matReqId': matReqId,
+          'siteId': siteId,
+          'supervisorName': supervisorName,
+        },
+      );
 
       if (!mounted) return;
 
@@ -803,16 +818,19 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                               backgroundColor: primaryColor,
                               foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.send, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  "Submit Request",
-                                  style: TextStyle(),
-                                ),
-                              ],
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.send, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Submit Request",
+                                    style: TextStyle(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

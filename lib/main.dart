@@ -6,6 +6,7 @@ import 'package:demo_cst/screens/splash_screen.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/main_dashboard.dart';
 import 'package:demo_cst/services/auth_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/screens/Organisation_LoginPage.dart';
 import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/supervisor_login_page.dart';
@@ -18,12 +19,17 @@ import 'package:demo_cst/screens/landing_page.dart';
 import 'package:demo_cst/screens/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding_edit_screen.dart';
 
+/// Global navigator key — used by NotificationService to show foreground banners.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirestoreService.initialize();
   await AppTheme.initialize();
   await AuthService.initialize();
+  // Initialize FCM: request permissions, foreground listener
+  await NotificationService.initialize(navigatorKey);
 
   runApp(const MyApp());
 }
@@ -43,6 +49,7 @@ class MyApp extends StatelessWidget {
               title: name,
               debugShowCheckedModeBanner: false,
               theme: AppTheme.getTheme(primary),
+              navigatorKey: navigatorKey,
 
               // Define initial route
               initialRoute: '/',

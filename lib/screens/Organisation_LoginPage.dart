@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'Organization_Dashboard.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -122,6 +123,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
         // Synchronize branding details
         await AppTheme.syncWithFirestore(dynamicPath);
+
+        // Save FCM token for push notifications
+        await NotificationService.saveToken(
+          userId: username,
+          userType: 'organisation',
+          userName: username,
+        );
 
         if (mounted) {
           if (mounted) {

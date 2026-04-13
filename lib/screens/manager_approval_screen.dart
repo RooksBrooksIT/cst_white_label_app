@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 
@@ -469,6 +470,23 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                       request['appLabours'] = approvedLabours;
                                       request['approvedPayment'] =
                                           approvedPayment;
+
+                                      // Notify supervisor of approval
+                                      final supName =
+                                          request['supervisorName']?.toString() ?? '';
+                                      if (supName.isNotEmpty) {
+                                        await NotificationService.notifySupervisor(
+                                          supervisorName: supName,
+                                          title: '✅ Worker Request Approved',
+                                          body: 'Your request ${request['wsReqId'] ?? ''} '
+                                              'has been approved for $approvedDays day(s).',
+                                          data: {
+                                            'type': 'worker_approval',
+                                            'wsReqId': request['wsReqId'],
+                                            'status': 'Approved',
+                                          },
+                                        );
+                                      }
                                     }
                                     setState(() {
                                       request['approvalStatus'] = 'Approved';
@@ -497,8 +515,25 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 22, vertical: 14),
                             ),
-                            onPressed: () => _updateRequestStatus(
-                                request['wsReqId'], "Rejected"),
+                            onPressed: () async {
+                              final supName =
+                                  request['supervisorName']?.toString() ?? '';
+                              if (supName.isNotEmpty) {
+                                await NotificationService.notifySupervisor(
+                                  supervisorName: supName,
+                                  title: '❌ Worker Request Rejected',
+                                  body: 'Your request ${request['wsReqId'] ?? ''} '
+                                      'has been rejected.',
+                                  data: {
+                                    'type': 'worker_rejection',
+                                    'wsReqId': request['wsReqId'],
+                                    'status': 'Rejected',
+                                  },
+                                );
+                              }
+                              _updateRequestStatus(
+                                  request['wsReqId'], "Rejected");
+                            },
                           ),
                         ],
                       ),

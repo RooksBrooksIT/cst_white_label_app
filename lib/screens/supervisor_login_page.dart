@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
 import '../services/firestore_service.dart';
@@ -503,6 +504,13 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               isContractor: false,
               orgId: orgId,
               resolvedPath: resolvedPath,
+            );
+
+            // Save FCM token for push notifications
+            await NotificationService.saveToken(
+              userId: supervisorId,
+              userType: 'supervisor',
+              userName: supervisorName,
             );
 
             if (context.mounted) {

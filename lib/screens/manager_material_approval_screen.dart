@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
-import '../utils/responsive.dart';
+import '../services/firestore_service.dart';
 
 class ManagerMaterialApprovalScreen extends StatefulWidget {
   const ManagerMaterialApprovalScreen({super.key});
 
   @override
-  State<ManagerMaterialApprovalScreen> createState() => _ManagerMaterialApprovalScreenState();
+  State<ManagerMaterialApprovalScreen> createState() =>
+      _ManagerMaterialApprovalScreenState();
 }
 
-class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalScreen> with SingleTickerProviderStateMixin {
+class _ManagerMaterialApprovalScreenState
+    extends State<ManagerMaterialApprovalScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -44,7 +48,10 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
             color: theme.cardColor,
             child: TabBar(
               controller: _tabController,
-              tabs: const [Tab(text: "PENDING"), Tab(text: "APPROVED")],
+              tabs: const [
+                Tab(text: "PENDING"),
+                Tab(text: "APPROVED"),
+              ],
               labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
               indicatorColor: theme.colorScheme.primary,
@@ -57,7 +64,8 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
               controller: _searchController,
               label: 'Search Requests...',
               icon: Icons.search,
-              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              onChanged: (v) =>
+                  setState(() => _searchQuery = v.trim().toLowerCase()),
             ),
           ),
           Expanded(
@@ -76,22 +84,56 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
 
   Widget _buildRequestsList(String status) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('siteMaterialsRequest')
-          .where('status', isEqualTo: status)
-          .snapshots(),
+      stream: FirestoreService.getCollection(
+        'siteMaterialsRequest',
+      ).orderBy('date', descending: true).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading requests',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          );
+        }
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const Center(child: CircularProgressIndicator());
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text('No $status requests found.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)));
+          return Center(
+            child: Text(
+              'No requests found.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
         }
 
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
+
+          // Match status case-insensitively
+          final docStatus = (data['status'] ?? '').toString().toLowerCase();
+          if (docStatus != status.toLowerCase()) return false;
+
           if (_searchQuery.isEmpty) return true;
-          final searchStr = '${data['matReqId']} ${data['siteId']} ${data['projectName']} ${data['supervisorName']}'.toLowerCase();
+          final searchStr =
+              '${data['matReqId']} ${data['siteId']} ${data['projectName']} ${data['supervisorName']}'
+                  .toLowerCase();
           return searchStr.contains(_searchQuery);
         }).toList();
+
+        if (docs.isEmpty) {
+          return Center(
+            child: Text(
+              'No $status requests found.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -109,7 +151,6 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
   Widget _buildRequestCard(Map<String, dynamic> data, String docId) {
     final theme = Theme.of(context);
     final status = data['status'] ?? 'Processing';
-    final isApproved = status == 'Approved';
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
@@ -120,24 +161,49 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(data['matReqId'] ?? 'REQ-N/A', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                data['matReqId'] ?? 'REQ-N/A',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               _buildStatusBadge(status),
             ],
           ),
           const SizedBox(height: 12),
-          _infoRow(Icons.location_on_outlined, data['siteId'] ?? 'Unknown Site'),
-          _infoRow(Icons.business_outlined, data['projectName'] ?? 'No Project'),
-          _infoRow(Icons.person_outline, data['supervisorName'] ?? 'No Supervisor'),
+          _infoRow(
+            Icons.location_on_outlined,
+            data['siteId'] ?? 'Unknown Site',
+          ),
+          _infoRow(
+            Icons.business_outlined,
+            data['projectName'] ?? 'No Project',
+          ),
+          _infoRow(
+            Icons.person_outline,
+            data['supervisorName'] ?? 'No Supervisor',
+          ),
           const Divider(height: 24),
           Row(
             children: [
-              Icon(Icons.inventory_2_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
-              Text("${(data['materials'] as List?)?.length ?? 0} Items", style: theme.textTheme.bodySmall),
+              Text(
+                "${(data['materials'] as List?)?.length ?? 0} Items",
+                style: theme.textTheme.bodySmall,
+              ),
               const Spacer(),
               Text(data['date'] ?? '', style: theme.textTheme.bodySmall),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.primary),
+              Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
             ],
           ),
         ],
@@ -155,7 +221,15 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Text(status.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 
@@ -165,7 +239,11 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(
+            icon,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
@@ -192,14 +270,34 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)))),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
-              Text(data['matReqId'] ?? 'Request Details', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                data['matReqId'] ?? 'Request Details',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 16),
               _infoRow(Icons.calendar_today_outlined, data['date'] ?? ''),
               _infoRow(Icons.person_outline, data['supervisorName'] ?? ''),
               const SizedBox(height: 24),
-              Text('REQUESTED MATERIALS', style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, color: theme.colorScheme.primary)),
+              Text(
+                'REQUESTED MATERIALS',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  letterSpacing: 1.2,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
               const SizedBox(height: 8),
               Flexible(
                 child: ListView.separated(
@@ -208,9 +306,16 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (c, i) => ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(materials[i]['materialName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${materials[i]['materialQty']} ${materials[i]['materialUnit']}'),
-                    trailing: _buildPriorityChip(materials[i]['priority'] ?? 'Normal'),
+                    title: Text(
+                      materials[i]['materialName'] ?? 'Unknown',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
+                    ),
+                    trailing: _buildPriorityChip(
+                      materials[i]['priority'] ?? 'Normal',
+                    ),
                   ),
                 ),
               ),
@@ -219,7 +324,29 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
                 GlassButton(
                   label: 'APPROVE REQUEST',
                   onPressed: () async {
-                    await FirebaseFirestore.instance.collection('siteMaterialsRequest').doc(docId).update({'status': 'Approved'});
+                    await FirestoreService.getCollection(
+                      'siteMaterialsRequest',
+                    ).doc(docId).update({'status': 'Approved'});
+
+                    // Notify supervisor of material approval
+                    final supName = data['supervisorName']?.toString() ?? '';
+                    final reqId = data['matReqId']?.toString() ?? '';
+                    final siteId = data['siteId']?.toString() ?? '';
+                    if (supName.isNotEmpty) {
+                      await NotificationService.notifySupervisor(
+                        supervisorName: supName,
+                        title: '✅ Material Request Approved',
+                        body:
+                            'Your material request $reqId for Site $siteId has been approved by the organization.',
+                        data: {
+                          'type': 'material_approval',
+                          'matReqId': reqId,
+                          'siteId': siteId,
+                          'status': 'Approved',
+                        },
+                      );
+                    }
+
                     if (mounted) Navigator.pop(context);
                   },
                 ),
@@ -235,8 +362,18 @@ class _ManagerMaterialApprovalScreenState extends State<ManagerMaterialApprovalS
     final color = priority.toLowerCase() == 'high' ? Colors.red : Colors.blue;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-      child: Text(priority, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        priority,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
