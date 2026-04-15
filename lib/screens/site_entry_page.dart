@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/expense_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -479,6 +480,18 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entry saved successfully!')),
+      );
+
+      // Notify the organisation about the daily site report
+      await NotificationService.notifyOrganisation(
+        title: '📝 Daily Site Report Submitted',
+        body: '${widget.userName} submitted a daily report for $siteCode.',
+        data: {
+          'type': 'site_entry',
+          'siteId': siteCode,
+          'supervisorName': widget.userName,
+          'date': dateForId,
+        },
       );
     } catch (e) {
       if (!mounted) return;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -308,6 +309,19 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tools returned successfully')),
       );
+
+      // Notify the organisation about tools return
+      await NotificationService.notifyOrganisation(
+        title: '🛠️ Tools Return Request',
+        body: '${_supervisorNameController.text} initiated a tools return (ID: $trId) from $_selectedSiteId.',
+        data: {
+          'type': 'tools_return',
+          'trId': trId,
+          'siteId': _selectedSiteId,
+          'supervisorName': _supervisorNameController.text,
+        },
+      );
+
       _resetForm();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

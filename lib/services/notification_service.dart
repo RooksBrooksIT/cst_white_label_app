@@ -335,7 +335,28 @@ class NotificationService {
       }
       await batch.commit();
     } catch (e) {
-      debugPrint('NotificationService: markAllRead failed: $e');
+      debugPrint('NotificationService: markAllReadForSupervisor failed: $e');
+    }
+  }
+
+  /// Mark all organisation notifications as read at once.
+  static Future<void> markAllReadForOrganisation() async {
+    try {
+      final orgId = FirestoreService.currentOrgId;
+      if (orgId.isEmpty) return;
+
+      final snap = await FirebaseFirestore.instance
+          .collection('notifications')
+          .where('forOrgId', isEqualTo: orgId)
+          .where('isRead', isEqualTo: false)
+          .get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in snap.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('NotificationService: markAllReadForOrganisation failed: $e');
     }
   }
 }
