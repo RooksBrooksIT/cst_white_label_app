@@ -2,10 +2,16 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class WorkerReportPdf {
-  static Future<Uint8List> build({required Map<String, dynamic> worker}) async {
+  static Future<Uint8List> build({
+    required Map<String, dynamic> worker,
+    required PdfColor primaryColor,
+  }) async {
     final pdf = pw.Document();
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
     final String workerName = worker['name'] ?? 'Unknown';
     final String month = worker['month'] ?? 'N/A';
     final String site = worker['site'] ?? 'N/A';
@@ -19,54 +25,28 @@ class WorkerReportPdf {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  'WORKER ATTENDANCE REPORT',
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blue900,
-                  ),
-                ),
-                pw.Text(
-                  month,
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.grey700,
-                  ),
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(thickness: 2, color: PdfColors.blue900),
-            pw.SizedBox(height: 16),
-          ],
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Worker Attendance Report',
+          orgDetails: orgDetails,
+          primaryColor: primaryColor,
         ),
         build: (context) => [
           // Worker & Site Info
           pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Expanded(
-                child: _buildInfoColumn('Worker Details', {
-                  'Name': workerName,
-                  'Designation': worker['designation'] ?? 'N/A',
-                  'ID': worker['id'] ?? 'N/A',
-                }),
-              ),
-              pw.SizedBox(width: 40),
-              pw.Expanded(
-                child: _buildInfoColumn('Project Details', {
-                  'Site': site,
-                  'Generated At': genAt,
-                }),
-              ),
+              PdfTemplates.buildMetaBox('Worker Name', workerName, primaryColor),
+              PdfTemplates.buildMetaBox('Designation', worker['designation'] ?? 'N/A', primaryColor),
+              PdfTemplates.buildMetaBox('Month', month, primaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Site', site, primaryColor),
+              PdfTemplates.buildMetaBox('Employee ID', worker['id'] ?? 'N/A', primaryColor),
+              PdfTemplates.buildMetaBox('Generated At', genAt, primaryColor),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -98,8 +78,9 @@ class WorkerReportPdf {
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
             ),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+            headerDecoration: pw.BoxDecoration(color: primaryColor),
             cellAlignment: pw.Alignment.center,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
           pw.SizedBox(height: 24),
 
@@ -125,7 +106,7 @@ class WorkerReportPdf {
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.green900,
+                    color: primaryColor,
                   ),
                 ),
               ],
@@ -141,30 +122,7 @@ class WorkerReportPdf {
           pw.SizedBox(height: 8),
           _buildDailyAttendanceTable(attendanceData),
         ],
-        footer: (context) => pw.Column(
-          children: [
-            pw.Divider(),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  'Company Confidential Report',
-                  style: const pw.TextStyle(
-                    fontSize: 10,
-                    color: PdfColors.grey600,
-                  ),
-                ),
-                pw.Text(
-                  'Page ${context.pageNumber} of ${context.pagesCount}',
-                  style: const pw.TextStyle(
-                    fontSize: 10,
-                    color: PdfColors.grey600,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
 

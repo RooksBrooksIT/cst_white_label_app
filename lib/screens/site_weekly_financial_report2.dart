@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class SiteWeeklyFinancialReport2 extends StatelessWidget {
   final Map<String, dynamic>? siteDetails;
@@ -43,6 +48,12 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           ),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => _generatePdf(context, siteId ?? 'N/A', paymentPeriod ?? 'N/A'),
+          ),
+        ],
       ),
       body:
           siteId == null ||
@@ -627,5 +638,88 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       if (!result.containsKey(d)) result[d] = 0;
     }
     return result;
+  }
+
+  Future<void> _generatePdf(BuildContext context, String siteId, String period) async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    // Fetch same data as in build
+    final prevPeriod = _getPrevPeriod(period);
+    final snap = await FirestoreService.getCollection('siteSupervisorPayments')
+        .where('siteId', isEqualTo: siteId)
+        .where('paymentPeriod', isEqualTo: period)
+        .limit(1)
+        .get();
+    
+    if (snap.docs.isEmpty) return;
+    final summary = snap.docs.first.data() as Map<String, dynamic>;
+    final List<dynamic> payments = (summary['payments'] ?? []) as List<dynamic>;
+    final List<String> dates = payments.map((p) => p['paymentDate']?.toString() ?? '').where((d) => d.isNotEmpty).toList();
+    
+    final openingData = await _fetchOpeningBalance(siteId, prevPeriod, dates);
+    final int openingBalance = (openingData['openingBalance'] as num? ?? 0).toInt();
+    final Map<String, num> expensesByDate = Map<String, num>.from(openingData['expensesByDate'] ?? {});
+
+    int totalPayment = 0;
+    int totalExpenses = 0;
+    for (var p in payments) {
+      totalPayment += (p['paymentAmount'] as num? ?? 0).toInt();
+      totalExpenses += (expensesByDate[p['paymentDate']] ?? 0).toInt();
+    }
+    int totalNet = openingBalance + totalPayment - totalExpenses;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(12 * PdfPageFormat.mm),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Weekly Financial Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Site ID', siteId, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Period', period, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Net Balance', '₹ $totalNet', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+               PdfTemplates.buildMetaBox('Opening Balance', '₹ $openingBalance', pdfPrimaryColor),
+               PdfTemplates.buildMetaBox('Total Received', '₹ $totalPayment', pdfPrimaryColor),
+               PdfTemplates.buildMetaBox('Total Spent', '₹ $totalExpenses', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+
+          pw.Text('Daily Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: ['Date', 'Payment', 'Expenses', 'Net'],
+            data: payments.map((p) {
+              final String date = p['paymentDate'] ?? '';
+              final int pAmt = (p['paymentAmount'] ?? 0).toInt();
+              final int eAmt = (expensesByDate[date] ?? 0).toInt();
+              return [date, '₹ $pAmt', '₹ $eAmt', '₹ ${pAmt - eAmt}'];
+            }).toList(),
+            headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

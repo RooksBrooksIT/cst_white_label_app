@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/firestore_service.dart';
+import 'dart:typed_data';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
@@ -471,12 +475,127 @@ class _DailySiteExpensesReportPageState
   }
 
   Future<void> _handlePdfExport(BuildContext context) async {
-    // Basic implementation for now, mirroring the logic in other report pages
     final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+    final reportData = await _fetchAllReports();
+    final totalAmount = _calculateTotal(reportData);
+    final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
+
+    final supervisorDoc = reportData['supervisor'] as DocumentSnapshot?;
+    final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
+    final managerEntries = reportData['managerEntries'] as List<DocumentSnapshot>;
+    final orgEntries = reportData['organizationEntries'] as List<DocumentSnapshot>;
+    final contractorEntries = reportData['contractorEntries'] as List<DocumentSnapshot>;
+
     pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) =>
-            pw.Center(child: pw.Text('Daily Site Report - Export')),
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Daily site Summary Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Site ID', widget.siteId ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Date', dateStr, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Total Spent', '₹ ${totalAmount.toStringAsFixed(2)}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Supervisor Section
+          if (supervisorData != null) ...[
+            pw.Text('Site Supervisor Entries', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: pdfPrimaryColor)),
+            pw.SizedBox(height: 8),
+            if ((supervisorData['labours'] as List?)?.isNotEmpty ?? false) ...[
+              pw.Text('Labour', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+              pw.Table.fromTextArray(
+                headers: ['Type', 'Count', 'Amount'],
+                data: (supervisorData['labours'] as List).map((l) => [l['type'], l['count'], '₹${l['amount']}']).toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+            if ((supervisorData['materials'] as List?)?.isNotEmpty ?? false) ...[
+              pw.Text('Materials', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+              pw.Table.fromTextArray(
+                headers: ['Type', 'Quantity', 'Amount'],
+                data: (supervisorData['materials'] as List).map((m) => [m['type'], m['quantity'], '₹${m['amount']}']).toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+            pw.Text('Other Supervisor Expenses', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            pw.Table.fromTextArray(
+              headers: ['Expense', 'Amount'],
+              data: [
+                ['Food', '₹${supervisorData['food'] ?? 0}'],
+                ['Fuel', '₹${supervisorData['fuel'] ?? 0}'],
+                ['Transport', '₹${supervisorData['transport'] ?? 0}'],
+              ],
+              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+              headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Manager Section
+          if (managerEntries.isNotEmpty) ...[
+            pw.Text('Manager Expenses', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: pdfPrimaryColor)),
+            pw.SizedBox(height: 8),
+            ...managerEntries.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final bills = List<Map<String, dynamic>>.from(data['bills'] ?? []);
+              return pw.Table.fromTextArray(
+                headers: ['Vendor', 'Bill No', 'Amount'],
+                data: bills.map((b) => [b['billVendor'], b['billNo'], '₹${b['billAmount']}']).toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+              );
+            }),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Org Section
+          if (orgEntries.isNotEmpty) ...[
+            pw.Text('Organization Expenses', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: pdfPrimaryColor)),
+            pw.SizedBox(height: 8),
+            ...orgEntries.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final bills = List<Map<String, dynamic>>.from(data['bills'] ?? []);
+              return pw.Table.fromTextArray(
+                headers: ['Vendor', 'Bill No', 'Amount'],
+                data: bills.map((b) => [b['billVendor'], b['billNo'], '₹${b['billAmount']}']).toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+              );
+            }),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Contractor Section
+          if (contractorEntries.isNotEmpty) ...[
+            pw.Text('Contractor Expenses', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: pdfPrimaryColor)),
+            pw.SizedBox(height: 8),
+            pw.Table.fromTextArray(
+              headers: ['Entry ID', 'Site', 'Amount'],
+              data: contractorEntries.map((doc) {
+                final d = doc.data() as Map<String, dynamic>;
+                return [doc.id, d['site'] ?? 'N/A', '₹${d['totalAmount'] ?? 0}'];
+              }).toList(),
+              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+              headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+            ),
+          ],
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());

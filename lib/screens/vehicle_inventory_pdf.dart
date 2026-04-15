@@ -1,9 +1,11 @@
 import 'dart:typed_data';
-import 'package:flutter/material.dart' show BuildContext;
+import 'package:flutter/material.dart' show BuildContext, Theme;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class InventoryReportPdf {
   static Future<void> generateAndShare({
@@ -11,7 +13,9 @@ class InventoryReportPdf {
     required String title,
     required List<Map<String, dynamic>> rows,
   }) async {
-    final pdfBytes = await _buildPdf(title: title, rows: rows);
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfBytes = await _buildPdf(title: title, rows: rows, primaryColor: pdfPrimaryColor);
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,
     );
@@ -20,7 +24,9 @@ class InventoryReportPdf {
   static Future<Uint8List> _buildPdf({
     required String title,
     required List<Map<String, dynamic>> rows,
+    required PdfColor primaryColor,
   }) async {
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
     // You can provide custom fonts here if needed using ThemeData.withFont(...)
     final doc = pw.Document();
 
@@ -81,18 +87,12 @@ class InventoryReportPdf {
 
     doc.addPage(
       pw.MultiPage(
-        pageTheme: const pw.PageTheme(margin: pw.EdgeInsets.all(24)),
-        header: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              title,
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text('Generated at: $genAt'),
-            pw.Divider(),
-          ],
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: title,
+          orgDetails: orgDetails,
+          primaryColor: primaryColor,
         ),
         build: (context) => [
           pw.DefaultTextStyle(
@@ -139,13 +139,7 @@ class InventoryReportPdf {
             ),
           ),
         ],
-        footer: (context) => pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Total rows: ${rows.length}'),
-            pw.Text('Page ${context.pageNumber} of ${context.pagesCount}'),
-          ],
-        ),
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
 

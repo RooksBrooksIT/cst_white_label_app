@@ -5,8 +5,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../services/firestore_service.dart';
+import '../utils/app_theme.dart';
+import '../utils/pdf_templates.dart';
 import 'dart:async';
-
 
 class DailySitePaymentReportScreen extends StatefulWidget {
   const DailySitePaymentReportScreen({super.key});
@@ -58,17 +59,18 @@ class _DailySitePaymentReportScreenState
 
       final ids = <String>{};
       final details = <String, Map<String, String>>{};
-      
+
       for (var doc in mappingSnapshot.docs) {
         final data = doc.data();
         final siteId = data['site']?.toString() ?? doc.id;
         if (siteId.isNotEmpty) {
           ids.add(siteId);
           details[siteId] = {
-            'project': '', // Will be filled from siteId parsing or projects collection
+            'project':
+                '', // Will be filled from siteId parsing or projects collection
             'supervisor': data['supervisor']?.toString() ?? '',
           };
-          
+
           // Try to extract project name from siteId if it follows the pattern siteName_projectName
           if (siteId.contains('_')) {
             final parts = siteId.split('_');
@@ -85,7 +87,8 @@ class _DailySitePaymentReportScreenState
         final data = doc.data();
         final siteId = data['siteId']?.toString();
         if (siteId != null && details.containsKey(siteId)) {
-          details[siteId]!['project'] = data['projectName']?.toString() ?? details[siteId]!['project']!;
+          details[siteId]!['project'] =
+              data['projectName']?.toString() ?? details[siteId]!['project']!;
         }
       }
 
@@ -104,7 +107,6 @@ class _DailySitePaymentReportScreenState
       }
     }
   }
-
 
   void _updateProjectAndSupervisor() {
     if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
@@ -232,115 +234,130 @@ class _DailySitePaymentReportScreenState
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
-    final pdfOnPrimaryColor = PdfColor.fromInt(
-      0xFFFFFFFF,
-    ); // White for text over primary
+    
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    final now = DateTime.now();
+    final String genAt = DateFormat('dd/MM/yyyy HH:mm').format(now);
 
     pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Site Payment Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (context) => [
+          // Report Metadata
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text(
-                'Site Payment Report',
-                style: pw.TextStyle(
-                  fontSize: 22,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                selectedSiteId ?? 'N/A',
+                pdfPrimaryColor,
               ),
-              pw.SizedBox(height: 10),
-              pw.Text('Site ID: ${selectedSiteId ?? ''}'),
-              pw.Text('Project: ${selectedProject ?? ''}'),
-              pw.Text('Supervisor: ${selectedSupervisor ?? ''}'),
-              pw.Text(
-                'Month: ${DateFormat.MMMM().format(DateTime(0, selectedMonth))}',
+              PdfTemplates.buildMetaBox(
+                'Project',
+                selectedProject ?? 'N/A',
+                pdfPrimaryColor,
               ),
-              pw.Text('Year: $selectedYear'),
-              pw.Text(
-                'Week: ${selectedWeekIndex != null ? selectedWeekIndex! + 1 : ''}',
-              ),
-              pw.SizedBox(height: 16),
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(color: pdfPrimaryColor),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Date',
-                          style: pw.TextStyle(
-                            color: pdfOnPrimaryColor,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Payment',
-                          style: pw.TextStyle(
-                            color: pdfOnPrimaryColor,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  ...paymentRecords.map((rec) {
-                    String dateStr = '';
-                    if (rec['paymentDate'] != null) {
-                      try {
-                        DateTime dt = DateFormat(
-                          'yyyy-MM-dd',
-                        ).parse(rec['paymentDate']);
-                        dateStr = DateFormat('EEE, MMM d, yyyy').format(dt);
-                      } catch (e) {
-                        dateStr = rec['paymentDate'].toString();
-                      }
-                    }
-                    return pw.TableRow(
-                      children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(dateStr),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(
-                            rec['paymentAmount']?.toString() ?? '',
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Total',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          totalAmount.toStringAsFixed(2),
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              PdfTemplates.buildMetaBox(
+                'Supervisor',
+                selectedSupervisor ?? 'N/A',
+                pdfPrimaryColor,
               ),
             ],
-          );
-        },
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Month',
+                DateFormat.MMMM().format(DateTime(0, selectedMonth)),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox('Year', selectedYear.toString(), pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Week',
+                selectedWeekIndex != null
+                    ? 'Week ${selectedWeekIndex! + 1}'
+                    : 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox('Generated At', genAt, pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Workforce Table
+          pw.Table.fromTextArray(
+            headers: ['Date', 'Payment Amount (INR)'],
+            data: paymentRecords.map((rec) {
+              String dateStr = '';
+              if (rec['paymentDate'] != null) {
+                try {
+                  DateTime dt = DateFormat(
+                    'yyyy-MM-dd',
+                  ).parse(rec['paymentDate']);
+                  dateStr = DateFormat('EEE, MMM d, yyyy').format(dt);
+                } catch (e) {
+                  dateStr = rec['paymentDate'].toString();
+                }
+              }
+              return [dateStr, rec['paymentAmount']?.toString() ?? '0.00'];
+            }).toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2),
+              1: const pw.FlexColumnWidth(1),
+            },
+          ),
+          pw.SizedBox(height: 24),
+
+          // Grand Totals Section
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: const pw.BoxDecoration(
+              color: PdfColors.blue50,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'Total Payment for Week:',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(width: 24),
+                pw.Text(
+                  'INR ${totalAmount.toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: pdfPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
+
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 

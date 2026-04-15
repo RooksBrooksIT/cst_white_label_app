@@ -12,12 +12,11 @@ import '../utils/responsive.dart';
 import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
 import 'org_subscription_page.dart';
-
+import 'org_information_screen.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   /// When [standalone] is true (default), the screen is shown as a separate
-  /// pushed route with its own AppBar. When false, it is embedded inside the
-  /// OrganizationDashboard as the Profile tab – no AppBar is rendered.
+
   final bool standalone;
   const OrgMenuScreen({super.key, this.standalone = true});
 
@@ -293,6 +292,19 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           ),
           const SizedBox(height: 16),
           _buildSettingsTile(
+            icon: Icons.business_rounded,
+            title: 'Organisation Information',
+            subtitle: 'Update address and phone details',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrgInformationScreen(),
+              ),
+            ),
+          ),
+
+          const Divider(color: Color(0xFFF1F5F9), height: 24),
+          _buildSettingsTile(
             icon: Icons.color_lens_outlined,
             title: 'Brand Color',
             subtitle: 'Change app theme color',
@@ -365,7 +377,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               );
             },
           ),
-
         ],
       ),
     );
@@ -435,7 +446,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     if (result == true) {
       // Clear global auth state
       await AuthService().logout();
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('org_isLoggedIn');
       await prefs.remove('org_username');

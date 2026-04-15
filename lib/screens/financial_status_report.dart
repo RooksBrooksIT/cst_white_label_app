@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../services/firestore_service.dart';
+import '../utils/pdf_templates.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
@@ -24,7 +25,8 @@ class FinancialStatusReportPage extends StatefulWidget {
   });
 
   @override
-  State<FinancialStatusReportPage> createState() => _FinancialStatusReportPageState();
+  State<FinancialStatusReportPage> createState() =>
+      _FinancialStatusReportPageState();
 }
 
 class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
@@ -41,9 +43,15 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   Future<void> _fetchProjectData() async {
     try {
       final col = FirestoreService.getCollection('projects');
-      QuerySnapshot<Map<String, dynamic>> query = await col.where('siteId', isEqualTo: widget.siteId).limit(1).get();
+      QuerySnapshot<Map<String, dynamic>> query = await col
+          .where('siteId', isEqualTo: widget.siteId)
+          .limit(1)
+          .get();
       if (query.docs.isEmpty) {
-        query = await col.where('siteid', isEqualTo: widget.siteId).limit(1).get();
+        query = await col
+            .where('siteid', isEqualTo: widget.siteId)
+            .limit(1)
+            .get();
       }
       if (query.docs.isNotEmpty) {
         setState(() {
@@ -75,8 +83,8 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMsg != null
-              ? _buildErrorView(theme)
-              : _buildReportView(theme),
+          ? _buildErrorView(theme)
+          : _buildReportView(theme),
     );
   }
 
@@ -89,7 +97,11 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           children: [
             Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
             const SizedBox(height: 16),
-            Text(errorMsg!, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+            Text(
+              errorMsg!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
             const SizedBox(height: 24),
             GlassButton(label: 'RETRY', onPressed: _fetchProjectData),
           ],
@@ -112,9 +124,22 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           const SizedBox(height: 32),
           Row(
             children: [
-              Expanded(child: GlassButton(label: 'EXPORT PDF', onPressed: _generateAndPreviewPDF, icon: Icons.picture_as_pdf)),
+              Expanded(
+                child: GlassButton(
+                  label: 'EXPORT PDF',
+                  onPressed: _generateAndPreviewPDF,
+                  icon: Icons.picture_as_pdf,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: GlassButton(label: 'REFRESH', onPressed: _fetchProjectData, isSecondary: true, icon: Icons.refresh)),
+              Expanded(
+                child: GlassButton(
+                  label: 'REFRESH',
+                  onPressed: _fetchProjectData,
+                  isSecondary: true,
+                  icon: Icons.refresh,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 40),
@@ -131,7 +156,10 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(Icons.apartment, color: theme.colorScheme.primary),
               ),
               const SizedBox(width: 16),
@@ -139,8 +167,18 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.projectName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text(widget.siteName, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    Text(
+                      widget.projectName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      widget.siteName,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -155,7 +193,9 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                 child: Text(
                   widget.ownerName,
                   textAlign: TextAlign.end,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -170,12 +210,34 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Project Information', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          Text(
+            'Project Information',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 16),
-          _buildInfoRow('Site ID', projectData?['siteid'] ?? projectData?['siteId'] ?? '-', Icons.tag),
-          _buildInfoRow('Location', projectData?['siteLocation'] ?? '-', Icons.location_on_outlined),
-          _buildInfoRow('Actual Start', _formatDate(projectData?['actualStartDate']), Icons.calendar_today_outlined),
-          _buildInfoRow('Duration', '${_calculateDuration()} days', Icons.history),
+          _buildInfoRow(
+            'Site ID',
+            projectData?['siteid'] ?? projectData?['siteId'] ?? '-',
+            Icons.tag,
+          ),
+          _buildInfoRow(
+            'Location',
+            projectData?['siteLocation'] ?? '-',
+            Icons.location_on_outlined,
+          ),
+          _buildInfoRow(
+            'Actual Start',
+            _formatDate(projectData?['actualStartDate']),
+            Icons.calendar_today_outlined,
+          ),
+          _buildInfoRow(
+            'Duration',
+            '${_calculateDuration()} days',
+            Icons.history,
+          ),
         ],
       ),
     );
@@ -192,20 +254,51 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Financial Summary', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          Text(
+            'Financial Summary',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 20),
-          _buildFinanceTile('Total Budget', '₹ $budget', theme.colorScheme.primary, Icons.account_balance_wallet_outlined),
-          _buildFinanceTile('Total Received', '₹ $received', Colors.green, Icons.arrow_downward_rounded),
-          _buildFinanceTile('Total Spent', '₹ $spent', Colors.orange, Icons.arrow_upward_rounded),
-          _buildFinanceTile('Balance', '₹ $balance', Colors.blue, Icons.account_balance_outlined),
+          _buildFinanceTile(
+            'Total Budget',
+            '₹ $budget',
+            theme.colorScheme.primary,
+            Icons.account_balance_wallet_outlined,
+          ),
+          _buildFinanceTile(
+            'Total Received',
+            '₹ $received',
+            Colors.green,
+            Icons.arrow_downward_rounded,
+          ),
+          _buildFinanceTile(
+            'Total Spent',
+            '₹ $spent',
+            Colors.orange,
+            Icons.arrow_upward_rounded,
+          ),
+          _buildFinanceTile(
+            'Balance',
+            '₹ $balance',
+            Colors.blue,
+            Icons.account_balance_outlined,
+          ),
           const SizedBox(height: 24),
-          Text('Budget Utilization (${usage.toStringAsFixed(1)}%)', style: theme.textTheme.bodySmall),
+          Text(
+            'Budget Utilization (${usage.toStringAsFixed(1)}%)',
+            style: theme.textTheme.bodySmall,
+          ),
           const SizedBox(height: 8),
           LinearProgressIndicator(
             value: usage / 100,
             minHeight: 10,
             borderRadius: BorderRadius.circular(5),
-            color: usage > 90 ? theme.colorScheme.error : theme.colorScheme.primary,
+            color: usage > 90
+                ? theme.colorScheme.error
+                : theme.colorScheme.primary,
             backgroundColor: theme.colorScheme.primary.withOpacity(0.05),
           ),
         ],
@@ -228,7 +321,9 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -236,7 +331,12 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     );
   }
 
-  Widget _buildFinanceTile(String label, String value, Color color, IconData icon) {
+  Widget _buildFinanceTile(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -245,7 +345,10 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 16),
@@ -255,7 +358,10 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: color),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -284,28 +390,155 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   Future<void> _generateAndPreviewPDF() async {
     final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
     final budget = _parseNum(projectData?['projectBudget']);
     final spent = _parseNum(projectData?['amountSpent']);
     final received = _parseNum(projectData?['amountPaid']);
+    final balance = budget - spent;
 
-    pdf.addPage(pw.Page(
-      build: (pw.Context context) => pw.Column(
-        children: [
-          pw.Header(level: 0, text: 'Financial Status Report'),
-          pw.Paragraph(text: 'Project: ${widget.projectName}'),
-          pw.Paragraph(text: 'Site: ${widget.siteName} (${widget.siteId})'),
-          pw.Paragraph(text: 'Owner: ${widget.ownerName}'),
-          pw.Divider(),
-          pw.Table.fromTextArray(data: [
-            ['Metric', 'Value'],
-            ['Total Budget', 'INR $budget'],
-            ['Total Received', 'INR $received'],
-            ['Total Spent', 'INR $spent'],
-            ['Balance', 'INR ${budget - spent}'],
-          ]),
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Financial Status Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (context) => [
+          // Project Summary Section
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Project Name',
+                widget.projectName,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                widget.siteId,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Client Name',
+                widget.ownerName,
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Location',
+                projectData?['siteLocation'] ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Start Date',
+                _formatDate(projectData?['actualStartDate']),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Duration',
+                '${_calculateDuration()} Days',
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+
+          // Financial Table
+          pw.Text(
+            'Financial Breakdown',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Table.fromTextArray(
+            headers: ['Financial Metric', 'Amount (INR)'],
+            data: [
+              ['Total Project Budget', budget.toStringAsFixed(2)],
+              ['Total Amount Received', received.toStringAsFixed(2)],
+              ['Total Amount Spent', spent.toStringAsFixed(2)],
+              ['Remaining Balance', balance.toStringAsFixed(2)],
+            ],
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 32),
+
+          // Progress Indicator (Visual represention)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue50,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Summary Analysis',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Budget Utilization: ',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      '${budget > 0 ? (spent / budget * 100).toStringAsFixed(1) : 0}%',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pdfPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Estimated Completion Weight: ',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      '${projectData?['completionPercentage'] ?? 0}%',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pdfPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
-    ));
+    );
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

@@ -5,6 +5,10 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
 
 class MaterialReportPage extends StatefulWidget {
   const MaterialReportPage({super.key});
@@ -100,6 +104,10 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     return GlassScaffold(
       title: 'Material Report',
       actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          onPressed: reportRows.isNotEmpty ? _generatePdf : null,
+        ),
         IconButton(
           icon: const Icon(Icons.refresh),
           onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
@@ -227,6 +235,44 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         ],
       ),
     );
+  }
+  Future<void> _generatePdf() async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Material Distribution Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Material Name', selectedMaterial ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Total Sites', '${reportRows.length}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Table.fromTextArray(
+            headers: ['Site ID', 'Quantity'],
+            data: reportRows.map((r) => [r.siteId, r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2)]).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }
 
