@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import '../widgets/glass_scaffold.dart';
 
@@ -377,6 +378,18 @@ class _SupervisorWorkSchedulePageState
             ? Timestamp.fromDate(_selectedStartDate!)
             : null,
       });
+
+      // Notify the organisation about the new work schedule request
+      await NotificationService.notifyOrganisation(
+        title: '📅 New Work Schedule Request',
+        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        data: {
+          'type': 'work_schedule',
+          'wsReqId': wsReqId,
+          'siteId': siteId,
+          'supervisorName': supervisorName,
+        },
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

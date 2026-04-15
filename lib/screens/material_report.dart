@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
@@ -22,12 +23,17 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   @override
   void initState() {
     super.initState();
-    _fetchMaterialNames();
+    _initAndFetch();
+  }
+
+  Future<void> _initAndFetch() async {
+    await FirestoreService.initialize();
+    await _fetchMaterialNames();
   }
 
   Future<void> _fetchMaterialNames() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('materialsInventory').get();
+      final snapshot = await FirestoreService.materials.get();
       final names = snapshot.docs
           .map((doc) => (doc.data()['materialName'] ?? '').toString().trim())
           .where((name) => name.isNotEmpty)
@@ -50,7 +56,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     });
 
     try {
-      final q = await FirebaseFirestore.instance.collection('materialsInventory').where('materialName', isEqualTo: materialName).get();
+      final q = await FirestoreService.getCollection('materialsInventory').where('materialName', isEqualTo: materialName).get();
       final Map<String, double> qtyBySite = {};
       for (final doc in q.docs) {
         final data = doc.data();

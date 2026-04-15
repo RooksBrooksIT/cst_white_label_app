@@ -9,7 +9,9 @@ import 'insights_dashboard.dart';
 import 'manager_expenses.dart';
 import 'manager_material_approval_screen.dart';
 import 'material_report.dart';
+import 'org_notification_page.dart';
 import 'org_site_supervisor_dailyWeek_report.dart';
+import '../services/notification_service.dart';
 import 'organization_expenses.dart';
 import 'organization_site_entry.dart';
 import 'site_weekly_financial_report.dart';
@@ -59,6 +61,56 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         return GlassScaffold(
           title: appName.isNotEmpty ? appName : 'Organization Dashboard',
           actions: [
+            StreamBuilder<int>(
+              stream: NotificationService.unreadCountForOrganisation(),
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined),
+                      tooltip: 'Notifications',
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const OrgNotificationPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.error,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            count > 9 ? '9+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.menu_rounded),
               tooltip: 'Menu',

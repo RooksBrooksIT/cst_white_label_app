@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -485,6 +486,18 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       }
 
       _showSnackBar('Materials saved successfully');
+      
+      // Notify the organisation about material arrival at site
+      await NotificationService.notifyOrganisation(
+        title: '✅ Material Arrival Logged',
+        body: '${supervisorNameController.text} logged material arrival at $siteId.',
+        data: {
+          'type': 'material_arrival',
+          'siteId': siteId,
+          'supervisorName': supervisorNameController.text,
+        },
+      );
+
       setState(() => materialEntries.clear());
     } catch (e) {
       _showSnackBar('Failed to save materials: ${e.toString()}', isError: true);
