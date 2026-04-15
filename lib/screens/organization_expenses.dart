@@ -477,172 +477,177 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           },
         ),
       ],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            GlassCard(
-              title: 'Site & Project Info',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  isLoadingSites
-                      ? const Center(child: CircularProgressIndicator())
-                      : DropdownButtonFormField<String>(
-                          value: selectedSiteId,
-                          decoration: InputDecoration(
-                            labelText: 'Site ID',
-                            prefixIcon: Icon(
-                              Icons.location_on,
-                              color: primaryColor,
+      body: SizedBox.expand(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              GlassCard(
+                title: 'Site & Project Info',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    isLoadingSites
+                        ? const Center(child: CircularProgressIndicator())
+                        : DropdownButtonFormField<String>(
+                            value: selectedSiteId,
+                            decoration: InputDecoration(
+                              labelText: 'Site ID',
+                              prefixIcon: Icon(
+                                Icons.location_on,
+                                color: primaryColor,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          items: siteIds
-                              .map(
-                                (site) => DropdownMenuItem<String>(
-                                  value: site,
-                                  child: Text(site),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedSiteId = value;
-                            });
-                            if (value != null) {
-                              _loadSiteDetails(value);
-                            }
-                          },
-                        ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: supervisorController,
-                    enabled: false,
-                    decoration: InputDecoration(
-                      labelText: 'Supervisor ID',
-                      prefixIcon: Icon(Icons.person, color: primaryColor),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: projectPhaseController,
-                    enabled: false,
-                    decoration: InputDecoration(
-                      labelText: 'Project Phase',
-                      prefixIcon: Icon(Icons.timeline, color: primaryColor),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 20, color: primaryColor),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Date:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(
-                          DateFormat('dd MMM yyyy').format(selectedDate),
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () => _selectDate(context),
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: const Text('Change'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            GlassCard(
-              title: 'Add Bill',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabeledTextField('Bill No', billNoController),
-                  _buildLabeledTextField(
-                    'Bill Date',
-                    TextEditingController(
-                      text: DateFormat('dd/MM/yy').format(selectedDate),
-                    ),
-                    enabled: false,
-                  ),
-                  _buildLabeledTextField('Bill Vendor', billVendorController),
-                  _buildLabeledTextField('Bill Amount', billAmountController),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GlassButton(
-                        label: 'Add Bill',
-                        icon: Icons.add_rounded,
-                        onPressed: _addBill,
-                        isSecondary: true,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (bills.isNotEmpty)
-              GlassCard(title: 'Bills List', child: _buildBillTable()),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: GlassButton(
-                    label: 'Reset',
-                    icon: Icons.refresh_rounded,
-                    onPressed: isSubmitting ? null : _resetForm,
-                    isSecondary: true,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GlassButton(
-                    label: 'Submit',
-                    icon: Icons.check_circle_outline,
-                    isLoading: isSubmitting,
-                    onPressed: isSubmitting
-                        ? null
-                        : () {
-                            if (selectedSiteId == null ||
-                                selectedSupervisorId == null ||
-                                selectedProjectPhase == null ||
-                                bills.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please fill all details and add at least one bill.',
+                            items: siteIds
+                                .map(
+                                  (site) => DropdownMenuItem<String>(
+                                    value: site,
+                                    child: Text(site),
                                   ),
-                                ),
-                              );
-                              return;
-                            }
-                            _showConfirmationDialog();
-                          },
-                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedSiteId = value;
+                              });
+                              if (value != null) {
+                                _loadSiteDetails(value);
+                              }
+                            },
+                          ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: supervisorController,
+                      enabled: false,
+                      decoration: InputDecoration(
+                        labelText: 'Supervisor ID',
+                        prefixIcon: Icon(Icons.person, color: primaryColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: projectPhaseController,
+                      enabled: false,
+                      decoration: InputDecoration(
+                        labelText: 'Project Phase',
+                        prefixIcon: Icon(Icons.timeline, color: primaryColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Date:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            DateFormat('dd MMM yyyy').format(selectedDate),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: () => _selectDate(context),
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 30),
-          ],
+              ),
+              const SizedBox(height: 16),
+              GlassCard(
+                title: 'Add Bill',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabeledTextField('Bill No', billNoController),
+                    _buildLabeledTextField(
+                      'Bill Date',
+                      TextEditingController(
+                        text: DateFormat('dd/MM/yy').format(selectedDate),
+                      ),
+                      enabled: false,
+                    ),
+                    _buildLabeledTextField('Bill Vendor', billVendorController),
+                    _buildLabeledTextField('Bill Amount', billAmountController),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GlassButton(
+                          label: 'Add Bill',
+                          icon: Icons.add_rounded,
+                          onPressed: _addBill,
+                          isSecondary: true,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (bills.isNotEmpty)
+                GlassCard(title: 'Bills List', child: _buildBillTable()),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: GlassButton(
+                      label: 'Reset',
+                      icon: Icons.refresh_rounded,
+                      onPressed: isSubmitting ? null : _resetForm,
+                      isSecondary: true,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: GlassButton(
+                      label: 'Submit',
+                      icon: Icons.check_circle_outline,
+                      isLoading: isSubmitting,
+                      onPressed: isSubmitting
+                          ? null
+                          : () {
+                              if (selectedSiteId == null ||
+                                  selectedSupervisorId == null ||
+                                  selectedProjectPhase == null ||
+                                  bills.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please fill all details and add at least one bill.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              _showConfirmationDialog();
+                            },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );
