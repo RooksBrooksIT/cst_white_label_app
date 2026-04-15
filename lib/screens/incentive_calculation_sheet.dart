@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../services/expense_service.dart';
+import '../services/firestore_service.dart';
 import '../utils/pdf_templates.dart';
 
 class LabourData {
@@ -76,15 +77,13 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     if (!mounted) return;
     setState(() => _loading = true);
 
-    final scheduleQuery = await FirebaseFirestore.instance
-        .collection('siteSupervisorProjectStageSchedule')
+    final scheduleQuery = await FirestoreService.siteSupervisorProjectStageSchedule
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .limit(1)
         .get();
 
-    final actualQuery = await FirebaseFirestore.instance
-        .collection('siteSupervisorProjectStageActual')
+    final actualQuery = await FirestoreService.siteSupervisorProjectStageActual
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .limit(1)
@@ -187,8 +186,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   }
 
   Future<Map<String, int>> _fetchDaysSummary() async {
-    final scheduleQuery = await FirebaseFirestore.instance
-        .collection('siteSupervisorProjectStageSchedule')
+    final scheduleQuery = await FirestoreService.siteSupervisorProjectStageSchedule
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .limit(1)
@@ -202,8 +200,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       aDays = (doc['appDays'] ?? 0) as int;
     }
 
-    final actualQuery = await FirebaseFirestore.instance
-        .collection('siteSupervisorProjectStageActual')
+    final actualQuery = await FirestoreService.siteSupervisorProjectStageActual
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .limit(1)
@@ -765,8 +762,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
     try {
       // 1) Save detailed incentive document for history/audit
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorIncentives')
+      await FirestoreService.siteSupervisorIncentives
           .doc(docId)
           .set({
             'siteId': widget.siteId,
@@ -784,8 +780,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           }, SetOptions(merge: true));
 
       // 2) Update totalIncentiveExpenses in totalSiteExpensesPerDay for this siteId
-      await FirebaseFirestore.instance
-          .collection('totalSiteExpensesPerDay')
+      await FirestoreService.totalSiteExpensesPerDay
           .doc(widget.siteId)
           .set({
             'totalIncentiveExpenses': amountToAdd,
