@@ -581,7 +581,12 @@ class _WorkerAttendanceSalaryPageState
   Future<void> _onGenerateReport(Map<String, dynamic> worker) async {
     setState(() => _isLoading = true);
     try {
-      final pdfBytes = await WorkerReportPdf.build(worker: worker);
+      final primaryColor = Theme.of(context).primaryColor;
+      final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+      final pdfBytes = await WorkerReportPdf.build(
+        worker: worker,
+        primaryColor: pdfPrimaryColor,
+      );
       if (!mounted) return;
       
       Navigator.push(
@@ -615,11 +620,14 @@ class _WorkerAttendanceSalaryPageState
 
     setState(() => _isLoading = true);
     try {
+      final primaryColor = Theme.of(context).primaryColor;
+      final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
       final pdfBytes = await OverallReportPdf.build(
         workers: _filteredWorkers,
         site: _selectedSite ?? 'All Sites',
         month: _selectedMonth ?? _currentMonth,
         overallPercentage: _overallAttendancePercentage,
+        primaryColor: pdfPrimaryColor,
       );
 
       if (!mounted) return;

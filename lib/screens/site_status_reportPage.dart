@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
 
 class SiteStatusReportPage extends StatelessWidget {
   final String status;
@@ -44,6 +48,12 @@ class SiteStatusReportPage extends StatelessWidget {
         backgroundColor: statusColor,
         elevation: 0,
         iconTheme: const IconThemeData(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => _generatePdf(context),
+          ),
+        ],
       ),
       body: Container(
         color: const Color(0xFFF8F9FA), // Light background
@@ -113,6 +123,66 @@ class SiteStatusReportPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _generatePdf(BuildContext context) async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(getStatusColor(context, status).value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    final snapshot = await FirestoreService.getCollection('projects')
+        .where('currentStatus', isEqualTo: status)
+        .get();
+    
+    final docs = snapshot.docs;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: '$status Sites Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Status', status, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Total Sites', '${docs.length}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Table.fromTextArray(
+            headers: ['Project', 'Site', 'Budget', 'Spent', 'Balance'],
+            data: docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final projectName = data['projectName']?.toString() ?? '-';
+              final siteLocation = data['siteLocation']?.toString() ?? '-';
+              final budget = double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0;
+              final paid = double.tryParse(data['amountPaid']?.toString() ?? '0') ?? 0;
+              final spent = double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0;
+              final balance = paid - spent;
+              return [
+                projectName,
+                siteLocation,
+                '₹${budget.toStringAsFixed(0)}',
+                '₹${spent.toStringAsFixed(0)}',
+                '₹${balance.toStringAsFixed(0)}'
+              ];
+            }).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }
 

@@ -6,6 +6,8 @@ import 'package:printing/printing.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class ToolsInventoryDetailsPage extends StatefulWidget {
   final String toolCode;
@@ -147,103 +149,96 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Tools Distribution Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          // Tool Details Section
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Tool Name', toolName.isNotEmpty ? toolName : 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Tool Code', widget.toolCode, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Category', toolCategory.isNotEmpty ? toolCategory : 'N/A', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          if (toolOwner.isNotEmpty || toolDescription.isNotEmpty)
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                if (toolOwner.isNotEmpty)
+                  PdfTemplates.buildMetaBox('Owner', toolOwner, pdfPrimaryColor),
+                if (toolDescription.isNotEmpty)
+                  pw.Expanded(
+                    child: pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 32),
+                      child: PdfTemplates.buildMetaBox('Description', toolDescription, pdfPrimaryColor),
+                    ),
+                  ),
+              ],
+            ),
+          pw.SizedBox(height: 32),
+
+          pw.Text(
+            'Distribution by Site',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: ['Site ID', 'Site Name', 'Tools Count'],
+            data: inventoryData
+                .map(
+                  (item) => [
+                    item['siteId'].toString(),
+                    siteNameMap[item['siteId']] ?? "Unnamed Site",
+                    item['toolsCount'].toString()
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              color: PdfColors.white,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            headerDecoration: pw.BoxDecoration(
+              color: pdfPrimaryColor,
+            ),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 24),
+          pw.Divider(thickness: 1, color: pdfPrimaryColor),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
             children: [
               pw.Text(
-                "Tools Distribution Report",
-                style: pw.TextStyle(
-                  fontSize: 28,
-                  fontWeight: pw.FontWeight.bold,
-                  color: pdfPrimaryColor,
-                ),
+                'Total Distribution: ',
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
               ),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 2, color: pdfPrimaryColor),
-              pw.SizedBox(height: 16),
               pw.Text(
-                "Tool Details",
+                '${inventoryData.fold<int>(0, (sum, item) => sum + (item['toolsCount'] as int))}',
                 style: pw.TextStyle(
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                   color: pdfPrimaryColor,
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Bullet(
-                text: "Name: ${toolName.isNotEmpty ? toolName : "N/A"}",
-                style: pw.TextStyle(fontSize: 14),
-              ),
-              pw.Bullet(
-                text: "Category: ${toolCategory.isNotEmpty ? toolCategory : "Uncategorized"}",
-                style: pw.TextStyle(fontSize: 14),
-              ),
-              pw.Bullet(
-                text: "Tool Code: ${widget.toolCode}",
-                style: pw.TextStyle(fontSize: 14),
-              ),
-              if (toolOwner.isNotEmpty)
-                pw.Bullet(
-                  text: "Owner: $toolOwner",
-                  style: pw.TextStyle(fontSize: 14),
-                ),
-              pw.SizedBox(height: 24),
-              pw.Text(
-                "Distribution by Site",
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                  color: pdfPrimaryColor,
-                ),
-              ),
-              pw.SizedBox(height: 12),
-              pw.Table.fromTextArray(
-                headers: ['Site ID', 'Site Name', 'Tools Count'],
-                data: inventoryData
-                    .map(
-                      (item) => [
-                        item['siteId'].toString(),
-                        siteNameMap[item['siteId']] ?? "Unnamed Site",
-                        item['toolsCount'].toString()
-                      ],
-                    )
-                    .toList(),
-                headerStyle: pw.TextStyle(
-                  color: PdfColors.white,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-                headerDecoration: pw.BoxDecoration(
-                  color: pdfPrimaryColor,
-                ),
-                cellAlignment: pw.Alignment.centerLeft,
-                cellPadding: const pw.EdgeInsets.all(8),
-                border: pw.TableBorder.all(
-                  color: pdfPrimaryColor,
-                  width: 1,
-                ),
-              ),
-              pw.Spacer(),
-              pw.Divider(thickness: 1, color: pdfPrimaryColor),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text(
-                  "Total Distribution: ${inventoryData.fold<int>(0, (sum, item) => sum + (item['toolsCount'] as int))}",
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                    color: pdfPrimaryColor,
-                  ),
                 ),
               ),
             ],
-          );
-        },
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
     await Printing.layoutPdf(

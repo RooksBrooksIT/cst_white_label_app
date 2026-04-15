@@ -9,6 +9,8 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class ProjectstageSiteSummaryReport extends StatefulWidget {
   final String siteId;
@@ -217,9 +219,72 @@ class _ProjectstageSiteSummaryReportState extends State<ProjectstageSiteSummaryR
   }
 
   Future<void> _generatePdf() async {
-    // PDF generation logic simplified for visual modernization context
     final pdf = pw.Document();
-    pdf.addPage(pw.Page(build: (c) => pw.Text('Project Stage Summary Report - ${widget.projectStage}')));
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Project Stage Summary',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Project', projectInfo?['projectName'] ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Site ID', widget.siteId, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Stage', widget.projectStage, pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Location', projectInfo?['siteLocation'] ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Status', projectInfo?['status'] ?? 'Active', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Budget', '₹ ${_toNum(projectInfo?['projectBudget']).toStringAsFixed(0)}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+
+          pw.Text('Expense Category Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: ['Category', 'Total Amount'],
+            data: expenseTotals.entries.map((e) => [
+              e.key,
+              '₹ ${e.value.toStringAsFixed(2)}',
+            ]).toList(),
+            headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 32),
+
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: pdfPrimaryColor,
+              borderRadius: pw.BorderRadius.circular(8),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('STAGE GRAND TOTAL', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                pw.Text('₹ ${grandTotal.toStringAsFixed(2)}', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
     await Printing.layoutPdf(onLayout: (f) => pdf.save());
   }
 }

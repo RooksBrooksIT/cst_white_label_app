@@ -5,6 +5,10 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
 
 class ContractorReportPage extends StatefulWidget {
   const ContractorReportPage({super.key});
@@ -135,6 +139,12 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
 
     return GlassScaffold(
       title: 'Contractor Report',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          onPressed: expenses.isNotEmpty ? _generatePdf : null,
+        ),
+      ],
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
@@ -403,5 +413,49 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
         ],
       ),
     );
+  }
+  Future<void> _generatePdf() async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Contractor Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Contractor', selectedContractor ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Site ID', selectedSiteId ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Total Payable', '₹ ${totalAmount.toStringAsFixed(2)}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Table.fromTextArray(
+            headers: ['Date', 'Details', 'Amount'],
+            data: expenses.map((exp) {
+              final date = _formatDate(exp['date']);
+              final amt = exp['totalAmount'] ?? exp['amount'] ?? 0;
+              final details = 'Food: ${exp['food'] ?? 0}, Fuel: ${exp['fuel'] ?? 0}, Trans: ${exp['transport'] ?? 0}';
+              return [date, details, '₹ $amt'];
+            }).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

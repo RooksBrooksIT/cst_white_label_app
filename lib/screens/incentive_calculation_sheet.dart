@@ -1,7 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../services/expense_service.dart';
+import '../utils/pdf_templates.dart';
 
 class LabourData {
   String labourType;
@@ -291,6 +296,12 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           ),
           iconTheme: const IconThemeData(),
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: _generatePdf,
+            ),
+          ],
         ),
         body: _loading
             ? Center(
@@ -819,5 +830,72 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       approvedDays = 0;
       actualDays = 0;
     });
+  }
+
+  Future<void> _generatePdf() async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(_primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Incentive Calculation Sheet',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Site ID', widget.siteId, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Supervisor', widget.supervisor, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Stage', widget.projectStage, pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Saved Amount', '₹ ${savedAmount.toStringAsFixed(2)}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Incentive %', '${_incentivePercentage.round()}%', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Incentive Amount', '₹ ${(savedAmount * (_incentivePercentage / 100)).toStringAsFixed(2)}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+          pw.Text('Labour Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: ['Labour Type', 'Requested', 'Approved', 'Actual'],
+            data: _labourData.map((l) => [
+              l.labourType,
+              l.requested.toString(),
+              l.approved.toString(),
+              l.actual.toString()
+            ]).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 24),
+          pw.Table.fromTextArray(
+            headers: ['Metric', 'Requested Total', 'Approved Total', 'Actual Total'],
+            data: [
+              ['Amount', '₹ ${requestedTotal.toStringAsFixed(2)}', '₹ ${approvedTotal.toStringAsFixed(2)}', '₹ ${actualTotal.toStringAsFixed(2)}'],
+              ['Days', requestedDays.toString(), approvedDays.toString(), actualDays.toString()],
+            ],
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

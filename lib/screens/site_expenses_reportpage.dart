@@ -6,6 +6,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:typed_data';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class SiteExpensesReportPage extends StatefulWidget {
   final String siteId;
@@ -28,7 +30,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   Color get primaryColor => Theme.of(context).primaryColor;
   Color get accentColor => Theme.of(context).colorScheme.secondary;
   Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
-  Color get textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
+  Color get textColor =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
   Color get cardColor => Theme.of(context).cardColor;
   Color get successColor => const Color(0xFF2e7d32);
   Color get warningColor => const Color(0xFFed6c02);
@@ -52,15 +55,15 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       final docId = '${widget.siteId}_${docIdDateFormat.format(current)}';
 
       // Supervisor entry
-      final supervisorDoc = await FirestoreService.getCollection('siteSupervisorEntries')
-          .doc(docId)
-          .get();
+      final supervisorDoc = await FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).doc(docId).get();
       final supervisorData = supervisorDoc.exists ? supervisorDoc.data() : null;
 
       // Manager bills for this date
-      final managerQuery = await FirestoreService.getCollection('managerEntries')
-          .where('siteId', isEqualTo: widget.siteId)
-          .get();
+      final managerQuery = await FirestoreService.getCollection(
+        'managerEntries',
+      ).where('siteId', isEqualTo: widget.siteId).get();
       List<Map<String, dynamic>> managerBills = [];
       for (final doc in managerQuery.docs) {
         final data = doc.data();
@@ -83,9 +86,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // Organization bills for this date
-      final orgQuery = await FirestoreService.getCollection('organizationEntries')
-          .where('siteId', isEqualTo: widget.siteId)
-          .get();
+      final orgQuery = await FirestoreService.getCollection(
+        'organizationEntries',
+      ).where('siteId', isEqualTo: widget.siteId).get();
       List<Map<String, dynamic>> orgBills = [];
       for (final doc in orgQuery.docs) {
         final data = doc.data();
@@ -108,10 +111,14 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // Contractor expenses for this date
-      final contractorQuery = await FirestoreService.getCollection('contractorEntries')
-          .where('siteId', isEqualTo: widget.siteId)
-          .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(current))
-          .get();
+      final contractorQuery =
+          await FirestoreService.getCollection('contractorEntries')
+              .where('siteId', isEqualTo: widget.siteId)
+              .where(
+                'date',
+                isEqualTo: DateFormat('yyyy-MM-dd').format(current),
+              )
+              .get();
       List<Map<String, dynamic>> contractorEntries = [];
       for (final doc in contractorQuery.docs) {
         final data = doc.data();
@@ -139,25 +146,45 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   }
 
   Future<void> _generateAndPreviewPDF(
-      List<Map<String, dynamic>> entries, num grandTotal) async {
+    List<Map<String, dynamic>> entries,
+    num grandTotal,
+  ) async {
     final pdf = pw.Document();
     final DateFormat displayDateFormat = DateFormat('dd-MMM-yyyy');
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
     pdf.addPage(
       pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Site Expenses Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
         build: (pw.Context context) => [
-          pw.Header(
-            level: 0,
-            child: pw.Text('Site Expenses Report',
-                style:
-                    pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                widget.siteId,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Year',
+                widget.fromDate.year.toString(),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Date Range',
+                '${displayDateFormat.format(widget.fromDate)} - ${displayDateFormat.format(widget.toDate)}',
+                pdfPrimaryColor,
+              ),
+            ],
           ),
-          pw.Text('Site: ${widget.siteId}', style: pw.TextStyle(fontSize: 16)),
-          pw.Text('Year: ${widget.fromDate.year}',
-              style: pw.TextStyle(fontSize: 16)),
-          pw.Text(
-              'From: ${displayDateFormat.format(widget.fromDate)}   To: ${displayDateFormat.format(widget.toDate)}',
-              style: pw.TextStyle(fontSize: 16)),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 24),
           ...entries.map((entry) {
             num supervisorTotal = 0;
             if (entry['supervisorData'] != null &&
@@ -165,8 +192,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               supervisorTotal = entry['supervisorData']['totalAmount'] is num
                   ? entry['supervisorData']['totalAmount']
                   : num.tryParse(
-                          entry['supervisorData']['totalAmount'].toString()) ??
-                      0;
+                          entry['supervisorData']['totalAmount'].toString(),
+                        ) ??
+                        0;
             }
 
             num managerTotal = 0;
@@ -174,9 +202,12 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               if (bill['billAmount'] is num) {
                 managerTotal += bill['billAmount'] as num;
               } else if (bill['billAmount'] is String) {
-                final parsed = double.tryParse(bill['billAmount']
-                    .toString()
-                    .replaceAll(RegExp(r'[^0-9.]'), ''));
+                final parsed = double.tryParse(
+                  bill['billAmount'].toString().replaceAll(
+                    RegExp(r'[^0-9.]'),
+                    '',
+                  ),
+                );
                 if (parsed != null) managerTotal += parsed;
               }
             }
@@ -186,9 +217,12 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               if (bill['billAmount'] is num) {
                 orgTotal += bill['billAmount'] as num;
               } else if (bill['billAmount'] is String) {
-                final parsed = double.tryParse(bill['billAmount']
-                    .toString()
-                    .replaceAll(RegExp(r'[^0-9.]'), ''));
+                final parsed = double.tryParse(
+                  bill['billAmount'].toString().replaceAll(
+                    RegExp(r'[^0-9.]'),
+                    '',
+                  ),
+                );
                 if (parsed != null) orgTotal += parsed;
               }
             }
@@ -199,9 +233,12 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               if (contractor['totalAmount'] is num) {
                 contractorTotal += contractor['totalAmount'] as num;
               } else if (contractor['totalAmount'] is String) {
-                final parsed = double.tryParse(contractor['totalAmount']
-                    .toString()
-                    .replaceAll(RegExp(r'[^0-9.]'), ''));
+                final parsed = double.tryParse(
+                  contractor['totalAmount'].toString().replaceAll(
+                    RegExp(r'[^0-9.]'),
+                    '',
+                  ),
+                );
                 if (parsed != null) contractorTotal += parsed;
               }
             }
@@ -220,26 +257,40 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('Date: ${entry['date']}',
-                      style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text(
+                    'Date: ${entry['date']}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                   pw.SizedBox(height: 4),
                   if (entry['supervisorData'] != null)
-                    pw.Text('Site Entries Total: Rs. $supervisorTotal',
-                        style: pw.TextStyle(fontSize: 12)),
+                    pw.Text(
+                      'Site Entries Total: Rs. $supervisorTotal',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
                   if ((entry['managerBills'] as List).isNotEmpty)
-                    pw.Text('Manager Expenses Total: Rs. $managerTotal',
-                        style: pw.TextStyle(fontSize: 12)),
+                    pw.Text(
+                      'Manager Expenses Total: Rs. $managerTotal',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
                   if ((entry['orgBills'] as List).isNotEmpty)
-                    pw.Text('Organization Expenses Total: Rs. $orgTotal',
-                        style: pw.TextStyle(fontSize: 12)),
+                    pw.Text(
+                      'Organization Expenses Total: Rs. $orgTotal',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
                   if (contractorEntries.isNotEmpty)
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('Contractor Expenses:',
-                            style: pw.TextStyle(
-                                fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                        pw.Text(
+                          'Contractor Expenses:',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
                         pw.SizedBox(height: 6),
                         ...contractorEntries.map<pw.Widget>((contractor) {
                           final labors =
@@ -258,37 +309,51 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                               crossAxisAlignment: pw.CrossAxisAlignment.start,
                               children: [
                                 pw.Text(
-                                    'Contractor: ${contractor['contractorName'] ?? '-'} | Project: ${contractor['projectField'] ?? '-'}',
-                                    style: pw.TextStyle(
-                                        fontWeight: pw.FontWeight.bold)),
+                                  'Contractor: ${contractor['contractorName'] ?? '-'} | Project: ${contractor['projectField'] ?? '-'}',
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
                                 pw.Text(
-                                    'Food: Rs. ${contractor['food'] ?? 0} | Fuel: Rs. ${contractor['fuel'] ?? 0} | Transport: Rs. ${contractor['transport'] ?? 0}'),
+                                  'Food: Rs. ${contractor['food'] ?? 0} | Fuel: Rs. ${contractor['fuel'] ?? 0} | Transport: Rs. ${contractor['transport'] ?? 0}',
+                                ),
                                 pw.SizedBox(height: 4),
-                                pw.Text('Labours:',
-                                    style: pw.TextStyle(
-                                        fontWeight: pw.FontWeight.bold)),
+                                pw.Text(
+                                  'Labours:',
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
                                 pw.Column(
                                   children: labors.map<pw.Widget>((labour) {
                                     return pw.Text(
-                                        '${labour['type']}: ${labour['count']} x Rs. ${labour['unitSalary']} = Rs. ${labour['amount']}');
-                                  }).toList(),
-                                ),
-                                pw.SizedBox(height: 4),
-                                pw.Text('Materials:',
-                                    style: pw.TextStyle(
-                                        fontWeight: pw.FontWeight.bold)),
-                                pw.Column(
-                                  children:
-                                      materials.map<pw.Widget>((material) {
-                                    return pw.Text(
-                                        '${material['type']}: ${material['quantity']} x Rs. ${material['unitPrice']} = Rs. ${material['amount']}');
+                                      '${labour['type']}: ${labour['count']} x Rs. ${labour['unitSalary']} = Rs. ${labour['amount']}',
+                                    );
                                   }).toList(),
                                 ),
                                 pw.SizedBox(height: 4),
                                 pw.Text(
-                                    'Total Amount: Rs. ${contractor['totalAmount'] ?? 0}',
-                                    style: pw.TextStyle(
-                                        fontWeight: pw.FontWeight.bold)),
+                                  'Materials:',
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
+                                pw.Column(
+                                  children: materials.map<pw.Widget>((
+                                    material,
+                                  ) {
+                                    return pw.Text(
+                                      '${material['type']}: ${material['quantity']} x Rs. ${material['unitPrice']} = Rs. ${material['amount']}',
+                                    );
+                                  }).toList(),
+                                ),
+                                pw.SizedBox(height: 4),
+                                pw.Text(
+                                  'Total Amount: Rs. ${contractor['totalAmount'] ?? 0}',
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
                               ],
                             ),
                           );
@@ -296,29 +361,47 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                       ],
                     ),
                   pw.SizedBox(height: 4),
-                  pw.Text('Total Amount: Rs. $dateTotal',
-                      style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold, fontSize: 13)),
+                  pw.Text(
+                    'Total Amount: Rs. $dateTotal',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             );
           }),
-          pw.Divider(),
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(primaryColor.value),
+              color: pdfPrimaryColor,
               borderRadius: pw.BorderRadius.circular(8),
             ),
-            child: pw.Center(
-              child: pw.Text('Grand Total: Rs. $grandTotal',
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Grand Total:',
                   style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 18,
-                      color: PdfColors.white)),
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 16,
+                    color: PdfColors.white,
+                  ),
+                ),
+                pw.Text(
+                  'Rs. ${grandTotal.toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 18,
+                    color: PdfColors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
     await Printing.layoutPdf(
@@ -333,11 +416,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       appBar: AppBar(
         title: Text(
           'Site Expenses Report',
-          style: TextStyle(
-            
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
         ),
         backgroundColor: primaryColor,
         iconTheme: IconThemeData(color: Colors.white),
@@ -384,21 +463,26 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                     num supervisorTotal = 0;
                     if (entry['supervisorData'] != null &&
                         entry['supervisorData']['totalAmount'] != null) {
-                      supervisorTotal = entry['supervisorData']['totalAmount']
-                              is num
+                      supervisorTotal =
+                          entry['supervisorData']['totalAmount'] is num
                           ? entry['supervisorData']['totalAmount']
-                          : num.tryParse(entry['supervisorData']['totalAmount']
-                                  .toString()) ??
-                              0;
+                          : num.tryParse(
+                                  entry['supervisorData']['totalAmount']
+                                      .toString(),
+                                ) ??
+                                0;
                     }
                     num managerTotal = 0;
                     for (final bill in (entry['managerBills'] ?? [])) {
                       if (bill['billAmount'] is num) {
                         managerTotal += bill['billAmount'] as num;
                       } else if (bill['billAmount'] is String) {
-                        final parsed = double.tryParse(bill['billAmount']
-                            .toString()
-                            .replaceAll(RegExp(r'[^0-9.]'), ''));
+                        final parsed = double.tryParse(
+                          bill['billAmount'].toString().replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          ),
+                        );
                         if (parsed != null) managerTotal += parsed;
                       }
                     }
@@ -407,9 +491,12 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                       if (bill['billAmount'] is num) {
                         orgTotal += bill['billAmount'] as num;
                       } else if (bill['billAmount'] is String) {
-                        final parsed = double.tryParse(bill['billAmount']
-                            .toString()
-                            .replaceAll(RegExp(r'[^0-9.]'), ''));
+                        final parsed = double.tryParse(
+                          bill['billAmount'].toString().replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          ),
+                        );
                         if (parsed != null) orgTotal += parsed;
                       }
                     }
@@ -419,13 +506,17 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                       if (contractor['totalAmount'] is num) {
                         contractorTotal += contractor['totalAmount'] as num;
                       } else if (contractor['totalAmount'] is String) {
-                        final parsed = double.tryParse(contractor['totalAmount']
-                            .toString()
-                            .replaceAll(RegExp(r'[^0-9.]'), ''));
+                        final parsed = double.tryParse(
+                          contractor['totalAmount'].toString().replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          ),
+                        );
                         if (parsed != null) contractorTotal += parsed;
                       }
                     }
-                    num dateTotal = supervisorTotal +
+                    num dateTotal =
+                        supervisorTotal +
                         managerTotal +
                         orgTotal +
                         contractorTotal;
@@ -445,10 +536,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                             ),
                           ],
                           border: Border(
-                            left: BorderSide(
-                              color: primaryColor,
-                              width: 6,
-                            ),
+                            left: BorderSide(color: primaryColor, width: 6),
                           ),
                         ),
                         child: Padding(
@@ -460,7 +548,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: primaryColor,
                                       borderRadius: BorderRadius.circular(20),
@@ -468,7 +558,6 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                                     child: Text(
                                       entry['date'],
                                       style: TextStyle(
-                                        
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
                                       ),
@@ -480,17 +569,25 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                               ),
                               SizedBox(height: 16),
                               _buildSection(
-                                  'Site Entries', entry['supervisorData'],
-                                  isSupervisor: true),
+                                'Site Entries',
+                                entry['supervisorData'],
+                                isSupervisor: true,
+                              ),
                               SizedBox(height: 12),
                               _buildSection(
-                                  'Manager Expenses', entry['managerBills']),
+                                'Manager Expenses',
+                                entry['managerBills'],
+                              ),
                               SizedBox(height: 12),
                               _buildSection(
-                                  'Organization Expenses', entry['orgBills']),
+                                'Organization Expenses',
+                                entry['orgBills'],
+                              ),
                               SizedBox(height: 12),
                               _buildContractorSection(
-                                  'Contractor Expenses', contractorEntries),
+                                'Contractor Expenses',
+                                contractorEntries,
+                              ),
                               SizedBox(height: 16),
                               Align(
                                 alignment: Alignment.centerRight,
@@ -546,7 +643,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 16),
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -658,8 +757,11 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     );
   }
 
-  Widget _buildSection(String title, dynamic data,
-      {bool isSupervisor = false}) {
+  Widget _buildSection(
+    String title,
+    dynamic data, {
+    bool isSupervisor = false,
+  }) {
     if (isSupervisor) {
       if (data == null) {
         return _noDataSection(title);
@@ -679,10 +781,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
           SizedBox(height: 4),
           Text(
             'Total: Rs. $total',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: textColor,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
           ),
         ],
       );
@@ -693,7 +792,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
           total += bill['billAmount'] as num;
         } else if (bill['billAmount'] is String) {
           final parsed = double.tryParse(
-              bill['billAmount'].toString().replaceAll(RegExp(r'[^0-9.]'), ''));
+            bill['billAmount'].toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+          );
           if (parsed != null) total += parsed;
         }
       }
@@ -712,8 +812,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              headingRowColor:
-                  WidgetStateProperty.all(primaryColor.withOpacity(0.1)),
+              headingRowColor: WidgetStateProperty.all(
+                primaryColor.withOpacity(0.1),
+              ),
               columns: [
                 DataColumn(
                   label: Text(
@@ -745,12 +846,14 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                 if (bill['billDate'] != null) {
                   if (bill['billDate'] is String) {
                     try {
-                      billDate = DateFormat('dd-MM-yy')
-                          .format(DateTime.parse(bill['billDate']));
+                      billDate = DateFormat(
+                        'dd-MM-yy',
+                      ).format(DateTime.parse(bill['billDate']));
                     } catch (_) {}
                   } else if (bill['billDate'] is Timestamp) {
-                    billDate = DateFormat('dd-MM-yy')
-                        .format((bill['billDate'] as Timestamp).toDate());
+                    billDate = DateFormat(
+                      'dd-MM-yy',
+                    ).format((bill['billDate'] as Timestamp).toDate());
                   }
                 }
                 return DataRow(
@@ -758,7 +861,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                     DataCell(Text(bill['billNo']?.toString() ?? '-')),
                     DataCell(Text(bill['billVendor']?.toString() ?? '-')),
                     DataCell(
-                        Text('Rs. ${bill['billAmount']?.toString() ?? '-'}')),
+                      Text('Rs. ${bill['billAmount']?.toString() ?? '-'}'),
+                    ),
                     DataCell(Text(billDate)),
                   ],
                 );
@@ -785,7 +889,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   }
 
   Widget _buildContractorSection(
-      String title, List<dynamic> contractorEntries) {
+    String title,
+    List<dynamic> contractorEntries,
+  ) {
     if (contractorEntries.isEmpty) {
       return _noDataSection(title);
     }
@@ -795,7 +901,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         total += c['totalAmount'] as num;
       } else if (c['totalAmount'] is String) {
         final parsed = double.tryParse(
-            c['totalAmount'].toString().replaceAll(RegExp(r'[^0-9.]'), ''));
+          c['totalAmount'].toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+        );
         if (parsed != null) total += parsed;
       }
     }
@@ -813,10 +920,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         SizedBox(height: 4),
         Text(
           'Total: Rs. $total',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: textColor,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
         ),
       ],
     );
@@ -825,10 +929,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   Widget _noDataSection(String title) {
     return Text(
       '$title: No data',
-      style: TextStyle(
-        color: warningColor,
-        fontStyle: FontStyle.italic,
-      ),
+      style: TextStyle(color: warningColor, fontStyle: FontStyle.italic),
     );
   }
 }

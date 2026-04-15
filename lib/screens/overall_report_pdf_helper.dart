@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class OverallReportPdf {
   static Future<Uint8List> build({
@@ -9,8 +11,10 @@ class OverallReportPdf {
     required String site,
     required String month,
     required double overallPercentage,
+    required PdfColor primaryColor,
   }) async {
     final pdf = pw.Document();
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
     final now = DateTime.now();
     final String genAt = DateFormat('dd/MM/yyyy HH:mm').format(now);
     
@@ -21,46 +25,22 @@ class OverallReportPdf {
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape, // Landscape for better table space
+        pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  'OVERALL MONTHLY ATTENDANCE SUMMARY',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blue900,
-                  ),
-                ),
-                pw.Text(
-                  month,
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.grey700,
-                  ),
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(thickness: 2, color: PdfColors.blue900),
-            pw.SizedBox(height: 16),
-          ],
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Overall Attendance Summary',
+          orgDetails: orgDetails,
+          primaryColor: primaryColor,
         ),
         build: (context) => [
           // Report Metadata
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              _buildMetaBox('Project Site', site),
-              _buildMetaBox('Workforce Size', '${workers.length} Workers'),
-              _buildMetaBox('Overall Presence', '${overallPercentage.toStringAsFixed(1)}%'),
-              _buildMetaBox('Generated At', genAt),
+              PdfTemplates.buildMetaBox('Project Site', site, primaryColor),
+              PdfTemplates.buildMetaBox('Workforce Size', '${workers.length} Workers', primaryColor),
+              PdfTemplates.buildMetaBox('Overall Presence', '${overallPercentage.toStringAsFixed(1)}%', primaryColor),
+              PdfTemplates.buildMetaBox('Generated At', genAt, primaryColor),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -90,7 +70,7 @@ class OverallReportPdf {
               ];
             }).toList(),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+            headerDecoration: pw.BoxDecoration(color: primaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
             columnWidths: {
@@ -126,26 +106,14 @@ class OverallReportPdf {
                   style: pw.TextStyle(
                     fontSize: 20,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blue900,
+                    color: primaryColor,
                   ),
                 ),
               ],
             ),
           ),
         ],
-        footer: (context) => pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              'Confidential - Organization Use Only',
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-            ),
-            pw.Text(
-              'Page ${context.pageNumber} of ${context.pagesCount}',
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-            ),
-          ],
-        ),
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
 

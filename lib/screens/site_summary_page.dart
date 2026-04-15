@@ -5,8 +5,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:typed_data';
-import 'package:flutter/services.dart'; // Added for rootBundle
+import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class SiteSummaryPage extends StatefulWidget {
   final String siteId;
@@ -785,6 +787,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     required num grandTotal,
   }) async {
     final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
     final site = project['siteLocation']?.toString() ?? 'N/A';
     final projectName = project['projectName']?.toString() ?? 'N/A';
     final budget = (project['projectBudget'] ?? 0) as num;
@@ -798,118 +802,28 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Site Summary Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
         build: (context) => [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text(
-                'Site Summary Report',
-                style: pw.TextStyle(
-                  fontSize: 22,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(primaryColor.value),
-                ),
-              ),
-              if (logo != null)
-                pw.Image(
-                  logo,
-                  width: 80,
-                  height: 80,
-                ),
+              PdfTemplates.buildMetaBox('Project Name', projectName, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Site Location', site, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Start Date', formatDate(plannedStartDate), pdfPrimaryColor),
             ],
           ),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'Project: $projectName',
-            style: pw.TextStyle(
-              fontSize: 16,
-              fontWeight: pw.FontWeight.bold,
-            ),
-          ),
-          pw.Text('Site Location: $site'),
-          pw.Text('Start Date: ${formatDate(plannedStartDate)}'),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 24),
           pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Expanded(
-                child: pw.Container(
-                  padding: pw.EdgeInsets.all(12),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Budget',
-                        style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey700,
-                        ),
-                      ),
-                      pw.Text(
-                        '₹${NumberFormat('#,##,###').format(budget)}',
-                        style: pw.TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              pw.SizedBox(width: 12),
-              pw.Expanded(
-                child: pw.Container(
-                  padding: pw.EdgeInsets.all(12),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Amount Spent',
-                        style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey700,
-                        ),
-                      ),
-                      pw.Text(
-                        '₹${NumberFormat('#,##,###').format(amountSpent)}',
-                        style: pw.TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              pw.SizedBox(width: 12),
-              pw.Expanded(
-                child: pw.Container(
-                  padding: pw.EdgeInsets.all(12),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Current Status',
-                        style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey700,
-                        ),
-                      ),
-                      pw.Text(
-                        currentStatus,
-                        style: pw.TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              PdfTemplates.buildMetaBox('Budget', '₹${NumberFormat('#,##,###').format(budget)}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Amount Spent', '₹${NumberFormat('#,##,###').format(amountSpent)}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Current Status', currentStatus, pdfPrimaryColor),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -1110,10 +1024,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           ),
           pw.SizedBox(height: 24),
           pw.Container(
-            padding: pw.EdgeInsets.all(16),
+            padding: const pw.EdgeInsets.all(16),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(primaryColor.value),
-              border: pw.Border.all(color: PdfColor.fromInt(primaryColor.value)),
+              color: pdfPrimaryColor,
               borderRadius: pw.BorderRadius.circular(8),
             ),
             child: pw.Row(
@@ -1124,7 +1037,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                   style: pw.TextStyle(
                     fontSize: 16,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(primaryColor.value),
+                    color: PdfColors.white,
                   ),
                 ),
                 pw.Text(
@@ -1132,21 +1045,14 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(primaryColor.value),
+                    color: PdfColors.white,
                   ),
                 ),
               ],
             ),
           ),
-          pw.SizedBox(height: 16),
-          pw.Text(
-            'Generated on ${dateFormat.format(DateTime.now())}',
-            style: pw.TextStyle(
-              fontSize: 10,
-              color: PdfColors.grey600,
-            ),
-          ),
         ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
     return pdf.save();
