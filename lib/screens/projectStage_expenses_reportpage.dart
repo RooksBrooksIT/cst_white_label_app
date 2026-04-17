@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import '../utils/project_stage_pdf_helper.dart';
+import './pdf_preview_page.dart';
 
 class ProjectStageExpensesReportPage extends StatefulWidget {
   final String siteId;
@@ -22,10 +25,12 @@ class ProjectStageExpensesReportPage extends StatefulWidget {
   });
 
   @override
-  State<ProjectStageExpensesReportPage> createState() => _ProjectStageExpensesReportPageState();
+  State<ProjectStageExpensesReportPage> createState() =>
+      _ProjectStageExpensesReportPageState();
 }
 
-class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesReportPage> {
+class _ProjectStageExpensesReportPageState
+    extends State<ProjectStageExpensesReportPage> {
   double supervisorTotal = 0;
   double managerTotal = 0;
   double organizationTotal = 0;
@@ -41,7 +46,7 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
 
   Future<void> _loadReport() async {
     setState(() => isLoading = true);
-    
+
     final results = await Future.wait([
       _fetchTotal('siteSupervisorEntries', 'date', 'totalAmount'),
       _fetchTotal('managerEntries', 'entryDate', 'totalAmount'),
@@ -60,22 +65,30 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
     });
   }
 
-  Future<double> _fetchTotal(String collection, String dateField, String amountField) async {
+  Future<double> _fetchTotal(
+    String collection,
+    String dateField,
+    String amountField,
+  ) async {
     double total = 0;
     final snap = await FirestoreService.getCollection(collection)
         .where('siteId', isEqualTo: widget.siteId)
         .where('projectStage', isEqualTo: widget.projectStage)
         .get();
-    
+
     for (var doc in snap.docs) {
       final data = doc.data();
       DateTime? entryDate;
       final rawDate = data[dateField];
-      if (rawDate is Timestamp) entryDate = rawDate.toDate();
-      else if (rawDate is String) entryDate = DateTime.tryParse(rawDate);
-      
-      if (entryDate != null && 
-          entryDate.isAfter(widget.fromDate.subtract(const Duration(days: 1))) && 
+      if (rawDate is Timestamp)
+        entryDate = rawDate.toDate();
+      else if (rawDate is String)
+        entryDate = DateTime.tryParse(rawDate);
+
+      if (entryDate != null &&
+          entryDate.isAfter(
+            widget.fromDate.subtract(const Duration(days: 1)),
+          ) &&
           entryDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
         total += _toDouble(data[amountField]);
       }
@@ -93,25 +106,37 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
-    final grandTotal = supervisorTotal + managerTotal + organizationTotal + contractorTotal + incentiveTotal;
+    final grandTotal =
+        supervisorTotal +
+        managerTotal +
+        organizationTotal +
+        contractorTotal +
+        incentiveTotal;
 
     return GlassScaffold(
       title: 'Stage Expense Analysis',
-      body: isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(theme),
-                const SizedBox(height: 24),
-                _buildFinanceSummary(theme),
-                const SizedBox(height: 24),
-                _buildBreakdownSection(theme),
-              ],
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          tooltip: 'Export PDF',
+          onPressed: isLoading ? null : _generatePdf,
+        ),
+      ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(theme),
+                  const SizedBox(height: 24),
+                  _buildFinanceSummary(theme),
+                  const SizedBox(height: 24),
+                  _buildBreakdownSection(theme),
+                ],
+              ),
             ),
-          ),
     );
   }
 
@@ -124,26 +149,54 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
             children: [
               Icon(Icons.layers_outlined, color: theme.primaryColor),
               const SizedBox(width: 12),
-              Text(widget.projectStage, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                widget.projectStage,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text('Period: ${DateFormat('dd MMM').format(widget.fromDate)} - ${DateFormat('dd MMM yyyy').format(widget.toDate)}', 
-               style: theme.textTheme.bodySmall),
+          Text(
+            'Period: ${DateFormat('dd MMM').format(widget.fromDate)} - ${DateFormat('dd MMM yyyy').format(widget.toDate)}',
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
     );
   }
 
   Widget _buildFinanceSummary(ThemeData theme) {
-    final grandTotal = supervisorTotal + managerTotal + organizationTotal + contractorTotal + incentiveTotal;
+    final grandTotal =
+        supervisorTotal +
+        managerTotal +
+        organizationTotal +
+        contractorTotal +
+        incentiveTotal;
     return GlassCard(
       color: theme.primaryColor,
       child: Column(
         children: [
-          const Text('TOTAL EXPENDITURE', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const Text(
+            'TOTAL EXPENDITURE',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('₹ ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+          Text(
+            '₹ ${grandTotal.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -153,18 +206,55 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('EXPENSE BREAKDOWN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+        const Text(
+          'EXPENSE BREAKDOWN',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 12),
-        _expenseItem('Supervisor Expenses', supervisorTotal, Icons.engineering_outlined, theme),
-        _expenseItem('Manager Expenses', managerTotal, Icons.manage_accounts_outlined, theme),
-        _expenseItem('Organization Expenses', organizationTotal, Icons.business_outlined, theme),
-        _expenseItem('Contractor Expenses', contractorTotal, Icons.construction_outlined, theme),
-        _expenseItem('Incentives', incentiveTotal, Icons.emoji_events_outlined, theme),
+        _expenseItem(
+          'Supervisor Expenses',
+          supervisorTotal,
+          Icons.engineering_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Manager Expenses',
+          managerTotal,
+          Icons.manage_accounts_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Organization Expenses',
+          organizationTotal,
+          Icons.business_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Contractor Expenses',
+          contractorTotal,
+          Icons.construction_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Incentives',
+          incentiveTotal,
+          Icons.emoji_events_outlined,
+          theme,
+        ),
       ],
     );
   }
 
-  Widget _expenseItem(String label, double amount, IconData icon, ThemeData theme) {
+  Widget _expenseItem(
+    String label,
+    double amount,
+    IconData icon,
+    ThemeData theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
@@ -173,11 +263,55 @@ class _ProjectStageExpensesReportPageState extends State<ProjectStageExpensesRep
           children: [
             Icon(icon, color: theme.primaryColor, size: 20),
             const SizedBox(width: 16),
-            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500))),
-            Text('₹ ${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Text(
+              '₹ ${amount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _generatePdf() async {
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.value,
+    );
+    try {
+      final pdfBytes = await ProjectStagePdfHelper.buildExpenseRangeReport(
+        siteId: widget.siteId,
+        projectStage: widget.projectStage,
+        fromDate: widget.fromDate,
+        toDate: widget.toDate,
+        supervisorTotal: supervisorTotal,
+        managerTotal: managerTotal,
+        organizationTotal: organizationTotal,
+        contractorTotal: contractorTotal,
+        incentiveTotal: incentiveTotal,
+        primaryColor: pdfPrimaryColor,
+      );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewPage(
+            pdfBytes: pdfBytes,
+            fileName:
+                'ExpenseRange_${widget.siteId}_${DateFormat('ddMMyyyy').format(widget.fromDate)}_${DateFormat('ddMMyyyy').format(widget.toDate)}.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate PDF: $e')),
+      );
+    }
   }
 }

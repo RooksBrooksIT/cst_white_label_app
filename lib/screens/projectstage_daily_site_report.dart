@@ -3,14 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
-import '../utils/pdf_templates.dart';
-import '../utils/app_theme.dart';
+import '../utils/project_stage_pdf_helper.dart';
+import './pdf_preview_page.dart';
 
 class ProjectStageDailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
@@ -27,10 +25,12 @@ class ProjectStageDailySiteExpensesReportPage extends StatefulWidget {
   });
 
   @override
-  State<ProjectStageDailySiteExpensesReportPage> createState() => _ProjectStageDailySiteExpensesReportPageState();
+  State<ProjectStageDailySiteExpensesReportPage> createState() =>
+      _ProjectStageDailySiteExpensesReportPageState();
 }
 
-class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDailySiteExpensesReportPage> {
+class _ProjectStageDailySiteExpensesReportPageState
+    extends State<ProjectStageDailySiteExpensesReportPage> {
   bool isLoading = true;
   Map<String, dynamic>? supervisorData;
   double grandTotal = 0;
@@ -49,7 +49,9 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
   Future<void> _loadReport() async {
     setState(() => isLoading = true);
     try {
-      final doc = await FirestoreService.getCollection('siteSupervisorEntries').doc(_documentId).get();
+      final doc = await FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).doc(_documentId).get();
       if (doc.exists) {
         supervisorData = doc.data() as Map<String, dynamic>?;
         grandTotal = _toNum(supervisorData?['totalAmount']);
@@ -74,11 +76,14 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
     return GlassScaffold(
       title: 'Daily Site Report',
       actions: [
-        IconButton(icon: const Icon(Icons.picture_as_pdf_outlined), onPressed: _generatePdf),
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          onPressed: _generatePdf,
+        ),
       ],
-      body: isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : (supervisorData == null)
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : (supervisorData == null)
           ? _buildEmptyState(theme)
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -101,9 +106,16 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.withOpacity(0.5)),
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 64,
+            color: Colors.grey.withOpacity(0.5),
+          ),
           const SizedBox(height: 16),
-          const Text('No records found for this date', style: TextStyle(color: Colors.grey)),
+          const Text(
+            'No records found for this date',
+            style: TextStyle(color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -114,11 +126,24 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('DAILY SUMMARY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+          const Text(
+            'DAILY SUMMARY',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 12),
-          Text(DateFormat('EEEE, dd MMMM yyyy').format(widget.date), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            DateFormat('EEEE, dd MMMM yyyy').format(widget.date),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text('Stage: ${widget.projectStage}', style: theme.textTheme.bodySmall),
+          Text(
+            'Stage: ${widget.projectStage}',
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -129,9 +154,24 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
       color: theme.primaryColor,
       child: Column(
         children: [
-          const Text('TOTAL EXPENSES', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const Text(
+            'TOTAL EXPENSES',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('₹ ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+          Text(
+            '₹ ${grandTotal.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -141,11 +181,33 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('CATEGORIES', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+        const Text(
+          'CATEGORIES',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 12),
-        _categoryItem('Material Costs', _calculateMaterials(), Icons.shopping_bag_outlined, theme),
-        _categoryItem('Labour Charges', _calculateLabours(), Icons.people_outline, theme),
-        _categoryItem('Site Expenses', _calculateMisc(), Icons.miscellaneous_services_outlined, theme),
+        _categoryItem(
+          'Material Costs',
+          _calculateMaterials(),
+          Icons.shopping_bag_outlined,
+          theme,
+        ),
+        _categoryItem(
+          'Labour Charges',
+          _calculateLabours(),
+          Icons.people_outline,
+          theme,
+        ),
+        _categoryItem(
+          'Site Expenses',
+          _calculateMisc(),
+          Icons.miscellaneous_services_outlined,
+          theme,
+        ),
       ],
     );
   }
@@ -167,10 +229,17 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
   }
 
   double _calculateMisc() {
-    return _toNum(supervisorData?['food']) + _toNum(supervisorData?['fuel']) + _toNum(supervisorData?['transport']);
+    return _toNum(supervisorData?['food']) +
+        _toNum(supervisorData?['fuel']) +
+        _toNum(supervisorData?['transport']);
   }
 
-  Widget _categoryItem(String label, double amount, IconData icon, ThemeData theme) {
+  Widget _categoryItem(
+    String label,
+    double amount,
+    IconData icon,
+    ThemeData theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
@@ -179,8 +248,16 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
           children: [
             Icon(icon, color: theme.primaryColor, size: 20),
             const SizedBox(width: 16),
-            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500))),
-            Text('₹ ${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Text(
+              '₹ ${amount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
@@ -188,104 +265,36 @@ class _ProjectStageDailySiteExpensesReportPageState extends State<ProjectStageDa
   }
 
   Future<void> _generatePdf() async {
-    final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
-    final orgDetails = await PdfTemplates.fetchOrgDetails();
-    final dateFormat = DateFormat('dd MMM yyyy');
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        header: (context) => PdfTemplates.buildHeader(
-          reportTitle: 'Daily Project Report',
-          orgDetails: orgDetails,
-          primaryColor: pdfPrimaryColor,
-        ),
-        build: (pw.Context context) => [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              PdfTemplates.buildMetaBox('Site ID', widget.siteId ?? 'N/A', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Date', dateFormat.format(widget.date), pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Stage', widget.projectStage, pdfPrimaryColor),
-            ],
-          ),
-          pw.SizedBox(height: 24),
-
-          // Materials Table
-          if (supervisorData?['materials'] != null && (supervisorData!['materials'] as List).isNotEmpty) ...[
-            pw.Text('Materials Detailed Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-            pw.SizedBox(height: 8),
-            pw.Table.fromTextArray(
-              headers: ['Material', 'Quantity', 'Amount'],
-              data: (supervisorData!['materials'] as List).map((m) => [
-                m['materialName']?.toString() ?? 'N/A',
-                m['quantity']?.toString() ?? '0',
-                '₹ ${_toNum(m['amount']).toStringAsFixed(2)}',
-              ]).toList(),
-              headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
-              cellAlignment: pw.Alignment.centerLeft,
-              oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
-            ),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Labours Table
-          if (supervisorData?['labours'] != null && (supervisorData!['labours'] as List).isNotEmpty) ...[
-            pw.Text('Labour Detailed Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-            pw.SizedBox(height: 8),
-            pw.Table.fromTextArray(
-              headers: ['Labour Type', 'Count', 'Amount'],
-              data: (supervisorData!['labours'] as List).map((l) => [
-                l['labourType']?.toString() ?? 'N/A',
-                l['labourCount']?.toString() ?? '0',
-                '₹ ${_toNum(l['amount']).toStringAsFixed(2)}',
-              ]).toList(),
-              headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
-              cellAlignment: pw.Alignment.centerLeft,
-              oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
-            ),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Other Expenses
-          pw.Text('Other Expenses Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-          pw.SizedBox(height: 8),
-          pw.Table.fromTextArray(
-            headers: ['Category', 'Amount'],
-            data: [
-              ['Food / Mess', '₹ ${_toNum(supervisorData?['food']).toStringAsFixed(2)}'],
-              ['Fuel / Transport', '₹ ${_toNum(supervisorData?['fuel']).toStringAsFixed(2)}'],
-              ['Transport / Travel', '₹ ${_toNum(supervisorData?['transport']).toStringAsFixed(2)}'],
-            ],
-            headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
-            cellAlignment: pw.Alignment.centerLeft,
-          ),
-          pw.SizedBox(height: 32),
-
-          // Grand Total
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: pdfPrimaryColor,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('GRAND TOTAL', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 16)),
-                pw.Text('₹ ${grandTotal.toStringAsFixed(2)}', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 18)),
-              ],
-            ),
-          ),
-        ],
-        footer: (context) => PdfTemplates.buildFooter(context),
-      ),
+    if (supervisorData == null) return;
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.value,
     );
-    await Printing.layoutPdf(onLayout: (f) => pdf.save());
+    try {
+      final pdfBytes = await ProjectStagePdfHelper.buildDailyReport(
+        siteId: widget.siteId ?? 'N/A',
+        supervisorId: widget.supervisorId,
+        date: widget.date,
+        projectStage: widget.projectStage,
+        supervisorData: supervisorData,
+        grandTotal: grandTotal,
+        primaryColor: pdfPrimaryColor,
+      );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewPage(
+            pdfBytes: pdfBytes,
+            fileName:
+                'DailyReport_${widget.siteId}_${DateFormat('ddMMyyyy').format(widget.date)}.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate PDF: $e')),
+      );
+    }
   }
 }

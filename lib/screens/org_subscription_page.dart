@@ -36,15 +36,20 @@ class _OrganizationSubscriptionPageState
         final data = doc.data()!;
         setState(() {
           _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Unknown');
-          _isActive = data['isSubscriptionActive'] ?? false;
-          _status = _isActive ? 'Active' : 'Inactive';
-
-          final expiry = data['subscriptionEndDate'];
-          if (expiry is Timestamp) {
+          
+          final isActiveField = data['isSubscriptionActive'] as bool? ?? false;
+          final expiry = data['subscriptionEndDate'] as Timestamp?;
+          
+          bool isExpired = false;
+          if (expiry != null) {
+            isExpired = DateTime.now().isAfter(expiry.toDate());
             _expiryDate = DateFormat('dd MMM yyyy').format(expiry.toDate());
           } else {
             _expiryDate = 'Lifetime';
           }
+
+          _isActive = isActiveField && !isExpired;
+          _status = _isActive ? 'Active' : 'Inactive';
           _isLoading = false;
         });
       }
@@ -63,8 +68,12 @@ class _OrganizationSubscriptionPageState
 
   String _formatPlanName(String raw) {
     return raw
-        .split('_')
-        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map(
+          (word) =>
+              word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1),
+        )
         .join(' ');
   }
 
@@ -74,23 +83,26 @@ class _OrganizationSubscriptionPageState
     final colorScheme = theme.colorScheme;
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Manage Subscription',
-      onBack: () => Navigator.pop(context),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildCurrentPlanCard(theme, colorScheme),
-                  const SizedBox(height: 24),
-                  _buildPlanDetailsSection(theme),
-                  const SizedBox(height: 32),
-                  _buildSupportSection(theme, colorScheme),
-                ],
+    return PopScope(
+      canPop: _isActive,
+      child: GlassScaffold(
+        title: 'Manage Subscription',
+        onBack: _isActive ? () => Navigator.pop(context) : null,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildCurrentPlanCard(theme, colorScheme),
+                    const SizedBox(height: 24),
+                    _buildPlanDetailsSection(theme),
+                    const SizedBox(height: 32),
+                    _buildSupportSection(theme, colorScheme),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

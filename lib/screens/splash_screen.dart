@@ -8,6 +8,7 @@ import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
+import 'package:demo_cst/screens/org_subscription_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -78,12 +79,22 @@ class _SplashScreenState extends State<SplashScreen>
           final data = auth.userData;
           switch (auth.userRole) {
             case UserRole.organization:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrganizationDashboard(),
-                ),
-              );
+              final isSubscriptionValid = await auth.checkSubscriptionStatus();
+              if (isSubscriptionValid) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrganizationDashboard(),
+                  ),
+                );
+              } else {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrganizationSubscriptionPage(),
+                  ),
+                );
+              }
               break;
             case UserRole.manager:
               Navigator.pushReplacement(

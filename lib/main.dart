@@ -20,9 +20,7 @@ import 'package:demo_cst/screens/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding_edit_screen.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
 
-/// Global navigator key — used by NotificationService to show foreground banners.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
