@@ -326,8 +326,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 children: [
                   _buildWelcomeSection(context),
                   const SizedBox(height: 28),
-                  _buildQuickStats(context),
-                  const SizedBox(height: 32),
+                  // _buildQuickStats(context),
+                  // const SizedBox(height: 32),
                   _buildDashboardSections(context),
                 ],
               ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
@@ -33,9 +33,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   }
 
   Future<void> _fetchSiteSupervisorData() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
-        .get();
+    final snapshot = await FirestoreService.siteSupervisorEntries.get();
     final siteIds = <String>{};
     final siteSupervisors = <String, String>{};
     final siteProjectStages = <String, Set<String>>{};
@@ -126,27 +124,40 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                       ? (_siteSupervisors[newValue] ?? '')
                                       : '';
                                   _filteredProjectStages = newValue != null
-                                      ? _siteProjectStages[newValue]?.toList() ?? []
+                                      ? _siteProjectStages[newValue]
+                                                ?.toList() ??
+                                            []
                                       : [];
                                   _selectedProjectStage = null;
                                 });
                               },
-                              validator: (value) => value == null ? 'Please select Site ID' : null,
+                              validator: (value) => value == null
+                                  ? 'Please select Site ID'
+                                  : null,
                             ),
                             const SizedBox(height: 20),
                             TextFormField(
                               decoration: InputDecoration(
                                 labelText: 'Supervisor Name',
-                                prefixIcon: Icon(Icons.person_outline, color: colorScheme.primary),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                prefixIcon: Icon(
+                                  Icons.person_outline,
+                                  color: colorScheme.primary,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: theme.dividerColor),
+                                  borderSide: BorderSide(
+                                    color: theme.dividerColor,
+                                  ),
                                 ),
                                 filled: true,
                                 fillColor: theme.cardColor,
                               ),
-                              controller: TextEditingController(text: _supervisorName),
+                              controller: TextEditingController(
+                                text: _supervisorName,
+                              ),
                               readOnly: true,
                             ),
                             const SizedBox(height: 20),
@@ -159,7 +170,9 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                   _selectedProjectStage = newValue;
                                 });
                               },
-                              validator: (value) => value == null ? 'Please select Project Stage' : null,
+                              validator: (value) => value == null
+                                  ? 'Please select Project Stage'
+                                  : null,
                             ),
                             const SizedBox(height: 32),
                             GlassButton(
@@ -183,11 +196,17 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.1),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: colorScheme.primary, size: 24),
+                        Icon(
+                          Icons.info_outline,
+                          color: colorScheme.primary,
+                          size: 24,
+                        ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
@@ -216,7 +235,8 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
-      value: value,
+      value: (value != null && items.contains(value)) ? value : null,
+      isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(Icons.list_alt, color: colorScheme.primary),
@@ -228,14 +248,13 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         filled: true,
         fillColor: theme.cardColor,
       ),
+      style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface),
       items: items.map((String value) {
-        return DropdownMenuItem<String>(
-          value: value,
-          child: Text(value),
-        );
+        return DropdownMenuItem<String>(value: value, child: Text(value));
       }).toList(),
       onChanged: onChanged,
       validator: validator,
+      hint: Text('Select $label'),
     );
   }
 
