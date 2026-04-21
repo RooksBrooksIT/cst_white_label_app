@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'config_account_dashboard.dart';
 import 'org_site_payment_screen.dart';
 import 'incentive_calculation.dart';
@@ -34,12 +37,15 @@ class OrganizationDashboard extends StatefulWidget {
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0.0;
+  StreamSubscription<DocumentSnapshot>? _subscriptionListener;
 
   DateTime? _lastBackPressTime;
 
   @override
   void initState() {
     super.initState();
+    _checkSubscription();
+    _startSubscriptionListener();
     _scrollController.addListener(() {
       setState(() {
         _scrollOffset = _scrollController.offset;
@@ -47,8 +53,47 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     });
   }
 
+  void _startSubscriptionListener() {
+    _subscriptionListener = FirestoreService.subscriptionDoc.snapshots().listen(
+      (snapshot) {
+        if (snapshot.exists && mounted) {
+          final data = snapshot.data()!;
+          final isActive = data['isSubscriptionActive'] as bool? ?? false;
+          final endDate = data['subscriptionEndDate'] as Timestamp?;
+
+          bool isExpired = false;
+          if (endDate != null) {
+            isExpired = DateTime.now().isAfter(endDate.toDate());
+          }
+
+          if (!isActive || isExpired) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizationSubscriptionPage(),
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  Future<void> _checkSubscription() async {
+    final isValid = await AuthService().checkSubscriptionStatus();
+    if (!isValid && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const OrganizationSubscriptionPage(),
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _subscriptionListener?.cancel();
     _scrollController.dispose();
     super.dispose();
   }

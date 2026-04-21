@@ -38,8 +38,8 @@ class SupervisorEntry {
       siteName: data['siteName'],
       date: data['date'] != null
           ? (data['date'] is Timestamp
-              ? (data['date'] as Timestamp).toDate()
-              : DateTime.tryParse(data['date'].toString()))
+                ? (data['date'] as Timestamp).toDate()
+                : DateTime.tryParse(data['date'].toString()))
           : null,
       amount: data['amount'],
       totalamount: data['totalamount'],
@@ -86,18 +86,15 @@ class SiteSupervisorMapEntry {
 }
 
 Future<List<SiteSupervisorMapEntry>> fetchAllSiteSupervisorMapEntries() async {
-  final snapshot =
-      await FirestoreService.getCollection('siteSupervisorMap').get();
+  final snapshot = await FirestoreService.getCollection(
+    'siteSupervisorMap',
+  ).get();
   return snapshot.docs
       .map((doc) => SiteSupervisorMapEntry.fromFirestore(doc))
       .toList();
 }
 
-enum ReportType {
-  dailyExpense,
-  expenseRange,
-  siteSummary,
-}
+enum ReportType { dailyExpense, expenseRange, siteSummary }
 
 class ProjectstageInsightsDashboard extends StatefulWidget {
   const ProjectstageInsightsDashboard({super.key});
@@ -167,9 +164,9 @@ class _ProjectstageInsightsDashboardState
       Set<String> stageSet = {};
 
       final futures = collections.map((collection) async {
-        final snapshot = await FirestoreService.getCollection(collection)
-            .where('siteId', isEqualTo: siteId)
-            .get();
+        final snapshot = await FirestoreService.getCollection(
+          collection,
+        ).where('siteId', isEqualTo: siteId).get();
         for (var doc in snapshot.docs) {
           if (doc.data().containsKey('projectStage')) {
             final stage = doc['projectStage'];
@@ -184,8 +181,9 @@ class _ProjectstageInsightsDashboardState
 
       setState(() {
         projectStages = stageSet.toList();
-        selectedProjectStage =
-            projectStages.isNotEmpty ? projectStages.first : null;
+        selectedProjectStage = projectStages.isNotEmpty
+            ? projectStages.first
+            : null;
 
         _updateSelectedSupervisorEntry();
       });
@@ -200,8 +198,9 @@ class _ProjectstageInsightsDashboardState
   }
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
-    final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries')
-        .get();
+    final querySnapshot = await FirestoreService.getCollection(
+      'siteSupervisorEntries',
+    ).get();
     final entries = querySnapshot.docs
         .map((doc) => SupervisorEntry.fromFirestore(doc))
         .toList();
@@ -219,18 +218,20 @@ class _ProjectstageInsightsDashboardState
     final entriesForSite = siteSupervisorEntries.isNotEmpty
         ? siteSupervisorEntries
         : _allSupervisorEntriesCached!
-            .where((e) => e.siteId == selectedSiteId)
-            .toList();
+              .where((e) => e.siteId == selectedSiteId)
+              .toList();
 
     if (selectedProjectStage == null) {
-      selectedSupervisorEntry =
-          entriesForSite.isNotEmpty ? entriesForSite.first : null;
+      selectedSupervisorEntry = entriesForSite.isNotEmpty
+          ? entriesForSite.first
+          : null;
     } else {
       final filteredEntries = entriesForSite
           .where((entry) => entry.projectStage == selectedProjectStage)
           .toList();
-      selectedSupervisorEntry =
-          filteredEntries.isNotEmpty ? filteredEntries.first : null;
+      selectedSupervisorEntry = filteredEntries.isNotEmpty
+          ? filteredEntries.first
+          : null;
     }
   }
 
@@ -458,7 +459,10 @@ class _ProjectstageInsightsDashboardState
                             value: siteId,
                             child: Text(
                               siteId,
-                              style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -476,7 +480,10 @@ class _ProjectstageInsightsDashboardState
                         borderRadius: BorderRadius.circular(8),
                         elevation: 2,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: theme.primaryColor),
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.primaryColor,
+                        ),
                         dropdownColor: theme.cardColor,
                       ),
                       if (selectedSupervisorEntry?.siteName != null &&
@@ -517,7 +524,10 @@ class _ProjectstageInsightsDashboardState
                             value: stage,
                             child: Text(
                               stage,
-                              style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -531,9 +541,12 @@ class _ProjectstageInsightsDashboardState
                         borderRadius: BorderRadius.circular(8),
                         elevation: 2,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: theme.primaryColor),
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.primaryColor,
+                        ),
                         dropdownColor: theme.cardColor,
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -621,14 +634,20 @@ class _ProjectstageInsightsDashboardState
                 GlassCard(
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: theme.primaryColor, size: 20),
+                      Icon(
+                        Icons.info_outline,
+                        color: theme.primaryColor,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Select a site and project stage to generate detailed reports',
                           style: TextStyle(
                             fontSize: 14,
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                         ),
                       ),
@@ -643,22 +662,33 @@ class _ProjectstageInsightsDashboardState
     );
   }
 
-  void _handleGenerateReport(ThemeData theme, List<SupervisorEntry> supervisorEntries) {
+  void _handleGenerateReport(
+    ThemeData theme,
+    List<SupervisorEntry> supervisorEntries,
+  ) {
     if (selectedReportType == ReportType.dailyExpense) {
       if (selectedSiteId == null ||
           selectedSiteId!.isEmpty ||
           selectedDate == null ||
           selectedProjectStage == null ||
           selectedProjectStage!.isEmpty) {
-        _showErrorSnackBar(theme, 'Please select a Site ID, Date, and Project Stage.');
+        _showErrorSnackBar(
+          theme,
+          'Please select a Site ID, Date, and Project Stage.',
+        );
         return;
       }
       final filteredEntries = supervisorEntries.where((entry) {
         final entryDate = entry.date != null
             ? DateTime(entry.date!.year, entry.date!.month, entry.date!.day)
             : null;
-        final selectedDateOnly = DateTime(selectedDate!.year, selectedDate!.month, selectedDate!.day);
-        return (entry.siteId?.trim().toLowerCase() ?? '') == (selectedSiteId?.trim().toLowerCase() ?? '') &&
+        final selectedDateOnly = DateTime(
+          selectedDate!.year,
+          selectedDate!.month,
+          selectedDate!.day,
+        );
+        return (entry.siteId?.trim().toLowerCase() ?? '') ==
+                (selectedSiteId?.trim().toLowerCase() ?? '') &&
             (entry.projectStage == selectedProjectStage) &&
             (entryDate == selectedDateOnly);
       }).toList();
@@ -676,7 +706,10 @@ class _ProjectstageInsightsDashboardState
           toDate == null ||
           selectedProjectStage == null ||
           selectedProjectStage!.isEmpty) {
-        _showErrorSnackBar(theme, 'Please select a Site ID, Project Stage, and Date Range.');
+        _showErrorSnackBar(
+          theme,
+          'Please select a Site ID, Project Stage, and Date Range.',
+        );
         return;
       }
       _openReport();
@@ -727,7 +760,9 @@ class _ProjectstageInsightsDashboardState
               ),
               child: Icon(
                 icon,
-                color: isSelected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant,
+                color: isSelected
+                    ? theme.primaryColor
+                    : theme.colorScheme.onSurfaceVariant,
                 size: 22,
               ),
             ),
@@ -740,8 +775,12 @@ class _ProjectstageInsightsDashboardState
                     title,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected ? theme.primaryColor : theme.colorScheme.onSurface,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
+                      color: isSelected
+                          ? theme.primaryColor
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -792,10 +831,15 @@ class _ProjectstageInsightsDashboardState
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
                   color: theme.colorScheme.surface.withValues(alpha: 0.5),
                 ),
                 child: Row(
@@ -807,12 +851,16 @@ class _ProjectstageInsightsDashboardState
                           : 'Select Date',
                       style: TextStyle(
                         fontSize: 15,
-                        color: date != null 
-                            ? theme.colorScheme.onSurface 
+                        color: date != null
+                            ? theme.colorScheme.onSurface
                             : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    Icon(Icons.calendar_today_outlined, color: theme.primaryColor, size: 20),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      color: theme.primaryColor,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -828,11 +876,15 @@ class _ProjectstageInsightsDashboardState
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

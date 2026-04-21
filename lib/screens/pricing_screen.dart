@@ -110,7 +110,7 @@ class _PricingScreenState extends State<PricingScreen> {
             'organisation/$orgId/admin/subscription',
           ),
           {
-            'subscriptionPlan': '30_days_free_trial',
+            'subscriptionPlan': '30 days',
             'subscriptionStartDate': Timestamp.fromDate(now),
             'subscriptionEndDate': Timestamp.fromDate(endDate),
             'isSubscriptionActive': true,
