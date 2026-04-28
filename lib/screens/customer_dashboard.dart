@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'Customer_insight_dashboard.dart';
 import 'customer_project_details.dart';
 import 'customer_worker_details.dart';
@@ -437,6 +438,26 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Project siteId not found')),
                     );
+                  }
+                },
+              ),
+              _dashboardButton(
+                title: "Privacy Policy",
+                subtitle: "View our privacy policy",
+                icon: Icons.privacy_tip_rounded,
+                color: Colors.blueGrey,
+                onPressed: () async {
+                  final Uri url = Uri.parse(
+                    'https://sites.google.com/view/cst-whitelabel-app/home',
+                  );
+                  if (!await launchUrl(url)) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Could not open privacy policy'),
+                        ),
+                      );
+                    }
                   }
                 },
               ),

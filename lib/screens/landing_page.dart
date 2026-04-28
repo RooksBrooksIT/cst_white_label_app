@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/app_theme.dart';
 import 'migration_screen.dart';
 
 class LandingPage extends StatelessWidget {
@@ -7,230 +8,295 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final primaryColor = colorScheme.primary;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = theme.primaryColor;
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              primaryColor.withOpacity(0.15),
-              primaryColor.withOpacity(0.05),
-              Colors.white,
-              Colors.white,
-            ],
-            stops: const [0.0, 0.3, 0.5, 1.0],
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          // Background Gradient blobs
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.08),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.05),
+              ),
+            ),
+          ),
 
-              // Hero Image
-              GestureDetector(
-                onLongPress: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MigrationScreen(),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 48),
+
+                // Hero Image with modern glass effect
+                GestureDetector(
+                  onLongPress: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MigrationScreen(),
+                      ),
+                    );
+                  },
+                  child: Center(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 240,
+                          height: 240,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.4),
+                                Colors.white.withOpacity(0.1),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.5),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.1),
+                                blurRadius: 40,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Hero(
+                          tag: 'hero_image',
+                          child: Container(
+                            width: 180,
+                            height: 180,
+                            padding: const EdgeInsets.all(24),
+                            child: Image.asset(
+                              'assets/images/construction_hero.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                    Icons.construction_rounded,
+                                    size: 80,
+                                    color: primaryColor.withOpacity(0.5),
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-                child: Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.08),
-                        blurRadius: 40,
-                        spreadRadius: 10,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // Headline & Subtitle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      ValueListenableBuilder<String>(
+                        valueListenable: AppTheme.appName,
+                        builder: (context, name, _) {
+                          return Text(
+                            'Manage Your Projects\nLike a Pro',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.onSurface,
+                              height: 1.1,
+                              letterSpacing: -1.0,
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Plan, track, and manage your construction\nwork seamlessly with professional tools.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                          height: 1.5,
+                        ),
                       ),
                     ],
                   ),
-                  child: ClipOval(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Image.asset(
-                        'assets/images/construction_hero.png',
-                        fit: BoxFit.contain,
+                ),
+
+                const Spacer(),
+
+                // Action Cards Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 32,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildActionTile(
+                        context: context,
+                        label: 'Create Account',
+                        subtitle: 'Register your organization',
+                        icon: Icons.business_center_rounded,
+                        isPrimary: true,
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          '/orgRegistrationForm',
+                        ),
                       ),
-                    ),
-                  ),
-                ), // Close Container
-              ), // Close GestureDetector
-
-              const SizedBox(height: 36),
-
-              // Headline
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: const Text(
-                  'Manage Your Projects\nLike a Pro',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E293B),
-                    height: 1.2,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48),
-                child: const Text(
-                  'Plan, track, and manage your construction\nwork seamlessly.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                    height: 1.5,
+                      const SizedBox(height: 16),
+                      _buildActionTile(
+                        context: context,
+                        label: 'Login',
+                        subtitle: 'Access your dashboard',
+                        icon: Icons.login_rounded,
+                        isPrimary: false,
+                        onTap: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.remove('temp_org_path');
+                          if (context.mounted) {
+                            Navigator.pushNamed(context, '/authSelection');
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _buildActionTile(
+                        context: context,
+                        label: 'Join with Code',
+                        subtitle: 'Join an existing organization',
+                        icon: Icons.qr_code_scanner_rounded,
+                        isPrimary: false,
+                        onTap: () =>
+                            Navigator.pushNamed(context, '/joinByReferral'),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-
-              const Spacer(),
-
-              // Action Buttons
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  children: [
-                    // Create Account - Primary
-                    _buildActionCard(
-                      context: context,
-                      label: 'Create Account →',
-                      icon: Icons.person_add_rounded,
-                      isPrimary: true,
-                      primaryColor: primaryColor,
-                      onTap: () =>
-                          Navigator.pushNamed(context, '/orgRegistrationForm'),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Login
-                    _buildActionCard(
-                      context: context,
-                      label: 'Login to your account',
-                      icon: Icons.login_rounded,
-                      isPrimary: false,
-                      primaryColor: primaryColor,
-                      onTap: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('temp_org_path');
-                        if (context.mounted) {
-                          Navigator.pushNamed(context, '/authSelection');
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Join by Referral
-                    _buildActionCard(
-                      context: context,
-                      label: 'Join using Referral Code',
-                      icon: Icons.qr_code_2_rounded,
-                      isPrimary: false,
-                      primaryColor: primaryColor,
-                      onTap: () =>
-                          Navigator.pushNamed(context, '/joinByReferral'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildActionCard({
+  Widget _buildActionTile({
     required BuildContext context,
     required String label,
+    required String subtitle,
     required IconData icon,
     required bool isPrimary,
-    required Color primaryColor,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(
-            gradient: isPrimary
-                ? LinearGradient(
-                    colors: [primaryColor, primaryColor.withOpacity(0.8)],
-                  )
-                : null,
-            color: isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: isPrimary
-                    ? primaryColor.withOpacity(0.3)
-                    : Colors.black.withOpacity(0.04),
-                blurRadius: isPrimary ? 16 : 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: isPrimary
-                ? null
-                : Border.all(color: const Color(0xFFE2E8F0)),
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isPrimary ? primaryColor : theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isPrimary ? primaryColor : theme.dividerColor.withOpacity(0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPrimary
+                ? primaryColor.withOpacity(0.3)
+                : Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isPrimary
-                      ? Colors.white.withOpacity(0.2)
-                      : primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: isPrimary ? Colors.white : primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isPrimary ? Colors.white : const Color(0xFF334155),
-                    letterSpacing: 0.2,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: isPrimary
+                        ? Colors.white.withOpacity(0.2)
+                        : primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isPrimary ? Colors.white : primaryColor,
+                    size: 24,
                   ),
                 ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: isPrimary
-                    ? Colors.white.withOpacity(0.7)
-                    : const Color(0xFFCBD5E1),
-                size: 24,
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: isPrimary
+                              ? Colors.white
+                              : theme.colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isPrimary
+                              ? Colors.white.withOpacity(0.8)
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: isPrimary
+                      ? Colors.white.withOpacity(0.5)
+                      : theme.dividerColor,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ),

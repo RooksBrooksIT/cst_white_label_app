@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'Supervisor_material_information.dart';
 import 'material_at_site_entry_page.dart';
 import 'material_request_form.dart';
@@ -145,6 +146,23 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           colorScheme.tertiary,
           () {
             _navigate(context, AttendanceManagementPage());
+          },
+        ),
+        DashboardItem(
+          'Privacy Policy',
+          Icons.privacy_tip_rounded,
+          colorScheme.primary,
+          () async {
+            final Uri url = Uri.parse(
+              'https://sites.google.com/view/cst-whitelabel-app/home',
+            );
+            if (!await launchUrl(url)) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not open privacy policy')),
+                );
+              }
+            }
           },
         ),
       ],

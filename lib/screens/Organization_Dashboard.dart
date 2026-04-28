@@ -10,6 +10,7 @@ import 'org_site_payment_screen.dart';
 import 'incentive_calculation.dart';
 import 'insights_dashboard.dart';
 import 'manager_expenses.dart';
+import 'manager_site_entry_page.dart';
 import 'manager_material_approval_screen.dart';
 import 'material_report.dart';
 import 'org_notification_page.dart';
@@ -511,6 +512,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             onTap: () => _navigateToManagerExpenses(context),
           ),
           SubMenuItem(
+            title: "Manager Daily Entry",
+            subtitle: "Log daily project progress and expenses",
+            icon: Icons.edit_note_rounded,
+            color: Colors.deepOrangeAccent,
+            onTap: () => _navigateToManagerDailyEntry(context),
+          ),
+          SubMenuItem(
             title: "Supervisor Expenses",
             subtitle: "Daily field-level operational expenses",
             icon: Icons.engineering_rounded,
@@ -801,6 +809,20 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
+    );
+  }
+
+  void _navigateToManagerDailyEntry(BuildContext context) {
+    final userData = AuthService().userData;
+    final userName = userData['username'] ?? userData['org_name'] ?? 'Admin';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManagerSiteEntryPage(
+          userName: userName,
+          userDetails: userData,
+        ),
+      ),
     );
   }
 

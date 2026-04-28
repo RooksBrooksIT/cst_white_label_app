@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
@@ -12,6 +13,7 @@ import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
+import 'package:demo_cst/screens/manager_site_entry_page.dart';
 import 'package:demo_cst/screens/material_screen.dart';
 import 'package:demo_cst/screens/project_category_screen.dart';
 import 'package:demo_cst/screens/project_contract_screen.dart';
@@ -173,6 +175,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Assign supervisors to sites',
         Colors.redAccent,
       ),
+      DashboardItem(
+        'Manager Daily Site Entry',
+        Icons.edit_note_rounded,
+        Colors.deepOrange,
+        'Log daily site progress and expenses',
+        Colors.deepOrange,
+      ),
     ],
     "Tools & Equipment": [
       DashboardItem(
@@ -294,6 +303,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.blue,
         'Expense tracking',
         Colors.blue,
+      ),
+    ],
+    "Support & Info": [
+      DashboardItem(
+        'Privacy Policy',
+        Icons.privacy_tip_rounded,
+        Colors.blueGrey,
+        'View our privacy policy',
+        Colors.blueGrey,
       ),
     ],
   };
@@ -664,7 +682,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         subtitle: item.subtitle,
         icon: item.icon,
         color: item.color,
-        onTap: () => _navigateToScreen(context, item.title),
+        onTap: () {
+          if (item.title == 'Privacy Policy') {
+            _launchPrivacyPolicy(context);
+          } else {
+            _navigateToScreen(context, item.title);
+          }
+        },
       );
     }).toList();
 
@@ -780,6 +804,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Tools Master': ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
       'Manager Expenses': const ManagerExpensesHomeScreen(),
+      'Manager Daily Site Entry': ManagerSiteEntryPage(
+        userName: _managerName,
+        userDetails: AuthService().userData,
+      ),
       'Layout and Drawings': const LayoutAndDrawingsPage(),
       'Tools Inventory': const ToolsInventoryPage(),
       'Material Master': const ConfigMaterialsScreen(),
@@ -806,6 +834,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     if (screen != null) {
       HapticFeedback.lightImpact();
       Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+    }
+  }
+
+  void _launchPrivacyPolicy(BuildContext context) async {
+    final Uri url = Uri.parse(
+      'https://sites.google.com/view/cst-whitelabel-app/home',
+    );
+    if (!await launchUrl(url)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open privacy policy')),
+        );
+      }
     }
   }
 }
