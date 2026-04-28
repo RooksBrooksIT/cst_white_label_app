@@ -5,6 +5,7 @@ import '../utils/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
@@ -335,6 +336,27 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 builder: (context) => const ContactSupportScreen(),
               ),
             ),
+          ),
+
+          const Divider(color: Color(0xFFF1F5F9), height: 24),
+          _buildSettingsTile(
+            icon: Icons.privacy_tip_rounded,
+            title: 'Privacy Policy',
+            subtitle: 'View our privacy policy',
+            onTap: () async {
+              final Uri url = Uri.parse(
+                'https://sites.google.com/view/cst-whitelabel-app/home',
+              );
+              if (!await launchUrl(url)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not open privacy policy'),
+                    ),
+                  );
+                }
+              }
+            },
           ),
         ],
       ),

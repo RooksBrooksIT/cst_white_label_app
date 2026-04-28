@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
 
 class OrganisationLandingPage extends StatelessWidget {
   const OrganisationLandingPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const textColor = Color(0xFF0F172A);
-    const secondaryTextColor = Color(0xFF64748B);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textColor = colorScheme.onSurface;
+    final secondaryTextColor = colorScheme.onSurfaceVariant;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -18,11 +21,7 @@ class OrganisationLandingPage extends StatelessWidget {
               top: 10,
               left: 10,
               child: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  size: 28,
-                  color: Colors.black,
-                ),
+                icon: Icon(Icons.arrow_back, size: 28, color: textColor),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -41,7 +40,7 @@ class OrganisationLandingPage extends StatelessWidget {
                     decoration: BoxDecoration(
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: theme.primaryColor.withOpacity(0.05),
                           blurRadius: 50,
                           spreadRadius: 10,
                         ),
@@ -50,32 +49,37 @@ class OrganisationLandingPage extends StatelessWidget {
                     child: Image.asset(
                       'assets/images/logo_main.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
+                      errorBuilder: (context, error, stackTrace) => Icon(
                         Icons.business_rounded,
                         size: 100,
-                        color: Colors.grey,
+                        color: theme.primaryColor.withOpacity(0.5),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
 
                   // App Name (Serif style for premium look)
-                  const Text(
-                    'CONSTRUCT PRO',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: 'serif',
-                      color: textColor,
-                      letterSpacing: 0.8,
-                    ),
+                  ValueListenableBuilder<String>(
+                    valueListenable: AppTheme.appName,
+                    builder: (context, name, _) {
+                      return Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'serif',
+                          color: textColor,
+                          letterSpacing: 0.8,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
 
                   // Subtitle
-                  const Text(
+                  Text(
                     'Streamlining Construction Excellence',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -87,7 +91,7 @@ class OrganisationLandingPage extends StatelessWidget {
                   ),
                   const Spacer(flex: 7),
 
-                  // Login Button (Amber/Orange)
+                  // Login Button (Dynamic Primary Color)
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -95,8 +99,8 @@ class OrganisationLandingPage extends StatelessWidget {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/orgLogin'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.black,
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: colorScheme.onPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -114,7 +118,7 @@ class OrganisationLandingPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Register Button (Light Grey with black border)
+                  // Register Button (Surface-based)
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -122,12 +126,17 @@ class OrganisationLandingPage extends StatelessWidget {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/orgRegistrationForm'),
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE5E7EB),
-                        side: const BorderSide(color: Colors.black, width: 1.2),
+                        backgroundColor: colorScheme.surfaceVariant.withOpacity(
+                          0.3,
+                        ),
+                        side: BorderSide(
+                          color: colorScheme.outline,
+                          width: 1.2,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        foregroundColor: Colors.black,
+                        foregroundColor: textColor,
                       ),
                       child: const Text(
                         'REGISTER ORGANIZATION',
@@ -145,21 +154,21 @@ class OrganisationLandingPage extends StatelessWidget {
                   GestureDetector(
                     onTap: () =>
                         Navigator.pushNamed(context, '/joinByReferral'),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.qr_code_scanner_rounded,
                           size: 22,
-                          color: Colors.black87,
+                          color: textColor.withOpacity(0.8),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           'Join using referral code',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: textColor.withOpacity(0.8),
                           ),
                         ),
                       ],
@@ -168,14 +177,14 @@ class OrganisationLandingPage extends StatelessWidget {
                   const Spacer(flex: 3),
 
                   // Version
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
                       'v1.0.0',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
-                        color: Colors.grey,
+                        color: secondaryTextColor.withOpacity(0.5),
                       ),
                     ),
                   ),

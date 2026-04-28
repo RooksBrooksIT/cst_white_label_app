@@ -67,20 +67,22 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
 
   @override
   Widget build(BuildContext context) {
-    const textColor = Color(0xFF0F172A);
-    const secondaryTextColor = Color(0xFF64748B);
-    const primaryColor = Color(0xFFF59E0B);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textColor = colorScheme.onSurface;
+    final secondaryTextColor = colorScheme.onSurfaceVariant;
+    final primaryColor = theme.primaryColor;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textColor),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Join Organization',
           style: TextStyle(
             color: textColor,
@@ -96,13 +98,9 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 20),
-            const Icon(
-              Icons.qr_code_scanner_rounded,
-              size: 80,
-              color: primaryColor,
-            ),
+            Icon(Icons.qr_code_scanner_rounded, size: 80, color: primaryColor),
             const SizedBox(height: 32),
-            const Text(
+            Text(
               'Enter Referral Code',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -112,7 +110,7 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Enter the referral code provided by your organization administrator to join and start configuring your dashboard.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -125,10 +123,11 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
             TextFormField(
               controller: _codeController,
               autofocus: true,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 2.0,
+                color: textColor,
               ),
               textAlign: TextAlign.center,
               decoration: InputDecoration(
@@ -137,15 +136,17 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
                   color: secondaryTextColor.withOpacity(0.3),
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
                 contentPadding: const EdgeInsets.symmetric(vertical: 20),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  borderSide: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.5),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: primaryColor, width: 2),
+                  borderSide: BorderSide(color: primaryColor, width: 2),
                 ),
               ),
               onFieldSubmitted: (_) => _handleJoin(),
@@ -157,14 +158,14 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
                 onPressed: _isLoading ? null : _handleJoin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
-                  foregroundColor: Colors.black,
+                  foregroundColor: colorScheme.onPrimary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.black)
+                    ? CircularProgressIndicator(color: colorScheme.onPrimary)
                     : const Text(
                         'JOIN ORGANIZATION',
                         style: TextStyle(

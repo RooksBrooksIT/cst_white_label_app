@@ -115,18 +115,24 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
       final snapshot = await FirestoreService.siteSupervisorMap.get();
-      siteList = snapshot.docs.map((doc) {
-        final data = doc.data();
-        final sId = data['site']?.toString() ?? '';
-        return {
-          'siteId': sId,
-          'siteName': siteNames[sId] ?? 'Unnamed Site',
-          'supervisor': data['supervisor']?.toString() ?? 'Not Available',
-          'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
-          'location': data['location']?.toString() ?? 'Not Available',
-          'projectStage': data['projectStage']?.toString() ?? 'Not Available',
-        };
-      }).where((site) => site['siteId']!.isNotEmpty).toList();
+      siteList = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final sId = data['site']?.toString() ?? '';
+            return {
+              'siteId': sId,
+              'siteName': siteNames[sId] ?? 'Unnamed Site',
+              'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+              'supervisorId':
+                  (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
+                  'Not Available',
+              'location': data['location']?.toString() ?? 'Not Available',
+              'projectStage':
+                  data['projectStage']?.toString() ?? 'Not Available',
+            };
+          })
+          .where((site) => site['siteId']!.isNotEmpty)
+          .toList();
 
       if (siteList.isNotEmpty) {
         selectedSiteId = siteList.first['siteId'];
@@ -140,7 +146,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   }
 
   void _onSiteSelected(String siteId) {
-    final site = siteList.firstWhere((s) => s['siteId'] == siteId, orElse: () => {});
+    final site = siteList.firstWhere(
+      (s) => s['siteId'] == siteId,
+      orElse: () => {},
+    );
     setState(() {
       selectedSiteId = siteId;
       siteCode = siteId;
@@ -174,7 +183,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           if (priceRaw is num) {
             price = priceRaw;
           } else if (priceRaw is String) {
-            price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            price =
+                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
           prices[name] = price;
         }
@@ -183,7 +193,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial = materialOptions.isNotEmpty ? materialOptions.first : null;
+        selectedMaterial = materialOptions.isNotEmpty
+            ? materialOptions.first
+            : null;
         isLoadingMaterials = false;
       });
     } catch (e) {
@@ -211,7 +223,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           if (salaryRaw is num) {
             salary = salaryRaw;
           } else if (salaryRaw is String) {
-            salary = num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            salary =
+                num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
           salaries[des] = salary;
         }
@@ -355,9 +368,14 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Entry'),
-        content: Text('Total Amount: ₹${_getTotalAmount()}\nAre you sure you want to save?'),
+        content: Text(
+          'Total Amount: ₹${_getTotalAmount()}\nAre you sure you want to save?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -392,12 +410,21 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       "afternoonStatus": afternoonStatusController.text,
     };
     try {
-      await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(docId).set(data);
+      await FirebaseFirestore.instance
+          .collection('siteSupervisorEntries')
+          .doc(docId)
+          .set(data);
       await ExpenseService.updateTotalSiteExpense(siteCode);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved!')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Saved!')));
       _resetForm();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -417,14 +444,20 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         final data = doc.data();
         final rawDate = data['date'];
         DateTime? dt;
-        if (rawDate is String) dt = DateTime.tryParse(rawDate);
-        else if (rawDate is Timestamp) dt = rawDate.toDate();
+        if (rawDate is String)
+          dt = DateTime.tryParse(rawDate);
+        else if (rawDate is Timestamp)
+          dt = rawDate.toDate();
         if (dt != null) entries.add({'docId': doc.id, 'date': dt});
       }
-      entries.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-      
+      entries.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
+      );
+
       if (entries.isEmpty && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No entries found.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No entries found.')));
         return;
       }
 
@@ -436,12 +469,30 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           title: const Text('Select Entry'),
           content: DropdownButtonFormField<String>(
             value: selectedDocId,
-            items: entries.map((e) => DropdownMenuItem(value: e['docId'] as String, child: Text(DateFormat('yyyy-MM-dd').format(e['date'] as DateTime)))).toList(),
+            items: entries
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e['docId'] as String,
+                    child: Text(
+                      DateFormat('yyyy-MM-dd').format(e['date'] as DateTime),
+                    ),
+                  ),
+                )
+                .toList(),
             onChanged: (v) => selectedDocId = v ?? selectedDocId,
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () { Navigator.pop(context); _loadEntryByDocId(selectedDocId); }, child: const Text('Load')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _loadEntryByDocId(selectedDocId);
+              },
+              child: const Text('Load'),
+            ),
           ],
         ),
       );
@@ -452,12 +503,17 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
   Future<void> _loadEntryByDocId(String docId) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(docId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('siteSupervisorEntries')
+          .doc(docId)
+          .get();
       if (!doc.exists) return;
       final data = doc.data()!;
       setState(() {
-        materials = (data['materials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-        labours = (data['labours'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+        materials = (data['materials'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
+        labours = (data['labours'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
         foodCost.text = (data['food'] ?? 0).toString();
         transportCost.text = (data['transport'] ?? 0).toString();
         fuelCost.text = (data['fuel'] ?? 0).toString();
@@ -470,7 +526,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         _selectedUpdateDate = selectedDate;
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load failed: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Load failed: $e')));
     }
   }
 
@@ -478,20 +537,29 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (_updateDocId == null) return;
     setState(() => isSaving = true);
     try {
-      await FirebaseFirestore.instance.collection('siteSupervisorEntries').doc(_updateDocId).update({
-        "materials": materials,
-        "labours": labours,
-        "food": int.tryParse(foodCost.text) ?? 0,
-        "transport": int.tryParse(transportCost.text) ?? 0,
-        "fuel": int.tryParse(fuelCost.text) ?? 0,
-        "morningStatus": morningStatusController.text,
-        "afternoonStatus": afternoonStatusController.text,
-        "totalAmount": _getTotalAmount(),
-      });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updated!')));
+      await FirebaseFirestore.instance
+          .collection('siteSupervisorEntries')
+          .doc(_updateDocId)
+          .update({
+            "materials": materials,
+            "labours": labours,
+            "food": int.tryParse(foodCost.text) ?? 0,
+            "transport": int.tryParse(transportCost.text) ?? 0,
+            "fuel": int.tryParse(fuelCost.text) ?? 0,
+            "morningStatus": morningStatusController.text,
+            "afternoonStatus": afternoonStatusController.text,
+            "totalAmount": _getTotalAmount(),
+          });
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Updated!')));
       _resetForm();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -508,7 +576,13 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           onPressed: () {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => SupervisorDashboard(username: widget.userName, supervisorId: '', supervisorName: '')),
+              MaterialPageRoute(
+                builder: (_) => SupervisorDashboard(
+                  username: widget.userName,
+                  supervisorId: '',
+                  supervisorName: '',
+                ),
+              ),
               (route) => false,
             );
           },
@@ -520,7 +594,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
             padding: const EdgeInsets.all(16.0),
             child: Center(
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 600, minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(
+                  maxWidth: 600,
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -573,53 +650,53 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                                   const EdgeInsets.symmetric(
                                                     horizontal: 8.0,
                                                   ),
-                                              child:
-                                                  DropdownButtonFormField<
-                                                    String
-                                                  >(
-                                                    value: selectedSiteId,
-                                                    isExpanded: true,
-                                                    decoration: InputDecoration(
-                                                      labelText: 'Site ID',
-                                                      labelStyle: TextStyle(
-                                                        color: primaryColor,
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                      border: InputBorder.none,
-                                                      contentPadding: const EdgeInsets.symmetric(
+                                              child: DropdownButtonFormField<String>(
+                                                value: selectedSiteId,
+                                                isExpanded: true,
+                                                decoration: InputDecoration(
+                                                  labelText: 'Site ID',
+                                                  labelStyle: TextStyle(
+                                                    color: primaryColor,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  border: InputBorder.none,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
                                                         vertical: 8,
                                                         horizontal: 10,
                                                       ),
-                                                      isDense: true,
-                                                    ),
-                                                    items: siteList
-                                                        .map(
-                                                          (
-                                                            site,
-                                                          ) => DropdownMenuItem(
-                                                            value:
-                                                                site['siteId'],
-                                                            child: Text(
-                                                              '${site['siteId']} - ${site['siteName']}',
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: const TextStyle(
+                                                  isDense: true,
+                                                ),
+                                                items: siteList
+                                                    .map(
+                                                      (
+                                                        site,
+                                                      ) => DropdownMenuItem(
+                                                        value: site['siteId'],
+                                                        child: Text(
+                                                          '${site['siteId']} - ${site['siteName']}',
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style:
+                                                              const TextStyle(
                                                                 fontSize: 14,
-                                                                color: Colors.black87,
-                                                                fontWeight: FontWeight.w500,
+                                                                color: Colors
+                                                                    .black87,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
                                                               ),
-                                                            ),
-                                                          ),
-                                                        )
-                                                        .toList(),
-                                                    onChanged: (value) {
-                                                      if (value != null) {
-                                                        _onSiteSelected(value);
-                                                      }
-                                                    },
-                                                  ),
+                                                        ),
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                                onChanged: (value) {
+                                                  if (value != null) {
+                                                    _onSiteSelected(value);
+                                                  }
+                                                },
+                                              ),
                                             ),
                                           ),
                                   ),
@@ -1052,9 +1129,17 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             const SizedBox(height: 8),
                             _buildQtyField('Qty', _customMaterialQtyController),
                             const SizedBox(height: 8),
-                            _buildQtyField('Price', _customMaterialPriceController),
+                            _buildQtyField(
+                              'Price',
+                              _customMaterialPriceController,
+                            ),
                             const SizedBox(height: 8),
-                            GlassButton(label: 'ADD CUSTOM', icon: Icons.check, onPressed: _addCustomMaterial, isSecondary: true),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomMaterial,
+                              isSecondary: true,
+                            ),
                           ],
                         ),
                       ),
@@ -1069,21 +1154,58 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
                                   value: selectedLabour,
-                                  decoration: const InputDecoration(labelText: 'Select Labour', border: OutlineInputBorder()),
-                                  items: labourOptions.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                                  onChanged: (v) => setState(() => selectedLabour = v),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Select Labour',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: labourOptions
+                                      .map(
+                                        (l) => DropdownMenuItem(
+                                          value: l,
+                                          child: Text(l),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => selectedLabour = v),
                                 ),
                           const SizedBox(height: 12),
                           _buildQtyField('Count', labourQtyController),
                           const SizedBox(height: 12),
-                          GlassButton(label: 'ADD LABOUR', icon: Icons.person_add, onPressed: _addLabour, isSecondary: true),
-                          TextButton(onPressed: () => setState(() => _showCustomLabourFields = !_showCustomLabourFields), child: Text(_showCustomLabourFields ? 'Hide Custom' : 'Add Custom Labour')),
+                          GlassButton(
+                            label: 'ADD LABOUR',
+                            icon: Icons.person_add,
+                            onPressed: _addLabour,
+                            isSecondary: true,
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _showCustomLabourFields =
+                                  !_showCustomLabourFields,
+                            ),
+                            child: Text(
+                              _showCustomLabourFields
+                                  ? 'Hide Custom'
+                                  : 'Add Custom Labour',
+                            ),
+                          ),
                           if (_showCustomLabourFields) ...[
-                            _buildTextField('Labour Type', _customLabourNameController),
+                            _buildTextField(
+                              'Labour Type',
+                              _customLabourNameController,
+                            ),
                             const SizedBox(height: 8),
-                            _buildQtyField('Salary', _customLabourSalaryController),
+                            _buildQtyField(
+                              'Salary',
+                              _customLabourSalaryController,
+                            ),
                             const SizedBox(height: 8),
-                            GlassButton(label: 'ADD CUSTOM', icon: Icons.check, onPressed: _addCustomLabour, isSecondary: true),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomLabour,
+                              isSecondary: true,
+                            ),
                           ],
                         ],
                       ),
@@ -1094,11 +1216,23 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                       title: 'Other Expenses',
                       child: Column(
                         children: [
-                          _buildQtyField('Food (₹)', foodCost, icon: Icons.fastfood),
+                          _buildQtyField(
+                            'Food (₹)',
+                            foodCost,
+                            icon: Icons.fastfood,
+                          ),
                           const SizedBox(height: 8),
-                          _buildQtyField('Transport (₹)', transportCost, icon: Icons.directions_car),
+                          _buildQtyField(
+                            'Transport (₹)',
+                            transportCost,
+                            icon: Icons.directions_car,
+                          ),
                           const SizedBox(height: 8),
-                          _buildQtyField('Fuel (₹)', fuelCost, icon: Icons.local_gas_station),
+                          _buildQtyField(
+                            'Fuel (₹)',
+                            fuelCost,
+                            icon: Icons.local_gas_station,
+                          ),
                         ],
                       ),
                     ),
@@ -1106,16 +1240,33 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
                     if (materials.isNotEmpty || labours.isNotEmpty)
                       GlassCard(
-                        title: 'Today\'s Summary (Total: ₹${_getTotalAmount()})',
+                        title:
+                            'Today\'s Summary (Total: ₹${_getTotalAmount()})',
                         child: _buildSummaryTable(),
                       ),
                     const SizedBox(height: 24),
 
                     Row(
                       children: [
-                        Expanded(child: GlassButton(label: isUpdateMode ? 'UPDATE' : 'SAVE', icon: isUpdateMode ? Icons.update : Icons.save, onPressed: isUpdateMode ? _updateExistingEntry : _showConfirmationDialog, isLoading: isSaving)),
+                        Expanded(
+                          child: GlassButton(
+                            label: isUpdateMode ? 'UPDATE' : 'SAVE',
+                            icon: isUpdateMode ? Icons.update : Icons.save,
+                            onPressed: isUpdateMode
+                                ? _updateExistingEntry
+                                : _showConfirmationDialog,
+                            isLoading: isSaving,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        Expanded(child: GlassButton(label: 'RESET', icon: Icons.refresh, onPressed: _resetForm, isSecondary: true)),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'RESET',
+                            icon: Icons.refresh,
+                            onPressed: _resetForm,
+                            isSecondary: true,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -1147,8 +1298,20 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         children: [
           Icon(icon, size: 18, color: primaryColor),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
-          Expanded(child: Text(value, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis)),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -1158,25 +1321,47 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return TextField(
       controller: ctrl,
       style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white70), border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 
-  Widget _buildQtyField(String label, TextEditingController ctrl, {IconData? icon}) {
+  Widget _buildQtyField(
+    String label,
+    TextEditingController ctrl, {
+    IconData? icon,
+  }) {
     return TextField(
       controller: ctrl,
       keyboardType: TextInputType.number,
       style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(prefixIcon: icon != null ? Icon(icon, color: primaryColor) : null, labelText: label, labelStyle: const TextStyle(color: Colors.white70), border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        prefixIcon: icon != null ? Icon(icon, color: primaryColor) : null,
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 
-  Widget _buildTextArea(String label, TextEditingController ctrl, IconData icon) {
+  Widget _buildTextArea(
+    String label,
+    TextEditingController ctrl,
+    IconData icon,
+  ) {
     return TextField(
       controller: ctrl,
       maxLines: 2,
       style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(prefixIcon: Icon(icon, color: primaryColor), labelText: label, labelStyle: const TextStyle(color: Colors.white70), border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: primaryColor),
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 
@@ -1185,10 +1370,92 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columnSpacing: 20,
-        columns: const [DataColumn(label: Text('Item', style: TextStyle(color: Colors.white70))), DataColumn(label: Text('Qty', style: TextStyle(color: Colors.white70))), DataColumn(label: Text('Amt', style: TextStyle(color: Colors.white70))), DataColumn(label: Text('', style: TextStyle(color: Colors.white70)))],
+        columns: const [
+          DataColumn(
+            label: Text('Item', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Qty', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Amt', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
         rows: [
-          ...materials.asMap().entries.map((e) => DataRow(cells: [DataCell(Text(e.value['type'], style: const TextStyle(color: Colors.white))), DataCell(Text('${e.value['quantity']}', style: const TextStyle(color: Colors.white))), DataCell(Text(_calculateMaterialAmount(e.value['type'], e.value['quantity']), style: const TextStyle(color: Colors.white))), DataCell(IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18), onPressed: () => _removeMaterial(e.key)))]))
-          , ...labours.asMap().entries.map((e) => DataRow(cells: [DataCell(Text(e.value['type'], style: const TextStyle(color: Colors.white))), DataCell(Text('${e.value['count']}', style: const TextStyle(color: Colors.white))), DataCell(Text(_calculateLabourAmount(e.value['type'], e.value['count']), style: const TextStyle(color: Colors.white))), DataCell(IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18), onPressed: () => _removeLabour(e.key)))]))
+          ...materials.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['quantity']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateMaterialAmount(
+                      e.value['type'],
+                      e.value['quantity'],
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _removeMaterial(e.key),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...labours.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['count']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateLabourAmount(e.value['type'], e.value['count']),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _removeLabour(e.key),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
