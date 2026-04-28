@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/firestore_service.dart';
 import '../services/expense_service.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
-import 'supervisor_dashboard.dart';
+import '../services/firestore_service.dart';
+import '../utils/app_theme.dart';
 
 class OrganizationExpenses extends StatefulWidget {
   const OrganizationExpenses({super.key});
@@ -16,7 +13,7 @@ class OrganizationExpenses extends StatefulWidget {
 }
 
 class _OrganizationExpensesState extends State<OrganizationExpenses> {
-  Color get primaryColor => Theme.of(context).primaryColor;
+  Color primaryColor = AppTheme.primaryColor.value;
 
   String? selectedSiteId;
   String? selectedSupervisorId;
@@ -26,7 +23,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
   List<String> siteIds = [];
   bool isLoadingSites = true;
   bool isLoadingSiteDetails = false;
-  bool isSubmitting = false; // Track submission state
+  bool isSubmitting = false;
 
   final billNoController = TextEditingController();
   final billVendorController = TextEditingController();
@@ -36,7 +33,65 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   List<Map<String, String>> bills = [];
 
-  // Helper functions
+  @override
+  void initState() {
+    super.initState();
+    AppTheme.primaryColor.addListener(_onPrimaryColorChanged);
+    _loadSiteIds();
+  }
+
+  void _onPrimaryColorChanged() {
+    setState(() {
+      primaryColor = AppTheme.primaryColor.value;
+    });
+  }
+
+  @override
+  void dispose() {
+    AppTheme.primaryColor.removeListener(_onPrimaryColorChanged);
+    billNoController.dispose();
+    billVendorController.dispose();
+    billAmountController.dispose();
+    supervisorController.dispose();
+    projectPhaseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSiteIds() async {
+    setState(() {
+      isLoadingSites = true;
+    });
+    try {
+      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      siteIds = snapshot.docs
+          .map((doc) => doc.data()['site'] as String?)
+          .where((site) => site != null && site.isNotEmpty)
+          .toSet()
+          .cast<String>()
+          .toList();
+
+      // If no site IDs found, add some test data
+      if (siteIds.isEmpty) {
+        siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
+      }
+
+      setState(() {
+        isLoadingSites = false;
+      });
+    } catch (e) {
+      // On error, use test data
+      siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
+      setState(() {
+        isLoadingSites = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load site IDs')),
+        );
+      }
+    }
+  }
+
   Widget _buildLabeledTextField(
     String label,
     TextEditingController controller, {
@@ -59,7 +114,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     if (bills.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text('No bills added yet.', style: TextStyle()),
+        child: Text(
+          'No bills added yet.',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
       );
     }
     return SingleChildScrollView(
@@ -133,7 +191,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           'billNo': billNoController.text,
           'billDate': DateFormat('dd/MM/yy').format(selectedDate),
           'billVendor': billVendorController.text,
-          'billAmount': '₹ ${billAmountController.text}',
+          'billAmount': '? ${billAmountController.text}',
         });
 
         billNoController.clear();
@@ -162,9 +220,6 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
           title: const Text('Confirm Submission'),
           content: SingleChildScrollView(
             child: ListBody(
@@ -190,9 +245,6 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
               ),
               child: const Text('OK'),
               onPressed: () {
@@ -208,7 +260,6 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   Future<void> _submitExpenseData() async {
     if (isSubmitting) return;
-    if (!mounted) return;
     setState(() {
       isSubmitting = true;
     });
@@ -217,7 +268,6 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         selectedSupervisorId == null ||
         selectedProjectPhase == null ||
         bills.isEmpty) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill all details and add at least one bill.'),
@@ -247,9 +297,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       final newDocId = '${selectedSiteId}_$dateStr';
 
       // 1. Save/merge to organizationEntries
-      final entryRef = FirestoreService.organizationEntries.doc(newDocId);
+      final entryRef = FirebaseFirestore.instance
+          .collection('organizationEntries')
+          .doc(newDocId);
       final entrySnap = await entryRef.get();
-      if (!mounted) return;
 
       List<dynamic> existingBills = [];
       double existingTotal = 0;
@@ -292,12 +343,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       };
 
       await entryRef.set(entry);
-      if (!mounted) return;
 
       // 2. Save/update summary in organizationExpenseSummary
       double orgExpenseTotalAmount = 0;
       final allEntrySnap = await entryRef.get();
-      if (!mounted) return;
       if (allEntrySnap.exists) {
         final data = allEntrySnap.data() as Map<String, dynamic>;
         final billsList = data['bills'] as List<dynamic>? ?? [];
@@ -315,14 +364,13 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         'siteId': selectedSiteId ?? '',
       };
 
-      await FirestoreService.organizationExpenseSummary
+      await FirebaseFirestore.instance
+          .collection('organizationExpenseSummary')
           .doc(newDocId)
           .set(summary);
-      if (!mounted) return;
 
       // Update totalOrgExpense in totalSiteExpensesPerDay
       await ExpenseService.updateTotalOrgExpenseForSite(selectedSiteId!);
-      if (!mounted) return;
 
       // Immediately reset the form after successful submission
       _resetForm();
@@ -352,64 +400,21 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('OK', style: TextStyle()),
+              child: const Text('OK', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
       );
     } catch (e) {
-      debugPrint('Error saving to Firestore: $e');
-      if (!mounted) return;
+      print('Error saving to Firestore:');
+      print(e);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to submit expense data')),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isSubmitting = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSiteIds();
-  }
-
-  @override
-  void dispose() {
-    billNoController.dispose();
-    billVendorController.dispose();
-    billAmountController.dispose();
-    supervisorController.dispose();
-    projectPhaseController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadSiteIds() async {
-    if (!mounted) return;
-    setState(() {
-      isLoadingSites = true;
-    });
-    try {
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
-      if (!mounted) return;
-      siteIds = snapshot.docs
-          .map((doc) => doc.data()['site'] as String?)
-          .where((site) => site != null && site.isNotEmpty)
-          .toSet()
-          .cast<String>()
-          .toList();
-    } catch (e) {
-      debugPrint('Error loading site IDs: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoadingSites = false;
-        });
-      }
+      setState(() {
+        isSubmitting = false;
+      });
     }
   }
 
@@ -455,50 +460,58 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      title: 'Organization Expenses',
-      onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            // Standard Logout flow
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const SupervisorDashboard(
-                  username: '',
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
-              ), // Assuming a dashboard check or login redirect
-              (route) => false,
-            );
-          },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Organization Expenses',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      ],
-      body: SizedBox.expand(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              GlassCard(
-                title: 'Site & Project Info',
+        backgroundColor: primaryColor,
+        toolbarHeight: 50,
+        elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _loadSiteIds,
+            tooltip: 'Refresh Site IDs',
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, color: primaryColor),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Site & Project Info',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     isLoadingSites
                         ? const Center(child: CircularProgressIndicator())
                         : DropdownButtonFormField<String>(
                             value: selectedSiteId,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               labelText: 'Site ID',
-                              prefixIcon: Icon(
-                                Icons.location_on,
-                                color: primaryColor,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              border: OutlineInputBorder(),
                             ),
                             items: siteIds
                                 .map(
@@ -521,63 +534,74 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     TextField(
                       controller: supervisorController,
                       enabled: false,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Supervisor ID',
-                        prefixIcon: Icon(Icons.person, color: primaryColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: projectPhaseController,
                       enabled: false,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Project Phase',
-                        prefixIcon: Icon(Icons.timeline, color: primaryColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 20,
-                          color: primaryColor,
-                        ),
+                        const Icon(Icons.calendar_today, size: 20),
                         const SizedBox(width: 8),
                         const Text(
                           'Date:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            DateFormat('dd MMM yyyy').format(selectedDate),
-                            style: const TextStyle(fontSize: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        TextButton.icon(
                           onPressed: () => _selectDate(context),
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Change'),
+                          label: Text(
+                            DateFormat('dd/MM/yy').format(selectedDate),
+                            style: const TextStyle(color: Colors.white),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              GlassCard(
-                title: 'Add Bill',
+            ),
+            const SizedBox(height: 20),
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Icon(Icons.receipt_long, color: primaryColor),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Add Bill',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     _buildLabeledTextField('Bill No', billNoController),
                     _buildLabeledTextField(
                       'Bill Date',
@@ -588,66 +612,147 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     ),
                     _buildLabeledTextField('Bill Vendor', billVendorController),
                     _buildLabeledTextField('Bill Amount', billAmountController),
-                    const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        GlassButton(
-                          label: 'Add Bill',
-                          icon: Icons.add_rounded,
+                        ElevatedButton.icon(
                           onPressed: _addBill,
-                          isSecondary: true,
+                          label: const Text(
+                            "Upload Bill",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: _addBill,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add, color: Colors.white),
+                              SizedBox(width: 4),
+                              const Text(
+                                'Add',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              if (bills.isNotEmpty)
-                GlassCard(title: 'Bills List', child: _buildBillTable()),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: GlassButton(
-                      label: 'Reset',
-                      icon: Icons.refresh_rounded,
-                      onPressed: isSubmitting ? null : _resetForm,
-                      isSecondary: true,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: GlassButton(
-                      label: 'Submit',
-                      icon: Icons.check_circle_outline,
-                      isLoading: isSubmitting,
-                      onPressed: isSubmitting
-                          ? null
-                          : () {
-                              if (selectedSiteId == null ||
-                                  selectedSupervisorId == null ||
-                                  selectedProjectPhase == null ||
-                                  bills.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please fill all details and add at least one bill.',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                              _showConfirmationDialog();
-                            },
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(height: 20),
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 30),
-            ],
-          ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.list_alt, color: primaryColor),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Bills List',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBillTable(),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: isSubmitting ? null : _resetForm,
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(color: Colors.black),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            if (selectedSiteId == null ||
+                                selectedSupervisorId == null ||
+                                selectedProjectPhase == null ||
+                                bills.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Please fill all details and add at least one bill.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            _showConfirmationDialog();
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Submit',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

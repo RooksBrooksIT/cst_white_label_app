@@ -10,7 +10,7 @@ class AppTheme {
   static final ValueNotifier<Color> primaryColor = ValueNotifier(defaultColor);
 
   // Default app name
-  static const String defaultAppName = 'CONSTRUCT PRO';
+  static const String defaultAppName = 'eBricks';
 
   // ValueNotifier to broadcast app name changes
   static final ValueNotifier<String> appName = ValueNotifier(defaultAppName);
