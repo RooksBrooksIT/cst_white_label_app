@@ -20,7 +20,6 @@ class GlassButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isSecondary) {
       return SizedBox(
-        width: double.infinity,
         height: 52,
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
@@ -30,7 +29,6 @@ class GlassButton extends StatelessWidget {
     }
 
     return SizedBox(
-      width: double.infinity,
       height: 52,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
