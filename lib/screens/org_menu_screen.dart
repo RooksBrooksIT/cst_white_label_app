@@ -14,6 +14,7 @@ import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
 import 'org_subscription_page.dart';
 import 'org_information_screen.dart';
+import 'about_us_screen.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   /// When [standalone] is true (default), the screen is shown as a separate
@@ -149,17 +150,31 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     return Column(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: 65,
+          height: 65,
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
+            color: Colors.white,
             shape: BoxShape.circle,
-            color: colorScheme.primary.withOpacity(0.12),
             border: Border.all(
-              color: colorScheme.primary.withOpacity(0.2),
+              color: colorScheme.primary.withOpacity(0.1),
               width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          child: Icon(Icons.business, color: colorScheme.primary, size: 40),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: Image.asset(
+              'assets/images/logo_main.png',
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         ValueListenableBuilder<String>(
@@ -356,6 +371,21 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                   );
                 }
               }
+            },
+          ),
+
+          const Divider(color: Color(0xFFF1F5F9), height: 24),
+          _buildSettingsTile(
+            icon: Icons.info_outline_rounded,
+            title: 'About Us',
+            subtitle: 'Learn more about eBicks',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AboutUsScreen(),
+                ),
+              );
             },
           ),
         ],

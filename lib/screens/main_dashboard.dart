@@ -96,6 +96,9 @@ class _MainDashboardState extends State<MainDashboard> {
                         Container(
                           width: 110,
                           height: 110,
+                          padding: const EdgeInsets.all(
+                            4,
+                          ), // Restored original-style padding
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
@@ -103,10 +106,10 @@ class _MainDashboardState extends State<MainDashboard> {
                               color: colorScheme.outline,
                               width: 2,
                             ),
-                            image: DecorationImage(
-                              image: NetworkImage(_logoUrl!),
-                              fit: BoxFit.cover,
-                            ),
+                          ),
+                          child: Image.network(
+                            _logoUrl!,
+                            fit: BoxFit.contain, // Prevent cropping
                           ),
                         )
                       else
@@ -126,47 +129,45 @@ class _MainDashboardState extends State<MainDashboard> {
                       Text(
                         _orgName ?? 'Organization',
                         textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontSize: 24,
-                        ),
+                        style: textTheme.headlineMedium?.copyWith(fontSize: 24),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Select your role to continue',
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                        ),
+                        style: textTheme.bodyMedium?.copyWith(fontSize: 14),
                       ),
                     ] else ...[
                       // Generic Header
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        width: 120,
+                        height: 120,
+                        padding: const EdgeInsets.all(
+                          4,
+                        ), // Restored original-style padding
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.construction_rounded,
-                          size: 60,
-                          color: colorScheme.primary,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(60),
+                          child: Image.asset(
+                            'assets/images/logo_main.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 32),
                       Text(
                         'Select Your Role',
                         textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontSize: 28,
-                        ),
+                        style: textTheme.headlineMedium?.copyWith(fontSize: 28),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Choose how you\'d like to sign in',
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                        ),
+                        style: textTheme.bodyMedium?.copyWith(fontSize: 14),
                       ),
                     ],
 
@@ -178,7 +179,7 @@ class _MainDashboardState extends State<MainDashboard> {
                         context: context,
                         title: 'Organization',
                         subtitle: 'Manage org details & data',
-                        icon: Icons.account_balance_rounded,
+                        icon: Icons.business_center_rounded,
                         accentColor: colorScheme.primary,
                         destination: const Organisation_LoginPage(),
                       ),
@@ -223,7 +224,8 @@ class _MainDashboardState extends State<MainDashboard> {
     required BuildContext context,
     required String title,
     required String subtitle,
-    required IconData icon,
+    IconData? icon,
+    String? logoPath,
     required Color accentColor,
     required Widget destination,
   }) {
@@ -252,7 +254,14 @@ class _MainDashboardState extends State<MainDashboard> {
                   color: accentColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: accentColor, size: 28),
+                child: logoPath != null
+                    ? Padding(
+                        padding: const EdgeInsets.all(
+                          4.0,
+                        ), // Restored original-style padding
+                        child: Image.asset(logoPath, fit: BoxFit.contain),
+                      )
+                    : Icon(icon, color: accentColor, size: 28),
               ),
               const SizedBox(width: 20),
               // Text
@@ -262,16 +271,12 @@ class _MainDashboardState extends State<MainDashboard> {
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 18,
-                      ),
+                      style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 14,
-                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                     ),
                   ],
                 ),

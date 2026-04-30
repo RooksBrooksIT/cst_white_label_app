@@ -89,19 +89,21 @@ class LandingPage extends StatelessWidget {
                         ),
                         Hero(
                           tag: 'hero_image',
-                          child: Container(
-                            width: 180,
-                            height: 180,
-                            padding: const EdgeInsets.all(24),
-                            child: Image.asset(
-                              'assets/images/construction_hero.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                    Icons.construction_rounded,
-                                    size: 80,
-                                    color: primaryColor.withOpacity(0.5),
-                                  ),
+                          child: ClipOval(
+                            child: Container(
+                              width: 190,
+                              height: 190,
+                              color: Colors.white,
+                              child: Image.asset(
+                                'assets/images/logo_launcher.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                      Icons.construction_rounded,
+                                      size: 100,
+                                      color: primaryColor.withOpacity(0.5),
+                                    ),
+                              ),
                             ),
                           ),
                         ),
@@ -162,7 +164,7 @@ class LandingPage extends StatelessWidget {
                         context: context,
                         label: 'Create Account',
                         subtitle: 'Register your organization',
-                        icon: Icons.business_center_rounded,
+                        icon: Icons.add_business_rounded,
                         isPrimary: true,
                         onTap: () => Navigator.pushNamed(
                           context,
@@ -244,18 +246,18 @@ class LandingPage extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     color: isPrimary
                         ? Colors.white.withOpacity(0.2)
                         : primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     icon,
                     color: isPrimary ? Colors.white : primaryColor,
-                    size: 24,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 16),

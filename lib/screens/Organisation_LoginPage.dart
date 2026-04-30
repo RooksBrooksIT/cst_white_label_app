@@ -50,9 +50,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
     if (auth.isLoggedIn && auth.userRole == UserRole.organization && mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const OrganizationDashboard(),
-        ),
+        MaterialPageRoute(builder: (context) => const OrganizationDashboard()),
       );
     }
   }
@@ -70,9 +68,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         content: Text(message),
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -108,15 +104,12 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
             'organisation/$dynamicPath/admin/data';
 
         // Write organization info to AuthService
-        await AuthService().login(
-          UserRole.organization,
-          {
-            'username': username,
-            'dynamicPath': dynamicPath,
-            'org_name': storedOrgName,
-            'org_doc_path': fullConfigPath,
-          },
-        );
+        await AuthService().login(UserRole.organization, {
+          'username': username,
+          'dynamicPath': dynamicPath,
+          'org_name': storedOrgName,
+          'org_doc_path': fullConfigPath,
+        });
 
         // Refresh FirestoreService cache
         await FirestoreService.initialize();
@@ -169,28 +162,47 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
               // Icon Header or Org Logo
               if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
                 Container(
-                  width: 110,
-                  height: 110,
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(8), // Small padding
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
                     border: Border.all(color: colorScheme.outline, width: 2),
-                    image: DecorationImage(
-                      image: NetworkImage(_tempLogoUrl!),
-                      fit: BoxFit.cover,
+                  ),
+                  child: Image.network(
+                    _tempLogoUrl!,
+                    fit: BoxFit.contain, // Use contain to prevent cropping
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.business_rounded,
+                      size: 60,
+                      color: colorScheme.primary,
                     ),
                   ),
                 )
+                
               else
                 Container(
-                  padding: const EdgeInsets.all(28),
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.08),
+                    color: colorScheme.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Icon(
-                    Icons.business_center_rounded,
-                    size: 64,
+                    Icons.business_rounded,
+                    size: 40,
                     color: colorScheme.primary,
                   ),
                 ),
@@ -198,17 +210,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
               Text(
                 _tempOrgName ?? 'Organization Login',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontSize: 28,
-                ),
+                style: theme.textTheme.headlineMedium?.copyWith(fontSize: 28),
               ),
               const SizedBox(height: 12),
               Text(
                 'Enter your credentials to continue',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 14,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
               ),
               const SizedBox(height: 48),
 
@@ -249,9 +257,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                 children: [
                   Text(
                     "Don't have an account? ",
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 14,
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                   ),
                   TextButton(
                     onPressed: () {

@@ -98,7 +98,7 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 20),
-            Icon(Icons.qr_code_scanner_rounded, size: 80, color: primaryColor),
+            Icon(Icons.card_giftcard_rounded, size: 80, color: primaryColor),
             const SizedBox(height: 32),
             Text(
               'Enter Referral Code',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import 'branding_screen.dart';
@@ -94,7 +95,6 @@ class _OrganisationRegistrationPageState
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -163,7 +163,9 @@ class _OrganisationRegistrationPageState
                 shape: BoxShape.circle,
                 color: isDone || isActive ? primaryColor : colorScheme.surface,
                 border: Border.all(
-                  color: isDone || isActive ? primaryColor : colorScheme.outline,
+                  color: isDone || isActive
+                      ? primaryColor
+                      : colorScheme.outline,
                   width: 2,
                 ),
               ),
@@ -173,7 +175,9 @@ class _OrganisationRegistrationPageState
                     : Text(
                         '${stepIndex + 1}',
                         style: TextStyle(
-                          color: isActive ? Colors.white : colorScheme.onSurfaceVariant,
+                          color: isActive
+                              ? Colors.white
+                              : colorScheme.onSurfaceVariant,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -184,7 +188,9 @@ class _OrganisationRegistrationPageState
             Text(
               steps[stepIndex],
               style: theme.textTheme.labelMedium?.copyWith(
-                color: isActive ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                color: isActive
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurfaceVariant,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -203,10 +209,7 @@ class _OrganisationRegistrationPageState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header
-          Text(
-            'Organization Details',
-            style: theme.textTheme.headlineSmall,
-          ),
+          Text('Organization Details', style: theme.textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             'Complete your organization profile to get started.',
@@ -239,6 +242,19 @@ class _OrganisationRegistrationPageState
                     label: 'Phone Number',
                     icon: Icons.phone_rounded,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Phone number is required';
+                      }
+                      if (value.length != 10) {
+                        return 'Phone number must be exactly 10 digits';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
                   GlassTextField(
@@ -267,10 +283,7 @@ class _OrganisationRegistrationPageState
           const SizedBox(height: 40),
 
           // Action Buttons
-          GlassButton(
-            label: 'CONTINUE',
-            onPressed: _goToNextStep,
-          ),
+          GlassButton(label: 'CONTINUE', onPressed: _goToNextStep),
           const SizedBox(height: 16),
           TextButton(
             onPressed: _goBack,
@@ -287,6 +300,4 @@ class _OrganisationRegistrationPageState
       ),
     );
   }
-
-
 }

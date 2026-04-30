@@ -31,7 +31,7 @@ class OrganisationLandingPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                  const Spacer(flex: 3),
+                  const Spacer(flex: 2), // Positioned slightly higher
 
                   // Logo with soft glow
                   Container(
@@ -46,6 +46,8 @@ class OrganisationLandingPage extends StatelessWidget {
                         ),
                       ],
                     ),
+
+                    padding: const EdgeInsets.all(8), // Restored original-style padding
                     child: Image.asset(
                       'assets/images/logo_main.png',
                       fit: BoxFit.contain,

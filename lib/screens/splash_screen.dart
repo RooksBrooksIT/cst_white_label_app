@@ -9,6 +9,7 @@ import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:demo_cst/screens/org_subscription_page.dart';
+import 'package:demo_cst/screens/terms_and_conditions_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,7 +22,6 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _logoOpacity;
-  late Animation<double> _logoScale;
   late Animation<double> _nameOpacity;
 
   @override
@@ -40,13 +40,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
-      ),
-    );
-
     _nameOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -62,6 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('org_isLoggedIn') ?? false;
     final orgId = prefs.getString('org_dynamic_path');
+    final hasAcceptedTerms = prefs.getBool('has_accepted_terms') ?? false;
 
     if (isLoggedIn && orgId != null && orgId.isNotEmpty) {
       // Refresh branding from Firestore if logged in
@@ -71,6 +65,16 @@ class _SplashScreenState extends State<SplashScreen>
     // After animation and sync, navigate
     Future.delayed(const Duration(milliseconds: 3000), () async {
       if (mounted) {
+        if (!hasAcceptedTerms) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TermsAndConditionsScreen(),
+            ),
+          );
+          return;
+        }
+
         // Request location permissions on startup
         await LocationService.handleLocationPermission(context);
 
@@ -170,17 +174,19 @@ class _SplashScreenState extends State<SplashScreen>
         builder: (context, child) {
           return Column(
             children: [
-              // Center logo
+              // Logo shifted slightly higher
               Expanded(
-                child: Center(
+                flex: 5,
+                child: Align(
+                  alignment: const Alignment(0, -0.2), // Shift slightly up from center
                   child: Opacity(
                     opacity: _logoOpacity.value,
-                    child: Transform.scale(
-                      scale: _logoScale.value,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
                       child: Image.asset(
                         'assets/images/splash_screen_logo.png',
-                        width: 220,
-                        height: 220,
+                        width: 200, // Increased size for better balance
+                        height: 200,
                         fit: BoxFit.contain,
                       ),
                     ),
