@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
@@ -111,6 +112,13 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       return;
     }
 
+    if (_phoneController.text.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Phone number must be exactly 10 digits')),
+      );
+      return;
+    }
+
     try {
       final workerId = await _getNextWorkerId();
 
@@ -215,6 +223,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   }
 
   void _saveEditing(String docId) {
+    final phone = _editingControllers['${docId}_phone']?.text ?? '';
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Phone number must be exactly 10 digits')),
+      );
+      return;
+    }
+
     final updatedData = {
       'name': _editingControllers['${docId}_name']?.text ?? '',
       'phoneNumber': _editingControllers['${docId}_phone']?.text ?? '',
@@ -313,6 +329,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                     labelText: 'Phone Number *',
                     icon: Icons.phone,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                   ),
                   SizedBox(height: 16),
                   Container(
@@ -489,6 +509,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     VoidCallback? onTap,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -510,6 +531,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         keyboardType: keyboardType,
         maxLines: maxLines,
         onTap: onTap,
+        inputFormatters: inputFormatters,
       ),
     );
   }
@@ -719,6 +741,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           label: 'Phone Number',
           icon: Icons.phone,
           keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
         ),
         SizedBox(height: 8),
         _buildEditableField(
@@ -772,6 +798,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     VoidCallback? onTap,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -797,6 +824,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         keyboardType: keyboardType,
         maxLines: maxLines,
         onTap: onTap,
+        inputFormatters: inputFormatters,
       ),
     );
   }

@@ -43,163 +43,166 @@ class LandingPage extends StatelessWidget {
           ),
 
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 48),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 48),
 
-                // Hero Image with modern glass effect
-                GestureDetector(
-                  onLongPress: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MigrationScreen(),
-                      ),
-                    );
-                  },
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 240,
-                          height: 240,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.white.withOpacity(0.4),
-                                Colors.white.withOpacity(0.1),
+                  // Hero Image with modern glass effect
+                  GestureDetector(
+                    onLongPress: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MigrationScreen(),
+                        ),
+                      );
+                    },
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 240,
+                            height: 240,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withOpacity(0.4),
+                                  Colors.white.withOpacity(0.1),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.5),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: primaryColor.withOpacity(0.1),
+                                  blurRadius: 40,
+                                  spreadRadius: 5,
+                                ),
                               ],
                             ),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryColor.withOpacity(0.1),
-                                blurRadius: 40,
-                                spreadRadius: 5,
-                              ),
-                            ],
                           ),
-                        ),
-                        Hero(
-                          tag: 'hero_image',
-                          child: ClipOval(
-                            child: Container(
-                              width: 190,
-                              height: 190,
-                              color: Colors.white,
-                              child: Image.asset(
-                                'assets/images/logo_launcher.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Icon(
-                                      Icons.construction_rounded,
-                                      size: 100,
-                                      color: primaryColor.withOpacity(0.5),
-                                    ),
+                          Hero(
+                            tag: 'hero_image',
+                            child: ClipOval(
+                              child: Container(
+                                width: 190,
+                                height: 190,
+                                color: Colors.white,
+                                child: Image.asset(
+                                  'assets/images/logo_main.png',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(
+                                        Icons.construction_rounded,
+                                        size: 100,
+                                        color: primaryColor.withOpacity(0.5),
+                                      ),
+                                ),
                               ),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Headline & Subtitle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      children: [
+                        ValueListenableBuilder<String>(
+                          valueListenable: AppTheme.appName,
+                          builder: (context, name, _) {
+                            return Text(
+                              'Manage Your Projects\nLike a Pro',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                color: colorScheme.onSurface,
+                                height: 1.1,
+                                letterSpacing: -1.0,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Plan, track, and manage your construction\nwork seamlessly with professional tools.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                            height: 1.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 40),
+                  const SizedBox(height: 32),
 
-                // Headline & Subtitle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    children: [
-                      ValueListenableBuilder<String>(
-                        valueListenable: AppTheme.appName,
-                        builder: (context, name, _) {
-                          return Text(
-                            'Manage Your Projects\nLike a Pro',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: colorScheme.onSurface,
-                              height: 1.1,
-                              letterSpacing: -1.0,
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Plan, track, and manage your construction\nwork seamlessly with professional tools.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
-                          height: 1.5,
+                  // Action Cards Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 32,
+                    ),
+                    child: Column(
+                      children: [
+                        _buildActionTile(
+                          context: context,
+                          label: 'Create Account',
+                          subtitle: 'Register your organization',
+                          icon: Icons.add_business_rounded,
+                          isPrimary: true,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            '/orgRegistrationForm',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Action Cards Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 32,
-                  ),
-                  child: Column(
-                    children: [
-                      _buildActionTile(
-                        context: context,
-                        label: 'Create Account',
-                        subtitle: 'Register your organization',
-                        icon: Icons.add_business_rounded,
-                        isPrimary: true,
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          '/orgRegistrationForm',
+                        const SizedBox(height: 16),
+                        _buildActionTile(
+                          context: context,
+                          label: 'Login',
+                          subtitle: 'Access your dashboard',
+                          icon: Icons.login_rounded,
+                          isPrimary: false,
+                          onTap: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.remove('temp_org_path');
+                            if (context.mounted) {
+                              Navigator.pushNamed(context, '/authSelection');
+                            }
+                          },
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildActionTile(
-                        context: context,
-                        label: 'Login',
-                        subtitle: 'Access your dashboard',
-                        icon: Icons.login_rounded,
-                        isPrimary: false,
-                        onTap: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.remove('temp_org_path');
-                          if (context.mounted) {
-                            Navigator.pushNamed(context, '/authSelection');
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildActionTile(
-                        context: context,
-                        label: 'Join with Code',
-                        subtitle: 'Join an existing organization',
-                        icon: Icons.qr_code_scanner_rounded,
-                        isPrimary: false,
-                        onTap: () =>
-                            Navigator.pushNamed(context, '/joinByReferral'),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        _buildActionTile(
+                          context: context,
+                          label: 'Join with Code',
+                          subtitle: 'Join an existing organization',
+                          icon: Icons.qr_code_scanner_rounded,
+                          isPrimary: false,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/joinByReferral'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

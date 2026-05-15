@@ -219,7 +219,7 @@ class NotificationService {
   // ---------------------------------------------------------------------------
   // FCM PUSH (via FCM Legacy HTTP API)
   // Note: The server key is stored in Firestore at
-  //   organisation/{orgId}/admin/fcmConfig  →  field: "serverKey"
+  //   organisation/{orgId}/data/fcmConfig  →  field: "serverKey"
   // Set it once from the Firebase Console → Project Settings → Cloud Messaging.
   // ---------------------------------------------------------------------------
   static Future<void> _sendFcmPush({
@@ -230,13 +230,13 @@ class NotificationService {
     try {
       final orgId = FirestoreService.currentOrgId;
       final configSnap = await FirebaseFirestore.instance
-          .doc('organisation/$orgId/admin/fcmConfig')
+          .doc('organisation/$orgId/data/fcmConfig')
           .get();
       final serverKey = configSnap.data()?['serverKey']?.toString();
       if (serverKey == null || serverKey.isEmpty) {
         debugPrint(
             'NotificationService: FCM server key not set. '
-            'Add it to Firestore at organisation/$orgId/admin/fcmConfig → serverKey');
+            'Add it to Firestore at organisation/$orgId/data/fcmConfig → serverKey');
         return;
       }
 

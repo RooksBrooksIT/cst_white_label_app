@@ -32,6 +32,10 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   final billVendorController = TextEditingController();
   final billAmountController = TextEditingController();
 
+  final supervisorIdController = TextEditingController();
+  final projectPhaseController = TextEditingController();
+  final projectNameController = TextEditingController();
+
   String? managerId;
   List<Map<String, String>> bills = [];
   Map<String, String> siteNameMap = {};
@@ -48,6 +52,17 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     setState(() {
       managerId = userData['username'] ?? userData['UserName'] ?? 'UNKNOWN_MANAGER';
     });
+  }
+
+  @override
+  void dispose() {
+    billNoController.dispose();
+    billVendorController.dispose();
+    billAmountController.dispose();
+    supervisorIdController.dispose();
+    projectPhaseController.dispose();
+    projectNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSiteIds() async {
@@ -87,35 +102,74 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
+    String? supervisorId;
+    String? projectPhase;
+    String? projectName;
+
     try {
-      // 1. Fetch Supervisor and Phase from siteSupervisorMap
-      final supervisorSnapshot = await FirestoreService.siteSupervisorMap
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-          
-      if (supervisorSnapshot.docs.isNotEmpty) {
-        final data = supervisorSnapshot.docs.first.data();
-        setState(() {
-          selectedSupervisorId = data['supervisor'] as String?;
-          selectedProjectPhase = data['projectStage'] as String?;
-        });
+      // 1. Try to fetch from siteSupervisorMap (by document ID first, then by field)
+      final docRef = FirestoreService.siteSupervisorMap.doc(siteId);
+      final docSnap = await docRef.get();
+      
+      if (docSnap.exists) {
+        final data = docSnap.data()!;
+        supervisorId = data['supervisor']?.toString();
+        projectPhase = data['projectStage']?.toString();
+        projectName = (data['projectName'] ?? data['project_name'])?.toString();
+      } else {
+        // Fallback: search by 'site' field
+        final mapSnapshot = await FirestoreService.siteSupervisorMap
+            .where('site', isEqualTo: siteId)
+            .limit(1)
+            .get();
+        if (mapSnapshot.docs.isNotEmpty) {
+          final data = mapSnapshot.docs.first.data();
+          supervisorId = data['supervisor']?.toString();
+          projectPhase = data['projectStage']?.toString();
+          projectName = (data['projectName'] ?? data['project_name'])?.toString();
+        }
       }
 
-      // 2. Fetch Project Name from projects collection
+      // 2. Fetch from projects collection (high priority for name)
       final projectSnapshot = await FirestoreService.projects
-          .where('siteId', isEqualTo: siteId)
+          .where('siteId', isEqualTo: siteId.trim())
           .limit(1)
           .get();
 
       if (projectSnapshot.docs.isNotEmpty) {
-        final projectData = projectSnapshot.docs.first.data();
-        setState(() {
-          selectedProjectName = projectData['projectName'] as String?;
-        });
+        final pData = projectSnapshot.docs.first.data();
+        final pName = pData['projectName']?.toString();
+        if (pName != null && pName.trim().isNotEmpty) {
+          projectName = pName;
+        }
+        // Also get phase if missing
+        if (projectPhase == null || projectPhase.isEmpty) {
+          projectPhase = (pData['projectStage'] ?? pData['status'])?.toString();
+        }
       }
+
+      // 3. Last fallback to Site Name from master list
+      if (projectName == null || projectName.trim().isEmpty) {
+        projectName = siteNameMap[siteId] ?? 'Project $siteId';
+      }
+
+      if (!mounted) return;
+      setState(() {
+        selectedSupervisorId = supervisorId;
+        selectedProjectPhase = projectPhase;
+        selectedProjectName = projectName;
+        
+        supervisorIdController.text = supervisorId ?? 'Not Assigned';
+        projectPhaseController.text = projectPhase ?? 'N/A';
+        projectNameController.text = projectName ?? 'Unknown Project';
+      });
     } catch (e) {
       debugPrint('Error loading site details: $e');
+      if (mounted) {
+        setState(() {
+          projectNameController.text = siteNameMap[siteId] ?? siteId;
+        });
+      }
     }
   }
 
@@ -195,11 +249,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                   if (v != null) _loadSiteDetails(v);
                 }),
           const SizedBox(height: 12),
-          GlassTextField(controller: TextEditingController(text: selectedSupervisorId ?? ''), label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
+          GlassTextField(controller: supervisorIdController, label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
           const SizedBox(height: 12),
-          GlassTextField(controller: TextEditingController(text: selectedProjectPhase ?? ''), label: 'Project Phase', icon: Icons.timeline_outlined, readOnly: true),
+          GlassTextField(controller: projectPhaseController, label: 'Project Phase', icon: Icons.timeline_outlined, readOnly: true),
           const SizedBox(height: 12),
-          GlassTextField(controller: TextEditingController(text: selectedProjectName ?? ''), label: 'Project Name', icon: Icons.assignment_outlined, readOnly: true),
+          GlassTextField(controller: projectNameController, label: 'Project Name', icon: Icons.assignment_outlined, readOnly: true),
           const SizedBox(height: 12),
           _buildDatePicker(theme),
         ],

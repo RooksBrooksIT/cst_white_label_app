@@ -10,7 +10,7 @@ class ToolMasterPage extends StatefulWidget {
   _ToolMasterPageState createState() => _ToolMasterPageState();
 }
 
-class _ToolMasterPageState extends State<ToolMasterPage>
+class _ToolMasterPageState extends State<ToolMasterPage> 
     with SingleTickerProviderStateMixin {
   final TextEditingController _toolNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -463,7 +463,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         Expanded(
           child: OutlinedButton.icon(
             icon: Icon(Icons.clear, size: 20),
-            label: Text('Cancel'),
+            label: Text('Clear'),
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.primary,
               side: BorderSide(color: theme.colorScheme.primary),
@@ -493,22 +493,45 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     if (newCount == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Count must be a number.')));
+      ).showSnackBar(const SnackBar(content: Text('Count must be a number.')));
       return;
     }
 
     try {
+      // 1. Update the 'tools' collection
       await FirestoreService.getCollection('tools')
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
+      // 2. Update the 'toolsAtCompany' collection to reflect the new count backend-wide
+      final toolCode = _selectedToolData?['toolCode']?.toString();
+      if (toolCode != null && toolCode.isNotEmpty) {
+        await FirestoreService.getCollection('toolsAtCompany')
+            .doc(toolCode)
+            .set({
+              'toolCode': toolCode,
+              'availableCount': newCount,
+            }, SetOptions(merge: true));
+      }
+
       if (!mounted) return;
+      
+      // 3. Immediately reflect changes in the UI state
+      setState(() {
+        if (_selectedToolData != null) {
+          // Creating a new map ensures the widget recognizes the change
+          _selectedToolData = Map<String, dynamic>.from(_selectedToolData!);
+          _selectedToolData!['toolCount'] = newCount;
+          _selectedToolData!['availableCount'] = newCount;
+        }
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tool count updated successfully!')),
+        const SnackBar(content: Text('Tool count updated successfully!')),
       );
 
-      _fetchTools();
-      _onToolSelected(_selectedToolDocId);
+      // 4. Fetch the latest tools in the background to sync the dropdown
+      await _fetchTools();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

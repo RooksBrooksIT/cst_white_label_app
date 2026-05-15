@@ -15,16 +15,27 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedDesignation;
   String? _selectedDepartment;
-  
+
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _contactNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  
-  List<String> _designationList = ['Project Manager', 'Site Manager', 'Regional Manager', 'General Manager'];
-  List<String> _departmentList = ['Operations', 'Finance', 'Execution', 'Logistics', 'Planning'];
-  
+
+  List<String> _designationList = [
+    'Project Manager',
+    'Site Manager',
+    'Regional Manager',
+    'General Manager',
+  ];
+  List<String> _departmentList = [
+    'Operations',
+    'Finance',
+    'Execution',
+    'Logistics',
+    'Planning',
+  ];
+
   bool _isLoadingDesignations = true;
   bool _isPasswordVisible = false;
   int _selectedTab = 0; // 0: Create, 1: Info
@@ -41,15 +52,23 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   Future<void> _fetchConfigData() async {
     try {
       // Try to fetch designations
-      final desigSnapshot = await FirestoreService.getCollection('managerDesignation').get();
+      final desigSnapshot = await FirestoreService.getCollection(
+        'managerDesignation',
+      ).get();
       if (desigSnapshot.docs.isNotEmpty) {
-        _designationList = desigSnapshot.docs.map((doc) => doc['Designation'] as String).toList();
+        _designationList = desigSnapshot.docs
+            .map((doc) => doc['Designation'] as String)
+            .toList();
       }
 
       // Try to fetch departments
-      final deptSnapshot = await FirestoreService.getCollection('managerDepartment').get();
+      final deptSnapshot = await FirestoreService.getCollection(
+        'managerDepartment',
+      ).get();
       if (deptSnapshot.docs.isNotEmpty) {
-        _departmentList = deptSnapshot.docs.map((doc) => doc['Department'] as String).toList();
+        _departmentList = deptSnapshot.docs
+            .map((doc) => doc['Department'] as String)
+            .toList();
       }
 
       setState(() {
@@ -65,9 +84,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
 
   Future<bool> _isUsernameUnique(String username) async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('manager')
-          .where('UserName', isEqualTo: username.trim())
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'manager',
+      ).where('UserName', isEqualTo: username.trim()).get();
       return querySnapshot.docs.isEmpty;
     } catch (e) {
       return false;
@@ -76,9 +95,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
 
   Future<bool> _isContactNoUnique(String contactNo) async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('manager')
-          .where('ContactNo', isEqualTo: contactNo.trim())
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'manager',
+      ).where('ContactNo', isEqualTo: contactNo.trim()).get();
       return querySnapshot.docs.isEmpty;
     } catch (e) {
       return false;
@@ -102,7 +121,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
       }
 
       if (!(await _isContactNoUnique(contactNo))) {
-        _showErrorSnackBar('Contact number "$contactNo" is already registered.');
+        _showErrorSnackBar(
+          'Contact number "$contactNo" is already registered.',
+        );
         setState(() => _isSubmitting = false);
         return;
       }
@@ -132,7 +153,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
           if (num != null && num > maxNumber) maxNumber = num;
         }
       }
-      
+
       final nextNumber = maxNumber + 1;
       final managerNumber = nextNumber.toString().padLeft(3, '0');
       final username = _userNameController.text.trim();
@@ -151,7 +172,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         'CreatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirestoreService.getCollection('manager').doc(managerId).set(managerData);
+      await FirestoreService.getCollection(
+        'manager',
+      ).doc(managerId).set(managerData);
 
       _showSuccessDialog();
       _resetForm();
@@ -170,20 +193,41 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Lottie.asset('assets/animation/success.json', width: 100, height: 100, repeat: false),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Lottie.asset(
+                  'assets/animation/success.json',
+                  width: 100,
+                  height: 100,
+                  repeat: false,
+                ),
               const SizedBox(height: 16),
-              Text('Success!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryColor)),
+              Text(
+                'Success!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('Manager details have been saved successfully.', textAlign: TextAlign.center),
+              const Text(
+                'Manager details have been saved successfully.',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('OK'),
@@ -192,7 +236,8 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _resetForm() {
@@ -228,7 +273,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
           const SizedBox(height: 16),
           _buildTabToggle(),
           const SizedBox(height: 16),
-          Expanded(child: _selectedTab == 0 ? _buildCreateForm() : _buildInfoTable()),
+          Expanded(
+            child: _selectedTab == 0 ? _buildCreateForm() : _buildInfoTable(),
+          ),
         ],
       ),
     );
@@ -284,19 +331,58 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         key: _formKey,
         child: Column(
           children: [
-            _buildTextField('Full Name', _fullNameController, isRequired: true, icon: Icons.person),
+            _buildTextField(
+              'Full Name',
+              _fullNameController,
+              isRequired: true,
+              icon: Icons.person,
+            ),
             const SizedBox(height: 16),
-            _buildTextField('User Name', _userNameController, isRequired: true, icon: Icons.alternate_email),
+            _buildTextField(
+              'User Name',
+              _userNameController,
+              isRequired: true,
+              icon: Icons.alternate_email,
+            ),
             const SizedBox(height: 16),
-            _buildTextField('Password', _passwordController, isRequired: true, isPassword: true, icon: Icons.lock),
+            _buildTextField(
+              'Password',
+              _passwordController,
+              isRequired: true,
+              isPassword: true,
+              icon: Icons.lock,
+            ),
             const SizedBox(height: 16),
-            _buildDropdown('Designation', _selectedDesignation, _designationList, (val) => setState(() => _selectedDesignation = val), icon: Icons.badge),
+            _buildDropdown(
+              'Designation',
+              _selectedDesignation,
+              _designationList,
+              (val) => setState(() => _selectedDesignation = val),
+              icon: Icons.badge,
+            ),
             const SizedBox(height: 16),
-            _buildDropdown('Department', _selectedDepartment, _departmentList, (val) => setState(() => _selectedDepartment = val), icon: Icons.business),
+            _buildDropdown(
+              'Department',
+              _selectedDepartment,
+              _departmentList,
+              (val) => setState(() => _selectedDepartment = val),
+              icon: Icons.business,
+            ),
             const SizedBox(height: 16),
-            _buildTextField('Contact No', _contactNoController, isRequired: true, keyboardType: TextInputType.phone, icon: Icons.phone),
+            _buildTextField(
+              'Contact No',
+              _contactNoController,
+              isRequired: true,
+              keyboardType: TextInputType.phone,
+              icon: Icons.phone,
+            ),
             const SizedBox(height: 16),
-            _buildTextField('Email', _emailController, keyboardType: TextInputType.emailAddress, icon: Icons.email),
+            _buildTextField(
+              'Email',
+              _emailController,
+              keyboardType: TextInputType.emailAddress,
+              icon: Icons.email,
+            ),
             const SizedBox(height: 32),
             _buildActionButtons(),
           ],
@@ -305,11 +391,25 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool isRequired = false, bool isPassword = false, TextInputType? keyboardType, IconData? icon}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    bool isRequired = false,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+    IconData? icon,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$label${isRequired ? ' *' : ''}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryColor)),
+        Text(
+          '$label${isRequired ? ' *' : ''}',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+          ),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -317,38 +417,76 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
           keyboardType: keyboardType,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: primaryColor, size: 20),
-            suffixIcon: isPassword ? IconButton(
-              icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: primaryColor),
-              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-            ) : null,
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: primaryColor,
+                    ),
+                    onPressed: () => setState(
+                      () => _isPasswordVisible = !_isPasswordVisible,
+                    ),
+                  )
+                : null,
             hintText: 'Enter $label',
             filled: true,
             fillColor: Colors.grey[50],
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryColor, width: 2)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 2),
+            ),
           ),
-          validator: (value) => (isRequired && (value == null || value.isEmpty)) ? 'Field required' : null,
+          validator: (value) => (isRequired && (value == null || value.isEmpty))
+              ? 'Field required'
+              : null,
         ),
       ],
     );
   }
 
-  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged, {IconData? icon}) {
+  Widget _buildDropdown(
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged, {
+    IconData? icon,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$label *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryColor)),
+        Text(
+          '$label *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+          ),
+        ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          items: items
+              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: primaryColor, size: 20),
             filled: true,
             fillColor: Colors.grey[50],
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryColor, width: 2)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 2),
+            ),
           ),
           validator: (val) => val == null ? 'Please select $label' : null,
         ),
@@ -365,9 +503,23 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: _isSubmitting ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Create Account',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
           ),
         ),
         const SizedBox(width: 12),
@@ -376,10 +528,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             onPressed: _resetForm,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               side: BorderSide(color: primaryColor),
             ),
-            child: Text('Reset', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor)),
+            child: Text(
+              'Reset',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
           ),
         ),
       ],
@@ -390,9 +551,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('manager').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
         final managers = snapshot.data!.docs;
-        if (managers.isEmpty) return const Center(child: Text('No managers found.'));
+        if (managers.isEmpty)
+          return const Center(child: Text('No managers found.'));
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -401,12 +564,30 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             final data = managers[index].data() as Map<String, dynamic>;
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: ListTile(
-                leading: CircleAvatar(backgroundColor: primaryColor.withOpacity(0.1), child: Icon(Icons.person, color: primaryColor)),
-                title: Text(data['FullName'] ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${data['Designation']} • ${data['Department']}'),
-                trailing: Text(data['Status'] ?? 'Active', style: TextStyle(color: (data['Status'] == 'Active') ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                leading: CircleAvatar(
+                  backgroundColor: primaryColor.withOpacity(0.1),
+                  child: Icon(Icons.person, color: primaryColor),
+                ),
+                title: Text(
+                  data['FullName'] ?? 'No Name',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  '${data['Designation']} • ${data['Department']}',
+                ),
+                trailing: Text(
+                  data['Status'] ?? 'Active',
+                  style: TextStyle(
+                    color: (data['Status'] == 'Active')
+                        ? Colors.green
+                        : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 onTap: () => _showManagerDetails(data),
               ),
             );
@@ -419,14 +600,23 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   void _showManagerDetails(Map<String, dynamic> data) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(data['FullName'], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primaryColor)),
+            Text(
+              data['FullName'],
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
             const Divider(height: 32),
             _buildDetailRow('Manager ID', data['ManagerId']),
             _buildDetailRow('Username', data['UserName']),
@@ -447,7 +637,13 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),

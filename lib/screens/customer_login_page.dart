@@ -94,7 +94,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cust_org_path', orgId);
-        final String resolvedPath = 'organisation/$orgId/admin/data';
+        final String resolvedPath = 'organisation/$orgId/data/admin';
         await prefs.setString('cust_org_doc_path', resolvedPath);
 
         

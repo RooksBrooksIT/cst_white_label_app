@@ -28,7 +28,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   bool _isLoading = false;
   String? _tempOrgName;
   String? _tempLogoUrl;
-
+  
   @override
   void initState() {
     super.initState();
@@ -82,26 +82,55 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       final username = _usernameController.text.trim();
       final password = _passwordController.text.trim();
 
-      // Query the globalUsers mapping directly by Doc ID (username)
-      final userDoc = await FirebaseFirestore.instance
-          .collection('globalUsers')
-          .doc(username)
+      // Query for the organization admin/data document by username
+      final userQuery = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('username', isEqualTo: username)
           .get();
 
-      if (userDoc.exists) {
-        final userData = userDoc.data()!;
+      // Find the document named 'data' in the query results
+      QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
+      for (var doc in userQuery.docs) {
+        if (doc.id == 'data') {
+          dataDoc = doc;
+          break;
+        }
+      }
 
-        // Validate password locally
+      Map<String, dynamic>? userData;
+      String? dynamicPath;
+      String? fullConfigPath;
+
+      if (dataDoc != null) {
+        userData = dataDoc.data();
+        // The OrgID is the document ID of the parent organization
+        dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
+        fullConfigPath = dataDoc.reference.path;
+      } else {
+        // FALLBACK: Check root organisation collection for legacy accounts
+        final legacyQuery = await FirebaseFirestore.instance
+            .collection('organisation')
+            .where('username', isEqualTo: username)
+            .limit(1)
+            .get();
+
+        if (legacyQuery.docs.isNotEmpty) {
+          final legacyDoc = legacyQuery.docs.first;
+          userData = legacyDoc.data();
+          dynamicPath = legacyDoc.id;
+          fullConfigPath = legacyDoc.reference.path;
+          debugPrint('Organisation_LoginPage: Logged in via legacy root fallback for $username');
+        }
+      }
+
+      if (userData != null) {
+        // Validate password
         if (userData['password'] != password) {
           _showError('Invalid username or password');
           return;
         }
 
         final String? storedOrgName = userData['orgName'] as String?;
-        final String dynamicPath = userData['dynamicPath'] ?? '';
-        final String fullConfigPath =
-            userData['fullConfigPath'] ??
-            'organisation/$dynamicPath/admin/data';
 
         // Write organization info to AuthService
         await AuthService().login(UserRole.organization, {
@@ -115,7 +144,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         await FirestoreService.initialize();
 
         // Synchronize branding details
-        await AppTheme.syncWithFirestore(dynamicPath);
+        await AppTheme.syncWithFirestore(dynamicPath ?? 'uninitialized');
 
         // Save FCM token for push notifications
         await NotificationService.saveToken(
@@ -125,13 +154,11 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         );
 
         if (mounted) {
-          if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/orgDashboard',
-              (route) => false,
-            );
-          }
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/orgDashboard',
+            (route) => false,
+          );
         }
       } else {
         _showError('Invalid username or password');
@@ -155,7 +182,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       onBack: () => Navigator.pop(context),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

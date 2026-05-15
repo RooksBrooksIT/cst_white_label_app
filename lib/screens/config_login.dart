@@ -152,7 +152,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
           'config_org_path',
           orgId,
         ); // Store the ID for FirestoreService
-        final String resolvedPath = 'organisation/$orgId/admin/data';
+        final String resolvedPath = 'organisation/$orgId/data/admin';
         await prefs.setString('config_org_doc_path', resolvedPath);
 
         // Refresh FirestoreService cache
@@ -166,7 +166,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          final String resolvedPath = 'organisation/$orgId/admin/data';
+          final String resolvedPath = 'organisation/$orgId/data/admin';
           await _saveLoginCredentials(
             _usernameController.text.trim(),
             _passwordController.text.trim(),
@@ -347,17 +347,18 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Reset Password',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: usernameController,
@@ -552,7 +553,8 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                     ),
                   ],
                 ),
-              );
+              ),
+            );
             },
           ),
         );

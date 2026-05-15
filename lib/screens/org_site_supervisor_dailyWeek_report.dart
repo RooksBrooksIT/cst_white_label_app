@@ -65,14 +65,18 @@ class _DailySitePaymentReportScreenState
         final siteId = data['site']?.toString() ?? doc.id;
         if (siteId.isNotEmpty) {
           ids.add(siteId);
+
+          // Read projectName directly from the siteSupervisorMap document first
+          final docProjectName = data['projectName']?.toString() ?? '';
+
           details[siteId] = {
-            'project':
-                '', // Will be filled from siteId parsing or projects collection
+            'project': docProjectName,
             'supervisor': data['supervisor']?.toString() ?? '',
           };
 
-          // Try to extract project name from siteId if it follows the pattern siteName_projectName
-          if (siteId.contains('_')) {
+          // Fallback: try to extract project name from siteId pattern (siteName_projectName)
+          // Only use this if projectName wasn't found in the document
+          if (docProjectName.isEmpty && siteId.contains('_')) {
             final parts = siteId.split('_');
             if (parts.length > 1) {
               details[siteId]!['project'] = parts.sublist(1).join('_');
@@ -81,14 +85,15 @@ class _DailySitePaymentReportScreenState
         }
       }
 
-      // 2. Fetch Projects to possibly get better project names
+      // 2. Fetch Projects to enhance/override project names where available
       final projectsSnapshot = await FirestoreService.projects.get();
       for (var doc in projectsSnapshot.docs) {
         final data = doc.data();
         final siteId = data['siteId']?.toString();
-        if (siteId != null && details.containsKey(siteId)) {
-          details[siteId]!['project'] =
-              data['projectName']?.toString() ?? details[siteId]!['project']!;
+        final fetchedProjectName = data['projectName']?.toString() ?? '';
+        // Only override if we get a non-empty name from projects collection
+        if (siteId != null && details.containsKey(siteId) && fetchedProjectName.isNotEmpty) {
+          details[siteId]!['project'] = fetchedProjectName;
         }
       }
 
@@ -110,15 +115,22 @@ class _DailySitePaymentReportScreenState
 
   void _updateProjectAndSupervisor() {
     if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
-      selectedProject = siteDetails[selectedSiteId]!['project'];
-      selectedSupervisor = siteDetails[selectedSiteId]!['supervisor'];
-      projectController.text = selectedProject ?? '';
-      supervisorController.text = selectedSupervisor ?? '';
+      final project = siteDetails[selectedSiteId]!['project'] ?? '';
+      final supervisor = siteDetails[selectedSiteId]!['supervisor'] ?? '';
+      projectController.text = project;
+      supervisorController.text = supervisor;
+      // Also update state variables and trigger rebuild
+      setState(() {
+        selectedProject = project.isNotEmpty ? project : null;
+        selectedSupervisor = supervisor.isNotEmpty ? supervisor : null;
+      });
     } else {
-      selectedProject = null;
-      selectedSupervisor = null;
       projectController.text = '';
       supervisorController.text = '';
+      setState(() {
+        selectedProject = null;
+        selectedSupervisor = null;
+      });
     }
   }
 
@@ -460,12 +472,13 @@ class _DailySitePaymentReportScreenState
           onChanged: (value) {
             setState(() {
               selectedSiteId = value;
-              _updateProjectAndSupervisor();
               selectedWeekIndex = null;
               weekDates = [];
               paymentRecords = [];
               totalAmount = 0.0;
             });
+            // Call AFTER setState so selectedSiteId is committed before auto-fill reads it
+            _updateProjectAndSupervisor();
           },
         ),
         SizedBox(height: fontSizeBase * 1.5),

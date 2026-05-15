@@ -36,11 +36,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   final TextEditingController _fromSiteNameController = TextEditingController();
   final TextEditingController _fromSupervisorController =
       TextEditingController();
+  final TextEditingController _fromProjectNameController =
+      TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
 
   final TextEditingController _toManagerController = TextEditingController();
   final TextEditingController _toSiteNameController = TextEditingController();
   final TextEditingController _toSupervisorController = TextEditingController();
+  final TextEditingController _toProjectNameController =
+      TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
 
   // Site-to-Company specific state
@@ -93,10 +97,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     _fromManagerController.dispose();
     _fromSiteNameController.dispose();
     _fromSupervisorController.dispose();
+    _fromProjectNameController.dispose();
     _fromDateController.dispose();
     _toManagerController.dispose();
     _toSiteNameController.dispose();
     _toSupervisorController.dispose();
+    _toProjectNameController.dispose();
     _toDateController.dispose();
 
     // Site-to-Company controllers
@@ -121,10 +127,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             final data = doc.data();
             return {
               'siteId': doc.id,
-              'siteName': data['site'] ?? doc.id,
-              'projectName': data['projectName'] ?? '',
-              'supervisorName':
-                  data['supervisor'] ?? data['supervisorName'] ?? '',
+              'siteName': data['site'] ?? data['Site'] ?? doc.id,
+              'projectName': data['projectName'] ?? data['Project Name'] ?? '',
+              'supervisorName': data['supervisor'] ??
+                  data['Supervisor'] ??
+                  data['supervisorName'] ??
+                  data['Supervisor Name'] ??
+                  '',
             };
           }).toList();
           _isLoadingSites = false;
@@ -182,12 +191,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       for (final doc in querySnapshot.docs) {
         final data = doc.data();
         // Check for both materialName and materialname
-        final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
+        final name = (data['materialName'] ?? data['materialname'] ?? '')
+            .toString()
+            .trim();
         if (name.isEmpty) continue;
-        
+
         final count = _parseCount(data['count']);
         // Check for both lastupdated and lastUpdated
-        final lastUpdatedMs = _tsMillis(data['lastupdated'] ?? data['lastUpdated']);
+        final lastUpdatedMs = _tsMillis(
+          data['lastupdated'] ?? data['lastUpdated'],
+        );
 
         if (!latestByName.containsKey(name)) {
           latestByName[name] = {
@@ -259,7 +272,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               .map((doc) {
                 final data = doc.data();
                 // Check for both materialName and materialname
-                final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
+                final name =
+                    (data['materialName'] ?? data['materialname'] ?? '')
+                        .toString()
+                        .trim();
                 if (name.isEmpty) return null;
                 final count = _parseCount(data['count']);
                 return {
@@ -421,6 +437,19 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _selectedSiteId = null;
       _projectNameController.clear();
       _supervisorNameController.clear();
+
+      _fromManagerController.clear();
+      _fromSiteId = null;
+      _fromSiteNameController.clear();
+      _fromProjectNameController.clear();
+      _fromSupervisorController.clear();
+
+      _toManagerController.clear();
+      _toSiteId = null;
+      _toSiteNameController.clear();
+      _toProjectNameController.clear();
+      _toSupervisorController.clear();
+
       _selectedMaterialName = null;
       _neededCountController.clear();
       availableCount = 0;
@@ -444,6 +473,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _selectedSiteId = null;
       _siteToCompanySiteNameController.clear();
       _siteToCompanySupervisorController.clear();
+      _projectNameController.clear();
       _siteToCompanyDateController.clear();
       _selectedMaterialName = null;
       _neededCountController.clear();
@@ -849,6 +879,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           "Tositeid": _toSiteId,
           "managername": _fromManagerController.text,
           "materialname": material['materialName'],
+          "materialdisplayname": material['displayName'],
+          "fromsitename": _fromSiteNameController.text,
+          "fromprojectname": _fromProjectNameController.text,
+          "fromsupervisorname": _fromSupervisorController.text,
+          "tositename": _toSiteNameController.text,
+          "toprojectname": _toProjectNameController.text,
+          "tosupervisorname": _toSupervisorController.text,
           "timestamp": FieldValue.serverTimestamp(),
         };
       }
@@ -1287,7 +1324,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       ),
                     ),
                     child: const Text(
-                      'CompanyToSite',
+                      'CTS',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1320,7 +1357,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       ),
                     ),
                     child: const Text(
-                      'SiteToSite',
+                      'STS',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1353,7 +1390,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       ),
                     ),
                     child: const Text(
-                      'SiteToCompany',
+                      'STC',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1586,6 +1623,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     _fromSiteId = v;
                     _fromSiteNameController.text =
                         site['siteName']?.toString() ?? '';
+                    _fromProjectNameController.text =
+                        site['projectName']?.toString() ?? '';
                     _fromSupervisorController.text =
                         site['supervisorName']?.toString() ?? '';
                     // Reset material selection for SiteToSite
@@ -1596,7 +1635,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   });
                   await _loadSiteMaterialData(v);
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1605,6 +1644,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _fromProjectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1644,11 +1691,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     _toSiteId = v;
                     _toSiteNameController.text =
                         site['siteName']?.toString() ?? '';
+                    _toProjectNameController.text =
+                        site['projectName']?.toString() ?? '';
                     _toSupervisorController.text =
                         site['supervisorName']?.toString() ?? '';
                   });
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1657,6 +1706,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _toProjectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1821,7 +1878,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   });
                   await _loadSiteMaterialData(v);
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
               const SizedBox(height: 16),
 
@@ -1832,6 +1889,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+
+              // Project Name
+              _buildTextField(
+                controller: _projectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
 

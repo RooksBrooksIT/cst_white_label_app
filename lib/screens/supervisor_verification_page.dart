@@ -13,8 +13,11 @@ class SupervisorVerificationPage extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
 
-  const SupervisorVerificationPage(
-      {super.key, required this.supervisorId, required this.supervisorName});
+  const SupervisorVerificationPage({
+    super.key,
+    required this.supervisorId,
+    required this.supervisorName,
+  });
 
   @override
   _SupervisorVerificationPageState createState() =>
@@ -51,10 +54,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
       duration: const Duration(milliseconds: 500),
     );
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
     _tabController = TabController(length: 1, vsync: this);
@@ -63,17 +63,15 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
 
   Future<void> _fetchAssignedSites() async {
     try {
-      final query = await FirestoreService
-          .getCollection('siteSupervisorMap')
-          .where('supervisor', isEqualTo: widget.supervisorName)
-          .get();
+      final query = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('supervisor', isEqualTo: widget.supervisorName).get();
       List<Map<String, dynamic>> sites = [];
       for (var doc in query.docs) {
         final siteId = doc['site'];
-        final siteDoc = await FirestoreService
-            .getCollection('Site')
-            .doc(siteId)
-            .get();
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(siteId).get();
         if (siteDoc.exists) {
           final siteData = siteDoc.data()!;
           sites.add({
@@ -142,7 +140,9 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
         return;
       }
 
-      final hasPermission = await LocationService.handleLocationPermission(context);
+      final hasPermission = await LocationService.handleLocationPermission(
+        context,
+      );
       if (!hasPermission) {
         if (mounted) {
           setState(() {
@@ -165,8 +165,10 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
         _siteLat!,
         _siteLng!,
       );
-      bool match =
-          _isWithinAllowedDistance(position.latitude, position.longitude);
+      bool match = _isWithinAllowedDistance(
+        position.latitude,
+        position.longitude,
+      );
       if (mounted) {
         setState(() {
           _currentPosition = position;
@@ -191,8 +193,12 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
 
   bool _isWithinAllowedDistance(double lat, double lng) {
     if (_siteLat == null || _siteLng == null) return false;
-    double distance =
-        Geolocator.distanceBetween(lat, lng, _siteLat!, _siteLng!);
+    double distance = Geolocator.distanceBetween(
+      lat,
+      lng,
+      _siteLat!,
+      _siteLng!,
+    );
     return distance <= _allowedDistance;
   }
 
@@ -360,19 +366,19 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
     return GlassScaffold(
       title: 'Supervisor Verification',
       onBack: () => Navigator.pop(context),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : _skipVerification,
-          child: Text(
-            'SKIP',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-      
+
+      // actions: [
+      //   TextButton(
+      //     onPressed: _isLoading ? null : _skipVerification,
+      //     child: Text(
+      //       'SKIP',
+      //       style: TextStyle(
+      //         color: Theme.of(context).colorScheme.onPrimary,
+      //         fontWeight: FontWeight.bold,
+      //       ),
+      //     ),
+      //   ),
+      // ],
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: TabBarView(
@@ -415,8 +421,9 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       child: Text(
                         'No sites assigned to you.',
                         style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 16),
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 20),
@@ -426,7 +433,8 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       backgroundColor: primaryColor,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: const Text(
                       'Check Location',
@@ -442,7 +450,9 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                               ? '✅ Location verified'
                               : '❌ Location mismatch',
                           style: TextStyle(
-                            color: _locationValid ? Colors.green : Theme.of(context).colorScheme.error,
+                            color: _locationValid
+                                ? Colors.green
+                                : Theme.of(context).colorScheme.error,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -459,7 +469,10 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _locationError!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -469,7 +482,8 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       backgroundColor: primaryColor,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: const Text(
                       'Take Photo',
@@ -491,36 +505,37 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _photoError!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 14),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _verifyAndContinue,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _verifyAndContinue,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                
-                                strokeWidth: 3,
-                              ),
-                            )
-                          : const Text(
-                              'Verify & Continue to Site Entry',
-                              style: TextStyle(
-                                  
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
-                            ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          )
+                        : const Text(
+                            'Verify & Continue to Site Entry',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                  ),
                 ],
               ),
             ),

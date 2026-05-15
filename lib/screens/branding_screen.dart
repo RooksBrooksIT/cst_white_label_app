@@ -10,6 +10,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../utils/enums.dart';
 
 class BrandingScreen extends StatefulWidget {
   final String orgName;
@@ -35,8 +36,6 @@ class BrandingScreen extends StatefulWidget {
 
 class _BrandingScreenState extends State<BrandingScreen> {
   final TextEditingController _appNameController = TextEditingController();
-  File? _logoFile;
-  bool _isPickingImage = false;
   bool _isLoading = false;
   Color _selectedColor = const Color(0xFF017FDF);
   Color _customColor = const Color(0xFF017FDF);
@@ -105,25 +104,6 @@ class _BrandingScreenState extends State<BrandingScreen> {
     super.dispose();
   }
 
-  Future<void> _pickLogo() async {
-    if (_isPickingImage) return;
-    _isPickingImage = true;
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
-      if (picked != null && mounted) {
-        setState(() => _logoFile = File(picked.path));
-      }
-    } catch (e) {
-      debugPrint('Image picker error: $e');
-    } finally {
-      _isPickingImage = false;
-    }
-  }
-
   Future<void> _goToNextStep() async {
     setState(() => _isLoading = true);
     try {
@@ -131,13 +111,36 @@ class _BrandingScreenState extends State<BrandingScreen> {
           ? _appNameController.text.trim()
           : widget.orgName;
 
-      // Check username availability globally across all organizations
-      final userDocs = await FirebaseFirestore.instance
-          .collectionGroup('organizationUser')
-          .where('username', isEqualTo: widget.username)
-          .limit(1)
-          .get();
-      if (userDocs.docs.isNotEmpty) {
+      // Check username availability globally across all organizations (new and old) and user subcollections
+      final checkResults = await Future.wait([
+        FirebaseFirestore.instance
+            .collectionGroup('admin')
+            .where('username', isEqualTo: widget.username)
+            .get(),
+        FirebaseFirestore.instance
+            .collectionGroup('organizationUser')
+            .where('username', isEqualTo: widget.username)
+            .limit(1)
+            .get(),
+        FirebaseFirestore.instance
+            .collection('organisation')
+            .where('username', isEqualTo: widget.username)
+            .limit(1)
+            .get(),
+      ]);
+
+      // Check if any document named 'data' in the 'admin' collection group matches the username
+      bool isTaken = checkResults[1].docs.isNotEmpty || checkResults[2].docs.isNotEmpty;
+      if (!isTaken) {
+        for (var doc in checkResults[0].docs) {
+          if (doc.id == 'data') {
+            isTaken = true;
+            break;
+          }
+        }
+      }
+
+      if (isTaken) {
         _showError('Username already taken.');
         setState(() => _isLoading = false);
         return;
@@ -155,7 +158,6 @@ class _BrandingScreenState extends State<BrandingScreen> {
               password: widget.password,
               dateStr: widget.dateStr,
               appName: appName,
-              logoFile: _logoFile,
               selectedColor: _selectedColor,
             ),
           ),
@@ -283,84 +285,6 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
                         const SizedBox(height: 20),
 
-                        // Company Logo Card
-                        GlassCard(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSectionHeader(
-                                theme: theme,
-                                icon: Icons.upload_rounded,
-                                title: 'Company Logo',
-                              ),
-                              const SizedBox(height: 20),
-                              GestureDetector(
-                                onTap: _pickLogo,
-                                child: Container(
-                                  width: double.infinity,
-                                  height: 140,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest
-                                        .withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: colorScheme.outlineVariant,
-                                    ),
-                                  ),
-                                  child: _logoFile != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            15,
-                                          ),
-                                          child: Image.file(
-                                            _logoFile!,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.cloud_upload_outlined,
-                                              size: 40,
-                                              color: colorScheme.primary
-                                                  .withOpacity(0.5),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              'Upload Logo',
-                                              style: theme.textTheme.titleSmall,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Recommended: PNG or JPG',
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: _pickLogo,
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text('CHANGE LOGO'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                         const SizedBox(height: 20),
 
                         // Color Theme Card

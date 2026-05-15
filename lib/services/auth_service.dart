@@ -52,25 +52,31 @@ class AuthService {
   /// Check if the current organization's subscription is active and not expired.
   Future<bool> checkSubscriptionStatus() async {
     final role = userRole;
-    if (role != UserRole.organization)
-      return true; // Only enforce for organizations
+    if (role != UserRole.organization) return true; // Only enforce for organizations
 
     try {
-      final doc = await FirestoreService.subscriptionDoc.get();
+      var doc = await FirestoreService.subscriptionDoc.get();
+
+      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint('AuthService: Subscription doc not found in admin, falling back to root.');
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (!doc.exists) return false;
 
       final data = doc.data()!;
-      final isActive = data['isSubscriptionActive'] as bool? ?? false;
+      // Default to true if fields are missing to avoid locking out valid users
+      // during transitions or if initialization hasn't finished.
+      final isActive = data['isSubscriptionActive'] as bool? ?? true;
       final endDate = data['subscriptionEndDate'] as Timestamp?;
 
       if (!isActive) return false;
-      if (endDate == null) return true; // Assume lifetime if no end date
+      if (endDate == null) return true; // Assume lifetime/trial if no end date
 
       return endDate.toDate().isAfter(DateTime.now());
     } catch (e) {
       debugPrint('Error checking subscription status: $e');
-      // In case of error, we might want to allow access if they were recently active,
-      // but for strict enforcement, we return false or the last known state.
       return true; // Default to true to avoid locking users out on network issues
     }
   }
@@ -95,7 +101,14 @@ class AuthService {
   /// Fetch and apply organization branding from Firestore
   Future<void> refreshBranding(String orgId) async {
     try {
-      final doc = await FirestoreService.brandingDocWithId(orgId).get();
+      var doc = await FirestoreService.brandingDocWithId(orgId).get();
+
+      // Fallback: If admin/branding doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint('AuthService: Branding doc not found in admin, falling back to root.');
+        doc = await FirebaseFirestore.instance.collection('organisation').doc(orgId).get();
+      }
+
       if (doc.exists) {
         final data = doc.data()!;
         final appName = data['appName'] as String?;

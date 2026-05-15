@@ -31,13 +31,21 @@ class _OrganizationSubscriptionPageState
 
   Future<void> _fetchSubscriptionData() async {
     try {
-      final doc = await FirestoreService.subscriptionDoc.get();
+      var doc = await FirestoreService.subscriptionDoc.get();
+
+      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint('OrganizationSubscriptionPage: Subscription doc not found in admin, falling back to root.');
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (doc.exists && mounted) {
         final data = doc.data()!;
         setState(() {
           _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Unknown');
           
-          final isActiveField = data['isSubscriptionActive'] as bool? ?? false;
+          // Default to true if missing to avoid lockouts during trial/transition
+          final isActiveField = data['isSubscriptionActive'] as bool? ?? true;
           final expiry = data['subscriptionEndDate'] as Timestamp?;
           
           bool isExpired = false;

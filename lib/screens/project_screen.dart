@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
@@ -66,42 +67,23 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   Future<void> _fetchUnassignedSiteIds() async {
-    final siteSnapshot = await FirestoreService.getCollection('Site').get();
-    final allSiteIds = siteSnapshot.docs.map((doc) => doc.id).toSet();
-
-    final assignedSnapshot = await FirestoreService.getCollection(
+    // Fetch site IDs from siteSupervisorMap under the current organisation:
+    // Path: /organisation/{orgId}/siteSupervisorMap/{doc} -> 'site' field
+    final siteSupervisorSnapshot = await FirestoreService.getCollection(
       'siteSupervisorMap',
     ).get();
-    final assignedSiteIds = assignedSnapshot.docs
-        .map((doc) => (doc.data() as Map<String, dynamic>)['site'])
+
+    final siteIds = siteSupervisorSnapshot.docs
+        .map((doc) => (doc.data())['site'])
         .where((id) => id != null && id.toString().isNotEmpty)
         .map((id) => id.toString())
-        .toSet();
-
-    final unassigned = allSiteIds.difference(assignedSiteIds).toList();
-
-    final projectsSnapshot = await FirestoreService.getCollection(
-      'projects',
-    ).get();
-    final Map<String, Map<String, dynamic>> projectsBySiteId = {};
-    for (var doc in projectsSnapshot.docs) {
-      final data = doc.data();
-      final sid = data['siteId']?.toString();
-      if (sid != null && sid.isNotEmpty) {
-        projectsBySiteId[sid] = data;
-      }
-    }
-
-    final filtered = unassigned.where((sid) {
-      final data = projectsBySiteId[sid];
-      if (data == null) return true;
-      return !_projectHasAllDetails(data);
-    }).toList();
+        .toSet()
+        .toList();
 
     if (!mounted) return;
 
     setState(() {
-      _unassignedSiteIds = filtered;
+      _unassignedSiteIds = siteIds;
       _selectedSiteId = _unassignedSiteIds.isNotEmpty
           ? _unassignedSiteIds[0]
           : null;
@@ -698,6 +680,7 @@ class _ProjectScreenState extends State<ProjectScreen>
                                 ? 'Required'
                                 : null,
                           ),
+
                           const SizedBox(height: 16),
                           _buildTextFormField(
                             context,
@@ -705,7 +688,79 @@ class _ProjectScreenState extends State<ProjectScreen>
                             label: 'Owner Phone Number',
                             icon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty)
+                                return 'Required';
+                              if (val.trim().length != 10)
+                                return 'Must be 10 digits';
+                              return null;
+                            },
                           ),
+
+                          const SizedBox(height: 16),
+                          // Customer Login Info Note
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  primaryColor.withOpacity(0.1),
+                                  primaryColor.withOpacity(0.05),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: primaryColor.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.lock_person_outlined,
+                                    color: primaryColor,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Customer Login Info',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'The Owner Name and Phone Number will be used as the username and password for the Customer Login.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: textColor.withOpacity(0.8),
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
                             value: _selectedSiteId,
@@ -742,7 +797,7 @@ class _ProjectScreenState extends State<ProjectScreen>
                             Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                'All sites are assigned.',
+                                'No sites found in the organisation.',
                                 style: TextStyle(color: errorColor),
                               ),
                             ),
@@ -1249,8 +1304,19 @@ class _ProjectScreenState extends State<ProjectScreen>
                                         )
                                         .toList();
                                   }
-                                  if (!fetchedStates.contains('Ongoing')) {
-                                    fetchedStates.add('Ongoing');
+
+                                  // Add default status options if they are not already present
+                                  final defaultStatuses = [
+                                    'Not Started',
+                                    'Ongoing',
+                                    'On Hold',
+                                    'Completed',
+                                    'Cancelled',
+                                  ];
+                                  for (var status in defaultStatuses) {
+                                    if (!fetchedStates.contains(status)) {
+                                      fetchedStates.add(status);
+                                    }
                                   }
                                   String? dropdownValue =
                                       fetchedStates.contains(currentStatus)
@@ -1671,6 +1737,8 @@ class _ProjectScreenState extends State<ProjectScreen>
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     bool readOnly = false,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
   }) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
@@ -1694,12 +1762,15 @@ class _ProjectScreenState extends State<ProjectScreen>
         ),
         filled: true,
         fillColor: readOnly ? Colors.grey[100] : Colors.grey[50],
+        counterText: "", // Hide character counter
       ),
       style: TextStyle(color: textColor),
       cursorColor: primaryColor,
       keyboardType: keyboardType,
       validator: validator,
       readOnly: readOnly,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
     );
   }
 

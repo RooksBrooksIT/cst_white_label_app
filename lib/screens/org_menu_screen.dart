@@ -41,20 +41,41 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      // Fetch referal codes using centralized FirestoreService path resolution
-      final referalDoc = await FirestoreService.referralDoc.get();
+      // Ensure FirestoreService has a valid org path before reading
+      if (!FirestoreService.isReady) {
+        await FirestoreService.initialize();
+      }
 
-      if (referalDoc.exists && mounted) {
-        final refData = referalDoc.data()!;
+      // ── Referral code ────────────────────────────────────────────────────
+      // Primary: organisation/{id}/admin/referral
+      final referralDoc = await FirestoreService.referralDoc.get();
+
+      String? code;
+      if (referralDoc.exists) {
+        final refData = referralDoc.data()!;
+        code =
+            refData['orgReferralCode'] as String? ??
+            refData['referralCode'] as String?;
+      }
+
+      // Fallback: some legacy orgs stored the code on the root org document
+      if (code == null || code.isEmpty) {
+        final rootDoc = await FirestoreService.rootOrgDoc.get();
+        if (rootDoc.exists) {
+          final rootData = rootDoc.data()!;
+          code =
+              rootData['orgReferralCode'] as String? ??
+              rootData['referralCode'] as String?;
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          _orgCode =
-              refData['orgReferralCode'] ??
-              refData['referralCode'] ??
-              'Not Set';
+          _orgCode = (code != null && code.isNotEmpty) ? code : 'Not Set';
         });
       }
 
-      // Fetch subscription data
+      // ── Subscription ─────────────────────────────────────────────────────
       final subDoc = await FirestoreService.subscriptionDoc.get();
 
       if (subDoc.exists && mounted) {
@@ -72,12 +93,30 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             _subscriptionExpiry = 'Never';
           }
         });
+      } else if (mounted) {
+        // Fallback: check root org doc for legacy subscription data
+        final rootDoc = await FirestoreService.rootOrgDoc.get();
+        if (rootDoc.exists && mounted) {
+          final rootData = rootDoc.data()!;
+          setState(() {
+            _subscriptionPlan = rootData['subscriptionPlan'] ?? 'No Plan';
+            _isSubscriptionActive = rootData['isSubscriptionActive'] ?? false;
+            final expiry = rootData['subscriptionEndDate'];
+            if (expiry is Timestamp) {
+              _subscriptionExpiry = DateFormat(
+                'dd MMM yyyy',
+              ).format(expiry.toDate());
+            } else {
+              _subscriptionExpiry = 'Never';
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching org data: $e');
       if (mounted) {
         setState(() {
-          _orgCode = 'Error';
+          _orgCode = 'Not Available';
           _subscriptionPlan = 'Error';
         });
       }
@@ -382,9 +421,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const AboutUsScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const AboutUsScreen()),
               );
             },
           ),

@@ -35,6 +35,39 @@ class _OrganisationRegistrationPageState
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  String _passwordStrength = '';
+  Color _strengthColor = Colors.transparent;
+
+  void _checkPasswordStrength(String value) {
+    if (value.isEmpty) {
+      setState(() {
+        _passwordStrength = '';
+        _strengthColor = Colors.transparent;
+      });
+      return;
+    }
+
+    int score = 0;
+    if (value.length >= 8) score++;
+    if (RegExp(r'[A-Z]').hasMatch(value)) score++;
+    if (RegExp(r'[a-z]').hasMatch(value)) score++;
+    if (RegExp(r'[0-9]').hasMatch(value)) score++;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) score++;
+
+    setState(() {
+      if (score <= 2) {
+        _passwordStrength = 'Weak';
+        _strengthColor = Colors.redAccent;
+      } else if (score <= 4) {
+        _passwordStrength = 'Moderate';
+        _strengthColor = Colors.orangeAccent;
+      } else {
+        _passwordStrength = 'Strong';
+        _strengthColor = Colors.greenAccent;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -228,6 +261,12 @@ class _OrganisationRegistrationPageState
                     controller: _orgNameController,
                     label: 'Organization Name',
                     icon: Icons.apartment_rounded,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Organization name is required';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
                   GlassTextField(
@@ -235,6 +274,19 @@ class _OrganisationRegistrationPageState
                     label: 'Corporate Email',
                     icon: Icons.email_rounded,
                     keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Corporate email is required';
+                      }
+                      // Basic email validation regex
+                      final emailRegex = RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      );
+                      if (!emailRegex.hasMatch(value)) {
+                        return 'Please enter a valid corporate email (e.g. name@company.com)';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
                   GlassTextField(
@@ -261,6 +313,15 @@ class _OrganisationRegistrationPageState
                     controller: _usernameController,
                     label: 'Admin Username',
                     icon: Icons.person_rounded,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Admin username is required';
+                      }
+                      if (value.length < 3) {
+                        return 'Username must be at least 3 characters';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
                   GlassTextField(
@@ -268,13 +329,83 @@ class _OrganisationRegistrationPageState
                     label: 'Secure Password',
                     icon: Icons.lock_rounded,
                     isPassword: true,
+                    onChanged: _checkPasswordStrength,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Password is required';
+                      }
+                      if (value.length < 8) {
+                        return 'Password must be at least 8 characters';
+                      }
+                      if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                        return 'Add at least one uppercase letter';
+                      }
+                      if (!RegExp(r'[a-z]').hasMatch(value)) {
+                        return 'Add at least one lowercase letter';
+                      }
+                      if (!RegExp(r'[0-9]').hasMatch(value)) {
+                        return 'Add at least one number';
+                      }
+                      if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+                        return 'Add at least one special character';
+                      }
+                      return null;
+                    },
                   ),
+                  if (_passwordStrength.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Password Strength: $_passwordStrength',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: _strengthColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value:
+                                  _passwordStrength == 'Weak'
+                                      ? 0.33
+                                      : (_passwordStrength == 'Moderate'
+                                          ? 0.66
+                                          : 1.0),
+                              backgroundColor: theme.colorScheme.outlineVariant
+                                  .withOpacity(0.2),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _strengthColor,
+                              ),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   GlassTextField(
                     controller: _confirmPasswordController,
                     label: 'Confirm Password',
                     icon: Icons.lock_outline_rounded,
                     isPassword: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
                   ),
                 ],
               ),

@@ -11,11 +11,13 @@ import '../widgets/glass_button.dart';
 class ContractorEntryPage extends StatefulWidget {
   final String userName;
   final Map<String, dynamic> userDetails;
+  final bool showLogout;
 
   const ContractorEntryPage({
     super.key,
     required this.userName,
     required this.userDetails,
+    this.showLogout = true,
   });
 
   @override
@@ -112,7 +114,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   bool _showCustomLabourFields = false;
   final _customLabourNameController = TextEditingController();
   final _customLabourSalaryController = TextEditingController(text: '0');
-
+  final _customLabourQtyController = TextEditingController(text: '0');
+ 
   @override
   void initState() {
     super.initState();
@@ -147,6 +150,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     _customMaterialPriceController.dispose();
     _customLabourNameController.dispose();
     _customLabourSalaryController.dispose();
+    _customLabourQtyController.dispose();
     super.dispose();
   }
 
@@ -168,11 +172,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       // 2. Fetch projects matching contractor
       final contractor =
           _selectedContractorName ?? widget.userDetails['contractorName'];
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projects')
-          .where('isContractWork', isEqualTo: true)
-          .where('contractorName', isEqualTo: contractor)
-          .get();
+          
+      Query<Map<String, dynamic>> query = FirestoreService.projects
+          .where('isContractWork', isEqualTo: true);
+          
+      if (widget.showLogout && contractor != null) {
+          query = query.where('contractorName', isEqualTo: contractor);
+      }
+      
+      final snapshot = await query.get();
       final ids = <String>[];
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -208,23 +216,40 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       setState(() {
         contractStartDate = null;
         contractEndDate = null;
+        if (!widget.showLogout) {
+           _contractorNameController.clear();
+           _projectFieldController.clear();
+           _selectedContractorName = null;
+           _selectedProjectField = null;
+        }
       });
       return;
     }
     try {
       final contractor =
           _selectedContractorName ?? widget.userDetails['contractorName'];
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
+          
+      Query<Map<String, dynamic>> query = FirestoreService.projects
           .where('siteId', isEqualTo: siteId)
-          .where('contractorName', isEqualTo: contractor)
-          .limit(1)
-          .get();
-      if (query.docs.isNotEmpty) {
-        final data = query.docs.first.data();
+          .limit(1);
+
+      // Only filter by contractor if it's a contractor logging in
+      if (widget.showLogout && contractor != null) {
+          query = query.where('contractorName', isEqualTo: contractor);
+      }
+      
+      final snapshot = await query.get();
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data() as Map<String, dynamic>;
         setState(() {
           contractStartDate = data['contractStartDate'];
           contractEndDate = data['contractEndDate'];
+          if (!widget.showLogout) {
+              _contractorNameController.text = data['contractorName'] ?? '';
+              _selectedContractorName = data['contractorName'] ?? '';
+              _projectFieldController.text = data['projectStage'] ?? '';
+              _selectedProjectField = data['projectStage'] ?? '';
+          }
         });
       } else {
         setState(() {
@@ -365,7 +390,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   void _addCustomLabour() {
     final name = _customLabourNameController.text.trim();
-    final qty = int.tryParse(labourQtyController.text) ?? 0;
+    final qty = int.tryParse(_customLabourQtyController.text) ?? 0;
     final salary = int.tryParse(_customLabourSalaryController.text) ?? 0;
     if (name.isNotEmpty && qty > 0) {
       setState(() {
@@ -373,7 +398,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         labourSalaries[name] = salary;
         _showCustomLabourFields = false;
         _customLabourNameController.clear();
-        labourQtyController.text = '0';
+        _customLabourQtyController.text = '0';
         _customLabourSalaryController.text = '0';
       });
     }
@@ -544,9 +569,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       );
       final docId = '${contractorNameForId}_$dateStr$siteIdForId';
 
-      // Check for duplicate entry for this contractor, site, and date
-      final duplicateQuery = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      final duplicateQuery = await FirestoreService.contractorEntries
           .where('contractorName', isEqualTo: _selectedContractorName)
           .where('siteId', isEqualTo: selectedSiteIdForEntry)
           .where('date', isEqualTo: dateStr)
@@ -581,10 +604,37 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         'contractorEndDate': contractEndDate,
       };
 
-      await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      await FirestoreService.contractorEntries
           .doc(docId)
           .set(data);
+
+      // If manager is editing, update the project details as well
+      if (!widget.showLogout && selectedSiteIdForEntry != null) {
+        try {
+          final projectQuery = await FirestoreService.projects
+              .where('siteId', isEqualTo: selectedSiteIdForEntry)
+              .limit(1)
+              .get();
+          if (projectQuery.docs.isNotEmpty) {
+            await projectQuery.docs.first.reference.update({
+              'contractStartDate': contractStartDate != null
+                  ? (contractStartDate is DateTime
+                      ? Timestamp.fromDate(contractStartDate)
+                      : contractStartDate)
+                  : null,
+              'contractEndDate': contractEndDate != null
+                  ? (contractEndDate is DateTime
+                      ? Timestamp.fromDate(contractEndDate)
+                      : contractEndDate)
+                  : null,
+              'contractorName': _selectedContractorName,
+              'projectStage': _selectedProjectField,
+            });
+          }
+        } catch (e) {
+          debugPrint('Failed to update project dates: $e');
+        }
+      }
 
       try {
         await ExpenseService.recalcTotalsAndSyncProject(
@@ -957,6 +1007,64 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   }
 
   // --------- Section Cards -----------
+  Future<void> _pickContractStartDate() async {
+    if (widget.showLogout) return;
+    DateTime? initial = contractStartDate is DateTime 
+        ? contractStartDate 
+        : (contractStartDate != null && contractStartDate.runtimeType.toString() == 'Timestamp' && contractStartDate.toDate != null
+            ? contractStartDate.toDate() 
+            : DateTime.now());
+            
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: _primaryColor,
+            onPrimary: Colors.white,
+            onSurface: Colors.black,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => contractStartDate = picked);
+    }
+  }
+
+  Future<void> _pickContractEndDate() async {
+    if (widget.showLogout) return;
+    DateTime? initial = contractEndDate is DateTime 
+        ? contractEndDate 
+        : (contractEndDate != null && contractEndDate.runtimeType.toString() == 'Timestamp' && contractEndDate.toDate != null
+            ? contractEndDate.toDate() 
+            : DateTime.now());
+            
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: _primaryColor,
+            onPrimary: Colors.white,
+            onSurface: Colors.black,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => contractEndDate = picked);
+    }
+  }
+
   Widget _buildContractorDetailsCard() {
     return GlassCard(
       child: Column(
@@ -972,7 +1080,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             label: 'Contractor Name',
             child: TextField(
               controller: _contractorNameController,
-              readOnly: true,
+              readOnly: widget.showLogout,
+              onChanged: (val) => _selectedContractorName = val,
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Enter contractor name',
@@ -983,7 +1092,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             label: 'Project Field',
             child: TextField(
               controller: _projectFieldController,
-              readOnly: true,
+              readOnly: widget.showLogout,
+              onChanged: (val) => _selectedProjectField = val,
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Enter project field',
@@ -1035,9 +1145,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                         Expanded(
                           child: _buildInputField(
                             label: 'Contract Start Date',
-                            child: Text(
-                              _formatDate(contractStartDate),
-                              style: TextStyle(fontSize: 14),
+                            child: InkWell(
+                              onTap: widget.showLogout ? null : _pickContractStartDate,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                child: Text(
+                                  _formatDate(contractStartDate).isEmpty ? 'Select Date' : _formatDate(contractStartDate),
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1045,9 +1161,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                         Expanded(
                           child: _buildInputField(
                             label: 'Contract End Date',
-                            child: Text(
-                              _formatDate(contractEndDate),
-                              style: TextStyle(fontSize: 14),
+                            child: InkWell(
+                              onTap: widget.showLogout ? null : _pickContractEndDate,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                child: Text(
+                                  _formatDate(contractEndDate).isEmpty ? 'Select Date' : _formatDate(contractEndDate),
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1104,7 +1226,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: selectedMaterial,
+                          value: (_filteredMaterialOptions ?? materialOptions).contains(selectedMaterial) ? selectedMaterial : null,
                           decoration: InputDecoration(
                             labelText: 'Material',
                             border: OutlineInputBorder(
@@ -1113,7 +1235,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                           ),
                           items: (_filteredMaterialOptions ?? materialOptions)
                               .map(
-                                (item) => DropdownMenuItem(
+                                (item) => DropdownMenuItem<String>(
                                   value: item,
                                   child: Text(item),
                                 ),
@@ -1271,7 +1393,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: selectedLabour,
+                          value: (_filteredLabourOptions ?? labourOptions).contains(selectedLabour) ? selectedLabour : null,
                           decoration: InputDecoration(
                             labelText: 'Labour',
                             border: OutlineInputBorder(
@@ -1280,7 +1402,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                           ),
                           items: (_filteredLabourOptions ?? labourOptions)
                               .map(
-                                (item) => DropdownMenuItem(
+                                (item) => DropdownMenuItem<String>(
                                   value: item,
                                   child: Text(item),
                                 ),
@@ -1348,7 +1470,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: labourQtyController,
+              controller: _customLabourQtyController,
               decoration: InputDecoration(
                 labelText: 'Count',
                 border: OutlineInputBorder(
@@ -1454,13 +1576,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
     return GlassScaffold(
       title: 'CONTRACTOR ENTRY',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded),
-          onPressed: _handleLogout,
-          tooltip: 'Logout',
-        ),
-      ],
+      actions: widget.showLogout
+          ? [
+              IconButton(
+                icon: const Icon(Icons.logout_rounded),
+                onPressed: _handleLogout,
+                tooltip: 'Logout',
+              ),
+            ]
+          : null,
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
           horizontal: hPad,

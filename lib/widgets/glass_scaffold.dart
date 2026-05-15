@@ -13,6 +13,7 @@ class GlassScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final Widget? drawer;
   final Widget? endDrawer;
+  final FloatingActionButtonLocation? floatingActionButtonLocation;
 
 
   const GlassScaffold({
@@ -29,6 +30,7 @@ class GlassScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.drawer,
     this.endDrawer,
+    this.floatingActionButtonLocation,
   });
 
 
@@ -49,7 +51,7 @@ class GlassScaffold extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: hasAppBar
           ? AppBar(
-              toolbarHeight: 90,
+              toolbarHeight: 50,
               backgroundColor: effectiveBgColor,
               foregroundColor: effectiveFgColor,
               elevation: 4,
@@ -89,12 +91,17 @@ class GlassScaffold extends StatelessWidget {
             )
           : null,
       floatingActionButton: floatingActionButton,
+      floatingActionButtonLocation: floatingActionButtonLocation,
       drawer: drawer,
       endDrawer: endDrawer,
       body: SafeArea(
-
+        bottom: bottomNavigationBar == null,
         child: Padding(
-          padding: padding ?? const EdgeInsets.all(16),
+          padding: (padding ?? const EdgeInsets.all(16)).copyWith(
+            bottom: bottomNavigationBar == null
+                ? (padding?.bottom ?? 16) + 20
+                : (padding?.bottom ?? 16),
+          ),
           child: body,
         ),
       ),

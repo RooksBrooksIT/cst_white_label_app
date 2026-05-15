@@ -23,6 +23,8 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _controller;
   late Animation<double> _logoOpacity;
   late Animation<double> _nameOpacity;
+  late Animation<double> _logoScale;
+  late Animation<Offset> _textSlide;
 
   @override
   void initState() {
@@ -30,22 +32,37 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 2200),
     );
 
     _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+        curve: const Interval(0.1, 0.6, curve: Curves.easeIn),
+      ),
+    );
+
+    _logoScale = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.1, 0.7, curve: Curves.easeOutBack),
       ),
     );
 
     _nameOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.4, 0.8, curve: Curves.easeIn),
+        curve: const Interval(0.5, 0.9, curve: Curves.easeIn),
       ),
     );
+
+    _textSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.5, 0.9, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _controller.forward();
     _checkLoginAndSync();
@@ -168,69 +185,115 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
-          return Column(
-            children: [
-              // Logo shifted slightly higher
-              Expanded(
-                flex: 5,
-                child: Align(
-                  alignment: const Alignment(0, -0.2), // Shift slightly up from center
-                  child: Opacity(
-                    opacity: _logoOpacity.value,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Image.asset(
-                        'assets/images/splash_screen_logo.png',
-                        width: 200, // Increased size for better balance
-                        height: 200,
-                        fit: BoxFit.contain,
+          return Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white,
+                  Colors.grey.shade50,
+                  Colors.grey.shade100,
+                ],
+              ),
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Align(
+                    alignment: const Alignment(0, -0.1),
+                    child: Transform.scale(
+                      scale: _logoScale.value,
+                      child: Opacity(
+                        opacity: _logoOpacity.value,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.15),
+                                blurRadius: 40,
+                                spreadRadius: 5,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'assets/images/splash_screen_logo.jpg',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              // App name at bottom
-              Opacity(
-                opacity: _nameOpacity.value,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 60),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ValueListenableBuilder<String>(
-                        valueListenable: AppTheme.appName,
-                        builder: (context, name, _) {
-                          return Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Theme.of(context).colorScheme.primary,
-                              letterSpacing: 1.5,
+                // App name at bottom
+                SlideTransition(
+                  position: _textSlide,
+                  child: Opacity(
+                    opacity: _nameOpacity.value,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 60),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ValueListenableBuilder<String>(
+                            valueListenable: AppTheme.appName,
+                            builder: (context, name, _) {
+                              return Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  letterSpacing: 1.2,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
                             ),
-                          );
-                        },
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Build smarter. Manage better.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Build smarter. Manage better.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),

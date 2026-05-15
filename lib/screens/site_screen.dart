@@ -74,6 +74,21 @@ class _SiteScreenState extends State<SiteScreen>
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
           .toList();
+
+      // Add default status options if they are not already present
+      final defaultStatuses = [
+        'Not Started',
+        'Ongoing',
+        'On Hold',
+        'Completed',
+        'Cancelled',
+      ];
+      for (var status in defaultStatuses) {
+        if (!statusList.contains(status)) {
+          statusList.add(status);
+        }
+      }
+
       return statusList;
     } catch (e) {
       throw 'Failed to load status options: $e';

@@ -13,9 +13,7 @@ import 'manager_expenses.dart';
 import 'manager_site_entry_page.dart';
 import 'manager_material_approval_screen.dart';
 import 'material_report.dart';
-import 'org_notification_page.dart';
 import 'org_site_supervisor_dailyWeek_report.dart';
-import '../services/notification_service.dart';
 import 'organization_expenses.dart';
 import 'organization_site_entry.dart';
 import 'site_weekly_financial_report.dart';
@@ -59,12 +57,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       (snapshot) {
         if (snapshot.exists && mounted) {
           final data = snapshot.data()!;
-          final isActive = data['isSubscriptionActive'] as bool? ?? false;
+          final isActive = data['isSubscriptionActive'] as bool? ?? true;
           final endDate = data['subscriptionEndDate'] as Timestamp?;
 
           bool isExpired = false;
           if (endDate != null) {
-            isExpired = DateTime.now().isAfter(endDate.toDate());
+            // Add a small buffer (e.g. 1 hour) to handle clock skews
+            isExpired = DateTime.now().isAfter(endDate.toDate().add(const Duration(hours: 1)));
           }
 
           if (!isActive || isExpired) {
@@ -107,56 +106,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         return GlassScaffold(
           title: appName.isNotEmpty ? appName : 'Organization Dashboard',
           actions: [
-            StreamBuilder<int>(
-              stream: NotificationService.unreadCountForOrganisation(),
-              builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      tooltip: 'Notifications',
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OrgNotificationPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    if (count > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.error,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            count > 9 ? '9+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
             IconButton(
               icon: const Icon(Icons.menu_rounded),
               tooltip: 'Menu',
@@ -330,6 +279,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ],
             ),
           ),
+        ),
+        SliverToBoxAdapter(
+          child: const SizedBox(height: 40), // Spacing for gesture bar
         ),
       ],
     );
@@ -738,7 +690,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   void _navigateToConfiguration(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ConfigAccountDashboard()),
+      MaterialPageRoute(builder: (context) => const ConfigAccountDashboard(showLogout: false)),
     );
   }
 
@@ -818,10 +770,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ManagerSiteEntryPage(
-          userName: userName,
-          userDetails: userData,
-        ),
+        builder: (context) =>
+            ManagerSiteEntryPage(userName: userName, userDetails: userData),
       ),
     );
   }

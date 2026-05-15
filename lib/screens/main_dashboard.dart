@@ -81,139 +81,125 @@ class _MainDashboardState extends State<MainDashboard> {
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 12),
-                    // Header
-                    if (_isFromReferral) ...[
-                      // Organization Logo
-                      if (_logoUrl != null && _logoUrl!.isNotEmpty)
-                        Container(
-                          width: 110,
-                          height: 110,
-                          padding: const EdgeInsets.all(
-                            4,
-                          ), // Restored original-style padding
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: colorScheme.outline,
-                              width: 2,
+          : SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // ... (existing content)
+                      const SizedBox(height: 12),
+                      // ... (header and cards)
+                      // I will replace the whole children block to be safe
+                      const SizedBox(height: 12),
+                      // Header
+                      if (_isFromReferral) ...[
+                        // Organization Logo
+                        if (_logoUrl != null && _logoUrl!.isNotEmpty)
+                          Container(
+                            width: 110,
+                            height: 110,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(color: colorScheme.outline, width: 2),
                             ),
+                            child: Image.network(_logoUrl!, fit: BoxFit.contain),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(28),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.business_rounded, size: 60, color: colorScheme.primary),
                           ),
-                          child: Image.network(
-                            _logoUrl!,
-                            fit: BoxFit.contain, // Prevent cropping
-                          ),
-                        )
-                      else
+                        const SizedBox(height: 24),
+                        Text(
+                          _orgName ?? 'Organization',
+                          textAlign: TextAlign.center,
+                          style: textTheme.headlineMedium?.copyWith(fontSize: 24),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Select your role to continue',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodyMedium?.copyWith(fontSize: 14),
+                        ),
+                      ] else ...[
+                        // Generic Header
                         Container(
-                          padding: const EdgeInsets.all(28),
+                          width: 120,
+                          height: 120,
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
                             color: colorScheme.primary.withOpacity(0.08),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            Icons.business_rounded,
-                            size: 60,
-                            color: colorScheme.primary,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(60),
+                            child: Image.asset('assets/images/logo_main.png', fit: BoxFit.contain),
                           ),
                         ),
-                      const SizedBox(height: 24),
-                      Text(
-                        _orgName ?? 'Organization',
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(fontSize: 24),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Select your role to continue',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(fontSize: 14),
-                      ),
-                    ] else ...[
-                      // Generic Header
-                      Container(
-                        width: 120,
-                        height: 120,
-                        padding: const EdgeInsets.all(
-                          4,
-                        ), // Restored original-style padding
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.08),
-                          shape: BoxShape.circle,
+                        const SizedBox(height: 32),
+                        Text(
+                          'Select Your Role',
+                          textAlign: TextAlign.center,
+                          style: textTheme.headlineMedium?.copyWith(fontSize: 28),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(60),
-                          child: Image.asset(
-                            'assets/images/logo_main.png',
-                            fit: BoxFit.contain,
-                          ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Choose how you\'d like to sign in',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodyMedium?.copyWith(fontSize: 14),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Select Your Role',
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(fontSize: 28),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Choose how you\'d like to sign in',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(fontSize: 14),
-                      ),
-                    ],
-
-                    const SizedBox(height: 48),
-
-                    // Role Cards
-                    if (!_isFromReferral) ...[
+                      ],
+                      const SizedBox(height: 48),
+                      // Role Cards
+                      if (!_isFromReferral) ...[
+                        _buildRoleCard(
+                          context: context,
+                          title: 'Organization',
+                          subtitle: 'Manage org details & data',
+                          icon: Icons.business_center_rounded,
+                          accentColor: colorScheme.primary,
+                          destination: const Organisation_LoginPage(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       _buildRoleCard(
                         context: context,
-                        title: 'Organization',
-                        subtitle: 'Manage org details & data',
-                        icon: Icons.business_center_rounded,
-                        accentColor: colorScheme.primary,
-                        destination: const Organisation_LoginPage(),
+                        title: 'Manager',
+                        subtitle: 'Configure settings & control',
+                        icon: Icons.manage_accounts_rounded,
+                        accentColor: colorScheme.secondary,
+                        destination: const ConfigLoginPage(),
                       ),
                       const SizedBox(height: 16),
+                      _buildRoleCard(
+                        context: context,
+                        title: 'Supervisor',
+                        subtitle: 'Manage site activities',
+                        icon: Icons.supervisor_account_rounded,
+                        accentColor: const Color(0xFF0EA5E9),
+                        destination: const SupervisorLoginPage(),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRoleCard(
+                        context: context,
+                        title: 'Customer',
+                        subtitle: 'View your project status',
+                        icon: Icons.person_rounded,
+                        accentColor: const Color(0xFF10B981),
+                        destination: const CustomerLoginPage(),
+                      ),
+                      const SizedBox(height: 40), // Extra bottom padding
                     ],
-
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Manager',
-                      subtitle: 'Configure settings & control',
-                      icon: Icons.manage_accounts_rounded,
-                      accentColor: colorScheme.secondary,
-                      destination: const ConfigLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Supervisor',
-                      subtitle: 'Manage site activities',
-                      icon: Icons.supervisor_account_rounded,
-                      accentColor: const Color(0xFF0EA5E9), // Light Blue
-                      destination: const SupervisorLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Customer',
-                      subtitle: 'View your project status',
-                      icon: Icons.person_rounded,
-                      accentColor: const Color(0xFF10B981), // Emerald
-                      destination: const CustomerLoginPage(),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
+                  ),
                 ),
               ),
             ),

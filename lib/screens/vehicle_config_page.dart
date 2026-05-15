@@ -83,11 +83,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       final names = snapshot.docs
           .map((doc) => doc['driverName'] as String? ?? '')
           .where((name) => name.isNotEmpty)
+          .toSet() // Ensure uniqueness
           .toList();
 
       if (!mounted) return;
       setState(() {
         _driverNames = names;
+        // Validate current selection
+        if (_selectedDriver != null && !_driverNames.contains(_selectedDriver)) {
+          _selectedDriver = null;
+        }
       });
     } catch (e) {
       print('Error loading drivers: $e');
@@ -113,7 +118,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               return siteName.toString();
             })
             .where((name) => name.isNotEmpty)
+            .toSet() // Ensure uniqueness
             .toList();
+            
+        // Validate current selections
+        if (_selectedFromSite != null && !_siteNames.contains(_selectedFromSite)) {
+          _selectedFromSite = null;
+        }
+        if (_selectedToSite != null && !_siteNames.contains(_selectedToSite)) {
+          _selectedToSite = null;
+        }
       });
     } catch (e) {
       print('Error loading sites: $e');
@@ -148,6 +162,10 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       if (!mounted) return;
       setState(() {
         _vehicles = vehicles;
+        // Validate current selection
+        if (_selectedVehicle != null && !_vehicles.any((v) => v['id'] == _selectedVehicle)) {
+          _selectedVehicle = null;
+        }
       });
     } catch (e) {
       print('Error loading vehicles: $e');
@@ -188,7 +206,21 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
       if (!mounted) return;
       setState(() {
-        _materials = materialsWithUnits;
+        // Ensure material names are unique for the dropdown
+        final uniqueMaterials = <String, Map<String, dynamic>>{};
+        for (var material in materialsWithUnits) {
+          final name = material['materialName'] as String;
+          if (!uniqueMaterials.containsKey(name)) {
+            uniqueMaterials[name] = material;
+          }
+        }
+        _materials = uniqueMaterials.values.toList();
+        
+        // Validate current selection
+        if (_selectedMaterial != null && !_materials.any((m) => m['materialName'] == _selectedMaterial)) {
+          _selectedMaterial = null;
+          _selectedUnit = '';
+        }
       });
     } catch (e) {
       print('Error loading materials: $e');

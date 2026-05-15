@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'Supervisor_material_information.dart';
 import 'material_at_site_entry_page.dart';
 import 'material_request_form.dart';
-import 'notification_page.dart';
 import 'supervisor_material_view_request_screen.dart';
 import 'supervisor_tool_movement.dart';
 import 'supervisor_verification_page.dart';
@@ -13,7 +12,6 @@ import 'supervisor_work_schedule_page.dart';
 import 'supervisor_worker_att_page.dart';
 import '../widgets/glass_scaffold.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
@@ -159,7 +157,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             if (!await launchUrl(url)) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Could not open privacy policy')),
+                  const SnackBar(
+                    content: Text('Could not open privacy policy'),
+                  ),
                 );
               }
             }
@@ -188,7 +188,12 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("No", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            child: Text(
+              "No",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -202,7 +207,13 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 );
               }
             },
-            child: Text("Yes", style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+            child: Text(
+              "Yes",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -237,79 +248,40 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       },
       child: GlassScaffold(
         title: 'Supervisor Dashboard',
-        onBack: () => _showLogoutDialog(context),
         actions: [
-          StreamBuilder<int>(
-            stream: NotificationService.unreadCountForSupervisor(
-                widget.supervisorName),
-            builder: (context, snapshot) {
-              final count = snapshot.data ?? 0;
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.notifications_outlined,
-                        color: Theme.of(context).colorScheme.onPrimary),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => NotificationPage(
-                              supervisorName: widget.supervisorName),
-                        ),
-                      );
-                    },
-                  ),
-                  if (count > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.error,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                            minWidth: 18, minHeight: 18),
-                        child: Text(
-                          count > 9 ? '9+' : '$count',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onError,
-                              fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+          IconButton(
+            icon: Icon(
+              Icons.logout_rounded,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            tooltip: 'Logout',
+            onPressed: () => _showLogoutDialog(context),
           ),
         ],
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.isMobile(context) ? 16 : 32,
-          vertical: 24,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildProfileSection(),
-            const SizedBox(height: 32),
-            ...groupedItems.entries.map((entry) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(entry.key),
-                  ...entry.value.map((item) => _buildMenuCard(item)),
-                ],
-              );
-            }),
-            const SizedBox(height: 40),
-          ],
+        body: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 16 : 32,
+            vertical: 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildProfileSection(),
+              const SizedBox(height: 32),
+              ...groupedItems.entries.map((entry) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader(entry.key),
+                    ...entry.value.map((item) => _buildMenuCard(item)),
+                  ],
+                );
+              }),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -371,7 +343,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   'Site Supervisor • ID: ${widget.supervisorId}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary.withOpacity(0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),

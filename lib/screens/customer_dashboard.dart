@@ -193,7 +193,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Colors.white60),
+                style: TextStyle(color: Color.fromARGB(153, 0, 0, 0)),
               ),
             ),
             TextButton(
@@ -277,7 +277,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         title: 'Customer Dashboard',
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
             onPressed: () => _showLogoutDialog(context),
             tooltip: 'Logout',
           ),

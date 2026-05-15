@@ -33,11 +33,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   final TextEditingController _fromSiteNameController = TextEditingController();
   final TextEditingController _fromSupervisorController =
       TextEditingController();
+  final TextEditingController _fromProjectNameController = TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
 
   final TextEditingController _toManagerController = TextEditingController();
   final TextEditingController _toSiteNameController = TextEditingController();
   final TextEditingController _toSupervisorController = TextEditingController();
+  final TextEditingController _toProjectNameController = TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
 
   // Site-to-Company specific state
@@ -87,10 +89,12 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     _fromManagerController.dispose();
     _fromSiteNameController.dispose();
     _fromSupervisorController.dispose();
+    _fromProjectNameController.dispose();
     _fromDateController.dispose();
     _toManagerController.dispose();
     _toSiteNameController.dispose();
     _toSupervisorController.dispose();
+    _toProjectNameController.dispose();
     _toDateController.dispose();
 
     // Site-to-Company controllers
@@ -403,7 +407,9 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       _fromSiteId = null;
       _toSiteId = null;
       _fromSiteNameController.clear();
+      _fromProjectNameController.clear();
       _toSiteNameController.clear();
+      _toProjectNameController.clear();
       _fromSupervisorController.clear();
       _toSupervisorController.clear();
       _fromDateController.clear();
@@ -580,6 +586,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           "Tositeid": _toSiteId,
           "managername": _fromManagerController.text,
           "materialname": material['materialName'],
+          "materialdisplayname": material['displayName'],
+          "fromsitename": _fromSiteNameController.text,
+          "fromprojectname": _fromProjectNameController.text,
+          "fromsupervisorname": _fromSupervisorController.text,
+          "tositename": _toSiteNameController.text,
+          "toprojectname": _toProjectNameController.text,
+          "tosupervisorname": _toSupervisorController.text,
           "timestamp": FieldValue.serverTimestamp(),
         };
       }
@@ -917,6 +930,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         setState(() {
           _fromSiteId = v;
           _fromSiteNameController.text = site['siteName']?.toString() ?? '';
+          _fromProjectNameController.text = site['projectName']?.toString() ?? '';
           _fromSupervisorController.text =
               site['supervisorName']?.toString() ?? '';
           _selectedMaterialName = null;
@@ -933,6 +947,14 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         hint: 'Auto-filled from selection',
         enabled: false,
         icon: Icons.location_on,
+      ),
+      SizedBox(height: Responsive.scaleV(context, 16)),
+      _buildTextField(
+        controller: _fromProjectNameController,
+        label: 'Project Name',
+        hint: 'Auto-filled from selection',
+        enabled: false,
+        icon: Icons.business,
       ),
       SizedBox(height: Responsive.scaleV(context, 16)),
       _buildTextField(
@@ -969,6 +991,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         setState(() {
           _toSiteId = v;
           _toSiteNameController.text = site['siteName']?.toString() ?? '';
+          _toProjectNameController.text = site['projectName']?.toString() ?? '';
           _toSupervisorController.text =
               site['supervisorName']?.toString() ?? '';
         });
@@ -980,6 +1003,14 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         hint: 'Auto-filled from selection',
         enabled: false,
         icon: Icons.location_on,
+      ),
+      SizedBox(height: Responsive.scaleV(context, 16)),
+      _buildTextField(
+        controller: _toProjectNameController,
+        label: 'Project Name',
+        hint: 'Auto-filled from selection',
+        enabled: false,
+        icon: Icons.business,
       ),
       SizedBox(height: Responsive.scaleV(context, 16)),
       _buildTextField(
@@ -1124,6 +1155,15 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         hint: 'Auto-filled from selection',
         enabled: false,
         icon: Icons.location_on,
+      ),
+      SizedBox(height: Responsive.scaleV(context, 16)),
+
+      _buildTextField(
+        controller: _projectNameController,
+        label: 'Project Name',
+        hint: 'Auto-filled from selection',
+        enabled: false,
+        icon: Icons.business,
       ),
       SizedBox(height: Responsive.scaleV(context, 16)),
 

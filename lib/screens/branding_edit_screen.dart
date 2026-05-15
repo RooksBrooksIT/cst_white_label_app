@@ -10,6 +10,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
+import '../utils/enums.dart';
 
 class BrandingEditScreen extends StatefulWidget {
   const BrandingEditScreen({super.key});
@@ -20,8 +21,6 @@ class BrandingEditScreen extends StatefulWidget {
 
 class _BrandingEditScreenState extends State<BrandingEditScreen> {
   final TextEditingController _appNameController = TextEditingController();
-  File? _logoFile;
-  bool _isPickingImage = false;
   bool _isLoading = false;
   bool _isFetching = true;
   Color _selectedColor = const Color(0xFF017FDF);
@@ -101,25 +100,6 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
     );
   }
 
-  Future<void> _pickLogo() async {
-    if (_isPickingImage) return;
-    _isPickingImage = true;
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
-      if (picked != null && mounted) {
-        setState(() => _logoFile = File(picked.path));
-      }
-    } catch (e) {
-      debugPrint('Image picker error: $e');
-    } finally {
-      _isPickingImage = false;
-    }
-  }
-
   Future<void> _saveChanges() async {
     setState(() => _isLoading = true);
     try {
@@ -129,18 +109,9 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
       final String appName = _appNameController.text.trim();
       final String colorHex = AppTheme.colorToHex(_selectedColor);
 
-      String? logoUrl;
-      if (_logoFile != null) {
-        final String orgId = FirestoreService.currentOrgId;
-        final ref = FirebaseStorage.instance.ref().child('org_logos/$orgId.jpg');
-        await ref.putFile(_logoFile!);
-        logoUrl = await ref.getDownloadURL();
-      }
-
       await FirestoreService.brandingDoc.set({
         'appName': appName,
         'primaryColor': colorHex,
-        if (logoUrl != null) 'logoUrl': logoUrl,
       }, SetOptions(merge: true));
 
       // Update local theme state immediately
@@ -217,56 +188,6 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                       controller: _appNameController,
                       label: 'App Name',
                       icon: Icons.app_registration_rounded,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSection(
-                    context,
-                    title: 'Company Logo',
-                    icon: Icons.upload_rounded,
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: _pickLogo,
-                          child: Container(
-                            width: double.infinity,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: _logoFile != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(15),
-                                    child: Image.file(
-                                      _logoFile!,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.add_photo_alternate_outlined,
-                                        color: const Color(0xFF94A3B8),
-                                        size: 40,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        'Change Logo',
-                                        style: TextStyle(
-                                          color: Color(0xFF94A3B8),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                   const SizedBox(height: 24),

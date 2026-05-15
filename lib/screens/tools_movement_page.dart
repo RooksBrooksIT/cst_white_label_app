@@ -53,15 +53,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   int? _selectedToolAvailableCount;
   int? _returnSelectedToolAvailableCount;
 
-  // Search controllers and texts for filtering tools
-  final TextEditingController _companyToolSearchController =
-      TextEditingController();
-  String _companyToolSearchText = '';
-
-  final TextEditingController _returnToolSearchController =
-      TextEditingController();
-  String _returnToolSearchText = '';
-
   @override
   void initState() {
     super.initState();
@@ -69,22 +60,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     _fetchSiteIds();
     _fetchTools();
 
-    // Add listeners to update filtered lists on search input
-    _companyToolSearchController.addListener(() {
-      setState(() {
-        _companyToolSearchText = _companyToolSearchController.text
-            .trim()
-            .toLowerCase();
-      });
-    });
-
-    _returnToolSearchController.addListener(() {
-      setState(() {
-        _returnToolSearchText = _returnToolSearchController.text
-            .trim()
-            .toLowerCase();
-      });
-    });
   }
 
   @override
@@ -96,8 +71,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     _returnProjectNameController.dispose();
     _returnManagerNameController.dispose();
     _returnSupervisorNameController.dispose();
-    _companyToolSearchController.dispose();
-    _returnToolSearchController.dispose();
     super.dispose();
   }
 
@@ -238,7 +211,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         _returnToolCount = null;
         _returnAddedTools.clear();
         _returnSelectedToolAvailableCount = null;
-        _returnToolSearchController.clear();
       } else {
         _projectNameController.clear();
         _managerNameController.clear();
@@ -249,7 +221,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         _toolCount = null;
         _addedTools.clear();
         _selectedToolAvailableCount = null;
-        _companyToolSearchController.clear();
       }
     });
   }
@@ -364,21 +335,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
 
   @override
   Widget build(BuildContext context) {
-    // Filtered lists for search bars (case-insensitive)
-    final companyFilteredTools = _tools.where((t) {
-      final code = (t['toolCode'] ?? '').toString().toLowerCase();
-      final name = (t['toolName'] ?? '').toString().toLowerCase();
-      return code.contains(_companyToolSearchText) ||
-          name.contains(_companyToolSearchText);
-    }).toList();
-
-    final returnFilteredTools = _tools.where((t) {
-      final code = (t['toolCode'] ?? '').toString().toLowerCase();
-      final name = (t['toolName'] ?? '').toString().toLowerCase();
-      return code.contains(_returnToolSearchText) ||
-          name.contains(_returnToolSearchText);
-    }).toList();
-
     return GlassScaffold(
       title: 'Tools Movement',
       onBack: () => Navigator.pop(context),
@@ -399,8 +355,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildCompanyToSiteTab(companyFilteredTools),
-          _buildSiteToCompanyTab(returnFilteredTools),
+          _buildCompanyToSiteTab(_tools),
+          _buildSiteToCompanyTab(_tools),
         ],
       ),
     );
@@ -525,36 +481,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // Search bar
-                  TextField(
-                    controller: _companyToolSearchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search Tools',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: _primaryColor.withOpacity(0.3),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: _primaryColor.withOpacity(0.3),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: _primaryColor),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                      filled: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   _buildDropdownField(
                     value: _selectedTool,
                     label: 'Select Tool',
@@ -801,36 +727,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // Search bar
-                  TextField(
-                    controller: _returnToolSearchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search Tools',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: _primaryColor.withOpacity(0.3),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: _primaryColor.withOpacity(0.3),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: _primaryColor),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                      filled: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   _buildDropdownField(
                     value: _returnSelectedTool,
                     label: 'Select Tool',
@@ -1224,8 +1120,11 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     List<String>? displayItems,
     required void Function(String?) onChanged,
   }) {
+    // Prevent dropdown crash if value is no longer in items list
+    final safeValue = items.contains(value) ? value : null;
+
     return DropdownButtonFormField<String>(
-      value: value,
+      value: safeValue,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(

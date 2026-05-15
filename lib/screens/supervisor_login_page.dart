@@ -434,7 +434,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('sup_org_path', orgId);
         // Default relative path for organization details
-        final String resolvedPath = 'organisation/$orgId/admin/data';
+        final String resolvedPath = 'organisation/$orgId/data/admin';
         await prefs.setString('sup_org_doc_path', resolvedPath);
 
         // Refresh FirestoreService cache

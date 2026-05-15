@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -29,12 +30,19 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
 
   Future<void> _fetchInformation() async {
     try {
-      final doc = await FirestoreService.orgDataDoc.get();
+      var doc = await FirestoreService.orgDataDoc.get();
+
+      // Fallback: If admin/data doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint('OrgInformationScreen: Data doc not found in admin, falling back to root.');
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (doc.exists && mounted) {
         final data = doc.data();
         setState(() {
           _addressController.text = data?['address'] ?? '';
-          _orgPhoneController.text = data?['orgPhone'] ?? '';
+          _orgPhoneController.text = data?['phone'] ?? data?['orgPhone'] ?? '';
         });
       }
     } catch (e) {
@@ -57,7 +65,7 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
     try {
       await FirestoreService.orgDataDoc.set({
         'address': _addressController.text.trim(),
-        'orgPhone': _orgPhoneController.text.trim(),
+        'phone': _orgPhoneController.text.trim(),
       }, SetOptions(merge: true));
 
       if (mounted) {
@@ -141,9 +149,16 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                             label: 'Organisation Phone Number',
                             icon: Icons.phone_rounded,
                             keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(10),
+                            ],
                             validator: (val) {
                               if (val == null || val.isEmpty) {
                                 return 'Please enter the phone number';
+                              }
+                              if (val.length != 10) {
+                                return 'Phone number must be 10 digits';
                               }
                               return null;
                             },

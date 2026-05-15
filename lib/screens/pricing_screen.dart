@@ -10,6 +10,9 @@ import 'Organization_Dashboard.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
+import '../utils/enums.dart';
+import '../services/auth_service.dart';
+
 
 class PricingScreen extends StatefulWidget {
   final String orgName;
@@ -19,7 +22,6 @@ class PricingScreen extends StatefulWidget {
   final String password;
   final String dateStr;
   final String appName;
-  final File? logoFile;
   final Color selectedColor;
 
   const PricingScreen({
@@ -31,7 +33,6 @@ class PricingScreen extends StatefulWidget {
     required this.password,
     required this.dateStr,
     required this.appName,
-    this.logoFile,
     required this.selectedColor,
   });
 
@@ -56,17 +57,7 @@ class _PricingScreenState extends State<PricingScreen> {
       final String orgId = '${sanitizedOrgName}_${widget.dateStr}';
 
       // Simplified path for organization details
-      final String orgConfigDocPath = 'organisation/$orgId/admin/data';
-
-      // Upload logo
-      String? logoUrl;
-      if (widget.logoFile != null) {
-        final ref = FirebaseStorage.instance.ref().child(
-          'org_logos/$orgId.jpg',
-        );
-        await ref.putFile(widget.logoFile!);
-        logoUrl = await ref.getDownloadURL();
-      }
+      final String orgConfigDocPath = 'organisation/$orgId/data/admin';
 
       // Subscription dates
       final now = DateTime.now();
@@ -74,73 +65,66 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final orgRef =
+            FirebaseFirestore.instance.collection('organisation').doc(orgId);
+        final adminColl = orgRef.collection('admin');
+
+        // 1. Branding Document
+        transaction.set(adminColl.doc('branding'), {
+          'appName': widget.appName,
+          'primaryColor': AppTheme.colorToHex(widget.selectedColor),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // 2. Data Document (Credentials & Info)
+        transaction.set(adminColl.doc('data'), {
+          'orgName': widget.orgName,
+          'email': widget.email,
+          'phone': widget.phone,
+          'username': widget.username,
+          'password': widget.password,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // 3. Referral Document
+        transaction.set(adminColl.doc('referral'), {
+          'referralCode': orgReferralCode,
+          'orgReferralCode': orgReferralCode,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // 4. Subscription Document
+        transaction.set(adminColl.doc('subscription'), {
+          'subscriptionPlan': '30 days',
+          'subscriptionStartDate': Timestamp.fromDate(now),
+          'subscriptionEndDate': Timestamp.fromDate(endDate),
+          'isSubscriptionActive': true,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // Also add the admin as the first entry in the organizationUser subcollection
         transaction.set(
-          FirebaseFirestore.instance.doc('organisation/$orgId/admin/data'),
+          orgRef.collection('organizationUser').doc(widget.username),
           {
-            'orgName': widget.orgName,
-            'email': widget.email,
-            'phone': widget.phone,
             'username': widget.username,
             'password': widget.password,
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance.doc('organisation/$orgId/admin/referal'),
-          {
-            'referralCode': orgReferralCode,
-            'orgReferralCode': orgReferralCode,
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance.doc('organisation/$orgId/admin/branding'),
-          {
-            'appName': widget.appName,
-            'primaryColor': AppTheme.colorToHex(widget.selectedColor),
-            if (logoUrl != null) 'logoUrl': logoUrl,
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-        );
-
-        transaction.set(
-          FirebaseFirestore.instance.doc(
-            'organisation/$orgId/admin/subscription',
-          ),
-          {
-            'subscriptionPlan': '30 days',
-            'subscriptionStartDate': Timestamp.fromDate(now),
-            'subscriptionEndDate': Timestamp.fromDate(endDate),
-            'isSubscriptionActive': true,
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-        );
-
-        // Global lookup mapping: Username to Org Details
-        transaction.set(
-          FirebaseFirestore.instance
-              .collection('globalUsers')
-              .doc(widget.username),
-          {
-            'orgName': widget.orgName,
-            'dynamicPath': orgId,
-            'username': widget.username,
-            'password': widget.password,
-            'fullConfigPath': orgConfigDocPath,
+            'role': 'admin',
+            'orgId': orgId,
             'createdAt': FieldValue.serverTimestamp(),
           },
         );
       });
 
-      // Auto-login
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('org_isLoggedIn', true);
-      await prefs.setString('org_username', widget.username);
-      await prefs.setString('org_dynamic_path', orgId);
-      await prefs.setString('org_name', widget.orgName);
-      await prefs.setString('org_doc_path', orgConfigDocPath);
+      // Auto-login using AuthService to ensure all unified keys are set
+      await AuthService().login(UserRole.organization, {
+        'username': widget.username,
+        'dynamicPath': orgId,
+        'org_name': widget.orgName,
+        'org_doc_path': orgConfigDocPath,
+      });
+
+      // Crucial: Initialize FirestoreService with the new orgId so it uses the correct path immediately
+      await FirestoreService.initialize();
 
       // Apply the new branding globally immediately after successful registration
       await AppTheme.updateTheme(widget.selectedColor);

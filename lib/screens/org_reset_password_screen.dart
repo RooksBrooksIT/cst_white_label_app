@@ -77,18 +77,26 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
       final oldPassword = _oldPasswordController.text.trim();
       final newPassword = _newPasswordController.text.trim();
 
-      // Verify old password globally using the new top-level mapping
-      final userDoc = await FirebaseFirestore.instance
-          .collection('globalUsers')
-          .doc(username)
+      // Verify old password globally using the admin collection group
+      final userQuery = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('username', isEqualTo: username)
           .get();
 
-      if (!userDoc.exists || userDoc.data()?['password'] != oldPassword) {
+      // Find the 'data' document
+      DocumentSnapshot<Map<String, dynamic>>? dataDoc;
+      for (var doc in userQuery.docs) {
+        if (doc.id == 'data') {
+          dataDoc = doc;
+          break;
+        }
+      }
+
+      if (dataDoc == null || dataDoc.data()?['password'] != oldPassword) {
         _showError('Incorrect old password');
       } else {
         // Update to new password via the found document reference
-        final userDocRef = userDoc.reference;
-        await userDocRef.update({'password': newPassword});
+        await dataDoc.reference.update({'password': newPassword});
 
         _showSuccess('Password updated successfully');
         if (mounted) Navigator.pop(context);

@@ -19,7 +19,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   String? _selectedProjectName;
 
   // Selected worker for current selection
-  String? _selectedWorker;
+  String? _selectedWorkerId;
+  String? _selectedWorkerName;
   String? _selectedWorkerDesignation;
   String? _selectedWorkerSalary;
   String? _selectedWorkerPhone;
@@ -210,23 +211,25 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     }
   }
 
-  void _onWorkerSelected(String? workerName) {
+  void _onWorkerSelected(String? workerId) {
     setState(() {
-      _selectedWorker = workerName;
+      _selectedWorkerId = workerId;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
     });
 
-    if (workerName != null) {
+    if (workerId != null) {
       // Find the selected worker details
       final selectedWorkerData = _workers.firstWhere(
-        (worker) => worker['name'] == workerName,
+        (worker) => worker['id'] == workerId,
         orElse: () => {},
       );
 
       if (selectedWorkerData.isNotEmpty) {
         setState(() {
+          _selectedWorkerName = selectedWorkerData['name'];
           _selectedWorkerDesignation = selectedWorkerData['designation'];
           _selectedWorkerSalary = selectedWorkerData['salary'];
           _selectedWorkerPhone = selectedWorkerData['phoneNumber'];
@@ -236,7 +239,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   }
 
   void _addWorkerToList() {
-    if (_selectedWorker == null || _selectedWorkerDesignation == null) {
+    if (_selectedWorkerId == null || _selectedWorkerName == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Please select a worker first')));
@@ -245,7 +248,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Check if worker is already added in current session
     bool alreadyExists = _selectedWorkersList.any(
-      (worker) => worker['workerName'] == _selectedWorker,
+      (worker) => worker['workerName'] == _selectedWorkerName,
     );
 
     if (alreadyExists) {
@@ -257,7 +260,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     setState(() {
       _selectedWorkersList.add({
-        'workerName': _selectedWorker,
+        'workerId': _selectedWorkerId,
+        'workerName': _selectedWorkerName,
         'workerDesignation': _selectedWorkerDesignation,
         'workerSalary': _selectedWorkerSalary,
         'workerPhone': _selectedWorkerPhone,
@@ -267,7 +271,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Reset current selection
     setState(() {
-      _selectedWorker = null;
+      _selectedWorkerId = null;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
@@ -303,6 +308,28 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
       return;
     }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Mapping'),
+        content: Text(
+          'Are you sure you want to save the worker mapping for $_selectedSite? This will update the existing records if any.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
 
     setState(() => _isSubmitting = true);
 
@@ -565,7 +592,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedWorker,
+                    value: _selectedWorkerId,
                     decoration: InputDecoration(
                       labelText: 'Select Worker',
                       border: OutlineInputBorder(),
@@ -578,12 +605,13 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                               child: Text('Loading workers...'),
                             ),
                           ]
-                        : availableWorkers.map<DropdownMenuItem<String>>((
-                            worker,
-                          ) {
+                          
+                        : availableWorkers.map<DropdownMenuItem<String>>((worker) {
+                            final String name = worker['name']?.toString().trim() ?? '';
+                            final String displayName = name.isNotEmpty ? name : 'Unnamed (${worker['id']})';
                             return DropdownMenuItem<String>(
-                              value: worker['name'] as String?,
-                              child: Text(worker['name'] ?? ''),
+                              value: worker['id'] as String?,
+                              child: Text(displayName),
                             );
                           }).toList(),
                     onChanged: _onWorkerSelected,
@@ -634,7 +662,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     ),
                 ],
               )
-            else if (_selectedWorker != null)
+            else if (_selectedWorkerId != null)
               Text(
                 'No details found for this worker',
                 style: TextStyle(color: Colors.orange),

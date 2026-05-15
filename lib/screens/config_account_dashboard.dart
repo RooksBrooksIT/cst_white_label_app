@@ -33,13 +33,15 @@ import 'package:demo_cst/screens/worker_summary_report_page.dart';
 import 'package:demo_cst/screens/workers_config_page.dart';
 import 'package:demo_cst/screens/workers_site_mapping_page.dart';
 import 'package:demo_cst/screens/workers_availability_report_page.dart';
+import 'package:demo_cst/screens/contact_support_screen.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
 
-  const ConfigAccountDashboard({super.key});
+  final bool showLogout;
+  const ConfigAccountDashboard({super.key, this.showLogout = true});
 
   @override
   State<ConfigAccountDashboard> createState() => _ConfigAccountDashboardState();
@@ -79,7 +81,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   // Dashboard items grouped by section with enhanced data
   final Map<String, List<DashboardItem>> groupedItems = {
-    "Project Configuration": [
+    "Configuration": [
       DashboardItem(
         'Project Category',
         Icons.category_rounded,
@@ -109,15 +111,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.teal,
       ),
       DashboardItem(
-        'Project',
-        Icons.work_rounded,
-        Colors.orangeAccent,
-        'Oversee project portfolios',
-        Colors.orangeAccent,
-      ),
-    ],
-    "Material Configuration": [
-      DashboardItem(
         'Material Master',
         Icons.inventory_2_rounded,
         Colors.green,
@@ -125,7 +118,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.green,
       ),
       DashboardItem(
-        'Material Sub Category',
+        'Material Sub Category Master',
         Icons.category_rounded,
         Colors.blue,
         'Organize material types',
@@ -139,18 +132,50 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.deepOrange,
       ),
       DashboardItem(
-        'Material Movements',
-        Icons.swap_horiz_rounded,
-        Colors.deepPurple,
-        'Track material transfers',
-        Colors.deepPurple,
-      ),
-      DashboardItem(
         'Material Availability',
         Icons.check_circle_rounded,
         Colors.lightGreen,
         'Real-time stock status',
         Colors.lightGreen,
+      ),
+      DashboardItem(
+        'Labour',
+        Icons.engineering_rounded,
+        Colors.brown,
+        'Labour management',
+        Colors.brown,
+      ),
+      DashboardItem(
+        'Workers Configuration',
+        Icons.people_rounded,
+        const Color(0xFF8E24AA),
+        'Worker profiles and roles',
+        const Color(0xFF8E24AA),
+      ),
+      DashboardItem(
+        'Vehicle Configuration',
+        Icons.settings_rounded,
+        Colors.red,
+        'Vehicle specifications',
+        Colors.red,
+      ),
+    ],
+    "Project Configuration": [
+      DashboardItem(
+        'Project',
+        Icons.work_rounded,
+        Colors.orangeAccent,
+        'Oversee project portfolios',
+        Colors.orangeAccent,
+      ),
+    ],
+    "Material Configuration": [
+      DashboardItem(
+        'Material Movements',
+        Icons.swap_horiz_rounded,
+        Colors.deepPurple,
+        'Track material transfers',
+        Colors.deepPurple,
       ),
     ],
     "Site & Supervisor": [
@@ -208,13 +233,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     ],
     "Labour & Contractor": [
       DashboardItem(
-        'Labour',
-        Icons.engineering_rounded,
-        Colors.brown,
-        'Labour management',
-        Colors.brown,
-      ),
-      DashboardItem(
         'Contractor',
         Icons.person_4_rounded,
         Colors.deepPurple,
@@ -230,13 +248,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Workers Management": [
-      DashboardItem(
-        'Workers Configuration',
-        Icons.people_rounded,
-        const Color(0xFF8E24AA),
-        'Worker profiles and roles',
-        const Color(0xFF8E24AA),
-      ),
       DashboardItem(
         'Workers Site Mapping',
         Icons.place_rounded,
@@ -260,13 +271,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Vehicle Fleet": [
-      DashboardItem(
-        'Vehicle Configuration',
-        Icons.settings_rounded,
-        Colors.red,
-        'Vehicle specifications',
-        Colors.red,
-      ),
       DashboardItem(
         'Vehicle Driver Configuration',
         Icons.person_rounded,
@@ -318,20 +322,71 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return GlassScaffold(
       title: 'Management Console',
       appBarBackgroundColor: colorScheme.primary,
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 26),
-          onPressed: () => _showLogoutConfirmation(context),
-          tooltip: 'Logout',
+      actions: widget.showLogout
+          ? [
+              IconButton(
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+                onPressed: () => _showLogoutConfirmation(context),
+                tooltip: 'Logout',
+              ),
+              const SizedBox(width: 8),
+            ]
+          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddOptions(context),
+        backgroundColor: colorScheme.primary,
+        foregroundColor: Colors.white,
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: const Icon(Icons.add_rounded, size: 32),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 10,
+        color: theme.cardColor,
+        elevation: 20,
+        surfaceTintColor: theme.cardColor,
+        child: SafeArea(
+          child: SizedBox(
+            height: 50,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    Icons.dashboard_rounded,
+                    'Console',
+                    true,
+                    () {},
+                  ),
+                ),
+                const SizedBox(width: 80), // Reserve space for the docked FAB
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    Icons.support_agent_rounded,
+                    'Support',
+                    false,
+                    () => _navigateToScreen(context, 'Support'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(width: 8),
-      ],
+      ),
       body: CustomScrollView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
@@ -789,6 +844,181 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
+  Widget _buildNavItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final color = isActive ? colorScheme.primary : colorScheme.onSurfaceVariant;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddOptions(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.dividerColor.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Quick Actions",
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      'Site',
+                      'Manage construction sites',
+                      Icons.location_city_rounded,
+                      Colors.green,
+                      () {
+                        Navigator.pop(context);
+                        _navigateToScreen(context, 'Site');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      'Project',
+                      'Configure project details',
+                      Icons.work_rounded,
+                      Colors.orangeAccent,
+                      () {
+                        Navigator.pop(context);
+                        _navigateToScreen(context, 'Project');
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    final theme = Theme.of(context);
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 28),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _navigateToScreen(BuildContext context, String title) {
     final routeMap = {
       'Project Category': const ProjectCategoryScreen(),
@@ -811,7 +1041,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Layout and Drawings': const LayoutAndDrawingsPage(),
       'Tools Inventory': const ToolsInventoryPage(),
       'Material Master': const ConfigMaterialsScreen(),
-      'Material Sub Category': const MatlsSubCat(),
+      'Material Sub Category Master': const MatlsSubCat(),
       'Material Movements': const MaterialInfoScreen(),
       "Material Availability": const MaterialAvailability(),
       'Contractor': const ContractorPage(),
@@ -828,6 +1058,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Vehicle Driver Configuration': VehicleDriverConfigPage(),
       "Vehicle Details": VehicleDetailsPage(),
       "Vehicle Inventory": VehicleInventoryReportPage(),
+      'Support': const ContactSupportScreen(),
     };
 
     final screen = routeMap[title];

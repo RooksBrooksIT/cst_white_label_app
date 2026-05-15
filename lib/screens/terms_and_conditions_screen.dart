@@ -211,7 +211,16 @@ These Terms may be updated periodically.
 Continued use indicates acceptance of the revised Terms.
 13. Governing Law
 These Terms shall be governed by the laws of India.
-14. Contact Information
+14. Subscription and Billing
+The application follows a subscription-based billing model. Each plan (Silver, Gold, Platinum) provides different features.
+Payments are securely processed via ICICI Bank Payment Gateway. No sensitive payment details are stored on our servers.
+Subscriptions are non-transferable between organizations.
+Each organization’s data is strictly isolated and securely maintained.
+
+15. Refund Policy
+Refunds (if applicable) are processed within 5–7 working days based on company policy.
+
+16. Contact Information
 
 For any questions or concerns:
 Company: Rooks and Brooks Technologies Pvt Ltd

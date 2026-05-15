@@ -114,6 +114,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.orangeAccent,
       ),
     ],
+
     "Material Configuration": [
       DashboardItem(
         'Material Master',

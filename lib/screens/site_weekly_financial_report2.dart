@@ -316,43 +316,28 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     int net,
     ColorScheme colorScheme,
   ) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 2.2,
-      children: [
-        _buildSummaryItem(
-          context,
-          'Opening',
-          opening,
-          Icons.account_balance_rounded,
-          const Color(0xFF64748B),
-        ),
-        _buildSummaryItem(
-          context,
-          'Payments',
-          payment,
-          Icons.payment_rounded,
-          colorScheme.primary,
-        ),
-        _buildSummaryItem(
-          context,
-          'Expenses',
-          expenses,
-          Icons.receipt_long_rounded,
-          const Color(0xFFF59E0B),
-        ),
-        _buildSummaryItem(
-          context,
-          'Net Amount',
-          net,
-          Icons.account_balance_wallet_rounded,
-          net >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-        ),
-      ],
+    // Use LayoutBuilder so item width/height are always based on actual available space.
+    final cards = [
+      _buildSummaryItem(context, 'Opening', opening, Icons.account_balance_rounded, const Color(0xFF64748B)),
+      _buildSummaryItem(context, 'Payments', payment, Icons.payment_rounded, colorScheme.primary),
+      _buildSummaryItem(context, 'Expenses', expenses, Icons.receipt_long_rounded, const Color(0xFFF59E0B)),
+      _buildSummaryItem(
+        context, 'Net Amount', net, Icons.account_balance_wallet_rounded,
+        net >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final double itemWidth = (constraints.maxWidth - 16) / 2;
+        const double itemHeight = 88;
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: cards
+              .map((c) => SizedBox(width: itemWidth, height: itemHeight, child: c))
+              .toList(),
+        );
+      },
     );
   }
 
@@ -364,10 +349,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
@@ -380,12 +365,12 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 20, color: color),
+            child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -393,14 +378,16 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -445,6 +432,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           2: FlexColumnWidth(1),
           3: FlexColumnWidth(1),
         },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
           TableRow(
             decoration: BoxDecoration(
@@ -532,13 +520,14 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           : const Color(0xFFEF4444);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Text(
         text,
+        textAlign: isHeader ? TextAlign.start : TextAlign.start,
         style: TextStyle(
           fontWeight: isHeader || isNet ? FontWeight.bold : FontWeight.normal,
           color: txtColor,
-          fontSize: isHeader ? 12 : 13,
+          fontSize: isHeader ? 11 : 12,
         ),
       ),
     );

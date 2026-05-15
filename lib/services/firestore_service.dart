@@ -37,22 +37,11 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>> getCollection(
     String collectionName,
   ) {
-    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
+    final orgId = _getOrgIdFromPath();
+
+    if (orgId == 'uninitialized') {
       // Fallback if not initialized or logged out
       return FirebaseFirestore.instance.collection(collectionName);
-    }
-
-    // Extract OrgID robustly from cached path
-    // Handles: "Hero_25-03-2026" or "organisation/Hero_25-03-2026/data"
-    String orgId = _cachedDynamicPath!;
-    if (orgId.contains('/')) {
-      final parts = orgId.split('/');
-      // If path is "organisation/ID/...", ID is at index 1
-      if (parts[0] == 'organisation' && parts.length > 1) {
-        orgId = parts[1];
-      } else {
-        orgId = parts[0];
-      }
     }
 
     return FirebaseFirestore.instance
@@ -83,34 +72,60 @@ class FirestoreService {
   /// Gets the current organization ID.
   static String get currentOrgId => _getOrgIdFromPath();
 
-  /// Gets the organization's core data document (Admin metadata).
+  /// Gets the root organization document (legacy location for branding/subscription).
+  static DocumentReference<Map<String, dynamic>> get rootOrgDoc {
+    final orgId = _getOrgIdFromPath();
+    return FirebaseFirestore.instance.collection('organisation').doc(orgId);
+  }
+
+  /// Gets the organization's core data document.
   static DocumentReference<Map<String, dynamic>> get orgDataDoc {
     final orgId = _getOrgIdFromPath();
-    return FirebaseFirestore.instance.doc('organisation/$orgId/admin/data');
+    return FirebaseFirestore.instance
+        .collection('organisation')
+        .doc(orgId)
+        .collection('admin')
+        .doc('data');
   }
 
   static DocumentReference<Map<String, dynamic>> get brandingDoc {
     final orgId = _getOrgIdFromPath();
-    return brandingDocWithId(orgId);
+    return FirebaseFirestore.instance
+        .collection('organisation')
+        .doc(orgId)
+        .collection('admin')
+        .doc('branding');
   }
 
   /// Gets the branding configuration for a specific organization.
-  static DocumentReference<Map<String, dynamic>> brandingDocWithId(String orgId) {
-    return FirebaseFirestore.instance.doc('organisation/$orgId/admin/branding');
+  static DocumentReference<Map<String, dynamic>> brandingDocWithId(
+    String orgId,
+  ) {
+    return FirebaseFirestore.instance
+        .collection('organisation')
+        .doc(orgId)
+        .collection('admin')
+        .doc('branding');
   }
 
   /// Gets the organization's referral codes.
   static DocumentReference<Map<String, dynamic>> get referralDoc {
     final orgId = _getOrgIdFromPath();
-    return FirebaseFirestore.instance.doc('organisation/$orgId/admin/referal');
+    return FirebaseFirestore.instance
+        .collection('organisation')
+        .doc(orgId)
+        .collection('admin')
+        .doc('referral');
   }
 
   /// Gets the organization's subscription status.
   static DocumentReference<Map<String, dynamic>> get subscriptionDoc {
     final orgId = _getOrgIdFromPath();
-    return FirebaseFirestore.instance.doc(
-      'organisation/$orgId/admin/subscription',
-    );
+    return FirebaseFirestore.instance
+        .collection('organisation')
+        .doc(orgId)
+        .collection('admin')
+        .doc('subscription');
   }
 
   /// Gets the collection of organization users for the current organization.
@@ -157,10 +172,8 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection(
-          'admin',
-        ) // Using 'admin' as a parent collection for org-level metadata
-        .doc('data'); // 'data' is the document containing organization details
+        .collection('data')
+        .doc('admin'); // 'admin' is the document containing organization details
   }
 
   static Future<CollectionReference<Map<String, dynamic>>> getOrgCollection(
@@ -264,7 +277,7 @@ class FirestoreService {
   }
 
   /// Finds the Organization ID (document ID in /organisation collection) by search across
-  /// all admin/referal documents for a matching referralCode.
+  /// all admin/referral documents for a matching referralCode.
   static Future<String?> findOrgIdByReferralCode(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -275,9 +288,7 @@ class FirestoreService {
 
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
-        // The referal document is at: /organisation/{orgId}/admin/referal
-        // reference.parent is collection 'admin'
-        // reference.parent.parent is document {orgId}
+        // The parent of the 'admin' document is the organization document
         return doc.reference.parent.parent?.id;
       }
       return null;
