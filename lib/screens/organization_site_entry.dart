@@ -465,7 +465,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       isSaving = true;
     });
     final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
-    final docId = '${siteCode}_${dateForId}_org';
+    final docId = '${siteCode}_${dateForId}';
     final dateIso = selectedDate!.toIso8601String();
     final data = {
       "date": dateIso,
@@ -513,7 +513,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Duplicate Entry'),
-            content: const Text('This entry already exists in your records.'),
+            content: const Text(
+              'An entry for this site and date already exists.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),

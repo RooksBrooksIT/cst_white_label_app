@@ -394,7 +394,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Future<void> _saveToFirestore() async {
     if (siteCode.isEmpty) return;
     setState(() => isSaving = true);
-    final docId = '${siteCode}_${DateFormat('ddMMyyyy').format(selectedDate!)}_manager';
+    final docId = '${siteCode}_${DateFormat('ddMMyyyy').format(selectedDate!)}';
 
     // Build new materials list with computed amounts
     List<Map<String, dynamic>> newMaterials = materials
@@ -427,151 +427,48 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           await FirestoreService.siteSupervisorEntries.doc(docId).get();
       final bool docExists = existingDoc.exists;
 
-      Map<String, dynamic> data;
-
       if (docExists) {
-        // Merge with existing entry
-        final existingData = existingDoc.data()!;
-        final List<dynamic> existingMaterials =
-            existingData['materials'] as List? ?? [];
-        final List<dynamic> existingLabours =
-            existingData['labours'] as List? ?? [];
-        final int existingFood = (existingData['food'] ?? 0) is int
-            ? existingData['food']
-            : (existingData['food'] as num?)?.toInt() ?? 0;
-        final int existingFuel = (existingData['fuel'] ?? 0) is int
-            ? existingData['fuel']
-            : (existingData['fuel'] as num?)?.toInt() ?? 0;
-        final int existingTransport = (existingData['transport'] ?? 0) is int
-            ? existingData['transport']
-            : (existingData['transport'] as num?)?.toInt() ?? 0;
-
-        // Sum duplicate materials by type
-        final Map<String, Map<String, dynamic>> consolidatedMaterials = {};
-        for (var m in existingMaterials) {
-          if (m is Map) {
-            final String type = m['type']?.toString() ?? '';
-            final num qty = m['quantity'] ?? 0;
-            final num price = m['unitPrice'] ?? 0;
-            if (type.isNotEmpty) {
-              consolidatedMaterials[type] = {
-                "type": type,
-                "quantity": (consolidatedMaterials[type]?["quantity"] ?? 0) + qty,
-                "unitPrice": price,
-                "amount": 0,
-              };
-            }
-          }
-        }
-        for (var m in newMaterials) {
-          final String type = m['type']?.toString() ?? '';
-          final num qty = m['quantity'] ?? 0;
-          final num price = m['unitPrice'] ?? 0;
-          if (type.isNotEmpty) {
-            consolidatedMaterials[type] = {
-              "type": type,
-              "quantity": (consolidatedMaterials[type]?["quantity"] ?? 0) + qty,
-              "unitPrice": price,
-              "amount": 0,
-            };
-          }
-        }
-        final List<Map<String, dynamic>> mergedMaterials = consolidatedMaterials.values.map((m) {
-          m["amount"] = (m["quantity"] as num) * (m["unitPrice"] as num);
-          return m;
-        }).toList();
-
-        // Sum duplicate labours by designation
-        final Map<String, Map<String, dynamic>> consolidatedLabours = {};
-        for (var l in existingLabours) {
-          if (l is Map) {
-            final String type = l['type']?.toString() ?? '';
-            final num count = l['count'] ?? 0;
-            final num salary = l['unitSalary'] ?? 0;
-            if (type.isNotEmpty) {
-              consolidatedLabours[type] = {
-                "type": type,
-                "count": (consolidatedLabours[type]?["count"] ?? 0) + count,
-                "unitSalary": salary,
-                "amount": 0,
-              };
-            }
-          }
-        }
-        for (var l in newLabours) {
-          final String type = l['type']?.toString() ?? '';
-          final num count = l['count'] ?? 0;
-          final num salary = l['unitSalary'] ?? 0;
-          if (type.isNotEmpty) {
-            consolidatedLabours[type] = {
-              "type": type,
-              "count": (consolidatedLabours[type]?["count"] ?? 0) + count,
-              "unitSalary": salary,
-              "amount": 0,
-            };
-          }
-        }
-        final List<Map<String, dynamic>> mergedLabours = consolidatedLabours.values.map((l) {
-          l["amount"] = (l["count"] as num) * (l["unitSalary"] as num);
-          return l;
-        }).toList();
-
-        final int mergedFood =
-            existingFood + (int.tryParse(foodCost.text) ?? 0);
-        final int mergedFuel =
-            existingFuel + (int.tryParse(fuelCost.text) ?? 0);
-        final int mergedTransport =
-            existingTransport + (int.tryParse(transportCost.text) ?? 0);
-
-        int mergedTotalAmount = mergedFood + mergedFuel + mergedTransport;
-        for (var m in mergedMaterials) {
-          mergedTotalAmount += ((m['amount'] ?? 0) as num).toInt();
-        }
-        for (var l in mergedLabours) {
-          mergedTotalAmount += ((l['amount'] ?? 0) as num).toInt();
-        }
-
-        data = {
-          "date": selectedDate!.toIso8601String(),
-          "siteId": siteCode,
-          "totalAmount": mergedTotalAmount,
-          "materials": mergedMaterials,
-          "labours": mergedLabours,
-          "food": mergedFood,
-          "transport": mergedTransport,
-          "fuel": mergedFuel,
-          "supervisorId": existingData['supervisorId'] ?? supervisorId,
-          "supervisorName": existingData['supervisorName'] ?? supervisorName,
-          "projectName": existingData['projectName'] ?? projectName,
-          "siteLocation": existingData['siteLocation'] ?? siteLocation,
-          "projectStage": existingData['projectStage'] ?? projectStage,
-          "morningStatus": morningStatusController.text,
-          "afternoonStatus": afternoonStatusController.text,
-          "isManagerEntry": true,
-          "createdBy": "manager",
-        };
-      } else {
-        // New entry
-        data = {
-          "date": selectedDate!.toIso8601String(),
-          "siteId": siteCode,
-          "totalAmount": _getTotalAmount(),
-          "materials": newMaterials,
-          "labours": newLabours,
-          "food": int.tryParse(foodCost.text) ?? 0,
-          "transport": int.tryParse(transportCost.text) ?? 0,
-          "fuel": int.tryParse(fuelCost.text) ?? 0,
-          "supervisorId": supervisorId,
-          "supervisorName": supervisorName,
-          "projectName": projectName,
-          "siteLocation": siteLocation,
-          "projectStage": projectStage,
-          "morningStatus": morningStatusController.text,
-          "afternoonStatus": afternoonStatusController.text,
-          "isManagerEntry": true,
-          "createdBy": "manager",
-        };
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Duplicate Entry'),
+            content: const Text(
+              'An entry for this site and date already exists.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        setState(() {
+          isSaving = false;
+        });
+        return;
       }
+
+      final Map<String, dynamic> data = {
+        "date": selectedDate!.toIso8601String(),
+        "siteId": siteCode,
+        "totalAmount": _getTotalAmount(),
+        "materials": newMaterials,
+        "labours": newLabours,
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "supervisorId": supervisorId,
+        "supervisorName": supervisorName,
+        "projectName": projectName,
+        "siteLocation": siteLocation,
+        "projectStage": projectStage,
+        "morningStatus": morningStatusController.text,
+        "afternoonStatus": afternoonStatusController.text,
+        "isManagerEntry": true,
+        "createdBy": "manager",
+      };
 
       await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       await ExpenseService.updateTotalSiteExpense(siteCode);
@@ -596,19 +493,22 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     try {
       final query = await FirestoreService.siteSupervisorEntries
           .where('siteId', isEqualTo: siteCode)
-          .where('isManagerEntry', isEqualTo: true)
           .get();
 
       final entries = <Map<String, dynamic>>[];
       for (var doc in query.docs) {
-        final data = doc.data();
-        final rawDate = data['date'];
-        DateTime? dt;
-        if (rawDate is String)
-          dt = DateTime.tryParse(rawDate);
-        else if (rawDate is Timestamp)
-          dt = rawDate.toDate();
-        if (dt != null) entries.add({'docId': doc.id, 'date': dt});
+        final data = doc.data() as Map<String, dynamic>;
+        final isManager = data['isManagerEntry'] == true;
+        final isOrg = data['isOrgEntry'] == true;
+        if (isManager || isOrg) {
+          final rawDate = data['date'];
+          DateTime? dt;
+          if (rawDate is String)
+            dt = DateTime.tryParse(rawDate);
+          else if (rawDate is Timestamp)
+            dt = rawDate.toDate();
+          if (dt != null) entries.add({'docId': doc.id, 'date': dt});
+        }
       }
       entries.sort(
         (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),

@@ -513,13 +513,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       final bool isSameDate = existing.exists;
 
       if (isSameDate) {
-        // Show duplicate warning dialog but still allow merge
+        if (!mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Duplicate Entry'),
             content: const Text(
-              'Your entry for this date has already been submitted. New data will be merged with the existing entry.',
+              'An entry for this site and date already exists.',
             ),
             actions: [
               TextButton(
@@ -529,6 +529,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             ],
           ),
         );
+        setState(() {
+          isSaving = false;
+        });
+        return;
       }
 
       Map<String, dynamic> data;
