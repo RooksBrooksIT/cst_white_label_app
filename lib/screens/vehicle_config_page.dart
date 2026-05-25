@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class AddVehicleLogPage extends StatefulWidget {
   const AddVehicleLogPage({super.key});
@@ -48,7 +49,46 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   void _setCurrentTime() {
     final now = DateTime.now();
-    _startTimeController.text = DateFormat('HH:mm').format(now);
+    _startTimeController.text = DateFormat('hh:mm a').format(now);
+  }
+
+  Future<void> _selectTime(BuildContext context, TextEditingController controller) async {
+    TimeOfDay initialTime = TimeOfDay.now();
+    if (controller.text.isNotEmpty) {
+      try {
+        // Try parsing existing time to set initial picker time
+        final parsedTime = DateFormat('hh:mm a').parse(controller.text);
+        initialTime = TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
+      } catch (e) {
+        try {
+          // Fallback if it was saved in HH:mm format
+          final parsedTime = DateFormat('HH:mm').parse(controller.text);
+          initialTime = TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
+        } catch (e) {
+          // Keep current time
+        }
+      }
+    }
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+      setState(() {
+        controller.text = DateFormat('hh:mm a').format(dt);
+      });
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -175,13 +215,14 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadMaterials() async {
     try {
-      final snapshot = await FirestoreService.getCollection('materials').get();
+      final snapshot = await FirestoreService.getCollection('materialCategories').get();
 
       List<Map<String, dynamic>> materialsWithUnits = [];
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final materialName = data['materialName'] as String? ?? '';
+        final materialName = (data['matCategory'] ?? data['materialName'] ?? '').toString().trim();
+        if (materialName.isEmpty) continue;
         final materialUnitRef = data['materialUnit'] as DocumentReference?;
 
         String unit = '';
@@ -190,7 +231,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           try {
             final unitDoc = await materialUnitRef.get();
             if (unitDoc.exists) {
-              unit = unitDoc['unitName'] as String? ?? '';
+              final unitData = unitDoc.data() as Map<String, dynamic>?;
+              unit = (unitData?['unitName'] ?? unitData?['name'] ?? unitData?['matUnit'] ?? '').toString();
             }
           } catch (e) {
             print('Error fetching unit for material $materialName: $e');
@@ -428,13 +470,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   void _showSuccessSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    DialogUtils.showSuccessDialog(context, message: message);
   }
 
   void _showErrorSnackBar(String message) {
@@ -945,12 +981,14 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 labelText: 'Start Time',
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.access_time),
-                                hintText: 'HH:mm',
+                                hintText: 'hh:mm a',
                               ),
                               readOnly: true,
-                              onTap: () {
-                                _setCurrentTime();
-                              },
+                              onTap: () => _selectTime(context, _startTimeController),
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Enter start time'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -961,8 +999,10 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 labelText: 'End Time',
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.access_time),
-                                hintText: 'HH:mm (e.g., 16:15)',
+                                hintText: 'hh:mm a',
                               ),
+                              readOnly: true,
+                              onTap: () => _selectTime(context, _endTimeController),
                               validator: (value) =>
                                   value == null || value.isEmpty
                                   ? 'Enter end time'

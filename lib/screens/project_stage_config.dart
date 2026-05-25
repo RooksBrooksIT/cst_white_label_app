@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lottie/lottie.dart';
 import '../services/firestore_service.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_card.dart';
@@ -119,7 +119,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                   setState(() {
                                     _selectedStage = newStage;
                                   });
-                                  await _showSuccessAnimation(
+                                  await DialogUtils.showSuccessDialog(
+                                    context,
                                     message: 'Stage added successfully!',
                                   );
                                 },
@@ -142,57 +143,6 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               ),
             );
           },
-        );
-      },
-    );
-  }
-
-  Future<void> _showSuccessAnimation({
-    String message = 'Stage added successfully!',
-  }) async {
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Lottie.asset(
-                  'assets/animation/success.json',
-                  width: 150,
-                  height: 150,
-                  repeat: false,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  message,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('OK', style: TextStyle()),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -342,7 +292,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
         _selectedStage = null;
       });
 
-      await _showSuccessAnimation(message: 'Stage deleted successfully!');
+      await DialogUtils.showSuccessDialog(context, message: 'Stage deleted successfully!');
     } catch (e) {
       _showErrorModal(context, 'Error', 'Failed to delete stage: $e');
     }

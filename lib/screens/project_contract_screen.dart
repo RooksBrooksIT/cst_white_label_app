@@ -5,6 +5,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
+import '../utils/dialog_utils.dart';
 
 class ProjectContractScreen extends StatefulWidget {
   const ProjectContractScreen({super.key});
@@ -46,8 +47,13 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
 
       if (snapshot.docs.isNotEmpty) {
         await snapshot.docs.first.reference.delete();
-        setState(() => _selectedContractType = null);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contract type deleted')));
+        if (mounted) {
+          setState(() => _selectedContractType = null);
+          await DialogUtils.showSuccessDialog(
+            context,
+            message: 'Contract type deleted successfully!',
+          );
+        }
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -128,6 +134,10 @@ class _ProjectContractScreenState extends State<ProjectContractScreen> {
                             if (mounted) {
                               Navigator.pop(context);
                               setState(() => _selectedContractType = name);
+                              await DialogUtils.showSuccessDialog(
+                                context,
+                                message: 'Contract type added successfully!',
+                              );
                             }
                           },
                         ),

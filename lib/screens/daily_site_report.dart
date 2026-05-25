@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/firestore_service.dart';
-import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,7 +10,6 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import '../utils/pdf_templates.dart';
-import '../utils/app_theme.dart';
 
 class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
@@ -41,9 +39,9 @@ class _DailySiteExpensesReportPageState
     final supervisorDoc = await FirestoreService.getCollection(
       'siteSupervisorEntries',
     ).doc(_documentId).get();
-    final managerQuery = await FirestoreService.getCollection(
+    final managerDoc = await FirestoreService.getCollection(
       'managerExpenses',
-    ).where('siteId', isEqualTo: widget.siteId).limit(20).get();
+    ).doc(_documentId).get();
     final orgQuery = await FirestoreService.getCollection(
       'organizationExpenses',
     ).where('siteId', isEqualTo: widget.siteId).limit(20).get();
@@ -68,7 +66,7 @@ class _DailySiteExpensesReportPageState
 
     return {
       'supervisor': supervisorDoc.exists ? supervisorDoc : null,
-      'managerEntries': managerQuery.docs,
+      'managerEntries': managerDoc.exists ? [managerDoc] : [],
       'organizationEntries': orgQuery.docs,
       'contractorEntries': contractorQuery.docs,
       'incentiveDoc': incentiveQuery.docs.isNotEmpty

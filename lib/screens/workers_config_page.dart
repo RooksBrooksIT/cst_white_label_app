@@ -4,6 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
+import '../utils/dialog_utils.dart';
 
 class WorkersConfigPage extends StatefulWidget {
   const WorkersConfigPage({super.key});
@@ -16,7 +20,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Removed _firestore field
   // Form controllers for Create New Worker tab
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -50,7 +53,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     _addressController.dispose();
     _joiningDateController.dispose();
     _salaryController.dispose();
-    // Dispose all editing controllers
     for (var controller in _editingControllers.values) {
       controller.dispose();
     }
@@ -90,7 +92,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       final lastWorker = querySnapshot.docs.first;
       final lastWorkerId = lastWorker['workerId'] as String? ?? 'WC000';
 
-      // Extract number and increment
       final numberStr = lastWorkerId.replaceAll(RegExp(r'[^0-9]'), '');
       final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
 
@@ -107,14 +108,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         _selectedDesignation == null ||
         _salaryController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill all required fields')),
+        const SnackBar(content: Text('Please fill all required fields')),
       );
       return;
     }
 
     if (_phoneController.text.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Phone number must be exactly 10 digits')),
+        const SnackBar(content: Text('Phone number must be exactly 10 digits')),
       );
       return;
     }
@@ -133,7 +134,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Clear form
       _nameController.clear();
       _phoneController.clear();
       _addressController.clear();
@@ -141,15 +141,19 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       _joiningDateController.text = DateFormat(
         'yyyy-MM-dd',
       ).format(DateTime.now());
-      if (!mounted) return;
-      setState(() {
-        _selectedDesignation = null;
-        _isSalaryEditable = false;
-      });
+      if (mounted) {
+        setState(() {
+          _selectedDesignation = null;
+          _isSalaryEditable = false;
+        });
+      }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Worker created successfully')));
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Worker created successfully!',
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -165,9 +169,12 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       await FirestoreService.getCollection(
         'workersConfig',
       ).doc(docId).update(updatedData);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Worker updated successfully')));
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Worker updated successfully!',
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -178,9 +185,12 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   Future<void> _deleteWorker(String docId) async {
     try {
       await FirestoreService.getCollection('workersConfig').doc(docId).delete();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Worker deleted successfully')));
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Worker deleted successfully!',
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -191,7 +201,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   void _startEditing(String docId, Map<String, dynamic> workerData) {
     setState(() {
       _isEditing[docId] = true;
-      // Initialize editing controllers with current data
       _editingControllers['${docId}_name'] = TextEditingController(
         text: workerData['name'] ?? '',
       );
@@ -213,7 +222,6 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   void _cancelEditing(String docId) {
     setState(() {
       _isEditing[docId] = false;
-      // Dispose editing controllers for this worker
       _editingControllers.remove('${docId}_name')?.dispose();
       _editingControllers.remove('${docId}_phone')?.dispose();
       _editingControllers.remove('${docId}_address')?.dispose();
@@ -226,7 +234,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     final phone = _editingControllers['${docId}_phone']?.text ?? '';
     if (phone.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Phone number must be exactly 10 digits')),
+        const SnackBar(content: Text('Phone number must be exactly 10 digits')),
       );
       return;
     }
@@ -263,31 +271,30 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Workers Configuration',
       onBack: () => Navigator.pop(context),
       bottom: TabBar(
         controller: _tabController,
-        indicatorColor: Colors.white,
+        indicatorColor: theme.colorScheme.primary,
         indicatorWeight: 3,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
+        labelColor: theme.colorScheme.primary,
+        unselectedLabelColor: Colors.grey[600],
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w500,
           fontSize: 14,
         ),
         tabs: const [
-          Tab(text: 'Create New'),
-          Tab(text: 'Workers List'),
+          Tab(text: 'CREATE NEW'),
+          Tab(text: 'WORKERS LIST'),
         ],
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Create New Worker Tab
           _buildCreateWorkerTab(),
-          // Workers List Tab
           _buildWorkersListTab(),
         ],
       ),
@@ -296,242 +303,180 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   Widget _buildCreateWorkerTab() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Text(
-                    'Add New Worker',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1E293B),
-                      letterSpacing: -0.5,
-                    ),
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Basic Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(height: 20),
-                  _buildTextFieldWithIcon(
-                    controller: _nameController,
-                    labelText: 'Name *',
-                    icon: Icons.person,
+                ),
+                const SizedBox(height: 20),
+                GlassTextField(
+                  controller: _nameController,
+                  label: 'Full Name *',
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 16),
+                GlassTextField(
+                  controller: _phoneController,
+                  label: 'Phone Number *',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Job Details',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(height: 16),
-                  _buildTextFieldWithIcon(
-                    controller: _phoneController,
-                    labelText: 'Phone Number *',
-                    icon: Icons.phone,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
+                ),
+                const SizedBox(height: 16),
+                _buildDesignationDropdown(),
+                const SizedBox(height: 16),
+                _buildSalaryField(),
+                const SizedBox(height: 16),
+                GlassTextField(
+                  controller: _joiningDateController,
+                  label: 'Joining Date',
+                  icon: Icons.calendar_today_outlined,
+                  readOnly: true,
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _joiningDateController.text = DateFormat(
+                          'yyyy-MM-dd',
+                        ).format(picked);
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Additional Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedDesignation,
-                        decoration: InputDecoration(
-                          labelText: 'Designation *',
-                          border: InputBorder.none,
-                          icon: Icon(Icons.work, color: Colors.grey.shade600),
-                        ),
-                        items: _designations.isNotEmpty
-                            ? _designations.map<DropdownMenuItem<String>>((
-                                designation,
-                              ) {
-                                final designationValue =
-                                    designation['designation']?.toString() ??
-                                    '';
-                                final salaryValue =
-                                    designation['salary']?.toString() ?? '';
-
-                                return DropdownMenuItem<String>(
-                                  value: designationValue.isEmpty
-                                      ? null
-                                      : designationValue,
-                                  child: Text(designationValue),
-                                  onTap: () {
-                                    setState(() {
-                                      _salaryController.text = salaryValue;
-                                      _isSalaryEditable =
-                                          false; // Reset to non-editable when new designation selected
-                                    });
-                                  },
-                                );
-                              }).toList()
-                            : [],
-                        onChanged: (String? value) {
-                          setState(() {
-                            _selectedDesignation = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  _buildSalaryField(),
-                  SizedBox(height: 16),
-                  _buildTextFieldWithIcon(
-                    controller: _joiningDateController,
-                    labelText: 'Joining Date',
-                    icon: Icons.calendar_today,
-                    isReadOnly: true,
-                    onTap: () async {
-                      final DateTime? picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _joiningDateController.text = DateFormat(
-                            'yyyy-MM-dd',
-                          ).format(picked);
-                        });
-                      }
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  _buildTextFieldWithIcon(
-                    controller: _addressController,
-                    labelText: 'Address',
-                    icon: Icons.location_on,
-                    maxLines: 3,
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _createWorker,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      minimumSize: Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      'Create Worker',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                GlassTextField(
+                  controller: _addressController,
+                  label: 'Address',
+                  icon: Icons.location_on_outlined,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 32),
+                GlassButton(
+                  label: 'CREATE WORKER',
+                  onPressed: _createWorker,
+                  icon: Icons.add_circle_outline,
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesignationDropdown() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Designation *',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedDesignation,
+            isExpanded: true,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              prefixIcon: Icon(Icons.work_outline, color: theme.colorScheme.primary, size: 20),
+            ),
+            hint: const Text('Select Designation'),
+            dropdownColor: theme.cardColor,
+            items: _designations.map<DropdownMenuItem<String>>((designation) {
+              final designationValue = designation['designation']?.toString() ?? '';
+              final salaryValue = designation['salary']?.toString() ?? '';
+
+              return DropdownMenuItem<String>(
+                value: designationValue.isEmpty ? null : designationValue,
+                child: Text(designationValue),
+                onTap: () {
+                  setState(() {
+                    _salaryController.text = salaryValue;
+                    // Keep it editable or set to true if we want to allow immediate override
+                    _isSalaryEditable = true; 
+                  });
+                },
+              );
+            }).toList(),
+            onChanged: (String? value) {
+              setState(() {
+                _selectedDesignation = value;
+              });
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSalaryField() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: _isSalaryEditable
-              ? colorScheme.primary
-              : const Color(0xFFE2E8F0),
+    final theme = Theme.of(context);
+    return GlassTextField(
+      controller: _salaryController,
+      label: 'Salary *',
+      icon: Icons.attach_money_rounded,
+      keyboardType: TextInputType.number,
+      prefixText: '₹ ',
+      readOnly: !_isSalaryEditable,
+      enabled: true,
+      suffixIcon: IconButton(
+        icon: Icon(
+          _isSalaryEditable ? Icons.edit_off_rounded : Icons.edit_rounded,
+          size: 20,
+          color: _isSalaryEditable ? theme.colorScheme.primary : Colors.grey,
         ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _salaryController,
-              decoration: InputDecoration(
-                labelText: 'Salary *',
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 16,
-                ),
-                icon: const Padding(
-                  padding: EdgeInsets.only(left: 12),
-                  child: Icon(
-                    Icons.attach_money_rounded,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ),
-              keyboardType: TextInputType.number,
-              readOnly: !_isSalaryEditable,
-              style: TextStyle(
-                color: _isSalaryEditable
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFF64748B),
-                fontWeight: _isSalaryEditable
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              _isSalaryEditable ? Icons.lock_open_rounded : Icons.edit_rounded,
-              color: _isSalaryEditable
-                  ? colorScheme.primary
-                  : const Color(0xFF64748B),
-            ),
-            onPressed: () {
-              setState(() {
-                _isSalaryEditable = !_isSalaryEditable;
-              });
-            },
-            tooltip: _isSalaryEditable ? 'Lock salary field' : 'Edit salary',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextFieldWithIcon({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData icon,
-    bool isReadOnly = false,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    VoidCallback? onTap,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: labelText,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          icon: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(icon, color: const Color(0xFF64748B), size: 20),
-          ),
-        ),
-        readOnly: isReadOnly,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        onTap: onTap,
-        inputFormatters: inputFormatters,
+        onPressed: () {
+          setState(() {
+            _isSalaryEditable = !_isSalaryEditable;
+          });
+        },
       ),
     );
   }
@@ -547,7 +492,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
 
         final workers = snapshot.data!.docs;
@@ -557,11 +502,11 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
+                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
                 Text(
                   'No workers found',
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -569,91 +514,81 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         }
 
         return ListView.builder(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           itemCount: workers.length,
           itemBuilder: (context, index) {
             final doc = workers[index];
             final data = doc.data() as Map<String, dynamic>;
             final docId = doc.id;
-            final workerId = data['workerId'] ?? docId;
             final isEditing = _isEditing[docId] ?? false;
 
-            return Container(
-              margin: EdgeInsets.only(bottom: 12),
-              child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Worker ID Header
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'ID: $workerId',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).primaryColor,
-                            fontSize: 12,
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'ID: ${data['workerId'] ?? docId}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: 12),
-
-                      if (isEditing) _buildEditableFields(docId, data),
-                      if (!isEditing) _buildReadOnlyFields(data),
-
-                      SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (!isEditing) ...[
-                            _buildActionButton(
-                              icon: Icons.edit,
-                              color: Colors.blue,
-                              onPressed: () => _startEditing(docId, data),
-                              label: 'Edit',
-                            ),
-                            SizedBox(width: 8),
-                            _buildActionButton(
-                              icon: Icons.delete,
-                              color: Colors.red,
-                              onPressed: () => _showDeleteDialog(docId),
-                              label: 'Delete',
-                            ),
-                          ],
-                          if (isEditing) ...[
-                            _buildActionButton(
-                              icon: Icons.cancel,
-                              color: Colors.grey,
-                              onPressed: () => _cancelEditing(docId),
-                              label: 'Cancel',
-                            ),
-                            SizedBox(width: 8),
-                            _buildActionButton(
-                              icon: Icons.save,
-                              color: Colors.green,
-                              onPressed: () => _saveEditing(docId),
-                              label: 'Save',
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
+                        if (!isEditing)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                                onPressed: () => _startEditing(docId, data),
+                                tooltip: 'Edit',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                onPressed: () => _showDeleteDialog(docId),
+                                tooltip: 'Delete',
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
+                                onPressed: () => _saveEditing(docId),
+                                tooltip: 'Save',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.cancel_outlined, size: 20, color: Colors.grey),
+                                onPressed: () => _cancelEditing(docId),
+                                tooltip: 'Cancel',
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (isEditing) 
+                      _buildEditableFields(docId, data)
+                    else 
+                      _buildReadOnlyFields(data),
+                  ],
                 ),
               ),
             );
@@ -663,63 +598,36 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-    required String label,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(0.1),
-        foregroundColor: color,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-    );
-  }
-
   Widget _buildReadOnlyFields(Map<String, dynamic> data) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.person, size: 16, color: Colors.grey),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                data['name'] ?? '',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
+        Text(
+          data['name'] ?? '',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        SizedBox(height: 8),
-        _buildInfoRow(Icons.phone, data['phoneNumber'] ?? ''),
-        _buildInfoRow(Icons.work, '${data['designation'] ?? ''}'),
-        _buildInfoRow(Icons.attach_money, data['salary']?.toString() ?? ''),
-        _buildInfoRow(Icons.calendar_today, data['joiningDate'] ?? ''),
+        const SizedBox(height: 12),
+        _buildInfoRow(Icons.phone_outlined, data['phoneNumber'] ?? ''),
+        _buildInfoRow(Icons.work_outline, '${data['designation'] ?? ''}'),
+        _buildInfoRow(Icons.attach_money_rounded, 'Salary: ₹${data['salary']?.toString() ?? '0'}'),
+        _buildInfoRow(Icons.calendar_today_outlined, 'Joined: ${data['joiningDate'] ?? 'N/A'}'),
         if (data['address'] != null && data['address'].isNotEmpty)
-          _buildInfoRow(Icons.location_on, data['address'] ?? ''),
+          _buildInfoRow(Icons.location_on_outlined, data['address'] ?? ''),
       ],
     );
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade600),
-          SizedBox(width: 8),
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
             ),
           ),
         ],
@@ -730,58 +638,61 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   Widget _buildEditableFields(String docId, Map<String, dynamic> data) {
     return Column(
       children: [
-        _buildEditableField(
+        GlassTextField(
           controller: _editingControllers['${docId}_name']!,
           label: 'Name',
-          icon: Icons.person,
+          icon: Icons.person_outline,
         ),
-        SizedBox(height: 8),
-        _buildEditableField(
+        const SizedBox(height: 12),
+        GlassTextField(
           controller: _editingControllers['${docId}_phone']!,
           label: 'Phone Number',
-          icon: Icons.phone,
+          icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(10),
           ],
         ),
-        SizedBox(height: 8),
-        _buildEditableField(
+        const SizedBox(height: 12),
+        GlassTextField(
           controller: _editingControllers['${docId}_joiningDate']!,
           label: 'Joining Date',
-          icon: Icons.calendar_today,
-          isReadOnly: true,
+          icon: Icons.calendar_today_outlined,
+          readOnly: true,
           onTap: () => _selectDate(context, docId),
         ),
-        SizedBox(height: 8),
-        _buildEditableField(
+        const SizedBox(height: 12),
+        GlassTextField(
           controller: _editingControllers['${docId}_salary']!,
           label: 'Salary',
-          icon: Icons.attach_money,
+          icon: Icons.attach_money_rounded,
           keyboardType: TextInputType.number,
+          prefixText: '₹ ',
         ),
-        SizedBox(height: 8),
-        _buildEditableField(
+        const SizedBox(height: 12),
+        GlassTextField(
           controller: _editingControllers['${docId}_address']!,
           label: 'Address',
-          icon: Icons.location_on,
+          icon: Icons.location_on_outlined,
           maxLines: 2,
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 12),
         Container(
-          padding: EdgeInsets.all(8),
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(6),
+            color: Colors.grey.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Row(
             children: [
-              Icon(Icons.work, size: 16),
-              SizedBox(width: 8),
+              const Icon(Icons.work_outline, size: 18, color: Colors.grey),
+              const SizedBox(width: 8),
               Text(
                 'Designation: ${data['designation'] ?? ''}',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -790,72 +701,38 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     );
   }
 
-  Widget _buildEditableField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool isReadOnly = false,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    VoidCallback? onTap,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color.fromARGB(255, 44, 88, 172)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          icon: Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Icon(
-              icon,
-              size: 18,
-              color: const Color.fromARGB(255, 16, 54, 124),
-            ),
-          ),
-        ),
-        readOnly: isReadOnly,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        onTap: onTap,
-        inputFormatters: inputFormatters,
-      ),
-    );
-  }
-
   void _showDeleteDialog(String docId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
-              Icon(Icons.warning, color: Colors.orange),
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
               SizedBox(width: 8),
               Text('Delete Worker'),
             ],
           ),
-          content: Text(
+          content: const Text(
             'Are you sure you want to delete this worker? This action cannot be undone.',
           ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+              child: const Text('CANCEL'),
             ),
             ElevatedButton(
               onPressed: () {
                 _deleteWorker(docId);
                 Navigator.of(context).pop();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: Text('Delete'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('DELETE'),
             ),
           ],
         );

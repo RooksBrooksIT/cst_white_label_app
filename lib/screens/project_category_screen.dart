@@ -6,6 +6,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/dialog_utils.dart';
 
 class ProjectCategoryScreen extends StatefulWidget {
   const ProjectCategoryScreen({super.key});
@@ -104,6 +105,10 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
                             if (mounted) {
                               Navigator.pop(context);
                               setState(() => _selectedCategory = name);
+                              await DialogUtils.showSuccessDialog(
+                                context,
+                                message: 'Category added successfully!',
+                              );
                             }
                           },
                         ),
@@ -124,8 +129,13 @@ class _ProjectCategoryScreenState extends State<ProjectCategoryScreen> {
     final snapshot = await FirestoreService.getCollection('projectCategories').where('projectCategory', isEqualTo: _selectedCategory).get();
     if (snapshot.docs.isNotEmpty) {
       await FirestoreService.getCollection('projectCategories').doc(snapshot.docs.first.id).delete();
-      setState(() => _selectedCategory = null);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Category deleted')));
+      if (mounted) {
+        setState(() => _selectedCategory = null);
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Category deleted successfully!',
+        );
+      }
     }
   }
 

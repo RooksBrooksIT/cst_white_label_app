@@ -28,6 +28,34 @@ class ProjectStagePdfHelper {
           0;
     }
 
+    List<Map<String, dynamic>> parseEntryList(dynamic rawData) {
+      if (rawData == null) return [];
+      if (rawData is List) {
+        return rawData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      if (rawData is Map) {
+        final Map<dynamic, dynamic> map = rawData;
+        final List<Map<String, dynamic>> list = [];
+        final sortedKeys = map.keys
+            .map((k) => int.tryParse(k.toString()))
+            .where((k) => k != null)
+            .cast<int>()
+            .toList()
+          ..sort();
+        for (var key in sortedKeys) {
+          final val = map[key.toString()] ?? map[key];
+          if (val is Map) {
+            list.add(Map<String, dynamic>.from(val));
+          }
+        }
+        return list;
+      }
+      return [];
+    }
+
+    final materialsList = parseEntryList(supervisorData?['materials']);
+    final laboursList = parseEntryList(supervisorData?['labours']);
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -53,8 +81,7 @@ class ProjectStagePdfHelper {
           pw.SizedBox(height: 24),
 
           // Materials Table
-          if (supervisorData?['materials'] != null &&
-              (supervisorData!['materials'] as List).isNotEmpty) ...[
+          if (materialsList.isNotEmpty) ...[
             pw.Text(
               'Materials Detailed Breakdown',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
@@ -62,11 +89,11 @@ class ProjectStagePdfHelper {
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
               headers: ['Material', 'Quantity', 'Amount'],
-              data: (supervisorData['materials'] as List)
+              data: materialsList
                   .map(
                     (m) => [
-                      m['materialName']?.toString() ?? 'N/A',
-                      m['quantity']?.toString() ?? '0',
+                      (m['materialName'] ?? m['type'] ?? 'N/A').toString(),
+                      (m['quantity'] ?? m['count'] ?? '0').toString(),
                       '₹ ${toNum(m['amount']).toStringAsFixed(2)}',
                     ],
                   )
@@ -85,8 +112,7 @@ class ProjectStagePdfHelper {
           ],
 
           // Labours Table
-          if (supervisorData?['labours'] != null &&
-              (supervisorData!['labours'] as List).isNotEmpty) ...[
+          if (laboursList.isNotEmpty) ...[
             pw.Text(
               'Labour Detailed Breakdown',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
@@ -94,11 +120,11 @@ class ProjectStagePdfHelper {
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
               headers: ['Labour Type', 'Count', 'Amount'],
-              data: (supervisorData['labours'] as List)
+              data: laboursList
                   .map(
                     (l) => [
-                      l['labourType']?.toString() ?? 'N/A',
-                      l['labourCount']?.toString() ?? '0',
+                      (l['labourType'] ?? l['type'] ?? 'N/A').toString(),
+                      (l['labourCount'] ?? l['count'] ?? '0').toString(),
                       '₹ ${toNum(l['amount']).toStringAsFixed(2)}',
                     ],
                   )

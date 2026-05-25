@@ -37,9 +37,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
   Future<void> _fetchMaterialNames() async {
     try {
-      final snapshot = await FirestoreService.materials.get();
+      final snapshot = await FirestoreService.materialCategories.get();
       final names = snapshot.docs
-          .map((doc) => (doc.data()['materialName'] ?? '').toString().trim())
+          .map((doc) => (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '').toString().trim())
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();

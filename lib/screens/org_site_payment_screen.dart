@@ -131,7 +131,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchSiteIds() async {
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap
+      final snapshot = await FirestoreService.getCollection('Site')
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -147,11 +147,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       if (!mounted) return;
 
       setState(() {
-        siteList = snapshot.docs.map((doc) {
+        siteList = snapshot.docs.map<Map<String, String>>((doc) {
           final data = doc.data();
-          final display = (data['site'] ?? doc.id).toString();
+          final display = (data['siteName'] ?? doc.id).toString();
           return {'id': doc.id.toString(), 'display': display};
-        }).toList();
+        }).toList()..sort((a, b) => a['display']!.compareTo(b['display']!));
       });
     } on TimeoutException catch (e) {
       print('Timeout fetching site IDs: $e');
@@ -178,11 +178,25 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           amountController.text = amount == 0 ? '' : amount.toString();
         });
       } else {
-        setState(() {
-          supervisor = '';
-          amount = 0;
-          amountController.text = '';
-        });
+        // Fallback: search by 'site' field in siteSupervisorMap
+        final query = await FirestoreService.siteSupervisorMap
+            .where('site', isEqualTo: siteId)
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          setState(() {
+            supervisor = data['supervisor'] ?? '';
+            amount = (data['amount'] ?? 0).toInt();
+            amountController.text = amount == 0 ? '' : amount.toString();
+          });
+        } else {
+          setState(() {
+            supervisor = 'Not Assigned';
+            amount = 0;
+            amountController.text = '';
+          });
+        }
       }
     } catch (e) {
       print('Error fetching supervisor: $e');

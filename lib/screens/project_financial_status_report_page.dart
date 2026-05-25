@@ -81,28 +81,35 @@ class _ProjectFinancialStatusReportPageState extends State<ProjectFinancialStatu
 
     return GlassScaffold(
       title: 'Financial Status Entry',
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildInfoCard(theme),
-            const SizedBox(height: 24),
-            _buildFormCard(theme),
-            const SizedBox(height: 32),
-            GlassButton(
-              label: 'VIEW FINANCIAL STATUS',
-              onPressed: _showFinancialStatus,
-              icon: Icons.pie_chart_outline,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInfoCard(theme),
+                const SizedBox(height: 24),
+                _buildFormCard(theme),
+                const SizedBox(height: 32),
+                GlassButton(
+                  label: 'VIEW FINANCIAL STATUS',
+                  onPressed: _showFinancialStatus,
+                  icon: Icons.pie_chart_outline,
+                ),
+                const SizedBox(height: 12),
+                GlassButton(
+                  label: 'VIEW PROJECT INDICATOR',
+                  onPressed: _showProjectIndicator,
+                  icon: Icons.analytics_outlined,
+                  isSecondary: true,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            GlassButton(
-              label: 'VIEW PROJECT INDICATOR',
-              onPressed: _showProjectIndicator,
-              icon: Icons.analytics_outlined,
-              isSecondary: true,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -137,8 +144,15 @@ class _ProjectFinancialStatusReportPageState extends State<ProjectFinancialStatu
               ? const LinearProgressIndicator()
               : DropdownButtonFormField<String>(
                   value: selectedSiteId,
+                  isExpanded: true,
                   decoration: _inputDecoration('Select Site ID', Icons.search),
-                  items: siteIds.map((id) => DropdownMenuItem(value: id, child: Text(id))).toList(),
+                  items: siteIds.map((id) => DropdownMenuItem(
+                    value: id,
+                    child: Text(
+                      id,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )).toList(),
                   onChanged: (v) {
                     setState(() => selectedSiteId = v);
                     if (v != null) _loadSiteDetails(v);

@@ -6,6 +6,7 @@ import 'package:demo_cst/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 
@@ -65,7 +66,7 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
     try {
       final query = await FirestoreService.getCollection(
         'siteSupervisorMap',
-      ).where('supervisor', isEqualTo: widget.supervisorName).get();
+      ).where('Supervisor ID', isEqualTo: widget.supervisorId).get();
       List<Map<String, dynamic>> sites = [];
       for (var doc in query.docs) {
         final siteId = doc['site'];
@@ -153,9 +154,31 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
         return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final Position position;
+      Position? tempPosition;
+      try {
+        tempPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('High accuracy getCurrentPosition failed/timed out: $e');
+        // Fallback 1: Try retrieving the last known position
+        tempPosition = await Geolocator.getLastKnownPosition();
+        if (tempPosition == null) {
+          debugPrint('Last known position is null, attempting low accuracy...');
+          // Fallback 2: Try low accuracy with a short timeout as a final attempt
+          tempPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 5),
+          );
+        }
+      }
+
+      if (tempPosition == null) {
+        throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
+      }
+      position = tempPosition;
 
       await Future.delayed(const Duration(milliseconds: 500));
 

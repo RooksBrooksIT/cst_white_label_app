@@ -465,7 +465,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       isSaving = true;
     });
     final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
-    final docId = '${siteCode}_$dateForId';
+    final docId = '${siteCode}_${dateForId}_org';
     final dateIso = selectedDate!.toIso8601String();
     final data = {
       "date": dateIso,
@@ -500,6 +500,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       "siteId": siteCode,
       "supervisorName": supervisorName,
       "projectStage": projectStage,
+      "isOrgEntry": true,
+      "createdBy": "manager_org",
     };
     try {
       final existing = await FirestoreService.siteSupervisorEntries

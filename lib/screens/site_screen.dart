@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 import '../services/firestore_service.dart';
 import 'project_screen.dart';
 
@@ -57,6 +58,7 @@ class _SiteScreenState extends State<SiteScreen>
           .map((doc) => doc['projectCategory']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
       return categories;
     } catch (e) {
@@ -73,6 +75,7 @@ class _SiteScreenState extends State<SiteScreen>
           .map((doc) => doc['projectState']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
 
       // Add default status options if they are not already present
@@ -174,9 +177,31 @@ class _SiteScreenState extends State<SiteScreen>
       if (permission == LocationPermission.deniedForever) {
         throw 'Location permissions are permanently denied';
       }
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final Position position;
+      Position? tempPosition;
+      try {
+        tempPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('High accuracy getCurrentPosition failed/timed out: $e');
+        // Fallback 1: Try retrieving the last known position
+        tempPosition = await Geolocator.getLastKnownPosition();
+        if (tempPosition == null) {
+          debugPrint('Last known position is null, attempting low accuracy...');
+          // Fallback 2: Try low accuracy with a short timeout as a final attempt
+          tempPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 5),
+          );
+        }
+      }
+
+      if (tempPosition == null) {
+        throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
+      }
+      position = tempPosition;
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -739,13 +764,6 @@ class _SiteScreenState extends State<SiteScreen>
           label: 'Reset',
           color: Colors.orange.shade700,
           onPressed: _resetForm,
-        ),
-        _buildActionButton(
-          context,
-          icon: Icons.cancel,
-          label: 'Cancel',
-          color: Colors.red.shade700,
-          onPressed: () => Navigator.pop(context),
         ),
       ],
     );

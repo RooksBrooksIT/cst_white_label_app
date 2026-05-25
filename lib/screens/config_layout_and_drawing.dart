@@ -31,20 +31,44 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
   List<Map<String, String>> allSites = [];
 
   Future<List<Map<String, String>>> fetchAllSites() async {
-    final snapshot = await FirestoreService.getCollection(
-      'siteSupervisorMap',
-    ).get();
-    return snapshot.docs
-        .map((doc) {
-          final data = doc.data();
-          return {
-            'site': data['site']?.toString() ?? '',
-            'supervisor': data['supervisor']?.toString() ?? '',
-            'projectName': data['projectName']?.toString() ?? '',
-          };
-        })
-        .where((site) => site['site']!.isNotEmpty)
-        .toList();
+    try {
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+
+      final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
+      final Map<String, Map<String, dynamic>> supervisorMap = {};
+      for (var doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final sId = data['site']?.toString() ?? doc.id;
+        if (sId.isNotEmpty) {
+          supervisorMap[sId] = data;
+        }
+      }
+
+      final projectsSnapshot = await FirestoreService.getCollection('projects').get();
+      final Map<String, String> projectNames = {};
+      for (var doc in projectsSnapshot.docs) {
+        final data = doc.data();
+        final sId = data['siteId']?.toString();
+        final pName = data['projectName']?.toString();
+        if (sId != null && sId.isNotEmpty && pName != null && pName.isNotEmpty) {
+          projectNames[sId] = pName;
+        }
+      }
+
+      return sitesSnapshot.docs.map<Map<String, String>>((doc) {
+        final sId = doc.id;
+        final mapping = supervisorMap[sId];
+
+        return {
+          'site': sId,
+          'supervisor': mapping?['supervisor']?.toString() ?? 'Not Assigned',
+          'projectName': mapping?['projectName'] ?? projectNames[sId] ?? 'Not Assigned',
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching all sites: $e');
+      return [];
+    }
   }
 
   void setSupervisorAndProject(String? siteId) async {

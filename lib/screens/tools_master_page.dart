@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
@@ -526,9 +527,12 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tool count updated successfully!')),
-      );
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Tool count updated successfully!',
+        );
+      }
 
       // 4. Fetch the latest tools in the background to sync the dropdown
       await _fetchTools();
@@ -636,10 +640,12 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         'toolsAtCompany',
       ).doc(toolCode).set({'toolCode': toolCode, 'availableCount': toolCount});
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Tool saved successfully!')));
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Tool saved successfully!',
+        );
+      }
 
       // Clear form
       _toolNameController.clear();

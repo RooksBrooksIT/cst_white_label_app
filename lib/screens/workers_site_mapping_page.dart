@@ -581,17 +581,20 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
     }).toList();
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Worker Dropdown and Add Button Row
-            Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
+            // Worker Dropdown and Add Button Section
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
                     value: _selectedWorkerId,
                     decoration: InputDecoration(
                       labelText: 'Select Worker',
@@ -605,7 +608,6 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                               child: Text('Loading workers...'),
                             ),
                           ]
-                          
                         : availableWorkers.map<DropdownMenuItem<String>>((worker) {
                             final String name = worker['name']?.toString().trim() ?? '';
                             final String displayName = name.isNotEmpty ? name : 'Unnamed (${worker['id']})';
@@ -615,28 +617,27 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                             );
                           }).toList(),
                     onChanged: _onWorkerSelected,
-                  ),
-                ),
-                SizedBox(width: 12),
-                SizedBox(
-                  height: 56, // Match the dropdown height
-                  child: FilledButton.icon(
-                    onPressed: _addWorkerToList,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Add'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(
-                        0xFF22C55E,
-                      ), // Professional Emerald
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 56, // Match the dropdown height
+                      width: 70,
+                      child: FilledButton(
+                        onPressed: _addWorkerToList,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Icon(Icons.add_rounded),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
 
             SizedBox(height: 16),
 
@@ -667,9 +668,11 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                 'No details found for this worker',
                 style: TextStyle(color: Colors.orange),
               ),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -681,8 +684,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 Text(
                   'Selected Workers (${_selectedWorkersList.length})',

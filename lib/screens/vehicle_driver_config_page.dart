@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class VehicleDriverConfigPage extends StatefulWidget {
   const VehicleDriverConfigPage({super.key});
@@ -84,13 +85,12 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
         .doc(driverId)
         .set(data);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
-        ),
-      ),
-    );
+    if (mounted) {
+      await DialogUtils.showSuccessDialog(
+        context,
+        message: 'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
+      );
+    }
 
     if (!_isEditing) {
       _resetForm();
@@ -149,9 +149,12 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
           .doc(driverId)
           .delete();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Driver deleted successfully!')),
-      );
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Driver deleted successfully!',
+        );
+      }
     }
   }
 

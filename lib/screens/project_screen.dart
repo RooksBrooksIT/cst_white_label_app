@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
+import '../utils/dialog_utils.dart';
 
 class ProjectScreen extends StatefulWidget {
   final String? projectId;
@@ -67,23 +68,47 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   Future<void> _fetchUnassignedSiteIds() async {
-    // Fetch site IDs from siteSupervisorMap under the current organisation:
-    // Path: /organisation/{orgId}/siteSupervisorMap/{doc} -> 'site' field
+    // Fetch site IDs from Site collection under the current organisation
+    final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+    final allSiteIds = sitesSnapshot.docs
+        .map((doc) => doc.id)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    // Fetch assigned site IDs from siteSupervisorMap
     final siteSupervisorSnapshot = await FirestoreService.getCollection(
       'siteSupervisorMap',
     ).get();
-
-    final siteIds = siteSupervisorSnapshot.docs
+    final assignedSiteIds = siteSupervisorSnapshot.docs
         .map((doc) => (doc.data())['site'])
         .where((id) => id != null && id.toString().isNotEmpty)
         .map((id) => id.toString())
-        .toSet()
-        .toList();
+        .toSet();
+
+    final unassigned = allSiteIds.difference(assignedSiteIds).toList();
+
+    final projectsSnapshot = await FirestoreService.getCollection(
+      'projects',
+    ).get();
+    final Map<String, Map<String, dynamic>> projectsBySiteId = {};
+    for (var doc in projectsSnapshot.docs) {
+      final data = doc.data();
+      final sid = data['siteId']?.toString();
+      if (sid != null && sid.isNotEmpty) {
+        projectsBySiteId[sid] = data;
+      }
+    }
+
+    final filtered = unassigned.where((sid) {
+      final data = projectsBySiteId[sid];
+      if (data == null) return true;
+      return !_projectHasAllDetails(data);
+    }).toList();
 
     if (!mounted) return;
 
     setState(() {
-      _unassignedSiteIds = siteIds;
+      _unassignedSiteIds = filtered;
       _selectedSiteId = _unassignedSiteIds.isNotEmpty
           ? _unassignedSiteIds[0]
           : null;
@@ -275,10 +300,9 @@ class _ProjectScreenState extends State<ProjectScreen>
           );
         }
 
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => _buildSuccessModal(context),
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Project created successfully!',
         );
         _resetForm();
         await _fetchUnassignedSiteIds();
@@ -342,10 +366,9 @@ class _ProjectScreenState extends State<ProjectScreen>
             projectStage: stageToSet,
           );
 
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => _buildSuccessModal(context),
+          await DialogUtils.showSuccessDialog(
+            context,
+            message: 'Project updated successfully!',
           );
           _resetForm();
         }
@@ -1258,11 +1281,17 @@ class _ProjectScreenState extends State<ProjectScreen>
                               StreamBuilder<QuerySnapshot>(
                                 stream: FirestoreService.getCollection(
                                   'projectStages',
-                                ).orderBy('projectStageId').snapshots(),
+                                ).snapshots(),
                                 builder: (context, snapshot) {
                                   List<String> fetchedStages = [];
                                   if (snapshot.hasData) {
-                                    fetchedStages = snapshot.data!.docs
+                                    final docs = List<QueryDocumentSnapshot>.from(snapshot.data!.docs);
+                                    docs.sort((a, b) {
+                                      final idA = a.id;
+                                      final idB = b.id;
+                                      return idA.compareTo(idB);
+                                    });
+                                    fetchedStages = docs
                                         .map(
                                           (doc) =>
                                               doc['projectStage'] as String,
@@ -1354,9 +1383,10 @@ class _ProjectScreenState extends State<ProjectScreen>
                                           final data =
                                               d.data() as Map<String, dynamic>;
                                           final n = data['contractorName'];
-                                          return n == null ? '' : n.toString();
+                                          return n == null ? '' : n.toString().trim();
                                         })
                                         .where((e) => e.isNotEmpty)
+                                        .toSet()
                                         .toList();
                                     final String? dropdownValue =
                                         names.contains(
@@ -1789,8 +1819,14 @@ class _ProjectScreenState extends State<ProjectScreen>
     final textColor =
         theme.textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
 
+    final uniqueItems = items
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
+
     return DropdownButtonFormField<String>(
-      value: (value != null && items.contains(value)) ? value : null,
+      value: (value != null && uniqueItems.contains(value.trim())) ? value.trim() : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: primaryColor),
@@ -1810,7 +1846,7 @@ class _ProjectScreenState extends State<ProjectScreen>
       style: TextStyle(color: textColor, fontSize: 16),
       icon: Icon(Icons.arrow_drop_down, color: primaryColor),
       dropdownColor: Colors.white,
-      items: items.map((item) {
+      items: uniqueItems.map((item) {
         return DropdownMenuItem<String>(
           value: item,
           child: Text(item, style: TextStyle(color: textColor)),
@@ -1866,7 +1902,6 @@ class _ProjectScreenState extends State<ProjectScreen>
 
   Widget _buildActionButtons(BuildContext context) {
     final theme = Theme.of(context);
-    final errorColor = theme.colorScheme.error;
     const successColor = Color(0xFF28a745);
     const warningColor = Color(0xFFffc107);
 
@@ -1886,13 +1921,6 @@ class _ProjectScreenState extends State<ProjectScreen>
           label: 'Reset',
           color: warningColor,
           onPressed: _resetForm,
-        ),
-        _buildActionButton(
-          context,
-          icon: Icons.cancel,
-          label: 'Cancel',
-          color: errorColor,
-          onPressed: () => Navigator.pop(context),
         ),
       ],
     );

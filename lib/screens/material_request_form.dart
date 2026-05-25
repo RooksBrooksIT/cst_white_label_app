@@ -128,10 +128,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   Future<void> _fetchMaterialsFromFirestore() async {
     try {
       final snapshot =
-          await FirestoreService.getCollection('materials').get();
+          await FirestoreService.getCollection('materialCategories').get();
       materialDocs = snapshot.docs.map((doc) => doc.data()).toList();
       materialDescriptions = materialDocs
-          .map((m) => m['materialName']?.toString() ?? '')
+          .map((m) => (m['matCategory'] ?? m['materialName'] ?? '').toString().trim())
           .where((desc) => desc.isNotEmpty)
           .toList();
       setState(() {});
@@ -169,7 +169,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     });
     if (value != null) {
       final mat = materialDocs.firstWhere(
-        (m) => m['materialName'] == value,
+        (m) => (m['matCategory'] ?? m['materialName'] ?? '').toString().trim() == value,
         orElse: () => {},
       );
       final unitRef = mat['materialUnit'];

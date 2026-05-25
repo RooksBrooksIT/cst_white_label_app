@@ -14,9 +14,13 @@ class GlassTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final FocusNode? node; // Alias for focusNode
   final bool readOnly;
+  final bool enabled;
   final String? hintText;
   final int? maxLines;
   final List<dynamic>? inputFormatters;
+  final Widget? suffixIcon;
+  final VoidCallback? onTap;
+  final String? prefixText;
 
   const GlassTextField({
     super.key,
@@ -32,9 +36,13 @@ class GlassTextField extends StatefulWidget {
     this.focusNode,
     this.node,
     this.readOnly = false,
+    this.enabled = true,
     this.hintText,
     this.maxLines = 1,
     this.inputFormatters,
+    this.suffixIcon,
+    this.onTap,
+    this.prefixText,
   });
 
   @override
@@ -78,13 +86,22 @@ class _GlassTextFieldState extends State<GlassTextField> {
           onChanged: widget.onChanged,
           focusNode: widget.focusNode ?? widget.node,
           readOnly: widget.readOnly,
+          enabled: widget.enabled,
           maxLines: widget.maxLines,
+          onTap: widget.onTap,
           inputFormatters: widget.inputFormatters?.cast<TextInputFormatter>(),
-          style: theme.textTheme.bodyLarge,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: widget.enabled ? null : theme.disabledColor,
+          ),
           decoration: InputDecoration(
             hintText: widget.hintText ?? 'Enter your ${widget.label}',
-            prefixIcon: Icon(widget.icon, size: 20),
-            suffixIcon: widget.isPassword
+            prefixIcon: Icon(
+              widget.icon,
+              size: 20,
+              color: widget.enabled ? null : theme.disabledColor,
+            ),
+            prefixText: widget.prefixText,
+            suffixIcon: widget.suffixIcon ?? (widget.isPassword
                 ? IconButton(
                     icon: Icon(
                       effectiveShowPassword
@@ -92,17 +109,19 @@ class _GlassTextFieldState extends State<GlassTextField> {
                           : Icons.visibility_off_rounded,
                       size: 20,
                     ),
-                    onPressed: () {
-                      if (widget.onTogglePassword != null) {
-                        widget.onTogglePassword!();
-                      } else {
-                        setState(() {
-                          _internalShowPassword = !_internalShowPassword;
-                        });
-                      }
-                    },
+                    onPressed: widget.enabled
+                        ? () {
+                            if (widget.onTogglePassword != null) {
+                              widget.onTogglePassword!();
+                            } else {
+                              setState(() {
+                                _internalShowPassword = !_internalShowPassword;
+                              });
+                            }
+                          }
+                        : null,
                   )
-                : null,
+                : null),
           ),
           validator: widget.validator,
         ),

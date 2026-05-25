@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expense_service.dart';
 import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
+import '../widgets/glass_scaffold.dart';
 
 class OrganizationExpenses extends StatefulWidget {
   const OrganizationExpenses({super.key});
@@ -62,25 +63,17 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       isLoadingSites = true;
     });
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      final snapshot = await FirestoreService.getCollection('Site').get();
       siteIds = snapshot.docs
-          .map((doc) => doc.data()['site'] as String?)
-          .where((site) => site != null && site.isNotEmpty)
-          .toSet()
-          .cast<String>()
+          .map((doc) => doc.id)
+          .where((id) => id.isNotEmpty)
           .toList();
-
-      // If no site IDs found, add some test data
-      if (siteIds.isEmpty) {
-        siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
-      }
 
       setState(() {
         isLoadingSites = false;
       });
     } catch (e) {
-      // On error, use test data
-      siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
+      siteIds = [];
       setState(() {
         isLoadingSites = false;
       });
@@ -96,15 +89,33 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     String label,
     TextEditingController controller, {
     bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
+    IconData? prefixIcon,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: TextField(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
         controller: controller,
         enabled: enabled,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryColor) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: primaryColor, width: 2),
+          ),
+          filled: true,
+          fillColor: enabled ? Colors.white : Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
     );
@@ -112,50 +123,83 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   Widget _buildBillTable() {
     if (bills.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'No bills added yet.',
-          style: TextStyle(color: Colors.grey[600]),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          child: Column(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text(
+                'No bills added yet',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(primaryColor.withOpacity(0.1)),
-        columns: const [
-          DataColumn(label: Text('Bill No')),
-          DataColumn(label: Text('Bill Date')),
-          DataColumn(label: Text('Bill Vendor')),
-          DataColumn(label: Text('Bill Amount')),
-          DataColumn(label: Text('Delete')),
-        ],
-        rows: bills
-            .asMap()
-            .entries
-            .map(
-              (entry) => DataRow(
-                cells: [
-                  DataCell(Text(entry.value['billNo']!)),
-                  DataCell(Text(entry.value['billDate']!)),
-                  DataCell(Text(entry.value['billVendor']!)),
-                  DataCell(Text(entry.value['billAmount']!)),
-                  DataCell(
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          bills.removeAt(entry.key);
-                        });
-                      },
-                    ),
-                  ),
-                ],
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: bills.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final bill = bills[index];
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            )
-            .toList(),
-      ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: primaryColor.withOpacity(0.1),
+              child: Icon(Icons.receipt_rounded, color: primaryColor),
+            ),
+            title: Text(
+              bill['billVendor']!,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text('Bill No: ${bill['billNo']} • ${bill['billDate']}'),
+                const SizedBox(height: 4),
+                Text(
+                  bill['billAmount']!,
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              onPressed: () {
+                setState(() {
+                  bills.removeAt(index);
+                });
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -191,7 +235,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           'billNo': billNoController.text,
           'billDate': DateFormat('dd/MM/yy').format(selectedDate),
           'billVendor': billVendorController.text,
-          'billAmount': '? ${billAmountController.text}',
+          'billAmount': '₹ ${billAmountController.text}',
         });
 
         billNoController.clear();
@@ -297,9 +341,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       final newDocId = '${selectedSiteId}_$dateStr';
 
       // 1. Save/merge to organizationEntries
-      final entryRef = FirebaseFirestore.instance
-          .collection('organizationEntries')
-          .doc(newDocId);
+      final entryRef = FirestoreService.organizationEntries.doc(newDocId);
       final entrySnap = await entryRef.get();
 
       List<dynamic> existingBills = [];
@@ -364,8 +406,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         'siteId': selectedSiteId ?? '',
       };
 
-      await FirebaseFirestore.instance
-          .collection('organizationExpenseSummary')
+      await FirestoreService.organizationExpenseSummary
           .doc(newDocId)
           .set(summary);
 
@@ -442,10 +483,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         });
       } else {
         setState(() {
-          selectedSupervisorId = null;
-          selectedProjectPhase = null;
-          supervisorController.clear();
-          projectPhaseController.clear();
+          selectedSupervisorId = 'Not Assigned';
+          selectedProjectPhase = 'Not Assigned';
+          supervisorController.text = 'Not Assigned';
+          projectPhaseController.text = 'Not Assigned';
           isLoadingSiteDetails = false;
         });
       }
@@ -460,236 +501,133 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Organization Expenses',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    return GlassScaffold(
+      title: 'Organization Expenses',
+      appBarBackgroundColor: primaryColor,
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: _loadSiteIds,
+          tooltip: 'Refresh Site IDs',
         ),
-        backgroundColor: primaryColor,
-        toolbarHeight: 50,
-        elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadSiteIds,
-            tooltip: 'Refresh Site IDs',
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        const SizedBox(width: 8),
+      ],
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
           children: [
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Site & Project Info',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    isLoadingSites
-                        ? const Center(child: CircularProgressIndicator())
-                        : DropdownButtonFormField<String>(
-                            value: selectedSiteId,
-                            decoration: const InputDecoration(
-                              labelText: 'Site ID',
-                              border: OutlineInputBorder(),
+            _buildSectionCard(
+              title: 'Site & Project Info',
+              icon: Icons.location_on_rounded,
+              child: Column(
+                children: [
+                  isLoadingSites
+                      ? const Center(child: CircularProgressIndicator())
+                      : DropdownButtonFormField<String>(
+                          value: selectedSiteId,
+                          decoration: InputDecoration(
+                            labelText: 'Site ID',
+                            prefixIcon: Icon(Icons.business_rounded, color: primaryColor),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            items: siteIds
-                                .map(
-                                  (site) => DropdownMenuItem<String>(
-                                    value: site,
-                                    child: Text(site),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedSiteId = value;
-                              });
-                              if (value != null) {
-                                _loadSiteDetails(value);
-                              }
-                            },
+                            filled: true,
+                            fillColor: Colors.white,
                           ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: supervisorController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Supervisor ID',
-                        border: OutlineInputBorder(),
+                          items: siteIds
+                              .map(
+                                (site) => DropdownMenuItem<String>(
+                                  value: site,
+                                  child: Text(site),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedSiteId = value;
+                            });
+                            if (value != null) {
+                              _loadSiteDetails(value);
+                            }
+                          },
+                        ),
+                  const SizedBox(height: 16),
+                  _buildLabeledTextField('Supervisor ID', supervisorController, enabled: false, prefixIcon: Icons.person_rounded),
+                  _buildLabeledTextField('Project Phase', projectPhaseController, enabled: false, prefixIcon: Icons.flag_rounded),
+                  InkWell(
+                    onTap: () => _selectDate(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded, color: primaryColor),
+                          const SizedBox(width: 12),
+                          const Text('Date', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                          const Spacer(),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(selectedDate),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: projectPhaseController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Project Phase',
-                        border: OutlineInputBorder(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              title: 'Add Bill',
+              icon: Icons.receipt_long_rounded,
+              child: Column(
+                children: [
+                  _buildLabeledTextField('Bill No', billNoController, prefixIcon: Icons.numbers_rounded),
+                  _buildLabeledTextField('Bill Vendor', billVendorController, prefixIcon: Icons.store_rounded),
+                  _buildLabeledTextField('Bill Amount', billAmountController, prefixIcon: Icons.currency_rupee_rounded, keyboardType: TextInputType.number),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _addBill,
+                      icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
+                      label: const Text(
+                        "Add Bill to List",
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Date:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () => _selectDate(context),
-                          label: Text(
-                            DateFormat('dd/MM/yy').format(selectedDate),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.receipt_long, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Add Bill',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLabeledTextField('Bill No', billNoController),
-                    _buildLabeledTextField(
-                      'Bill Date',
-                      TextEditingController(
-                        text: DateFormat('dd/MM/yy').format(selectedDate),
-                      ),
-                      enabled: false,
-                    ),
-                    _buildLabeledTextField('Bill Vendor', billVendorController),
-                    _buildLabeledTextField('Bill Amount', billAmountController),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _addBill,
-                          label: const Text(
-                            "Upload Bill",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: _addBill,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.add, color: Colors.white),
-                              SizedBox(width: 4),
-                              const Text(
-                                'Add',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              title: 'Bills List',
+              icon: Icons.list_alt_rounded,
+              child: _buildBillTable(),
             ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.list_alt, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bills List',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildBillTable(),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: Colors.grey.shade400, width: 2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -697,23 +635,21 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     onPressed: isSubmitting ? null : _resetForm,
                     child: const Text(
                       'Reset',
-                      style: TextStyle(color: Colors.black),
+                      style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
+                  flex: 2,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 4,
                     ),
                     onPressed: isSubmitting
                         ? null
@@ -727,6 +663,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                                   content: Text(
                                     'Please fill all details and add at least one bill.',
                                   ),
+                                  backgroundColor: Colors.redAccent,
                                 ),
                               );
                               return;
@@ -739,19 +676,57 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(
-                            'Submit',
-                            style: TextStyle(color: Colors.white),
+                            'Submit Expenses',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({required String title, required IconData icon, required Widget child}) {
+    return Card(
+      elevation: 4,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: primaryColor, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            child,
           ],
         ),
       ),

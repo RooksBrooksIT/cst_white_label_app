@@ -39,7 +39,7 @@ class _WorkerAttendanceSalaryPageState
     super.initState();
     _loadInitialData();
   }
-  
+
   Future<void> _loadInitialData() async {
     try {
       // 1. Fetch unique sites and months from workersAttendance documents (The collection structure as requested)
@@ -415,8 +415,8 @@ class _WorkerAttendanceSalaryPageState
                           _overallAttendancePercentage > 80
                               ? Colors.green
                               : _overallAttendancePercentage > 50
-                                  ? Colors.orange
-                                  : Colors.red,
+                              ? Colors.orange
+                              : Colors.red,
                         ),
                       ),
                     ),
@@ -485,9 +485,9 @@ class _WorkerAttendanceSalaryPageState
 
   Widget _buildWorkerCard(Map<String, dynamic> worker, ThemeData theme) {
     final cs = theme.colorScheme;
-    
+
     final isExpanded = _expandedWorkerId == worker['id'];
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassCard(
@@ -511,8 +511,10 @@ class _WorkerAttendanceSalaryPageState
                           fontSize: 16,
                         ),
                       ),
-                      Text(worker['designation'],
-                          style: theme.textTheme.bodySmall),
+                      Text(
+                        worker['designation'],
+                        style: theme.textTheme.bodySmall,
+                      ),
                       Text(
                         worker['site'],
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -546,8 +548,16 @@ class _WorkerAttendanceSalaryPageState
               children: [
                 _buildStatItem('Present', worker['present'] ?? 0, Colors.green),
                 _buildStatItem('Absent', worker['absent'] ?? 0, Colors.red),
-                _buildStatItem('Overtime', worker['overtime'] ?? 0, Colors.orange),
-                _buildStatItem('Not Marked', worker['notMarked'] ?? 0, Colors.grey),
+                _buildStatItem(
+                  'Overtime',
+                  worker['overtime'] ?? 0,
+                  Colors.orange,
+                ),
+                _buildStatItem(
+                  'Not Marked',
+                  worker['notMarked'] ?? 0,
+                  Colors.grey,
+                ),
               ],
             ),
             AnimatedSize(
@@ -588,7 +598,7 @@ class _WorkerAttendanceSalaryPageState
         primaryColor: pdfPrimaryColor,
       );
       if (!mounted) return;
-      
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -637,16 +647,17 @@ class _WorkerAttendanceSalaryPageState
         MaterialPageRoute(
           builder: (context) => PdfPreviewPage(
             pdfBytes: pdfBytes,
-            fileName: 'OverallReport_${_selectedSite ?? 'All'}_${_selectedMonth}.pdf',
+            fileName:
+                'OverallReport_${_selectedSite ?? 'All'}_${_selectedMonth}.pdf',
           ),
         ),
       );
     } catch (e) {
       debugPrint('Error generating Overall PDF: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to generate report: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate report: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

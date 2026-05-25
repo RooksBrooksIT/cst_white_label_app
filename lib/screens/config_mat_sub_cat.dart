@@ -4,6 +4,7 @@ import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_card.dart';
+import '../utils/dialog_utils.dart';
 
 class MatlsSubCat extends StatefulWidget {
   const MatlsSubCat({super.key});
@@ -106,7 +107,10 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      _showSuccessSnackbar('Saved successfully!');
+      await DialogUtils.showSuccessDialog(
+        context,
+        message: 'Saved successfully!',
+      );
       _cancel();
     } catch (e) {
       _showErrorSnackbar('Error saving: $e');

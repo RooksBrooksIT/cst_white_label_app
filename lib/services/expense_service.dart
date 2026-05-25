@@ -133,6 +133,13 @@ class ExpenseService {
 
       for (final doc in snapshot.docs) {
         final data = doc.data();
+        // Skip manager entries entered through manager site entry page
+        if (data['isManagerEntry'] == true ||
+            data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true ||
+            data['createdBy'] == 'manager_org') {
+          continue;
+        }
         final amount = data['totalAmount'];
         if (amount is num) {
           total += amount.toDouble();
@@ -161,6 +168,32 @@ class ExpenseService {
           total += amount.toDouble();
         }
       }
+
+      // Also sum manager site entry expenses saved in managerEntries
+      final managerEntriesSnapshot = await FirestoreService.managerEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in managerEntriesSnapshot.docs) {
+        final data = doc.data();
+        final amount = data['totalAmount'];
+        if (amount is num) {
+          total += amount.toDouble();
+        }
+      }
+
+      // Maintain backward compatibility with historical manager entries in siteSupervisorEntries
+      final supervisorEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in supervisorEntriesSnapshot.docs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
+          final amount = data['totalAmount'];
+          if (amount is num) {
+            total += amount.toDouble();
+          }
+        }
+      }
     } catch (e) {
       print("❌ Error summing manager expenses for siteId=$siteId: $e");
     }
@@ -182,6 +215,20 @@ class ExpenseService {
         final amount = data['orgExpenseTotalAmount'];
         if (amount is num) {
           total += amount.toDouble();
+        }
+      }
+
+      // Also sum manager site entry organization expenses saved in siteSupervisorEntries
+      final orgEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in orgEntriesSnapshot.docs) {
+        final data = doc.data();
+        if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          final amount = data['totalAmount'];
+          if (amount is num) {
+            total += amount.toDouble();
+          }
         }
       }
     } catch (e) {

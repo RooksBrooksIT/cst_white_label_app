@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import '../services/expense_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -26,6 +27,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   List<String> siteIds = [];
   bool isLoadingSites = true;
+  bool isLoadingBills = false;
   bool isSubmitting = false;
 
   final billNoController = TextEditingController();
@@ -38,7 +40,13 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   String? managerId;
   List<Map<String, String>> bills = [];
+  List<Map<String, String>> initialBills = [];
   Map<String, String> siteNameMap = {};
+  double existingDailyTotal = 0.0;
+
+  /// Generation counter to prevent stale async responses from overwriting
+  /// current data when the user switches sites quickly.
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -75,24 +83,21 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
       };
 
-      // 2. Fetch sites from mapping
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
-      final fetchedSiteIds = snapshot.docs
-          .map((doc) => doc.data()['site'] as String?)
-          .where((site) => site != null && site.isNotEmpty)
-          .toSet()
-          .cast<String>()
+      final fetchedSiteIds = sitesSnapshot.docs
+          .map((doc) => doc.id)
+          .where((id) => id.isNotEmpty)
           .toList();
 
       setState(() {
         siteNameMap = names;
-        siteIds = fetchedSiteIds;
+        siteIds = fetchedSiteIds..sort();
         isLoadingSites = false;
 
         // Auto-select if only one site ID exists
         if (siteIds.length == 1) {
           selectedSiteId = siteIds.first;
           _loadSiteDetails(selectedSiteId!);
+          // Don't load existing expenses — bill list starts empty
         }
       });
     } catch (e) {
@@ -173,6 +178,57 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     }
   }
 
+  Future<void> _loadExistingExpenses() async {
+    if (selectedSiteId == null) return;
+    
+    // Increment generation so any in-flight request from a previous site
+    // selection will be discarded when it completes.
+    final thisGeneration = ++_loadGeneration;
+
+    setState(() {
+      isLoadingBills = true;
+      // Clear immediately so stale data is never visible
+      bills = [];
+      initialBills = [];
+      existingDailyTotal = 0.0;
+    });
+    
+    final formattedDate = DateFormat('ddMMyyyy').format(selectedDate);
+    final docId = '${selectedSiteId}_$formattedDate';
+    
+    try {
+      final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
+
+      // If the user switched site while we were fetching, discard this result.
+      if (!mounted || _loadGeneration != thisGeneration) return;
+
+      if (docSnap.exists) {
+        final data = docSnap.data();
+        if (data != null && data['bills'] != null) {
+          final List<dynamic> loadedBills = data['bills'];
+          double loadedTotal = 0.0;
+          for (var bill in loadedBills) {
+            final amountStr = bill['billAmount'] ?? '0';
+            final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+            loadedTotal += parsed;
+          }
+          setState(() {
+            bills = loadedBills.map((b) => Map<String, String>.from(b)).toList();
+            initialBills = loadedBills.map((b) => Map<String, String>.from(b)).toList();
+            existingDailyTotal = loadedTotal;
+          });
+        }
+      }
+      // If no document exists, bills stay empty (already cleared above)
+    } catch (e) {
+      debugPrint('Error loading existing expenses: $e');
+    } finally {
+      if (mounted && _loadGeneration == thisGeneration) {
+        setState(() => isLoadingBills = false);
+      }
+    }
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -182,6 +238,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     );
     if (picked != null && picked != selectedDate) {
       setState(() => selectedDate = picked);
+      _loadExistingExpenses();
     }
   }
 
@@ -245,8 +302,25 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           isLoadingSites
               ? const LinearProgressIndicator()
               : _buildDropdown('Select Site ID', siteIds, selectedSiteId, (v) {
-                  setState(() => selectedSiteId = v);
-                  if (v != null) _loadSiteDetails(v);
+                  setState(() {
+                    selectedSiteId = v;
+                    // Clear site detail fields immediately
+                    selectedSupervisorId = null;
+                    selectedProjectPhase = null;
+                    selectedProjectName = null;
+                    supervisorIdController.clear();
+                    projectPhaseController.clear();
+                    projectNameController.clear();
+                    // Reset bill list — start fresh for new site
+                    bills = [];
+                    initialBills = [];
+                    existingDailyTotal = 0.0;
+                  });
+                  if (v != null) {
+                    _loadSiteDetails(v);
+                    // Don't auto-load existing expenses;
+                    // bill list starts empty for new entry session
+                  }
                 }),
           const SizedBox(height: 12),
           GlassTextField(controller: supervisorIdController, label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
@@ -294,6 +368,14 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   }
 
   Widget _buildBillsListSection(ThemeData theme) {
+    if (isLoadingBills) {
+      return const GlassCard(
+        child: Center(child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        )),
+      );
+    }
     if (bills.isEmpty) return const SizedBox.shrink();
     return GlassCard(
       child: Column(
@@ -404,20 +486,128 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select Site and Project')));
       return;
     }
+
     setState(() => isSubmitting = true);
     try {
-      final docId = 'EXP-${DateTime.now().millisecondsSinceEpoch}';
-      await FirestoreService.managerExpenses.doc(docId).set({
+      final formattedDate = DateFormat('ddMMyyyy').format(selectedDate);
+      final docId = '${selectedSiteId}_$formattedDate';
+
+      // 1. Fetch existing bills from Firestore to merge and preserve other fields if needed
+      final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
+      List<Map<String, String>> mergedBills = [];
+      List<Map<String, String>> newBills = [];
+      
+      final Map<String, dynamic> docData = {
         'expenseId': docId,
         'managerId': managerId ?? 'UNKNOWN_MANAGER',
         'siteId': selectedSiteId,
         'projectName': selectedProjectName,
         'date': DateFormat('dd/MM/yy').format(selectedDate),
-        'bills': bills,
         'status': 'Pending',
         'timestamp': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (docSnap.exists) {
+        final existingData = docSnap.data();
+        if (existingData != null) {
+          if (existingData['bills'] != null) {
+            final List<dynamic> dbBills = existingData['bills'];
+            mergedBills = dbBills.map((b) => Map<String, String>.from(b)).toList();
+          }
+          docData['status'] = existingData['status'] ?? 'Pending';
+          if (existingData['timestamp'] != null) {
+            docData['timestamp'] = existingData['timestamp'];
+          }
+        }
+
+        // Identify new bills not present in the initially loaded list
+        for (final bill in bills) {
+          final isExisting = initialBills.any((b) =>
+              b['billNo'] == bill['billNo'] &&
+              b['billVendor'] == bill['billVendor'] &&
+              b['billAmount'] == bill['billAmount']);
+          if (!isExisting) {
+            newBills.add(bill);
+          }
+        }
+        mergedBills.addAll(newBills);
+      } else {
+        mergedBills = List<Map<String, String>>.from(bills);
+        newBills = List<Map<String, String>>.from(bills);
+      }
+
+      docData['bills'] = mergedBills;
+
+      // Robustly calculate the sum total of all bills inside the list
+      double totalAmount = 0.0;
+      for (var bill in mergedBills) {
+        final amountStr = bill['billAmount'] ?? '0';
+        final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        totalAmount += parsed;
+      }
+
+      // Calculate increment from new bills only
+      double increment = 0.0;
+      for (var bill in newBills) {
+        final amountStr = bill['billAmount'] ?? '0';
+        final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        increment += parsed;
+      }
+
+      // 2. Save manager expense document
+      await FirestoreService.managerExpenses.doc(docId).set(docData);
+
+      // 3. Save corresponding summary in managerExpenseSummary
+      final summary = {
+        'date': selectedDate.toIso8601String(),
+        'mgrExpenseTotalAmount': totalAmount,
+        'projectName': selectedProjectName,
+        'projectStage': selectedProjectPhase ?? '',
+        'siteId': selectedSiteId ?? '',
+      };
+      await FirestoreService.managerExpenseSummary.doc(docId).set(summary);
+
+      // 4. Atomically update totalMgrExpense and totalAllExpenses in totalSiteExpensesPerDay collection
+      try {
+        final totalsRef = FirestoreService.getCollection(
+          'totalSiteExpensesPerDay',
+        ).doc(selectedSiteId!);
+        await FirebaseFirestore.instance.runTransaction((txn) async {
+          final snap = await txn.get(totalsRef);
+          double existingMgr = 0.0;
+          double existingAll = 0.0;
+          if (snap.exists) {
+            final Map<String, dynamic>? d = snap.data();
+            if (d != null) {
+              final v1 = d['totalMgrExpense'];
+              final v2 = d['totalAllExpenses'];
+              if (v1 is num) existingMgr = v1.toDouble();
+              if (v2 is num) existingAll = v2.toDouble();
+            }
+          }
+          txn.set(totalsRef, {
+            'siteId': selectedSiteId,
+            'totalMgrExpense': existingMgr + increment,
+            'totalAllExpenses': existingAll + increment,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        });
+      } catch (e) {
+        debugPrint('Failed to increment totals: $e');
+      }
+
+      // 5. Update totalMgrExpense in totalSiteExpensesPerDay and sync project document
+      await ExpenseService.updateTotalMgrExpenseForSite(selectedSiteId!);
+
       if (mounted) {
+        setState(() {
+          bills = [];
+          initialBills = [];
+          existingDailyTotal = 0.0;
+          billNoController.clear();
+          billVendorController.clear();
+          billAmountController.clear();
+        });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Expenses submitted successfully')));
         Navigator.pop(context);
       }

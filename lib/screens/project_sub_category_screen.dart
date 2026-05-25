@@ -5,6 +5,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
+import '../utils/dialog_utils.dart';
 
 class ProjectSubCategoryScreen extends StatefulWidget {
   const ProjectSubCategoryScreen({super.key});
@@ -106,6 +107,10 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                             if (mounted) {
                               Navigator.pop(context);
                               setState(() => _selectedSubCategory = name);
+                              await DialogUtils.showSuccessDialog(
+                                context,
+                                message: 'Sub Category added successfully!',
+                              );
                             }
                           },
                         ),
@@ -126,8 +131,13 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
     final snapshot = await FirestoreService.getCollection('projectSubCategories').where('projectSubCategory', isEqualTo: _selectedSubCategory).get();
     if (snapshot.docs.isNotEmpty) {
       await snapshot.docs.first.reference.delete();
-      setState(() => _selectedSubCategory = null);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sub-category deleted')));
+      if (mounted) {
+        setState(() => _selectedSubCategory = null);
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Sub Category deleted successfully!',
+        );
+      }
     }
   }
 

@@ -164,16 +164,15 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   Future<void> fetchDropdownOptions() async {
     try {
-      final materialsSnapshot = await FirestoreService.materials.get();
+      final materialsSnapshot = await FirestoreService.materialCategories.get();
       final unitsSnapshot = await FirestoreService.materialUnits.get();
 
       setState(() {
         materialOptions = materialsSnapshot.docs
-            .map(
-              (doc) => doc.data().containsKey('materialName')
-                  ? doc['materialName'].toString()
-                  : '',
-            )
+            .map((doc) {
+              final data = doc.data();
+              return (data['matCategory'] ?? data['materialName'] ?? '').toString().trim();
+            })
             .where((e) => e.isNotEmpty)
             .toList();
         unitOptions = unitsSnapshot.docs

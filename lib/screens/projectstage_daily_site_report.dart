@@ -95,6 +95,12 @@ class _ProjectStageDailySiteExpensesReportPageState
                   _buildTotalCard(theme),
                   const SizedBox(height: 24),
                   _buildCategoryBreakdown(theme),
+                  const SizedBox(height: 32),
+                  GlassButton(
+                    label: 'Generate PDF',
+                    icon: Icons.picture_as_pdf_rounded,
+                    onPressed: _generatePdf,
+                  ),
                 ],
               ),
             ),
@@ -212,18 +218,45 @@ class _ProjectStageDailySiteExpensesReportPageState
     );
   }
 
+  List<Map<String, dynamic>> _parseEntryList(dynamic rawData) {
+    if (rawData == null) return [];
+    if (rawData is List) {
+      return rawData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    if (rawData is Map) {
+      final Map<dynamic, dynamic> map = rawData;
+      final List<Map<String, dynamic>> list = [];
+      final sortedKeys = map.keys
+          .map((k) => int.tryParse(k.toString()))
+          .where((k) => k != null)
+          .cast<int>()
+          .toList()
+        ..sort();
+      for (var key in sortedKeys) {
+        final val = map[key.toString()] ?? map[key];
+        if (val is Map) {
+          list.add(Map<String, dynamic>.from(val));
+        }
+      }
+      return list;
+    }
+    return [];
+  }
+
   double _calculateMaterials() {
     double total = 0;
-    if (supervisorData?['materials'] is List) {
-      for (var m in supervisorData!['materials']) total += _toNum(m['amount']);
+    final list = _parseEntryList(supervisorData?['materials']);
+    for (var m in list) {
+      total += _toNum(m['amount']);
     }
     return total;
   }
 
   double _calculateLabours() {
     double total = 0;
-    if (supervisorData?['labours'] is List) {
-      for (var l in supervisorData!['labours']) total += _toNum(l['amount']);
+    final list = _parseEntryList(supervisorData?['labours']);
+    for (var l in list) {
+      total += _toNum(l['amount']);
     }
     return total;
   }

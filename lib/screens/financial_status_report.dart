@@ -230,7 +230,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           ),
           _buildInfoRow(
             'Actual Start',
-            _formatDate(projectData?['actualStartDate']),
+            _formatDate(projectData?['actualStateDate']),
             Icons.calendar_today_outlined,
           ),
           _buildInfoRow(
@@ -383,7 +383,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   }
 
   int _calculateDuration() {
-    final start = projectData?['actualStartDate'];
+    final start = projectData?['actualStateDate'];
     if (start is! Timestamp) return 0;
     return DateTime.now().difference(start.toDate()).inDays;
   }

@@ -173,7 +173,9 @@ class FirestoreService {
         .collection('organisation')
         .doc(orgId)
         .collection('data')
-        .doc('admin'); // 'admin' is the document containing organization details
+        .doc(
+          'admin',
+        ); // 'admin' is the document containing organization details
   }
 
   static Future<CollectionReference<Map<String, dynamic>>> getOrgCollection(
@@ -220,6 +222,8 @@ class FirestoreService {
   // Additional business collections
   static CollectionReference<Map<String, dynamic>> get siteSupervisorEntries =>
       getCollection('siteSupervisorEntries');
+  static CollectionReference<Map<String, dynamic>> get managerEntries =>
+      getCollection('managerEntries');
   static CollectionReference<Map<String, dynamic>> get managerExpenses =>
       getCollection('managerExpenses');
   static CollectionReference<Map<String, dynamic>> get managerExpenseSummary =>
@@ -246,7 +250,6 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>>
   get siteSupervisorProjectStageActual =>
       getCollection('siteSupervisorProjectStageActual');
-
 
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {

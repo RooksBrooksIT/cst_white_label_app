@@ -153,24 +153,46 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       materialError = null;
     });
     try {
-      final snapshot = await FirestoreService.materials.get();
+      // 1. Fetch materialCategories to build a lookup map
+      final categoriesSnapshot = await FirestoreService.getCollection('materialCategories').get();
+      final categoryMap = <String, String>{};
+      for (var doc in categoriesSnapshot.docs) {
+        final data = doc.data();
+        final name = (data['matCategory'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          categoryMap[doc.reference.path] = name;
+          categoryMap[doc.id] = name;
+        }
+      }
+
+      // 2. Fetch specific materials
+      final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data.containsKey('materialName')) {
-          final name = data['materialName']?.toString() ?? '';
-          if (name.isNotEmpty) {
-            options.add(name);
-            final priceRaw = data['materialPrice'];
-            num price = 0;
-            if (priceRaw is num) {
-              price = priceRaw;
-            } else if (priceRaw is String) {
-              price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-            }
-            prices[name] = price;
+        
+        // Resolve materialCategory reference
+        String? resolvedCategory;
+        final catRef = data['materialCategory'];
+        if (catRef is DocumentReference) {
+          resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
+        } else if (catRef is String && catRef.isNotEmpty) {
+          resolvedCategory = categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
+        }
+        
+        // Fallback if not resolved
+        final name = (resolvedCategory ?? data['materialName'] ?? data['matCategory'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          options.add(name);
+          final priceRaw = data['materialPrice'];
+          num price = 0;
+          if (priceRaw is num) {
+            price = priceRaw;
+          } else if (priceRaw is String) {
+            price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
+          prices[name] = price;
         }
       }
       if(!mounted) return;

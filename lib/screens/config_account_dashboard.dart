@@ -397,10 +397,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildWelcomeSection(context),
-                  const SizedBox(height: 28),
-                  // _buildQuickStats(context),
-                  // const SizedBox(height: 32),
                   _buildDashboardSections(context),
                 ],
               ),

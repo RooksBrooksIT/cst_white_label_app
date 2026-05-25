@@ -35,6 +35,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   final commentsController = TextEditingController();
 
   List<String> siteList = [];
+  // Supervisor data: list of {id, fullName} maps from Firestore 'supervisor' collection
+  List<Map<String, String>> _supervisorList = [];
 
   Color get primaryColor => Theme.of(context).colorScheme.primary;
 
@@ -42,12 +44,52 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   void initState() {
     super.initState();
     _fetchSiteSupervisorMapDocs();
+    _fetchSupervisors();
   }
+
+  /// Fetches all supervisors from the 'supervisor' collection to populate the Supervisor ID dropdown.
+  void _fetchSupervisors() async {
+    try {
+      final snapshot = await FirestoreService.getCollection('supervisor').get();
+      if (!mounted) return;
+      final List<Map<String, String>> supervisors = [];
+      final Set<String> seenIds = {};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final supId = (data['SupervisorId']?.toString() ?? doc.id).trim();
+        final fullName = (data['FullName']?.toString() ?? '').trim();
+        if (supId.isNotEmpty && !seenIds.contains(supId)) {
+          seenIds.add(supId);
+          supervisors.add({'id': supId, 'fullName': fullName});
+        }
+      }
+      setState(() {
+        _supervisorList = supervisors;
+      });
+    } catch (e) {
+      debugPrint('Error fetching supervisors: $e');
+    }
+  }
+
+  // Cache of Site collection document data keyed by doc ID
+  Map<String, Map<String, dynamic>> _siteDocCache = {};
 
   /// Fetches all documents from siteSupervisorMap and populates the site dropdown.
   /// Path: /organisation/{OrgID}/siteSupervisorMap
   void _fetchSiteSupervisorMapDocs() async {
     try {
+      // 1. Fetch all site docs from 'Site' and cache their data
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+      final List<String> allSiteIds = [];
+      final Map<String, Map<String, dynamic>> siteDocCache = {};
+      for (final doc in sitesSnapshot.docs) {
+        if (doc.id.isNotEmpty) {
+          allSiteIds.add(doc.id);
+          siteDocCache[doc.id] = doc.data();
+        }
+      }
+
+      // 2. Fetch all mappings from 'siteSupervisorMap'
       final snapshot = await FirestoreService.getCollection(
         'siteSupervisorMap',
       ).get();
@@ -60,7 +102,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         final data = doc.data();
         final site = data['site']?.toString();
         if (site != null && site.isNotEmpty) {
-          // If duplicate site names exist, last one wins — adjust if needed
           siteToDocId[site] = doc.id;
           docCache[doc.id] = data;
         }
@@ -69,7 +110,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       setState(() {
         _siteToDocId = siteToDocId;
         _docCache = docCache;
-        siteList = siteToDocId.keys.toList();
+        _siteDocCache = siteDocCache;
+        siteList = allSiteIds..sort();
       });
     } catch (error) {
       debugPrint('Error fetching siteSupervisorMap: $error');
@@ -80,25 +122,145 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     }
   }
 
+  /// Retrieves the project name for a given site by querying the 'projects' collection.
+  /// Tries multiple field names and query strategies to handle inconsistent data.
+  Future<Map<String, dynamic>> _fetchProjectDataForSite(String siteId) async {
+    try {
+      // Try 1: query projects by siteId field
+      var projSnap = await FirestoreService.getCollection('projects')
+          .where('siteId', isEqualTo: siteId)
+          .limit(1)
+          .get();
+
+      // Try 2: if siteId query returned nothing, try querying by siteName from the Site doc
+      if (projSnap.docs.isEmpty) {
+        final siteData = _siteDocCache[siteId];
+        final sName = siteData?['siteName']?.toString();
+        if (sName != null && sName.isNotEmpty && sName != siteId) {
+          projSnap = await FirestoreService.getCollection('projects')
+              .where('siteName', isEqualTo: sName)
+              .limit(1)
+              .get();
+        }
+      }
+
+      if (projSnap.docs.isNotEmpty) {
+        return projSnap.docs.first.data();
+      }
+    } catch (e) {
+      debugPrint('Error fetching project data for site $siteId: $e');
+    }
+    return {};
+  }
+
+  /// Extracts the project name from project data, trying multiple field names.
+  String _extractProjectName(Map<String, dynamic> pData) {
+    // projects collection sometimes stores the name in 'projectName', sometimes in 'siteName'
+    final name = (pData['projectName']?.toString() ?? '').trim();
+    if (name.isNotEmpty) return name;
+    return (pData['siteName']?.toString() ?? '').trim();
+  }
+
   /// Auto-fills all form fields from the cached siteSupervisorMap document
   /// corresponding to the selected site name.
-  void _autoFillFromSite(String siteName) {
+  void _autoFillFromSite(String siteName) async {
     final docId = _siteToDocId[siteName];
-    if (docId == null) return;
-    final data = _docCache[docId];
-    if (data == null) return;
+    if (docId != null) {
+      final data = _docCache[docId];
+      if (data != null) {
+        String pName = (data['projectName']?.toString() ?? '').trim();
+        String pStage = (data['projectStage']?.toString() ?? '').trim();
+        String loc = (data['location']?.toString() ?? '').trim();
+        DateTime? sDate = _parseDate(data['startDate']);
+        DateTime? eDate = _parseDate(data['endDate']);
 
+        // If key fields are missing from the map doc, fetch from projects collection
+        if (pName.isEmpty || sDate == null || eDate == null) {
+          final pData = await _fetchProjectDataForSite(siteName);
+          if (pData.isNotEmpty) {
+            if (pName.isEmpty) pName = _extractProjectName(pData);
+            if (pStage.isEmpty) pStage = (pData['projectStage']?.toString() ?? '').trim();
+            if (loc.isEmpty) loc = (pData['location'] ?? pData['siteLocation'])?.toString() ?? '';
+            sDate ??= _parseDate(pData['plannedStartDate']) ?? _parseDate(pData['startDate']);
+            eDate ??= _parseDate(pData['plannedEndDate']) ?? _parseDate(pData['endDate']);
+          }
+        }
+
+        // Final fallback: use siteName from the Site collection
+        if (pName.isEmpty) {
+          final siteData = _siteDocCache[siteName];
+          pName = (siteData?['siteName']?.toString() ?? '').trim();
+          if (loc.isEmpty) loc = (siteData?['location']?.toString() ?? '').trim();
+          sDate ??= _parseDate(siteData?['startDate']);
+          eDate ??= _parseDate(siteData?['endDate']);
+        }
+
+        if (!mounted) return;
+        setState(() {
+          selectedSupervisorId = data['Supervisor ID']?.toString() ?? '';
+          selectedSupervisor = data['supervisor']?.toString() ?? '';
+          projectName = pName;
+          selectedProjectStage = pStage;
+          locationController.text = loc;
+          commentsController.text = data['siteComments']?.toString() ?? '';
+          startDate = sDate;
+          endDate = eDate;
+          joinedDate = _parseDate(data['joinedOn']);
+        });
+        return;
+      }
+    }
+
+    // Fallback: it's a newly created site with no siteSupervisorMap entry
     setState(() {
-      selectedSupervisorId = data['Supervisor ID']?.toString() ?? '';
-      selectedSupervisor = data['supervisor']?.toString() ?? '';
-      projectName = data['projectName']?.toString() ?? '';
-      selectedProjectStage = data['projectStage']?.toString() ?? '';
-      locationController.text = data['location']?.toString() ?? '';
-      commentsController.text = data['siteComments']?.toString() ?? '';
-      startDate = _parseDate(data['startDate']);
-      endDate = _parseDate(data['endDate']);
-      joinedDate = _parseDate(data['joinedOn']);
+      selectedSupervisorId = '';
+      selectedSupervisor = '';
+      projectName = '';
+      selectedProjectStage = '';
+      locationController.clear();
+      commentsController.clear();
+      startDate = null;
+      endDate = null;
+      joinedDate = null;
     });
+
+    try {
+      // 1. Try fetching from the projects collection
+      final pData = await _fetchProjectDataForSite(siteName);
+      String pName = '';
+      String pStage = '';
+      String loc = '';
+      DateTime? sDate;
+      DateTime? eDate;
+
+      if (pData.isNotEmpty) {
+        pName = _extractProjectName(pData);
+        pStage = (pData['projectStage']?.toString() ?? '').trim();
+        loc = (pData['location'] ?? pData['siteLocation'])?.toString() ?? '';
+        sDate = _parseDate(pData['plannedStartDate']) ?? _parseDate(pData['startDate']);
+        eDate = _parseDate(pData['plannedEndDate']) ?? _parseDate(pData['endDate']);
+      }
+
+      // 2. Fallback to Site collection data for any still-missing fields
+      final siteData = _siteDocCache[siteName];
+      if (siteData != null) {
+        if (pName.isEmpty) pName = (siteData['siteName']?.toString() ?? '').trim();
+        if (loc.isEmpty) loc = (siteData['location']?.toString() ?? '').trim();
+        sDate ??= _parseDate(siteData['startDate']);
+        eDate ??= _parseDate(siteData['endDate']);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        projectName = pName;
+        selectedProjectStage = pStage;
+        locationController.text = loc;
+        startDate = sDate;
+        endDate = eDate;
+      });
+    } catch (e) {
+      debugPrint('Error auto-filling from site $siteName: $e');
+    }
   }
 
   DateTime? _parseDate(dynamic value) {
@@ -412,8 +574,36 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                   style: TextStyle(fontSize: fontSize),
                 ),
                 SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
+                      ? selectedSupervisorId
+                      : null,
+                  hint: Text(
+                    'Select Supervisor ID',
+                    style: TextStyle(color: primaryColor, fontSize: fontSize),
+                  ),
+                  items: _supervisorList.map((sup) {
+                    return DropdownMenuItem<String>(
+                      value: sup['id'],
+                      child: Text(
+                        '${sup['id']} - ${sup['fullName']}',
+                        style: TextStyle(fontSize: fontSize),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedSupervisorId = value;
+                      // Auto-fill supervisor name from the selected ID
+                      final match = _supervisorList.firstWhere(
+                        (s) => s['id'] == value,
+                        orElse: () => {'id': '', 'fullName': ''},
+                      );
+                      selectedSupervisor = match['fullName'] ?? '';
+                    });
+                  },
                   decoration: InputDecoration(
                     labelText: 'Supervisor ID',
                     prefixIcon: Icon(Icons.badge_outlined, color: primaryColor),
@@ -426,10 +616,10 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                       horizontal: 18,
                     ),
                   ),
-                  controller: TextEditingController(
-                    text: selectedSupervisorId ?? '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
+                  icon: Icon(Icons.arrow_drop_down, color: primaryColor),
+                  borderRadius: BorderRadius.circular(12),
+                  dropdownColor: Colors.white,
+                  elevation: 4,
                 ),
                 SizedBox(height: 14),
                 TextFormField(
@@ -917,17 +1107,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             fontSize: fontSize,
           ),
         ),
-        SizedBox(width: 20),
-        Flexible(
-          child: _buildActionButton(
-            context,
-            icon: Icons.cancel,
-            label: 'Cancel',
-            color: Colors.redAccent,
-            onPressed: cancelAction,
-            fontSize: fontSize,
-          ),
-        ),
       ],
     );
   }
@@ -979,9 +1158,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     );
   }
 
-  void cancelAction() {
-    Navigator.of(context).pop();
-  }
+
 
   void _showSaveConfirmationDialog(BuildContext context) {
     showDialog(

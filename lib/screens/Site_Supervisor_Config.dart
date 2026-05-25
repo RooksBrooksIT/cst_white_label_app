@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class SiteSupervisorConfig extends StatefulWidget {
   const SiteSupervisorConfig({super.key});
@@ -310,16 +311,12 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       ),
     ).then((result) {
       if (result == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, size: 20),
-              SizedBox(width: 8),
-              Text('Supervisor updated successfully'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-        ));
+        if (mounted) {
+          DialogUtils.showSuccessDialog(
+            context,
+            message: 'Supervisor updated successfully!',
+          );
+        }
         setState(() {}); // Refresh list
       }
     });
@@ -378,7 +375,12 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       ).doc(documentId).set(supervisorData);
 
       // Show success dialog
-      _showSuccessDialog();
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Your supervisor details have been saved successfully.',
+        );
+      }
 
       // Clear form
       _resetForm();

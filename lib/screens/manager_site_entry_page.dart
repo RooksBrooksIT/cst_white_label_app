@@ -394,28 +394,186 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Future<void> _saveToFirestore() async {
     if (siteCode.isEmpty) return;
     setState(() => isSaving = true);
-    final docId = '${siteCode}_${DateFormat('ddMMyyyy').format(selectedDate!)}';
-    final data = {
-      "date": selectedDate!.toIso8601String(),
-      "siteId": siteCode,
-      "totalAmount": _getTotalAmount(),
-      "materials": materials,
-      "labours": labours,
-      "food": int.tryParse(foodCost.text) ?? 0,
-      "transport": int.tryParse(transportCost.text) ?? 0,
-      "fuel": int.tryParse(fuelCost.text) ?? 0,
-      "supervisorId": supervisorId,
-      "supervisorName": supervisorName,
-      "projectName": projectName,
-      "siteLocation": siteLocation,
-      "projectStage": projectStage,
-      "morningStatus": morningStatusController.text,
-      "afternoonStatus": afternoonStatusController.text,
-    };
+    final docId = '${siteCode}_${DateFormat('ddMMyyyy').format(selectedDate!)}_manager';
+
+    // Build new materials list with computed amounts
+    List<Map<String, dynamic>> newMaterials = materials
+        .map(
+          (m) => {
+            "type": m['type'] ?? '',
+            "quantity": m['quantity'] ?? 0,
+            "unitPrice": materialPrices[m['type'] ?? ''] ?? 0,
+            "amount":
+                (materialPrices[m['type'] ?? ''] ?? 0) * (m['quantity'] ?? 0),
+          },
+        )
+        .toList();
+
+    // Build new labours list with computed amounts
+    List<Map<String, dynamic>> newLabours = labours
+        .map(
+          (l) => {
+            "type": l['type'] ?? '',
+            "count": l['count'] ?? 0,
+            "unitSalary": labourSalaries[l['type'] ?? ''] ?? 0,
+            "amount":
+                (labourSalaries[l['type'] ?? ''] ?? 0) * (l['count'] ?? 0),
+          },
+        )
+        .toList();
+
     try {
-      await FirestoreService.siteSupervisorEntries
-          .doc(docId)
-          .set(data);
+      final existingDoc =
+          await FirestoreService.siteSupervisorEntries.doc(docId).get();
+      final bool docExists = existingDoc.exists;
+
+      Map<String, dynamic> data;
+
+      if (docExists) {
+        // Merge with existing entry
+        final existingData = existingDoc.data()!;
+        final List<dynamic> existingMaterials =
+            existingData['materials'] as List? ?? [];
+        final List<dynamic> existingLabours =
+            existingData['labours'] as List? ?? [];
+        final int existingFood = (existingData['food'] ?? 0) is int
+            ? existingData['food']
+            : (existingData['food'] as num?)?.toInt() ?? 0;
+        final int existingFuel = (existingData['fuel'] ?? 0) is int
+            ? existingData['fuel']
+            : (existingData['fuel'] as num?)?.toInt() ?? 0;
+        final int existingTransport = (existingData['transport'] ?? 0) is int
+            ? existingData['transport']
+            : (existingData['transport'] as num?)?.toInt() ?? 0;
+
+        // Sum duplicate materials by type
+        final Map<String, Map<String, dynamic>> consolidatedMaterials = {};
+        for (var m in existingMaterials) {
+          if (m is Map) {
+            final String type = m['type']?.toString() ?? '';
+            final num qty = m['quantity'] ?? 0;
+            final num price = m['unitPrice'] ?? 0;
+            if (type.isNotEmpty) {
+              consolidatedMaterials[type] = {
+                "type": type,
+                "quantity": (consolidatedMaterials[type]?["quantity"] ?? 0) + qty,
+                "unitPrice": price,
+                "amount": 0,
+              };
+            }
+          }
+        }
+        for (var m in newMaterials) {
+          final String type = m['type']?.toString() ?? '';
+          final num qty = m['quantity'] ?? 0;
+          final num price = m['unitPrice'] ?? 0;
+          if (type.isNotEmpty) {
+            consolidatedMaterials[type] = {
+              "type": type,
+              "quantity": (consolidatedMaterials[type]?["quantity"] ?? 0) + qty,
+              "unitPrice": price,
+              "amount": 0,
+            };
+          }
+        }
+        final List<Map<String, dynamic>> mergedMaterials = consolidatedMaterials.values.map((m) {
+          m["amount"] = (m["quantity"] as num) * (m["unitPrice"] as num);
+          return m;
+        }).toList();
+
+        // Sum duplicate labours by designation
+        final Map<String, Map<String, dynamic>> consolidatedLabours = {};
+        for (var l in existingLabours) {
+          if (l is Map) {
+            final String type = l['type']?.toString() ?? '';
+            final num count = l['count'] ?? 0;
+            final num salary = l['unitSalary'] ?? 0;
+            if (type.isNotEmpty) {
+              consolidatedLabours[type] = {
+                "type": type,
+                "count": (consolidatedLabours[type]?["count"] ?? 0) + count,
+                "unitSalary": salary,
+                "amount": 0,
+              };
+            }
+          }
+        }
+        for (var l in newLabours) {
+          final String type = l['type']?.toString() ?? '';
+          final num count = l['count'] ?? 0;
+          final num salary = l['unitSalary'] ?? 0;
+          if (type.isNotEmpty) {
+            consolidatedLabours[type] = {
+              "type": type,
+              "count": (consolidatedLabours[type]?["count"] ?? 0) + count,
+              "unitSalary": salary,
+              "amount": 0,
+            };
+          }
+        }
+        final List<Map<String, dynamic>> mergedLabours = consolidatedLabours.values.map((l) {
+          l["amount"] = (l["count"] as num) * (l["unitSalary"] as num);
+          return l;
+        }).toList();
+
+        final int mergedFood =
+            existingFood + (int.tryParse(foodCost.text) ?? 0);
+        final int mergedFuel =
+            existingFuel + (int.tryParse(fuelCost.text) ?? 0);
+        final int mergedTransport =
+            existingTransport + (int.tryParse(transportCost.text) ?? 0);
+
+        int mergedTotalAmount = mergedFood + mergedFuel + mergedTransport;
+        for (var m in mergedMaterials) {
+          mergedTotalAmount += ((m['amount'] ?? 0) as num).toInt();
+        }
+        for (var l in mergedLabours) {
+          mergedTotalAmount += ((l['amount'] ?? 0) as num).toInt();
+        }
+
+        data = {
+          "date": selectedDate!.toIso8601String(),
+          "siteId": siteCode,
+          "totalAmount": mergedTotalAmount,
+          "materials": mergedMaterials,
+          "labours": mergedLabours,
+          "food": mergedFood,
+          "transport": mergedTransport,
+          "fuel": mergedFuel,
+          "supervisorId": existingData['supervisorId'] ?? supervisorId,
+          "supervisorName": existingData['supervisorName'] ?? supervisorName,
+          "projectName": existingData['projectName'] ?? projectName,
+          "siteLocation": existingData['siteLocation'] ?? siteLocation,
+          "projectStage": existingData['projectStage'] ?? projectStage,
+          "morningStatus": morningStatusController.text,
+          "afternoonStatus": afternoonStatusController.text,
+          "isManagerEntry": true,
+          "createdBy": "manager",
+        };
+      } else {
+        // New entry
+        data = {
+          "date": selectedDate!.toIso8601String(),
+          "siteId": siteCode,
+          "totalAmount": _getTotalAmount(),
+          "materials": newMaterials,
+          "labours": newLabours,
+          "food": int.tryParse(foodCost.text) ?? 0,
+          "transport": int.tryParse(transportCost.text) ?? 0,
+          "fuel": int.tryParse(fuelCost.text) ?? 0,
+          "supervisorId": supervisorId,
+          "supervisorName": supervisorName,
+          "projectName": projectName,
+          "siteLocation": siteLocation,
+          "projectStage": projectStage,
+          "morningStatus": morningStatusController.text,
+          "afternoonStatus": afternoonStatusController.text,
+          "isManagerEntry": true,
+          "createdBy": "manager",
+        };
+      }
+
+      await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       await ExpenseService.updateTotalSiteExpense(siteCode);
       if (mounted)
         ScaffoldMessenger.of(
@@ -438,6 +596,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     try {
       final query = await FirestoreService.siteSupervisorEntries
           .where('siteId', isEqualTo: siteCode)
+          .where('isManagerEntry', isEqualTo: true)
           .get();
 
       final entries = <Map<String, dynamic>>[];
@@ -504,9 +663,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
   Future<void> _loadEntryByDocId(String docId) async {
     try {
-      final doc = await FirestoreService.siteSupervisorEntries
-          .doc(docId)
-          .get();
+      final doc = await FirestoreService.siteSupervisorEntries.doc(docId).get();
       if (!doc.exists) return;
       final data = doc.data()!;
       setState(() {
@@ -537,18 +694,19 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (_updateDocId == null) return;
     setState(() => isSaving = true);
     try {
-      await FirestoreService.siteSupervisorEntries
-          .doc(_updateDocId)
-          .update({
-            "materials": materials,
-            "labours": labours,
-            "food": int.tryParse(foodCost.text) ?? 0,
-            "transport": int.tryParse(transportCost.text) ?? 0,
-            "fuel": int.tryParse(fuelCost.text) ?? 0,
-            "morningStatus": morningStatusController.text,
-            "afternoonStatus": afternoonStatusController.text,
-            "totalAmount": _getTotalAmount(),
-          });
+      await FirestoreService.siteSupervisorEntries.doc(_updateDocId).update({
+        "materials": materials,
+        "labours": labours,
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "morningStatus": morningStatusController.text,
+        "afternoonStatus": afternoonStatusController.text,
+        "totalAmount": _getTotalAmount(),
+        "isManagerEntry": true,
+        "createdBy": "manager",
+      });
+      await ExpenseService.updateTotalSiteExpense(siteCode);
       if (mounted)
         ScaffoldMessenger.of(
           context,
@@ -1495,7 +1653,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                 DataCell(Text('₹${foodCost.text}')),
                 DataCell(
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
                     onPressed: () => setState(() => foodCost.text = '0'),
                   ),
                 ),
@@ -1509,7 +1671,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                 DataCell(Text('₹${transportCost.text}')),
                 DataCell(
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
                     onPressed: () => setState(() => transportCost.text = '0'),
                   ),
                 ),
@@ -1523,7 +1689,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                 DataCell(Text('₹${fuelCost.text}')),
                 DataCell(
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
                     onPressed: () => setState(() => fuelCost.text = '0'),
                   ),
                 ),

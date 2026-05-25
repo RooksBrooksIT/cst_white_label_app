@@ -63,7 +63,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           bool isExpired = false;
           if (endDate != null) {
             // Add a small buffer (e.g. 1 hour) to handle clock skews
-            isExpired = DateTime.now().isAfter(endDate.toDate().add(const Duration(hours: 1)));
+            isExpired = DateTime.now().isAfter(
+              endDate.toDate().add(const Duration(hours: 1)),
+            );
           }
 
           if (!isActive || isExpired) {
@@ -464,14 +466,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             onTap: () => _navigateToManagerExpenses(context),
           ),
           SubMenuItem(
-            title: "Manager Daily Entry",
+            title: "Organisation Daily Entry",
             subtitle: "Log daily project progress and expenses",
             icon: Icons.edit_note_rounded,
             color: Colors.deepOrangeAccent,
             onTap: () => _navigateToManagerDailyEntry(context),
           ),
           SubMenuItem(
-            title: "Supervisor Expenses",
+            title: "Supervisor Daily Entry",
             subtitle: "Daily field-level operational expenses",
             icon: Icons.engineering_rounded,
             color: Colors.amber[800]!,
@@ -690,7 +692,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   void _navigateToConfiguration(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ConfigAccountDashboard(showLogout: false)),
+      MaterialPageRoute(
+        builder: (context) => const ConfigAccountDashboard(showLogout: false),
+      ),
     );
   }
 
@@ -771,7 +775,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       context,
       MaterialPageRoute(
         builder: (context) =>
-            ManagerSiteEntryPage(userName: userName, userDetails: userData),
+            OrganizationSiteEntry(userName: userName, userDetails: userData),
       ),
     );
   }

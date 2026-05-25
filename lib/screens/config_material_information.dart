@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 import 'package:intl/intl.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
@@ -114,39 +115,185 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     super.dispose();
   }
 
-  // Load site data from siteSupervisorMap collection
+  // Load site data from site collection with supervisor mapping left-joined
   Future<void> _loadSiteData() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).get();
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+      final Map<String, Map<String, dynamic>> siteDetails = {
+        for (var doc in sitesSnapshot.docs)
+          doc.id: doc.data() as Map<String, dynamic>
+      };
+
+      final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
+      // Build lookup by 'site' field AND by plain site name (for older records)
+      final Map<String, Map<String, dynamic>> supervisorMap = {};
+      for (var doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final siteField = data['site']?.toString().trim();
+        if (siteField != null && siteField.isNotEmpty) {
+          supervisorMap[siteField] = data;
+        }
+      }
 
       if (mounted) {
         setState(() {
-          sitesList = querySnapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'siteId': doc.id,
-              'siteName': data['site'] ?? data['Site'] ?? doc.id,
-              'projectName': data['projectName'] ?? data['Project Name'] ?? '',
-              'supervisorName': data['supervisor'] ??
-                  data['Supervisor'] ??
-                  data['supervisorName'] ??
-                  data['Supervisor Name'] ??
-                  '',
+          sitesList = siteDetails.entries.map<Map<String, dynamic>>((entry) {
+            final sId = entry.key;           // e.g. "S001_MySiteName"
+            final sData = entry.value;
+            final siteName = sData['siteName']?.toString() ?? sId;
+            // Try matching by doc ID first, then by plain site name
+            final mapping = supervisorMap[sId] ?? supervisorMap[siteName];
+
+            return <String, dynamic>{
+              'siteId': sId,
+              'siteName': siteName,
+              'projectName': mapping?['projectName'] ?? sData['projectName'] ?? '',
+              'supervisorName': mapping?['supervisor'] ?? 'Not Assigned',
             };
           }).toList();
           _isLoadingSites = false;
+          debugPrint('Loaded ${sitesList.length} sites successfully');
         });
       }
     } catch (e) {
-      print('Error loading site data: $e');
+      debugPrint('Error loading site data: $e');
       if (mounted) {
         setState(() {
           _isLoadingSites = false;
         });
         _showSnackBar('Error loading site data');
       }
+    }
+  }
+
+  // Asynchronously fetch and fill latest project and supervisor details from Firestore
+  Future<void> _fetchAndFillSiteDetails(String siteId, {required int mode, bool isFromSite = true}) async {
+    final trimmedId = siteId.trim();
+    if (trimmedId.isEmpty) return;
+
+    debugPrint('Auto-filling site details for ID: $trimmedId (mode: $mode)');
+
+    String? supervisor;
+    String? projectName;
+    String? siteName;
+
+    // 1. Check preloaded sitesList as a fast initial fill (instant UI update)
+    final siteItem = sitesList.firstWhere(
+      (s) => s['siteId']?.toString().trim() == trimmedId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (siteItem.isNotEmpty) {
+      debugPrint('Found preloaded siteItem: $siteItem');
+      siteName = siteItem['siteName']?.toString();
+      // Only use preloaded supervisor/projectName if they are non-empty/non-default
+      final preloadedProject = siteItem['projectName']?.toString() ?? '';
+      final preloadedSupervisor = siteItem['supervisorName']?.toString() ?? '';
+      if (preloadedProject.isNotEmpty) projectName = preloadedProject;
+      if (preloadedSupervisor.isNotEmpty && preloadedSupervisor != 'Not Assigned') supervisor = preloadedSupervisor;
+    } else {
+      debugPrint('No preloaded siteItem found for $trimmedId');
+    }
+
+    // Fill immediately with whatever we have so far
+    if (mounted) {
+      setState(() {
+        _applyFill(mode: mode, isFromSite: isFromSite,
+          siteName: siteName ?? trimmedId,
+          projectName: projectName ?? '',
+          supervisor: supervisor ?? '');
+      });
+    }
+
+    try {
+      // 2. Always query siteSupervisorMap by 'site' field (doc IDs don't match siteId)
+      // Also try plain siteName in case older records stored the name rather than doc ID
+      QuerySnapshot<Map<String, dynamic>>? mapSnapshot;
+      mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap')
+          .where('site', isEqualTo: trimmedId)
+          .limit(1)
+          .get();
+
+      if (mapSnapshot.docs.isEmpty && siteName != null && siteName != trimmedId) {
+        // Fallback: try querying by the human-readable site name
+        mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap')
+            .where('site', isEqualTo: siteName)
+            .limit(1)
+            .get();
+      }
+
+      if (mapSnapshot.docs.isNotEmpty) {
+        final data = mapSnapshot.docs.first.data();
+        final fetchedSupervisor = data['supervisor']?.toString();
+        final fetchedProject = (data['projectName'] ?? data['project_name'])?.toString();
+        if (fetchedSupervisor != null && fetchedSupervisor.isNotEmpty) supervisor = fetchedSupervisor;
+        if (fetchedProject != null && fetchedProject.isNotEmpty) projectName = fetchedProject;
+      }
+
+      // 3. Fetch from projects collection by siteId for the project name
+      if (projectName == null || projectName.isEmpty) {
+        // Try with doc ID format first
+        var projectSnapshot = await FirestoreService.getCollection('projects')
+            .where('siteId', isEqualTo: trimmedId)
+            .limit(1)
+            .get();
+        // Also try with siteName if still not found
+        if (projectSnapshot.docs.isEmpty && siteName != null) {
+          projectSnapshot = await FirestoreService.getCollection('projects')
+              .where('siteName', isEqualTo: siteName)
+              .limit(1)
+              .get();
+        }
+        if (projectSnapshot.docs.isNotEmpty) {
+          final pData = projectSnapshot.docs.first.data();
+          // projects docs have 'siteName' not 'projectName'
+          final pName = (pData['projectName'] ?? pData['siteName'])?.toString();
+          if (pName != null && pName.trim().isNotEmpty) projectName = pName;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error auto-filling site details for $trimmedId: $e');
+    }
+
+    // Final fallbacks
+    supervisor = (supervisor?.isNotEmpty == true) ? supervisor : 'Not Assigned';
+    projectName = (projectName?.isNotEmpty == true) ? projectName : (siteName ?? trimmedId);
+    siteName ??= trimmedId;
+
+    if (mounted) {
+      setState(() {
+        _applyFill(mode: mode, isFromSite: isFromSite,
+          siteName: siteName!,
+          projectName: projectName!,
+          supervisor: supervisor!);
+      });
+    }
+  }
+
+  // Helper to apply filled values to the correct controllers based on mode
+  void _applyFill({
+    required int mode,
+    required bool isFromSite,
+    required String siteName,
+    required String projectName,
+    required String supervisor,
+  }) {
+    if (mode == 0) {
+      _projectNameController.text = projectName;
+      _supervisorNameController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+    } else if (mode == 1) {
+      if (isFromSite) {
+        _fromSiteNameController.text = siteName;
+        _fromProjectNameController.text = projectName;
+        _fromSupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      } else {
+        _toSiteNameController.text = siteName;
+        _toProjectNameController.text = projectName;
+        _toSupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      }
+    } else if (mode == 2) {
+      _siteToCompanySiteNameController.text = siteName;
+      _siteToCompanySupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      _projectNameController.text = projectName;
     }
   }
 
@@ -320,7 +467,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // Find the selected site data and auto-fill site name and supervisor name
       final selectedSite = sitesList.firstWhere(
         (site) => site['siteId'] == siteId,
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
 
       if (selectedSite.isNotEmpty) {
@@ -348,7 +495,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final source = _transferMode == 0 ? materialsList : siteMaterialsList;
         final selectedMaterial = source.firstWhere(
           (material) => material['materialName'] == materialName,
-          orElse: () => {},
+          orElse: () => <String, dynamic>{},
         );
         if (selectedMaterial.isNotEmpty) {
           availableCount = selectedMaterial['count'] ?? 0;
@@ -389,7 +536,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     final source = _transferMode == 0 ? materialsList : siteMaterialsList;
     final selectedMaterial = source.firstWhere(
       (material) => material['materialName'] == _selectedMaterialName,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
     final displayName =
         selectedMaterial['displayName'] ?? _selectedMaterialName!;
@@ -449,6 +596,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _toSiteNameController.clear();
       _toProjectNameController.clear();
       _toSupervisorController.clear();
+
+      _siteToCompanyManagerController.clear();
+      _siteToCompanySiteNameController.clear();
+      _siteToCompanySupervisorController.clear();
+      _siteToCompanyDateController.text = DateFormat(
+        'yyyy-MM-dd',
+      ).format(DateTime.now());
 
       _selectedMaterialName = null;
       _neededCountController.clear();
@@ -646,7 +800,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     if (_selectedSiteId == null) return '';
     final selectedSite = sitesList.firstWhere(
       (site) => site['siteId'] == _selectedSiteId,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
     return selectedSite['siteName'] ?? _selectedSiteId!;
   }
@@ -705,7 +859,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         // Update materialsavailablity collection (decrease count) on the latest document for this material
         final latestEntry = materialsList.firstWhere(
           (mat) => mat['materialName'] == material['materialName'],
-          orElse: () => {'count': 0, 'docId': material['materialName']},
+          orElse: () => <String, dynamic>{'count': 0, 'docId': material['materialName']},
         );
         final String docId = (latestEntry['docId'] ?? material['materialName'])
             .toString();
@@ -769,7 +923,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // Close loading dialog and show success
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialog();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been transferred successfully.',
+        );
+        _clearAll();
       }
     } catch (e) {
       print('Error saving transfer data: $e');
@@ -897,7 +1055,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialogSiteToSite();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been transferred successfully between sites.',
+        );
 
         // Clear form and reload data
         setState(() {
@@ -906,6 +1067,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           availableCount = 0;
           _neededCountController.clear();
         });
+
+        _fromManagerController.clear();
+        _toManagerController.clear();
+        _fromDateController.clear();
+        _toDateController.clear();
 
         // Reload site materials for updated counts
         await _loadSiteMaterialData(_fromSiteId);
@@ -990,7 +1156,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         // Update materialsavailablity collection (increase count)
         final latestEntry = materialsList.firstWhere(
           (mat) => mat['materialName'] == matName,
-          orElse: () => {'count': 0, 'docId': matName},
+          orElse: () => <String, dynamic>{'count': 0, 'docId': matName},
         );
         final String docId = (latestEntry['docId'] ?? matName).toString();
         final currentAvailableCount = (latestEntry['count'] ?? 0).toInt();
@@ -1058,7 +1224,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialogSiteToCompany();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been returned to company successfully.',
+        );
 
         // Clear form
         _clearSiteToCompanyFields();
@@ -1072,184 +1241,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Materials have been transferred successfully.'),
-              const SizedBox(height: 12),
-              Text('Site: ${_getSelectedSiteName()}'),
-              Text('Date: ${_dateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Transferred Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ Available counts updated in system\n✓ Materials added to site inventory\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _clearAll();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  void _showSuccessDialogSiteToSite() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Materials have been transferred successfully between sites.',
-              ),
-              const SizedBox(height: 12),
-              Text('From Site: ${_fromSiteNameController.text}'),
-              Text('To Site: ${_toSiteNameController.text}'),
-              Text('Date: ${_fromDateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Transferred Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ From site inventory decreased\n✓ To site inventory increased\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Optionally clear more fields if needed
-                _fromManagerController.clear();
-                _toManagerController.clear();
-                _fromDateController.clear();
-                _toDateController.clear();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialogSiteToCompany() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Materials have been returned to company successfully.',
-              ),
-              const SizedBox(height: 12),
-              Text('From Site: ${_siteToCompanySiteNameController.text}'),
-              Text('Date: ${_siteToCompanyDateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Returned Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ Company inventory increased\n✓ Site inventory decreased\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1307,6 +1299,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         _neededCountController.clear();
                       });
                     },
+
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 0
                           ? Theme.of(context).colorScheme.primary
@@ -1533,13 +1526,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -1615,28 +1608,21 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _fromSiteId,
                 onChanged: (v) async {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _fromSiteId = v;
-                    _fromSiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _fromProjectNameController.text =
-                        site['projectName']?.toString() ?? '';
-                    _fromSupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                    // Reset material selection for SiteToSite
-                    _selectedMaterialName = null;
-                    availableCount = 0;
-                    _neededCountController.clear();
-                    _isLoadingMaterials = true;
-                  });
-                  await _loadSiteMaterialData(v);
+                  if (v != null) {
+                    setState(() {
+                      _fromSiteId = v;
+                      _selectedMaterialName = null;
+                      availableCount = 0;
+                      _neededCountController.clear();
+                      _isLoadingMaterials = true;
+                    });
+                    await _fetchAndFillSiteDetails(v, mode: 1, isFromSite: true);
+                    await _loadSiteMaterialData(v);
+                  }
                 },
                 label: 'Site *',
               ),
+              
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _fromSiteNameController,
@@ -1683,19 +1669,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _toSiteId,
                 onChanged: (v) {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _toSiteId = v;
-                    _toSiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _toProjectNameController.text =
-                        site['projectName']?.toString() ?? '';
-                    _toSupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                  });
+                  if (v != null) {
+                    setState(() {
+                      _toSiteId = v;
+                    });
+                    _fetchAndFillSiteDetails(v, mode: 1, isFromSite: false);
+                  }
                 },
                 label: 'Site *',
               ),
@@ -1805,13 +1784,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel Transfer',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -1858,25 +1837,17 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _selectedSiteId,
                 onChanged: (v) async {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _selectedSiteId = v;
-                    _siteToCompanySiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _siteToCompanySupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                    _projectNameController.text =
-                        site['projectName']?.toString() ?? '';
-                    // Reset material selection
-                    _selectedMaterialName = null;
-                    availableCount = 0;
-                    _neededCountController.clear();
-                    _isLoadingMaterials = true;
-                  });
-                  await _loadSiteMaterialData(v);
+                  if (v != null) {
+                    setState(() {
+                      _selectedSiteId = v;
+                      _selectedMaterialName = null;
+                      availableCount = 0;
+                      _neededCountController.clear();
+                      _isLoadingMaterials = true;
+                    });
+                    await _fetchAndFillSiteDetails(v, mode: 2);
+                    await _loadSiteMaterialData(v);
+                  }
                 },
                 label: 'Site *',
               ),
@@ -2008,13 +1979,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel Transfer',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -2275,17 +2246,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       );
                     }).toList(),
                     onChanged: (v) {
-                      final site = sitesList.firstWhere(
-                        (s) => s['siteId'] == v,
-                        orElse: () => {},
-                      );
-                      setState(() {
-                        _selectedSiteId = v;
-                        _projectNameController.text =
-                            site['projectName']?.toString() ?? '';
-                        _supervisorNameController.text =
-                            site['supervisorName']?.toString() ?? '';
-                      });
+                      if (v != null) {
+                        setState(() {
+                          _selectedSiteId = v;
+                        });
+                        _fetchAndFillSiteDetails(v, mode: 0);
+                      }
                     },
                   ),
                 ),

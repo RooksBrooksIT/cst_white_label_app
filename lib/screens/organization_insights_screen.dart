@@ -78,10 +78,35 @@ class _OrganizationInsightsScreenState
   }
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
-    final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries').get();
-    return querySnapshot.docs
-        .map((doc) => SupervisorEntry.fromFirestore(doc))
-        .toList();
+    try {
+      final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries').get();
+      final List<SupervisorEntry> entries = querySnapshot.docs
+          .map((doc) => SupervisorEntry.fromFirestore(doc))
+          .toList();
+
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+      final Set<String> loggedSiteIds = entries
+          .where((e) => e.siteId != null && e.siteId!.isNotEmpty)
+          .map((e) => e.siteId!)
+          .toSet();
+
+      for (var doc in sitesSnapshot.docs) {
+        final sId = doc.id;
+        if (!loggedSiteIds.contains(sId)) {
+          final sData = doc.data();
+          entries.add(SupervisorEntry(
+            supervisorId: 'Not Assigned',
+            siteId: sId,
+            siteName: sData['siteName']?.toString() ?? sId,
+          ));
+        }
+      }
+
+      return entries;
+    } catch (e) {
+      debugPrint('Error fetching supervisor entries: $e');
+      return [];
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
