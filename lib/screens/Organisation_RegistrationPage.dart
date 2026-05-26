@@ -3,10 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../utils/responsive.dart';
 import 'branding_screen.dart';
-import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
-import '../widgets/glass_text_field.dart';
 
 // Form screen for organization registration details
 
@@ -131,19 +127,51 @@ class _OrganisationRegistrationPageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return GlassScaffold(
-      title: 'Register Organization',
-      onBack: _goBack,
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          'Register Organization',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+            color: Colors.white,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: Colors.white,
+          ),
+          onPressed: _goBack,
+        ),
+      ),
       body: Column(
         children: [
-          const SizedBox(height: 24),
-          // Step Indicator
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+          // Rectangular Header with Step Indicator
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: _buildStepIndicator(theme),
           ),
-          const SizedBox(height: 12),
           // Page Content
           Expanded(
             child: FadeTransition(
@@ -166,67 +194,72 @@ class _OrganisationRegistrationPageState
   Widget _buildStepIndicator(ThemeData theme) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0;
-    final primaryColor = theme.primaryColor;
     final colorScheme = theme.colorScheme;
 
     return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          return Expanded(
-            child: Container(
-              height: 2,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                color: colorScheme.outlineVariant,
-              ),
-            ),
-          );
-        }
-        final stepIndex = i ~/ 2;
-        final isActive = activeStep == stepIndex;
-        final isDone = activeStep > stepIndex;
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(steps.length, (index) {
+        final isActive = activeStep == index;
+        final isDone = activeStep > index;
 
-        return Column(
+        return Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDone || isActive ? primaryColor : colorScheme.surface,
-                border: Border.all(
-                  color: isDone || isActive
-                      ? primaryColor
-                      : colorScheme.outline,
-                  width: 2,
+            // Step circle and label
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDone
+                        ? Colors.white
+                        : (isActive ? Colors.white : Colors.white24),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Center(
+                    child: isDone
+                        ? Icon(
+                            Icons.check,
+                            color: colorScheme.primary,
+                            size: 18,
+                          )
+                        : Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: isActive
+                                  ? colorScheme.primary
+                                  : Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  steps[index],
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            // Connector line
+            if (index < steps.length - 1)
+              Container(
+                width: 40,
+                height: 2,
+                margin: const EdgeInsets.only(bottom: 16, left: 12, right: 12),
+                decoration: BoxDecoration(
+                  color: activeStep > index ? Colors.white : Colors.white24,
+                  borderRadius: BorderRadius.circular(1),
                 ),
               ),
-              child: Center(
-                child: isDone
-                    ? const Icon(Icons.check, color: Colors.white, size: 18)
-                    : Text(
-                        '${stepIndex + 1}',
-                        style: TextStyle(
-                          color: isActive
-                              ? Colors.white
-                              : colorScheme.onSurfaceVariant,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              steps[stepIndex],
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: isActive
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurfaceVariant,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
           ],
         );
       }),
@@ -237,197 +270,297 @@ class _OrganisationRegistrationPageState
     final colorScheme = theme.colorScheme;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Text('Organization Details', style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            'Complete your organization profile to get started.',
-            style: theme.textTheme.bodyMedium,
+          // Section Heading
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Create Your Profile',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Please provide your organization details below.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 32),
 
-          // Form
-          GlassCard(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  GlassTextField(
-                    controller: _orgNameController,
-                    label: 'Organization Name',
-                    icon: Icons.apartment_rounded,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Organization name is required';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  GlassTextField(
-                    controller: _emailController,
-                    label: 'Corporate Email',
-                    icon: Icons.email_rounded,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Corporate email is required';
-                      }
-                      // Basic email validation regex
-                      final emailRegex = RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      );
-                      if (!emailRegex.hasMatch(value)) {
-                        return 'Please enter a valid corporate email (e.g. name@company.com)';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  GlassTextField(
-                    controller: _phoneController,
-                    label: 'Phone Number',
-                    icon: Icons.phone_rounded,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Phone number is required';
-                      }
-                      if (value.length != 10) {
-                        return 'Phone number must be exactly 10 digits';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  GlassTextField(
-                    controller: _usernameController,
-                    label: 'Admin Username',
-                    icon: Icons.person_rounded,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Admin username is required';
-                      }
-                      if (value.length < 3) {
-                        return 'Username must be at least 3 characters';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  GlassTextField(
-                    controller: _passwordController,
-                    label: 'Secure Password',
-                    icon: Icons.lock_rounded,
-                    isPassword: true,
-                    onChanged: _checkPasswordStrength,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (value.length < 8) {
-                        return 'Password must be at least 8 characters';
-                      }
-                      if (!RegExp(r'[A-Z]').hasMatch(value)) {
-                        return 'Add at least one uppercase letter';
-                      }
-                      if (!RegExp(r'[a-z]').hasMatch(value)) {
-                        return 'Add at least one lowercase letter';
-                      }
-                      if (!RegExp(r'[0-9]').hasMatch(value)) {
-                        return 'Add at least one number';
-                      }
-                      if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
-                        return 'Add at least one special character';
-                      }
-                      return null;
-                    },
-                  ),
-                  if (_passwordStrength.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Password Strength: $_passwordStrength',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: _strengthColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
+          // Professional Form Container
+          Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFieldLabel('Organization Name'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _orgNameController,
+                  hint: 'Enter organization name',
+                  icon: Icons.business_rounded,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Organization name is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildFieldLabel('Corporate Email'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _emailController,
+                  hint: 'email@company.com',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Corporate email is required';
+                    }
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value)) {
+                      return 'Please enter a valid corporate email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildFieldLabel('Phone Number'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _phoneController,
+                  hint: '10-digit mobile number',
+                  icon: Icons.phone_android_rounded,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Phone number is required';
+                    }
+                    if (value.length != 10) {
+                      return 'Phone number must be 10 digits';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildFieldLabel('Admin Username'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _usernameController,
+                  hint: 'e.g. admin_user',
+                  icon: Icons.alternate_email_rounded,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Username is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildFieldLabel('Security Password'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _passwordController,
+                  hint: '••••••••',
+                  icon: Icons.lock_outline_rounded,
+                  isPassword: true,
+                  onChanged: _checkPasswordStrength,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Password is required';
+                    }
+                    if (value.length < 8)
+                      return 'Minimum 8 characters required';
+                    return null;
+                  },
+                ),
+                if (_passwordStrength.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, left: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _strengthColor,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                              value:
-                                  _passwordStrength == 'Weak'
-                                      ? 0.33
-                                      : (_passwordStrength == 'Moderate'
-                                          ? 0.66
-                                          : 1.0),
-                              backgroundColor: theme.colorScheme.outlineVariant
-                                  .withOpacity(0.2),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                _strengthColor,
-                              ),
-                              minHeight: 4,
                             ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Security: $_passwordStrength',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _strengthColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: _passwordStrength == 'Weak'
+                                ? 0.33
+                                : (_passwordStrength == 'Moderate'
+                                      ? 0.66
+                                      : 1.0),
+                            backgroundColor: colorScheme.surfaceVariant,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _strengthColor,
+                            ),
+                            minHeight: 4,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 20),
-                  GlassTextField(
-                    controller: _confirmPasswordController,
-                    label: 'Confirm Password',
-                    icon: Icons.lock_outline_rounded,
-                    isPassword: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
                   ),
-                ],
+                const SizedBox(height: 20),
+                _buildFieldLabel('Confirm Password'),
+                const SizedBox(height: 8),
+                _buildProfessionalField(
+                  controller: _confirmPasswordController,
+                  hint: '••••••••',
+                  icon: Icons.shield_outlined,
+                  isPassword: true,
+                  validator: (value) {
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 48),
+
+          // Primary Action Button
+          ElevatedButton(
+            onPressed: _goToNextStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              elevation: 4,
+              shadowColor: colorScheme.primary.withOpacity(0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'CONTINUE TO BRANDING',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
               ),
             ),
           ),
-          const SizedBox(height: 40),
-
-          // Action Buttons
-          GlassButton(label: 'CONTINUE', onPressed: _goToNextStep),
           const SizedBox(height: 16),
+          // Secondary Action
           TextButton(
             onPressed: _goBack,
             style: TextButton.styleFrom(
               foregroundColor: colorScheme.onSurfaceVariant,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
             child: const Text(
-              'CANCEL',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              'Already have an account? Login',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  Widget _buildProfessionalField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      onChanged: onChanged,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+          fontSize: 14,
+        ),
+        prefixIcon: Icon(icon, color: colorScheme.primary, size: 20),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 20,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colorScheme.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: colorScheme.error, width: 2),
+        ),
+        errorStyle: TextStyle(color: colorScheme.error, fontSize: 12),
       ),
     );
   }

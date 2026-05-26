@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_theme.dart';
-import 'migration_screen.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -16,28 +15,28 @@ class LandingPage extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Background Gradient blobs
+          // Subtle background blobs – reduced opacity for less distraction
           Positioned(
-            top: -100,
-            right: -100,
+            top: -80,
+            right: -80,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 220,
+              height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withOpacity(0.08),
+                color: primaryColor.withOpacity(0.06),
               ),
             ),
           ),
           Positioned(
-            bottom: -50,
-            left: -50,
+            bottom: -30,
+            left: -30,
             child: Container(
-              width: 200,
-              height: 200,
+              width: 160,
+              height: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withOpacity(0.05),
+                color: primaryColor.withOpacity(0.04),
               ),
             ),
           ),
@@ -45,46 +44,40 @@ class LandingPage extends StatelessWidget {
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  const SizedBox(height: 48),
-
-                  // Hero Image with modern glass effect
-                  GestureDetector(
-                    onLongPress: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MigrationScreen(),
-                        ),
-                      );
-                    },
-                    child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Column(
+                  children: [
+                    // ---------- Compact Hero Section ----------
+                    Center(
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
                           Container(
-                            width: 240,
-                            height: 240,
+                            width: 130,
+                            height: 130,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Colors.white.withOpacity(0.4),
-                                  Colors.white.withOpacity(0.1),
+                                  Colors.white.withOpacity(0.3),
+                                  Colors.white.withOpacity(0.05),
                                 ],
                               ),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.5),
-                                width: 2,
+                                color: primaryColor.withOpacity(0.3),
+                                width: 1.5,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: primaryColor.withOpacity(0.1),
-                                  blurRadius: 40,
-                                  spreadRadius: 5,
+                                  color: primaryColor.withOpacity(0.15),
+                                  blurRadius: 24,
+                                  spreadRadius: 2,
                                 ),
                               ],
                             ),
@@ -93,8 +86,8 @@ class LandingPage extends StatelessWidget {
                             tag: 'hero_image',
                             child: ClipOval(
                               child: Container(
-                                width: 190,
-                                height: 190,
+                                width: 100,
+                                height: 100,
                                 color: Colors.white,
                                 child: Image.asset(
                                   'assets/images/logo_main.png',
@@ -102,8 +95,8 @@ class LandingPage extends StatelessWidget {
                                   errorBuilder: (context, error, stackTrace) =>
                                       Icon(
                                         Icons.construction_rounded,
-                                        size: 100,
-                                        color: primaryColor.withOpacity(0.5),
+                                        size: 50,
+                                        color: primaryColor.withOpacity(0.6),
                                       ),
                                 ),
                               ),
@@ -112,96 +105,76 @@ class LandingPage extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 40),
-
-                  // Headline & Subtitle
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Column(
-                      children: [
-                        ValueListenableBuilder<String>(
-                          valueListenable: AppTheme.appName,
-                          builder: (context, name, _) {
-                            return Text(
-                              'Manage Your Projects\nLike a Pro',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                color: colorScheme.onSurface,
-                                height: 1.1,
-                                letterSpacing: -1.0,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Plan, track, and manage your construction\nwork seamlessly with professional tools.',
+                    // ---------- Headline & Subtitle (more compact) ----------
+                    ValueListenableBuilder<String>(
+                      valueListenable: AppTheme.appName,
+                      builder: (context, name, _) {
+                        return Text(
+                          'Manage Your Projects\nLike a Pro',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 15,
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                            height: 1.5,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.onSurface,
+                            height: 1.2,
+                            letterSpacing: -0.5,
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Plan, track, and manage your construction work\nseamlessly with professional tools.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
-                  const SizedBox(height: 32),
-
-                  // Action Cards Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 32,
+                    // ---------- Three Action Cards (now primary focus) ----------
+                    _buildActionTile(
+                      context: context,
+                      label: 'Create Account',
+                      subtitle: 'Register your organization',
+                      icon: Icons.add_business_rounded,
+                      isPrimary: true,
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/orgRegistrationForm'),
                     ),
-                    child: Column(
-                      children: [
-                        _buildActionTile(
-                          context: context,
-                          label: 'Create Account',
-                          subtitle: 'Register your organization',
-                          icon: Icons.add_business_rounded,
-                          isPrimary: true,
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            '/orgRegistrationForm',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildActionTile(
-                          context: context,
-                          label: 'Login',
-                          subtitle: 'Access your dashboard',
-                          icon: Icons.login_rounded,
-                          isPrimary: false,
-                          onTap: () async {
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.remove('temp_org_path');
-                            if (context.mounted) {
-                              Navigator.pushNamed(context, '/authSelection');
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildActionTile(
-                          context: context,
-                          label: 'Join with Code',
-                          subtitle: 'Join an existing organization',
-                          icon: Icons.qr_code_scanner_rounded,
-                          isPrimary: false,
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/joinByReferral'),
-                        ),
-                      ],
+                    const SizedBox(height: 14),
+                    _buildActionTile(
+                      context: context,
+                      label: 'Login',
+                      subtitle: 'Access your dashboard',
+                      icon: Icons.login_rounded,
+                      isPrimary: false,
+                      onTap: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.remove('temp_org_path');
+                        if (context.mounted) {
+                          Navigator.pushNamed(context, '/authSelection');
+                        }
+                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    _buildActionTile(
+                      context: context,
+                      label: 'Join with Code',
+                      subtitle: 'Join an existing organization',
+                      icon: Icons.qr_code_scanner_rounded,
+                      isPrimary: false,
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/joinByReferral'),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ),
@@ -220,22 +193,31 @@ class LandingPage extends StatelessWidget {
   }) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
+    final colorScheme = theme.colorScheme;
 
+    // Enhanced design: bigger icon container, bolder typography, refined shadows
     return Container(
       decoration: BoxDecoration(
-        color: isPrimary ? primaryColor : theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
+        gradient: isPrimary
+            ? LinearGradient(
+                colors: [primaryColor, primaryColor.withOpacity(0.85)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isPrimary ? null : theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isPrimary ? primaryColor : theme.dividerColor.withOpacity(0.5),
+          color: isPrimary ? primaryColor : theme.dividerColor.withOpacity(0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: isPrimary
-                ? primaryColor.withOpacity(0.3)
-                : Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+                ? primaryColor.withOpacity(0.35)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -243,27 +225,28 @@ class LandingPage extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             child: Row(
               children: [
+                // Icon container – larger & more impactful
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     color: isPrimary
                         ? Colors.white.withOpacity(0.2)
-                        : primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
+                        : primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
                     icon,
                     color: isPrimary ? Colors.white : primaryColor,
-                    size: 28,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 18),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,22 +254,22 @@ class LandingPage extends StatelessWidget {
                       Text(
                         label,
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: isPrimary
                               ? Colors.white
-                              : theme.colorScheme.onSurface,
+                              : colorScheme.onSurface,
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle,
                         style: TextStyle(
                           fontSize: 13,
                           color: isPrimary
-                              ? Colors.white.withOpacity(0.8)
-                              : theme.colorScheme.onSurfaceVariant,
+                              ? Colors.white.withOpacity(0.85)
+                              : colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -296,9 +279,9 @@ class LandingPage extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: isPrimary
-                      ? Colors.white.withOpacity(0.5)
-                      : theme.dividerColor,
-                  size: 16,
+                      ? Colors.white.withOpacity(0.7)
+                      : theme.dividerColor.withOpacity(0.6),
+                  size: 18,
                 ),
               ],
             ),
