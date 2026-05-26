@@ -18,17 +18,47 @@ class FirestoreService {
   /// Should be called after login or at app startup.
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _cachedDynamicPath =
+
+    // Prioritize the unified key first
+    String? path = prefs.getString('org_dynamic_path');
+
+    if (path == null || path.isEmpty) {
+      // If unified key is missing, check which role was last logged in
+      final roleStr = prefs.getString(
+        'user_role_key',
+      ); // This is the _userRoleKey from AuthService
+      if (roleStr != null) {
+        if (roleStr.contains('manager')) {
+          path = prefs.getString('config_org_path');
+        } else if (roleStr.contains('supervisor')) {
+          path = prefs.getString('sup_org_path');
+        } else if (roleStr.contains('customer')) {
+          path = prefs.getString('cust_org_path');
+        }
+      }
+    }
+
+    // Last resort fallbacks
+    path ??=
         prefs.getString('org_dynamic_path') ??
         prefs.getString('config_org_path') ??
         prefs.getString('sup_org_path') ??
         prefs.getString('cust_org_path');
+
+    _cachedDynamicPath = path;
+    debugPrint(
+      'FirestoreService: Initialized with OrgPath: $_cachedDynamicPath',
+    );
   }
 
   /// Explicitly sets the organization path, bypassing SharedPreferences.
   /// Useful for immediate initialization during login or registration.
   static void setOrgPath(String path) {
     _cachedDynamicPath = path;
+    // Persist to SharedPreferences so it's available after app restart
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('org_dynamic_path', path);
+    });
   }
 
   /// Gets a collection that is nested under the organization's data root.
@@ -38,6 +68,10 @@ class FirestoreService {
     String collectionName,
   ) {
     final orgId = _getOrgIdFromPath();
+
+    debugPrint(
+      'FirestoreService: Accessing collection "$collectionName" for OrgID: $orgId',
+    );
 
     if (orgId == 'uninitialized') {
       // Fallback if not initialized or logged out

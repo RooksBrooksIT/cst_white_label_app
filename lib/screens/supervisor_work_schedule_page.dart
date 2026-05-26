@@ -361,13 +361,22 @@ class _SupervisorWorkSchedulePageState
       final approvalStatus = 'Pending';
       final reqDays = _numberOfDays ?? 0;
 
-      final docId = '${siteId}_${supervisorName}_$projectStage';
+      // Helper to sanitize strings for the document ID (replace spaces with underscores)
+      String sanitize(String input) => input.trim().replaceAll(' ', '_');
+
+      final docId =
+          '${sanitize(siteId)}_'
+          '${sanitize(projectName)}_'
+          '${sanitize(supervisorName)}_'
+          '${sanitize(projectStage)}_'
+          '$wsReqId';
 
       await FirestoreService.siteSupervisorProjectStageSchedule.doc(docId).set({
         'wsReqId': wsReqId,
         'siteId': siteId,
         'projectName': projectName,
         'projectStage': projectStage,
+        'supervisorId': widget.supervisorId,
         'supervisorName': supervisorName,
         'approvalStatus': approvalStatus,
         'estimatedPayment': estimatedPayment,
@@ -376,6 +385,7 @@ class _SupervisorWorkSchedulePageState
         'startDate': _selectedStartDate != null
             ? Timestamp.fromDate(_selectedStartDate!)
             : null,
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       // Notify the organisation about the new work schedule request
