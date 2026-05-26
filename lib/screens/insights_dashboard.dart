@@ -18,8 +18,6 @@ class InsightsDashboard extends StatelessWidget {
 
     return GlassScaffold(
       title: 'Insights Dashboard',
-      appBarBackgroundColor: theme.colorScheme.primary,
-      appBarForegroundColor: theme.colorScheme.onPrimary,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(

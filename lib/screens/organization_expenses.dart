@@ -100,7 +100,9 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryColor) : null,
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: primaryColor)
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade300),
@@ -115,7 +117,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           ),
           filled: true,
           fillColor: enabled ? Colors.white : Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
       ),
     );
@@ -128,7 +133,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           padding: const EdgeInsets.symmetric(vertical: 32.0),
           child: Column(
             children: [
-              Icon(Icons.receipt_long_rounded, size: 64, color: Colors.grey.shade300),
+              Icon(
+                Icons.receipt_long_rounded,
+                size: 64,
+                color: Colors.grey.shade300,
+              ),
               const SizedBox(height: 16),
               Text(
                 'No bills added yet',
@@ -164,7 +173,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
             ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
             leading: CircleAvatar(
               backgroundColor: primaryColor.withOpacity(0.1),
               child: Icon(Icons.receipt_rounded, color: primaryColor),
@@ -502,9 +514,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
-      title: 'Organization Expenses',
-      appBarBackgroundColor: primaryColor,
-      appBarForegroundColor: Colors.white,
+      title: 'Company Expenses',
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
@@ -529,7 +539,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           value: selectedSiteId,
                           decoration: InputDecoration(
                             labelText: 'Site ID',
-                            prefixIcon: Icon(Icons.business_rounded, color: primaryColor),
+                            prefixIcon: Icon(
+                              Icons.business_rounded,
+                              color: primaryColor,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -554,13 +567,26 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           },
                         ),
                   const SizedBox(height: 16),
-                  _buildLabeledTextField('Supervisor ID', supervisorController, enabled: false, prefixIcon: Icons.person_rounded),
-                  _buildLabeledTextField('Project Phase', projectPhaseController, enabled: false, prefixIcon: Icons.flag_rounded),
+                  _buildLabeledTextField(
+                    'Supervisor ID',
+                    supervisorController,
+                    enabled: false,
+                    prefixIcon: Icons.person_rounded,
+                  ),
+                  _buildLabeledTextField(
+                    'Project Phase',
+                    projectPhaseController,
+                    enabled: false,
+                    prefixIcon: Icons.flag_rounded,
+                  ),
                   InkWell(
                     onTap: () => _selectDate(context),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
@@ -568,13 +594,25 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today_rounded, color: primaryColor),
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            color: primaryColor,
+                          ),
                           const SizedBox(width: 12),
-                          const Text('Date', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                          const Text(
+                            'Date',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
+                            ),
+                          ),
                           const Spacer(),
                           Text(
                             DateFormat('dd/MM/yyyy').format(selectedDate),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -589,17 +627,37 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               icon: Icons.receipt_long_rounded,
               child: Column(
                 children: [
-                  _buildLabeledTextField('Bill No', billNoController, prefixIcon: Icons.numbers_rounded),
-                  _buildLabeledTextField('Bill Vendor', billVendorController, prefixIcon: Icons.store_rounded),
-                  _buildLabeledTextField('Bill Amount', billAmountController, prefixIcon: Icons.currency_rupee_rounded, keyboardType: TextInputType.number),
+                  _buildLabeledTextField(
+                    'Bill No',
+                    billNoController,
+                    prefixIcon: Icons.numbers_rounded,
+                  ),
+                  _buildLabeledTextField(
+                    'Bill Vendor',
+                    billVendorController,
+                    prefixIcon: Icons.store_rounded,
+                  ),
+                  _buildLabeledTextField(
+                    'Bill Amount',
+                    billAmountController,
+                    prefixIcon: Icons.currency_rupee_rounded,
+                    keyboardType: TextInputType.number,
+                  ),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _addBill,
-                      icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: Colors.white,
+                      ),
                       label: const Text(
                         "Add Bill to List",
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
@@ -635,7 +693,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     onPressed: isSubmitting ? null : _resetForm,
                     child: const Text(
                       'Reset',
-                      style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -676,12 +738,18 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
                             'Submit Expenses',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                   ),
                 ),
@@ -694,7 +762,11 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     );
   }
 
-  Widget _buildSectionCard({required String title, required IconData icon, required Widget child}) {
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
     return Card(
       elevation: 4,
       shadowColor: Colors.black12,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'dart:async';
 import 'site_weekly_financial_report2.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SiteWeeklyFinancialReports extends StatefulWidget {
   const SiteWeeklyFinancialReports({super.key});
@@ -62,9 +63,7 @@ class _SiteWeeklyFinancialReportState
 
       supervisorMaps = snapshot.docs.isEmpty
           ? []
-          : snapshot.docs
-                .map((doc) => doc.data())
-                .toList();
+          : snapshot.docs.map((doc) => doc.data()).toList();
 
       if (mounted) {
         setState(() {
@@ -94,30 +93,10 @@ class _SiteWeeklyFinancialReportState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Weekly Financial Report',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Weekly Financial Report',
+      onBack: () => Navigator.pop(context),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : _buildBody(context),

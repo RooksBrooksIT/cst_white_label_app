@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../utils/app_theme.dart';
 
 class GlassScaffold extends StatelessWidget {
   final Widget body;
@@ -14,7 +16,7 @@ class GlassScaffold extends StatelessWidget {
   final Widget? drawer;
   final Widget? endDrawer;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
-
+  final double? toolbarHeight;
 
   const GlassScaffold({
     super.key,
@@ -31,81 +33,95 @@ class GlassScaffold extends StatelessWidget {
     this.drawer,
     this.endDrawer,
     this.floatingActionButtonLocation,
+    this.toolbarHeight = 70,
   });
-
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final hasAppBar =
-        title != null ||
-        onBack != null ||
-        (actions != null && actions!.isNotEmpty) ||
-        bottom != null;
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final theme = Theme.of(context);
+        final hasAppBar =
+            title != null ||
+            onBack != null ||
+            (actions != null && actions!.isNotEmpty) ||
+            bottom != null;
 
-    final effectiveBgColor = appBarBackgroundColor ?? colorScheme.primary;
-    final effectiveFgColor = appBarForegroundColor ?? colorScheme.onPrimary;
+        final effectiveBgColor = appBarBackgroundColor ?? primaryColor;
+        final effectiveFgColor = appBarForegroundColor ?? Colors.white;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: hasAppBar
-          ? AppBar(
-              toolbarHeight: 50,
-              backgroundColor: effectiveBgColor,
-              foregroundColor: effectiveFgColor,
-              elevation: 4,
-              shadowColor: Colors.black26,
-              scrolledUnderElevation: 8,
-              centerTitle: false,
-              titleSpacing: onBack != null ? 8 : 24,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32),
-                ),
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: hasAppBar
+              ? AppBar(
+                  elevation: 0,
+                  toolbarHeight: toolbarHeight,
+                  backgroundColor: effectiveBgColor,
+                  foregroundColor: effectiveFgColor,
+                  centerTitle: true,
+                  title: title != null
+                      ? Text(
+                          title!,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                        )
+                      : null,
+                  leading: onBack != null
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          onPressed: onBack,
+                        )
+                      : null,
+                  actions: actions,
+                  bottom: bottom,
+                  systemOverlayStyle: const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.light,
+                  ),
+                  shape: const RoundedRectangleBorder(),
+                )
+              : null,
+          floatingActionButton: floatingActionButton,
+          floatingActionButtonLocation: floatingActionButtonLocation,
+          drawer: drawer,
+          endDrawer: endDrawer,
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.colorScheme.surface,
+                  theme.colorScheme.surface.withOpacity(0.95),
+                ],
               ),
-              title: title != null
-                  ? Text(
-                      title!,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1.0,
-                        color: effectiveFgColor,
-                      ),
-                    )
-                  : null,
-              leading: onBack != null
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: effectiveFgColor,
-                        size: 20,
-                      ),
-                      onPressed: onBack,
-                    )
-                  : null,
-              actions: actions,
-              bottom: bottom,
-            )
-          : null,
-      floatingActionButton: floatingActionButton,
-      floatingActionButtonLocation: floatingActionButtonLocation,
-      drawer: drawer,
-      endDrawer: endDrawer,
-      body: SafeArea(
-        bottom: bottomNavigationBar == null,
-        child: Padding(
-          padding: (padding ?? const EdgeInsets.all(16)).copyWith(
-            bottom: bottomNavigationBar == null
-                ? (padding?.bottom ?? 16) + 20
-                : (padding?.bottom ?? 16),
+            ),
+            child: SafeArea(
+              bottom: bottomNavigationBar == null,
+              child: Padding(
+                padding:
+                    (padding ??
+                            const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 24,
+                            ))
+                        .copyWith(top: 0),
+                child: body,
+              ),
+            ),
           ),
-          child: body,
-        ),
-      ),
-      bottomNavigationBar: bottomNavigationBar,
+          bottomNavigationBar: bottomNavigationBar,
+        );
+      },
     );
   }
 }

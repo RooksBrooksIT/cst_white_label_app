@@ -118,8 +118,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
 
     return GlassScaffold(
       title: 'Tools Inventory',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh),

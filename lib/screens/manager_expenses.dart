@@ -58,7 +58,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   void _loadManagerData() {
     final userData = AuthService().userData;
     setState(() {
-      managerId = userData['username'] ?? userData['UserName'] ?? 'UNKNOWN_MANAGER';
+      managerId =
+          userData['username'] ?? userData['UserName'] ?? 'UNKNOWN_MANAGER';
     });
   }
 
@@ -80,7 +81,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       final sitesSnapshot = await FirestoreService.sites.get();
       final Map<String, String> names = {
         for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
 
       final fetchedSiteIds = sitesSnapshot.docs
@@ -115,7 +116,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       // 1. Try to fetch from siteSupervisorMap (by document ID first, then by field)
       final docRef = FirestoreService.siteSupervisorMap.doc(siteId);
       final docSnap = await docRef.get();
-      
+
       if (docSnap.exists) {
         final data = docSnap.data()!;
         supervisorId = data['supervisor']?.toString();
@@ -131,7 +132,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           final data = mapSnapshot.docs.first.data();
           supervisorId = data['supervisor']?.toString();
           projectPhase = data['projectStage']?.toString();
-          projectName = (data['projectName'] ?? data['project_name'])?.toString();
+          projectName = (data['projectName'] ?? data['project_name'])
+              ?.toString();
         }
       }
 
@@ -163,7 +165,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         selectedSupervisorId = supervisorId;
         selectedProjectPhase = projectPhase;
         selectedProjectName = projectName;
-        
+
         supervisorIdController.text = supervisorId ?? 'Not Assigned';
         projectPhaseController.text = projectPhase ?? 'N/A';
         projectNameController.text = projectName ?? 'Unknown Project';
@@ -180,7 +182,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   Future<void> _loadExistingExpenses() async {
     if (selectedSiteId == null) return;
-    
+
     // Increment generation so any in-flight request from a previous site
     // selection will be discarded when it completes.
     final thisGeneration = ++_loadGeneration;
@@ -192,10 +194,10 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       initialBills = [];
       existingDailyTotal = 0.0;
     });
-    
+
     final formattedDate = DateFormat('ddMMyyyy').format(selectedDate);
     final docId = '${selectedSiteId}_$formattedDate';
-    
+
     try {
       final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
 
@@ -209,12 +211,18 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           double loadedTotal = 0.0;
           for (var bill in loadedBills) {
             final amountStr = bill['billAmount'] ?? '0';
-            final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+            final parsed =
+                double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ??
+                0.0;
             loadedTotal += parsed;
           }
           setState(() {
-            bills = loadedBills.map((b) => Map<String, String>.from(b)).toList();
-            initialBills = loadedBills.map((b) => Map<String, String>.from(b)).toList();
+            bills = loadedBills
+                .map((b) => Map<String, String>.from(b))
+                .toList();
+            initialBills = loadedBills
+                .map((b) => Map<String, String>.from(b))
+                .toList();
             existingDailyTotal = loadedTotal;
           });
         }
@@ -268,8 +276,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
     return GlassScaffold(
       title: 'Manager Expenses',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
@@ -297,7 +303,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Site & Project Details', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Site & Project Details',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 20),
           isLoadingSites
               ? const LinearProgressIndicator()
@@ -323,11 +334,26 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                   }
                 }),
           const SizedBox(height: 12),
-          GlassTextField(controller: supervisorIdController, label: 'Supervisor ID', icon: Icons.person_outline, readOnly: true),
+          GlassTextField(
+            controller: supervisorIdController,
+            label: 'Supervisor ID',
+            icon: Icons.person_outline,
+            readOnly: true,
+          ),
           const SizedBox(height: 12),
-          GlassTextField(controller: projectPhaseController, label: 'Project Phase', icon: Icons.timeline_outlined, readOnly: true),
+          GlassTextField(
+            controller: projectPhaseController,
+            label: 'Project Phase',
+            icon: Icons.timeline_outlined,
+            readOnly: true,
+          ),
           const SizedBox(height: 12),
-          GlassTextField(controller: projectNameController, label: 'Project Name', icon: Icons.assignment_outlined, readOnly: true),
+          GlassTextField(
+            controller: projectNameController,
+            label: 'Project Name',
+            icon: Icons.assignment_outlined,
+            readOnly: true,
+          ),
           const SizedBox(height: 12),
           _buildDatePicker(theme),
         ],
@@ -340,11 +366,24 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Add Bill', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Add Bill',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 20),
-          GlassTextField(controller: billNoController, label: 'Bill Number', icon: Icons.receipt_long_outlined),
+          GlassTextField(
+            controller: billNoController,
+            label: 'Bill Number',
+            icon: Icons.receipt_long_outlined,
+          ),
           const SizedBox(height: 12),
-          GlassTextField(controller: billVendorController, label: 'Vendor Name', icon: Icons.storefront_outlined),
+          GlassTextField(
+            controller: billVendorController,
+            label: 'Vendor Name',
+            icon: Icons.storefront_outlined,
+          ),
           const SizedBox(height: 12),
           GlassTextField(
             controller: billAmountController,
@@ -370,10 +409,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   Widget _buildBillsListSection(ThemeData theme) {
     if (isLoadingBills) {
       return const GlassCard(
-        child: Center(child: Padding(
-          padding: EdgeInsets.all(24),
-          child: CircularProgressIndicator(),
-        )),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: CircularProgressIndicator(),
+          ),
+        ),
       );
     }
     if (bills.isEmpty) return const SizedBox.shrink();
@@ -381,7 +422,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Bills List', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Bills List',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -394,17 +440,30 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                 DataColumn(label: Text('Amount')),
                 DataColumn(label: Text('Action')),
               ],
-              rows: bills.asMap().entries.map((entry) => DataRow(
-                cells: [
-                  DataCell(Text(entry.value['billNo']!)),
-                  DataCell(Text(entry.value['billVendor']!)),
-                  DataCell(Text(entry.value['billAmount']!)),
-                  DataCell(IconButton(
-                    icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 20),
-                    onPressed: () => setState(() => bills.removeAt(entry.key)),
-                  )),
-                ],
-              )).toList(),
+              rows: bills
+                  .asMap()
+                  .entries
+                  .map(
+                    (entry) => DataRow(
+                      cells: [
+                        DataCell(Text(entry.value['billNo']!)),
+                        DataCell(Text(entry.value['billVendor']!)),
+                        DataCell(Text(entry.value['billAmount']!)),
+                        DataCell(
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: theme.colorScheme.error,
+                              size: 20,
+                            ),
+                            onPressed: () =>
+                                setState(() => bills.removeAt(entry.key)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -412,7 +471,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     );
   }
 
-  Widget _buildDropdown(String label, List<String> items, String? value, Function(String?) onChanged) {
+  Widget _buildDropdown(
+    String label,
+    List<String> items,
+    String? value,
+    Function(String?) onChanged,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
@@ -420,7 +484,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-        prefixIcon: Icon(Icons.location_on_outlined, size: 20, color: colorScheme.primary),
+        prefixIcon: Icon(
+          Icons.location_on_outlined,
+          size: 20,
+          color: colorScheme.primary,
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -458,7 +526,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         decoration: InputDecoration(
           labelText: 'Date',
           labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-          prefixIcon: Icon(Icons.calendar_today_outlined, size: 20, color: colorScheme.primary),
+          prefixIcon: Icon(
+            Icons.calendar_today_outlined,
+            size: 20,
+            color: colorScheme.primary,
+          ),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -474,7 +546,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
               DateFormat('dd MMM yyyy').format(selectedDate),
               style: TextStyle(color: colorScheme.onSurface),
             ),
-            Icon(Icons.edit_calendar_outlined, size: 18, color: colorScheme.primary),
+            Icon(
+              Icons.edit_calendar_outlined,
+              size: 18,
+              color: colorScheme.primary,
+            ),
           ],
         ),
       ),
@@ -483,7 +559,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   Future<void> _handleSubmit() async {
     if (selectedSiteId == null || selectedProjectName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select Site and Project')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select Site and Project')),
+      );
       return;
     }
 
@@ -496,7 +574,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
       List<Map<String, String>> mergedBills = [];
       List<Map<String, String>> newBills = [];
-      
+
       final Map<String, dynamic> docData = {
         'expenseId': docId,
         'managerId': managerId ?? 'UNKNOWN_MANAGER',
@@ -512,7 +590,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         if (existingData != null) {
           if (existingData['bills'] != null) {
             final List<dynamic> dbBills = existingData['bills'];
-            mergedBills = dbBills.map((b) => Map<String, String>.from(b)).toList();
+            mergedBills = dbBills
+                .map((b) => Map<String, String>.from(b))
+                .toList();
           }
           docData['status'] = existingData['status'] ?? 'Pending';
           if (existingData['timestamp'] != null) {
@@ -522,10 +602,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
         // Identify new bills not present in the initially loaded list
         for (final bill in bills) {
-          final isExisting = initialBills.any((b) =>
-              b['billNo'] == bill['billNo'] &&
-              b['billVendor'] == bill['billVendor'] &&
-              b['billAmount'] == bill['billAmount']);
+          final isExisting = initialBills.any(
+            (b) =>
+                b['billNo'] == bill['billNo'] &&
+                b['billVendor'] == bill['billVendor'] &&
+                b['billAmount'] == bill['billAmount'],
+          );
           if (!isExisting) {
             newBills.add(bill);
           }
@@ -542,7 +624,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       double totalAmount = 0.0;
       for (var bill in mergedBills) {
         final amountStr = bill['billAmount'] ?? '0';
-        final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        final parsed =
+            double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
         totalAmount += parsed;
       }
 
@@ -550,7 +633,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       double increment = 0.0;
       for (var bill in newBills) {
         final amountStr = bill['billAmount'] ?? '0';
-        final parsed = double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        final parsed =
+            double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
         increment += parsed;
       }
 
@@ -608,11 +692,16 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           billVendorController.clear();
           billAmountController.clear();
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Expenses submitted successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Expenses submitted successfully')),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }
