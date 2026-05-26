@@ -151,13 +151,10 @@ class _ApprovalListState extends State<ApprovalList> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream:
-                FirestoreService.getCollection(
-                      'siteSupervisorProjectStageSchedule',
-                    )
-                    .where('approvalStatus', isEqualTo: widget.status)
-                    .where('supervisorName', isEqualTo: widget.supervisorName)
-                    .snapshots(),
+            stream: FirestoreService.siteSupervisorProjectStageSchedule
+                .where('approvalStatus', isEqualTo: widget.status)
+                .where('supervisorName', isEqualTo: widget.supervisorName)
+                .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
@@ -329,21 +326,23 @@ class _ApprovalCardState extends State<ApprovalCard>
                             horizontal: 12,
                             vertical: 4,
                           ),
-                            decoration: BoxDecoration(
+                          decoration: BoxDecoration(
+                            color: widget.status == 'Pending'
+                                ? Colors.orange.withOpacity(0.2)
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            data['approvalStatus'],
+                            style: TextStyle(
                               color: widget.status == 'Pending'
-                                  ? Colors.orange.withOpacity(0.2)
-                                  : Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
+                                  ? Colors.orange
+                                  : Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Text(
-                              data['approvalStatus'],
-                              style: TextStyle(
-                                color: widget.status == 'Pending'
-                                    ? Colors.orange
-                                    : Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -418,8 +417,12 @@ class _ApprovalCardState extends State<ApprovalCard>
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
+                                foregroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -612,9 +615,9 @@ class _ApprovalCardState extends State<ApprovalCard>
     String newStatus,
   ) async {
     try {
-      await FirestoreService.getCollection(
-        'siteSupervisorProjectStageSchedule',
-      ).doc(docId).update({'approvalStatus': newStatus});
+      await FirestoreService.siteSupervisorProjectStageSchedule
+          .doc(docId)
+          .update({'approvalStatus': newStatus});
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

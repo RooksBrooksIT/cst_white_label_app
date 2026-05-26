@@ -13,10 +13,7 @@ import '../utils/app_theme.dart';
 class SiteSummaryPage extends StatefulWidget {
   final String siteId;
 
-  const SiteSummaryPage({
-    super.key,
-    required this.siteId,
-  });
+  const SiteSummaryPage({super.key, required this.siteId});
 
   @override
   State<SiteSummaryPage> createState() => _SiteSummaryPageState();
@@ -26,7 +23,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   Color get primaryColor => Theme.of(context).primaryColor;
   Color get accentColor => Theme.of(context).colorScheme.secondary;
   Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
-  Color get textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
+  Color get textColor =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
   Color get cardColor => Theme.of(context).cardColor;
   Color get successColor => const Color(0xFF2e7d32);
   Color get warningColor => const Color(0xFFed6c02);
@@ -40,8 +38,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   }
 
   String formatCurrency(num value) {
-    final formatter =
-        NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
     return formatter.format(value);
   }
 
@@ -53,9 +54,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchExpenseTotals() async {
     try {
-      final query = await FirestoreService
-          .getCollection('siteSupervisorEntries')
-          .get();
+      final query = await FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).get();
 
       final List<String> expenseFields = ['food', 'fuel', 'transport'];
       Map<String, num> totals = {
@@ -73,8 +74,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               if (value is int || value is double) {
                 totals[field] = (totals[field] ?? 0) + value;
               } else if (value is String) {
-                final parsed =
-                    num.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+                final parsed = num.tryParse(
+                  value.replaceAll(RegExp(r'[^0-9.]'), ''),
+                );
                 if (parsed != null) {
                   totals[field] = (totals[field] ?? 0) + parsed;
                 }
@@ -88,8 +90,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 if (amount is int || amount is double) {
                   totals['labours'] = (totals['labours'] ?? 0) + amount;
                 } else if (amount is String) {
-                  final parsed =
-                      num.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), ''));
+                  final parsed = num.tryParse(
+                    amount.replaceAll(RegExp(r'[^0-9.]'), ''),
+                  );
                   if (parsed != null) {
                     totals['labours'] = (totals['labours'] ?? 0) + parsed;
                   }
@@ -104,8 +107,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 if (amount is int || amount is double) {
                   totals['materials'] = (totals['materials'] ?? 0) + amount;
                 } else if (amount is String) {
-                  final parsed =
-                      num.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), ''));
+                  final parsed = num.tryParse(
+                    amount.replaceAll(RegExp(r'[^0-9.]'), ''),
+                  );
                   if (parsed != null) {
                     totals['materials'] = (totals['materials'] ?? 0) + parsed;
                   }
@@ -124,8 +128,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<num> fetchManagerExpenses() async {
     try {
-      final query =
-          await FirestoreService.getCollection('managerEntries').get();
+      final query = await FirestoreService.getCollection(
+        'managerExpenses',
+      ).get();
       num total = 0;
       for (var doc in query.docs) {
         final data = doc.data();
@@ -135,8 +140,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             if (value is int || value is double) {
               total += value;
             } else if (value is String) {
-              final parsed =
-                  num.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+              final parsed = num.tryParse(
+                value.replaceAll(RegExp(r'[^0-9.]'), ''),
+              );
               if (parsed != null) total += parsed;
             }
           }
@@ -151,9 +157,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<num> fetchOrganizationExpenses() async {
     try {
-      final query = await FirestoreService
-          .getCollection('organizationEntries')
-          .get();
+      final query = await FirestoreService.getCollection(
+        'organizationEntries',
+      ).get();
       num total = 0;
       for (var doc in query.docs) {
         final data = doc.data();
@@ -163,8 +169,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             if (value is int || value is double) {
               total += value;
             } else if (value is String) {
-              final parsed =
-                  num.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+              final parsed = num.tryParse(
+                value.replaceAll(RegExp(r'[^0-9.]'), ''),
+              );
               if (parsed != null) total += parsed;
             }
           }
@@ -179,10 +186,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchContractorAndIncentiveExpenses() async {
     try {
-      final query = await FirestoreService
-          .getCollection('totalSiteExpensesPerDay')
-          .where('siteId', isEqualTo: widget.siteId)
-          .get();
+      final query = await FirestoreService.getCollection(
+        'totalSiteExpensesPerDay',
+      ).where('siteId', isEqualTo: widget.siteId).get();
 
       num totalContractorExpense = 0;
       num totalIncentiveExpenses = 0;
@@ -194,8 +200,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           if (value is int || value is double) {
             totalContractorExpense += value;
           } else if (value is String) {
-            final parsed =
-                num.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+            final parsed = num.tryParse(
+              value.replaceAll(RegExp(r'[^0-9.]'), ''),
+            );
             if (parsed != null) totalContractorExpense += parsed;
           }
         }
@@ -204,8 +211,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           if (value is int || value is double) {
             totalIncentiveExpenses += value;
           } else if (value is String) {
-            final parsed =
-                num.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+            final parsed = num.tryParse(
+              value.replaceAll(RegExp(r'[^0-9.]'), ''),
+            );
             if (parsed != null) totalIncentiveExpenses += parsed;
           }
         }
@@ -223,11 +231,9 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, dynamic>?> fetchProjectInfo() async {
     try {
-      final query = await FirestoreService
-          .getCollection('projects')
-          .where('siteId', isEqualTo: widget.siteId)
-          .limit(1)
-          .get();
+      final query = await FirestoreService.getCollection(
+        'projects',
+      ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
       if (query.docs.isNotEmpty) {
         return query.docs.first.data();
       }
@@ -245,11 +251,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
       appBar: AppBar(
         title: Text(
           'Site Summary',
-          style: TextStyle(
-            
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
@@ -306,9 +308,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     Text(
                       'No project found for site ID: ${widget.siteId}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: textColor.withOpacity(0.7),
-                      ),
+                      style: TextStyle(color: textColor.withOpacity(0.7)),
                     ),
                   ],
                 ),
@@ -339,8 +339,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline,
-                            color: primaryColor, size: 48),
+                        Icon(
+                          Icons.error_outline,
+                          color: primaryColor,
+                          size: 48,
+                        ),
                         SizedBox(height: 16),
                         Text(
                           'Failed to load expenses',
@@ -355,8 +358,10 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                   );
                 }
                 final expenseTotals = expenseSnapshot.data ?? {};
-                num totalSupervisorExpenses =
-                    expenseTotals.values.fold(0, (a, b) => a + b);
+                num totalSupervisorExpenses = expenseTotals.values.fold(
+                  0,
+                  (a, b) => a + b,
+                );
 
                 return FutureBuilder<List<dynamic>>(
                   future: Future.wait([
@@ -369,13 +374,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         ConnectionState.waiting) {
                       return Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            primaryColor,
+                          ),
                         ),
                       );
                     }
                     final managerExpenses = otherSnapshot.data?[0] ?? 0;
                     final orgExpenses = otherSnapshot.data?[1] ?? 0;
-                    final contractorIncentive = otherSnapshot.data?[2] ??
+                    final contractorIncentive =
+                        otherSnapshot.data?[2] ??
                         {'contractor': 0, 'incentive': 0};
 
                     final contractorExpenses =
@@ -383,7 +391,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     final incentiveExpenses =
                         contractorIncentive['incentive'] ?? 0;
 
-                    final grandTotal = totalSupervisorExpenses +
+                    final grandTotal =
+                        totalSupervisorExpenses +
                         managerExpenses +
                         orgExpenses +
                         contractorExpenses +
@@ -407,7 +416,10 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.assignment, color: primaryColor),
+                                      Icon(
+                                        Icons.assignment,
+                                        color: primaryColor,
+                                      ),
                                       SizedBox(width: 12),
                                       Text(
                                         'Project Overview',
@@ -427,11 +439,17 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                     formatDate(plannedStartDate),
                                   ),
                                   _buildInfoRow(
-                                      'Budget', formatCurrency(budget)),
-                                  _buildInfoRow('Amount Spent',
-                                      formatCurrency(amountSpent)),
+                                    'Budget',
+                                    formatCurrency(budget),
+                                  ),
                                   _buildInfoRow(
-                                      'Current Status', currentStatus),
+                                    'Amount Spent',
+                                    formatCurrency(amountSpent),
+                                  ),
+                                  _buildInfoRow(
+                                    'Current Status',
+                                    currentStatus,
+                                  ),
                                 ],
                               ),
                             ),
@@ -505,8 +523,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.calculate,
-                                        color: primaryColor, size: 28),
+                                    Icon(
+                                      Icons.calculate,
+                                      color: primaryColor,
+                                      size: 28,
+                                    ),
                                     SizedBox(width: 10),
                                     Text(
                                       'Total Expenses',
@@ -571,9 +592,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                       });
                                     },
                               icon: Icon(Icons.picture_as_pdf),
-                              label: Text(_isSaving
-                                  ? 'Generating PDF...'
-                                  : 'Generate PDF Report'),
+                              label: Text(
+                                _isSaving
+                                    ? 'Generating PDF...'
+                                    : 'Generate PDF Report',
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
@@ -616,10 +639,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: textColor,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
             ),
           ),
         ],
@@ -635,9 +655,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   }) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -663,9 +681,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'No expenses recorded',
-                  style: TextStyle(
-                    color: textColor.withOpacity(0.6),
-                  ),
+                  style: TextStyle(color: textColor.withOpacity(0.6)),
                 ),
               )
             else
@@ -679,9 +695,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         children: [
                           Text(
                             entry.key[0].toUpperCase() + entry.key.substring(1),
-                            style: TextStyle(
-                              color: textColor,
-                            ),
+                            style: TextStyle(color: textColor),
                           ),
                           Text(
                             formatCurrency(entry.value),
@@ -729,9 +743,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   }) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -755,12 +767,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Total Amount',
-                  style: TextStyle(
-                    color: textColor,
-                  ),
-                ),
+                Text('Total Amount', style: TextStyle(color: textColor)),
                 Text(
                   formatCurrency(amount),
                   style: TextStyle(
@@ -812,18 +819,38 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Project Name', projectName, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Project Name',
+                projectName,
+                pdfPrimaryColor,
+              ),
               PdfTemplates.buildMetaBox('Site Location', site, pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Start Date', formatDate(plannedStartDate), pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Start Date',
+                formatDate(plannedStartDate),
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Budget', '₹${NumberFormat('#,##,###').format(budget)}', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Amount Spent', '₹${NumberFormat('#,##,###').format(amountSpent)}', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Current Status', currentStatus, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Budget',
+                '₹${NumberFormat('#,##,###').format(budget)}',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Amount Spent',
+                '₹${NumberFormat('#,##,###').format(amountSpent)}',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Current Status',
+                currentStatus,
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -838,10 +865,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           pw.SizedBox(height: 12),
           pw.Text(
             'Site Supervisor Expenses',
-            style: pw.TextStyle(
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           expenseTotals.isEmpty
@@ -1061,11 +1085,13 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   Future<pw.MemoryImage?> _getLogoImage() async {
     try {
       // Replace with your actual logo asset
-      final byteData =
-          await rootBundle.load('assets/images/splash_screen_logo.png');
+      final byteData = await rootBundle.load(
+        'assets/images/splash_screen_logo.png',
+      );
       final buffer = byteData.buffer;
       return pw.MemoryImage(
-          buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+        buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes),
+      );
     } catch (e) {
       print('Error loading logo: $e');
       return null;

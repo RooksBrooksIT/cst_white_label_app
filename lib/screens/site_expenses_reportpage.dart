@@ -62,7 +62,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
 
       // Manager bills for this date
       final managerQuery = await FirestoreService.getCollection(
-        'managerEntries',
+        'managerExpenses',
       ).where('siteId', isEqualTo: widget.siteId).get();
       List<Map<String, dynamic>> managerBills = [];
       for (final doc in managerQuery.docs) {

@@ -139,7 +139,6 @@ class _SupervisorWorkSchedulePageState
     }
   }
 
-
   Future<void> _fetchLabours() async {
     final snapshot = await FirestoreService.getCollection('labours').get();
     if (!mounted) return;
@@ -340,9 +339,11 @@ class _SupervisorWorkSchedulePageState
 
       String wsReqId = 'WSR001';
       try {
-        final querySnapshot = await FirestoreService.getCollection(
-          'siteSupervisorProjectStageSchedule',
-        ).orderBy('wsReqId', descending: true).limit(1).get();
+        final querySnapshot = await FirestoreService
+            .siteSupervisorProjectStageSchedule
+            .orderBy('wsReqId', descending: true)
+            .limit(1)
+            .get();
         if (querySnapshot.docs.isNotEmpty) {
           final lastId = querySnapshot.docs.first['wsReqId'] as String?;
           if (lastId != null && lastId.startsWith('WSR')) {
@@ -362,9 +363,7 @@ class _SupervisorWorkSchedulePageState
 
       final docId = '${siteId}_${supervisorName}_$projectStage';
 
-      await FirestoreService.getCollection(
-        'siteSupervisorProjectStageSchedule',
-      ).doc(docId).set({
+      await FirestoreService.siteSupervisorProjectStageSchedule.doc(docId).set({
         'wsReqId': wsReqId,
         'siteId': siteId,
         'projectName': projectName,
@@ -382,7 +381,8 @@ class _SupervisorWorkSchedulePageState
       // Notify the organisation about the new work schedule request
       await NotificationService.notifyOrganisation(
         title: '📅 New Work Schedule Request',
-        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        body:
+            '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
         data: {
           'type': 'work_schedule',
           'wsReqId': wsReqId,
@@ -450,7 +450,10 @@ class _SupervisorWorkSchedulePageState
           ? Center(
               child: Text(
                 _supervisorSiteError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 16),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 16,
+                ),
               ),
             )
           : SingleChildScrollView(
@@ -517,14 +520,18 @@ class _SupervisorWorkSchedulePageState
                               labelText: 'Site ID',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
                               ),
                               prefixIcon: Icon(
                                 Icons.location_on_outlined,
                                 color: mainColor,
                               ),
                               filled: true,
-                              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+                              fillColor: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLowest,
                             ),
                             items: _siteMaps.map((site) {
                               final siteId = site['id']?.toString() ?? '';
@@ -587,14 +594,18 @@ class _SupervisorWorkSchedulePageState
                               labelText: 'Number of Days',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
                               ),
                               prefixIcon: Icon(
                                 Icons.calendar_today,
                                 color: mainColor,
                               ),
                               filled: true,
-                              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+                              fillColor: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLowest,
                             ),
                           ),
                         ],
@@ -652,7 +663,11 @@ class _SupervisorWorkSchedulePageState
                                       children: [
                                         Text(
                                           'No labours found. Please add labours in Firestore.',
-                                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                          ),
                                         ),
                                         SizedBox(height: 10),
                                       ],
@@ -950,7 +965,9 @@ class _SupervisorWorkSchedulePageState
                       ElevatedButton(
                         onPressed: _isSubmitting ? null : _resetForm,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1087,9 +1104,15 @@ class _SupervisorWorkSchedulePageState
               children: [
                 _buildLegendItem(Colors.green, 'High Availability'),
                 SizedBox(width: 15),
-                _buildLegendItem(Theme.of(context).colorScheme.secondary, 'Limited'),
+                _buildLegendItem(
+                  Theme.of(context).colorScheme.secondary,
+                  'Limited',
+                ),
                 SizedBox(width: 15),
-                _buildLegendItem(Theme.of(context).colorScheme.error, 'Unavailable'),
+                _buildLegendItem(
+                  Theme.of(context).colorScheme.error,
+                  'Unavailable',
+                ),
               ],
             ),
           ],
@@ -1107,7 +1130,13 @@ class _SupervisorWorkSchedulePageState
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -1115,7 +1144,10 @@ class _SupervisorWorkSchedulePageState
   Widget _buildDayWithAvailability(DateTime day) {
     if (day.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
       return Center(
-        child: Text('${day.day}', style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+        child: Text(
+          '${day.day}',
+          style: TextStyle(color: Theme.of(context).colorScheme.outline),
+        ),
       );
     }
 
@@ -1126,7 +1158,7 @@ class _SupervisorWorkSchedulePageState
     // Calculate availability percentage
     double availabilityScore = 1.0;
     int busyCount = 0;
-    
+
     final busyWorkersOnDate = _busyWorkersByDate[dateStr] ?? [];
     busyCount = busyWorkersOnDate.length;
 
@@ -1164,7 +1196,7 @@ class _SupervisorWorkSchedulePageState
 
     Color highlightColor = Colors.transparent;
     Color dotColor = Colors.transparent;
-    
+
     if (_addedLabours.isEmpty) {
       highlightColor = Colors.transparent;
       if (busyCount > 0) dotColor = Colors.grey.withOpacity(0.5);
@@ -1172,7 +1204,9 @@ class _SupervisorWorkSchedulePageState
       highlightColor = Colors.green.withOpacity(0.12);
       dotColor = Colors.green;
     } else if (availabilityScore > 0.0) {
-      highlightColor = Theme.of(context).colorScheme.secondary.withOpacity(0.12);
+      highlightColor = Theme.of(
+        context,
+      ).colorScheme.secondary.withOpacity(0.12);
       dotColor = Theme.of(context).colorScheme.secondary;
     } else {
       highlightColor = Theme.of(context).colorScheme.error.withOpacity(0.12);
@@ -1192,15 +1226,15 @@ class _SupervisorWorkSchedulePageState
               border: isToday
                   ? Border.all(color: mainColor, width: 2)
                   : isSelected
-                      ? Border.all(color: Colors.white24, width: 1)
-                      : null,
+                  ? Border.all(color: Colors.white24, width: 1)
+                  : null,
               boxShadow: isSelected
                   ? [
                       BoxShadow(
                         color: mainColor.withOpacity(0.3),
                         blurRadius: 8,
                         spreadRadius: 1,
-                      )
+                      ),
                     ]
                   : null,
             ),
@@ -1210,7 +1244,9 @@ class _SupervisorWorkSchedulePageState
                 style: TextStyle(
                   color: isSelected
                       ? Theme.of(context).colorScheme.onPrimary
-                      : (isToday ? mainColor : Theme.of(context).colorScheme.onSurface),
+                      : (isToday
+                            ? mainColor
+                            : Theme.of(context).colorScheme.onSurface),
                   fontWeight: isSelected || isToday
                       ? FontWeight.bold
                       : FontWeight.normal,

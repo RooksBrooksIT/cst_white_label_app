@@ -94,6 +94,7 @@ class AuthService {
     // Automatically refresh branding if orgId is available
     final orgId = data['dynamicPath'] ?? data['orgId'];
     if (orgId != null && orgId.toString().isNotEmpty) {
+      FirestoreService.setOrgPath(orgId.toString());
       await refreshBranding(orgId.toString());
     }
   }

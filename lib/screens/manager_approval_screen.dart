@@ -48,8 +48,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   }
 
   Future<List<Map<String, dynamic>>> fetchAllSchedules() async {
-    final QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorProjectStageSchedule')
+    final QuerySnapshot snapshot = await FirestoreService
+        .siteSupervisorProjectStageSchedule
         .get();
     return snapshot.docs
         .map((doc) => doc.data() as Map<String, dynamic>)
@@ -57,27 +57,36 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   }
 
   Future<List<Map<String, dynamic>>> fetchAllLabours() async {
-    final QuerySnapshot snapshot =
-        await FirestoreService.getCollection('labours').get();
+    final QuerySnapshot snapshot = await FirestoreService.getCollection(
+      'labours',
+    ).get();
     return snapshot.docs
         .map((doc) => doc.data() as Map<String, dynamic>)
         .toList();
   }
 
   void _showRequestDetails(Map<String, dynamic> request) async {
-    TextEditingController dateController =
-        TextEditingController(text: request['reqDays'].toString());
-    TextEditingController paymentController =
-        TextEditingController(text: request['estimatedPayment'].toString());
-    List<Map<String, dynamic>> labours =
-        List<Map<String, dynamic>>.from(request['reqLabours'] ?? []);
+    TextEditingController dateController = TextEditingController(
+      text: request['reqDays'].toString(),
+    );
+    TextEditingController paymentController = TextEditingController(
+      text: request['estimatedPayment'].toString(),
+    );
+    List<Map<String, dynamic>> labours = List<Map<String, dynamic>>.from(
+      request['reqLabours'] ?? [],
+    );
     List<TextEditingController> labourCountControllers = labours
-        .map((labour) => TextEditingController(
-            text: labour['labourCount']?.toString() ?? ''))
+        .map(
+          (labour) => TextEditingController(
+            text: labour['labourCount']?.toString() ?? '',
+          ),
+        )
         .toList();
     List<TextEditingController> labourDesignationControllers = labours
-        .map((labour) =>
-            TextEditingController(text: labour['labourDesignation'] ?? ''))
+        .map(
+          (labour) =>
+              TextEditingController(text: labour['labourDesignation'] ?? ''),
+        )
         .toList();
 
     List<Map<String, dynamic>> allLabours = await fetchAllLabours();
@@ -88,7 +97,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       context: context,
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (context) => SafeArea(
         child: DraggableScrollableSheet(
           expand: false,
@@ -142,8 +152,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             return SingleChildScrollView(
               controller: scrollController,
               child: Padding(
-                padding: getSymmetricPadding(context, fraction: 0.06)
-                    .copyWith(top: 32, bottom: 32),
+                padding: getSymmetricPadding(
+                  context,
+                  fraction: 0.06,
+                ).copyWith(top: 32, bottom: 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -153,7 +165,6 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         height: 5,
                         margin: EdgeInsets.only(bottom: 18),
                         decoration: BoxDecoration(
-                          
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -170,8 +181,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                           ),
                         ),
                         Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
                           decoration: BoxDecoration(
                             color: request['approvalStatus'] == 'Approved'
                                 ? Colors.green[100]
@@ -195,38 +208,49 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     Divider(),
                     SizedBox(height: 10),
                     // Project Info
-                    Text("Project Info",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                            color: Theme.of(context).colorScheme.primary)),
+                    Text(
+                      "Project Info",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                     SizedBox(height: 3),
                     _RowInfo(
-                        label: "Project Name",
-                        value: request['projectName'] ?? '',
-                        icon: Icons.business),
+                      label: "Project Name",
+                      value: request['projectName'] ?? '',
+                      icon: Icons.business,
+                    ),
                     _RowInfo(
-                        label: "Site ID",
-                        value: request['siteId'] ?? '',
-                        icon: Icons.location_on),
+                      label: "Site ID",
+                      value: request['siteId'] ?? '',
+                      icon: Icons.location_on,
+                    ),
                     _RowInfo(
-                        label: "Supervisor",
-                        value: request['supervisorName'] ?? '',
-                        icon: Icons.person),
+                      label: "Supervisor",
+                      value: request['supervisorName'] ?? '',
+                      icon: Icons.person,
+                    ),
                     _RowInfo(
-                        label: "Project Stage",
-                        value: request['projectStage'] ?? '',
-                        icon: Icons.account_tree),
+                      label: "Project Stage",
+                      value: request['projectStage'] ?? '',
+                      icon: Icons.account_tree,
+                    ),
                     SizedBox(height: 14),
                     // Labour Requirements
-                    Text("Labour Requirements",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                            color: Theme.of(context).colorScheme.primary)),
+                    Text(
+                      "Labour Requirements",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                     SizedBox(height: 5),
-                    ...List.generate(request['reqLabours']?.length ?? 0,
-                        (index) {
+                    ...List.generate(request['reqLabours']?.length ?? 0, (
+                      index,
+                    ) {
                       final labour = request['reqLabours'][index];
                       final designation = labour['labourDesignation'] ?? '';
                       final matched = allLabours.firstWhere(
@@ -236,9 +260,11 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       final labourId = matched['labourId']?.toString() ?? '';
                       final salary =
                           int.tryParse(matched['salary']?.toString() ?? '0') ??
-                              0;
-                      final count = int.tryParse(
-                              labour['labourCount']?.toString() ?? '0') ??
+                          0;
+                      final count =
+                          int.tryParse(
+                            labour['labourCount']?.toString() ?? '0',
+                          ) ??
                           0;
                       final totalSalary = count * salary;
                       return _LabourRequirementCard(
@@ -252,25 +278,33 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     }),
                     SizedBox(height: 17),
                     // Days
-                    Text("Edit Details",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                            color: Theme.of(context).colorScheme.primary)),
+                    Text(
+                      "Edit Details",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                     SizedBox(height: 6),
                     Row(
                       children: [
-                        Text("Days: ",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueGrey)),
+                        Text(
+                          "Days: ",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
                             child: Text(
                               request['reqDays'].toString(),
                               style: TextStyle(
-                                  fontSize: 16, color: Colors.blueGrey[900]),
+                                fontSize: 16,
+                                color: Colors.blueGrey[900],
+                              ),
                             ),
                           ),
                         ),
@@ -278,18 +312,22 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     ),
                     Row(
                       children: [
-                        Text("Requested Amount: ",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueGrey)),
+                        Text(
+                          "Requested Amount: ",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
                         Expanded(
                           child: TextFormField(
                             controller: paymentController,
                             keyboardType: TextInputType.number,
                             readOnly: true,
                             style: TextStyle(
-                                color: Colors.green[800],
-                                fontWeight: FontWeight.bold),
+                              color: Colors.green[800],
+                              fontWeight: FontWeight.bold,
+                            ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                             ),
@@ -301,10 +339,13 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     // Editable Days field
                     Row(
                       children: [
-                        Text("Days: ",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueGrey)),
+                        Text(
+                          "Days: ",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
                         Expanded(
                           child: TextFormField(
                             controller: dateController,
@@ -313,10 +354,15 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                               labelText: 'Days',
                               isDense: true,
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Theme.of(context).dividerColor)),
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).dividerColor,
+                                ),
+                              ),
                               errorText: approvedDaysError,
-                              fillColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                              fillColor: Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.05),
                               filled: true,
                             ),
                             onChanged: (val) {
@@ -332,7 +378,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         padding: const EdgeInsets.only(top: 4.0, left: 8.0),
                         child: Text(
                           approvedDaysError!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     SizedBox(height: 10),
@@ -340,12 +389,13 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       final designation =
                           labourDesignationControllers[index].text;
                       final matched = allLabours.firstWhere(
-                          (l) => l['designation'] == designation,
-                          orElse: () => {});
+                        (l) => l['designation'] == designation,
+                        orElse: () => {},
+                      );
                       final labourId = matched['labourId']?.toString() ?? '';
                       final salary =
                           int.tryParse(matched['salary']?.toString() ?? '0') ??
-                              0;
+                          0;
                       final count =
                           int.tryParse(labourCountControllers[index].text) ?? 0;
                       final totalSalary = count * salary;
@@ -385,17 +435,19 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                           Text(
                             "Actual Payment: ",
                             style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                                fontSize: 16),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                              fontSize: 16,
+                            ),
                           ),
                           Expanded(
                             child: Text(
                               '₹${getApprovedDays() * calculateLabourTotal()}',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.green),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Colors.green,
+                              ),
                               textAlign: TextAlign.right,
                             ),
                           ),
@@ -408,15 +460,17 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton.icon(
-                            icon: Icon(Icons.check, ),
-                            label: Text("Approve",
-                                style: TextStyle()),
+                            icon: Icon(Icons.check),
+                            label: Text("Approve", style: TextStyle()),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               padding: EdgeInsets.symmetric(
-                                  horizontal: 22, vertical: 14),
+                                horizontal: 22,
+                                vertical: 14,
+                              ),
                             ),
                             onPressed: (approvedDaysError != null)
                                 ? null
@@ -424,7 +478,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                     final wsReqId = request['wsReqId'];
                                     final approvedDays =
                                         int.tryParse(dateController.text) ??
-                                            request['reqDays'];
+                                        request['reqDays'];
                                     final estimatedDays =
                                         request['reqDays'] ?? 0;
                                     if (approvedDays > estimatedDays) {
@@ -434,10 +488,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                       });
                                       return;
                                     }
-                                    final docSnapshot = await FirebaseFirestore
-                                        .instance
-                                        .collection(
-                                            'siteSupervisorProjectStageSchedule')
+                                    final docSnapshot = await FirestoreService
+                                        .siteSupervisorProjectStageSchedule
                                         .where('wsReqId', isEqualTo: wsReqId)
                                         .limit(1)
                                         .get();
@@ -446,20 +498,20 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                           docSnapshot.docs.first.reference;
                                       final approvedPayment =
                                           getApprovedDays() *
-                                              calculateLabourTotal();
+                                          calculateLabourTotal();
                                       final approvedLabours = List.generate(
-                                          labours.length,
-                                          (i) => {
-                                                'labourCount': int.tryParse(
-                                                        labourCountControllers[
-                                                                i]
-                                                            .text) ??
-                                                    0,
-                                                'labourDesignation':
-                                                    labourDesignationControllers[
-                                                            i]
-                                                        .text,
-                                              });
+                                        labours.length,
+                                        (i) => {
+                                          'labourCount':
+                                              int.tryParse(
+                                                labourCountControllers[i].text,
+                                              ) ??
+                                              0,
+                                          'labourDesignation':
+                                              labourDesignationControllers[i]
+                                                  .text,
+                                        },
+                                      );
                                       await docRef.update({
                                         'appDays': approvedDays,
                                         'appLabours': approvedLabours,
@@ -473,12 +525,15 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
                                       // Notify supervisor of approval
                                       final supName =
-                                          request['supervisorName']?.toString() ?? '';
+                                          request['supervisorName']
+                                              ?.toString() ??
+                                          '';
                                       if (supName.isNotEmpty) {
                                         await NotificationService.notifySupervisor(
                                           supervisorName: supName,
                                           title: '✅ Worker Request Approved',
-                                          body: 'Your request ${request['wsReqId'] ?? ''} '
+                                          body:
+                                              'Your request ${request['wsReqId'] ?? ''} '
                                               'has been approved for $approvedDays day(s).',
                                           data: {
                                             'type': 'worker_approval',
@@ -491,14 +546,18 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                     setState(() {
                                       request['approvalStatus'] = 'Approved';
                                       pendingRequests = allRequests
-                                          .where((req) =>
-                                              req["approvalStatus"] ==
-                                              "Pending")
+                                          .where(
+                                            (req) =>
+                                                req["approvalStatus"] ==
+                                                "Pending",
+                                          )
                                           .toList();
                                       approvedRequests = allRequests
-                                          .where((req) =>
-                                              req["approvalStatus"] ==
-                                              "Approved")
+                                          .where(
+                                            (req) =>
+                                                req["approvalStatus"] ==
+                                                "Approved",
+                                          )
                                           .toList();
                                     });
                                     Navigator.pop(context);
@@ -509,11 +568,16 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                             icon: const Icon(Icons.close, color: Colors.white),
                             label: const Text("Reject"),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.secondary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondary,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 22, vertical: 14),
+                                horizontal: 22,
+                                vertical: 14,
+                              ),
                             ),
                             onPressed: () async {
                               final supName =
@@ -522,7 +586,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                 await NotificationService.notifySupervisor(
                                   supervisorName: supName,
                                   title: '❌ Worker Request Rejected',
-                                  body: 'Your request ${request['wsReqId'] ?? ''} '
+                                  body:
+                                      'Your request ${request['wsReqId'] ?? ''} '
                                       'has been rejected.',
                                   data: {
                                     'type': 'worker_rejection',
@@ -532,7 +597,9 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                                 );
                               }
                               _updateRequestStatus(
-                                  request['wsReqId'], "Rejected");
+                                request['wsReqId'],
+                                "Rejected",
+                              );
                             },
                           ),
                         ],
@@ -559,7 +626,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       context: context,
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (context) => SafeArea(
         child: DraggableScrollableSheet(
           expand: false,
@@ -569,8 +637,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
           builder: (context, scrollController) => SingleChildScrollView(
             controller: scrollController,
             child: Padding(
-              padding: getSymmetricPadding(context, fraction: 0.06)
-                  .copyWith(top: 32, bottom: 32),
+              padding: getSymmetricPadding(
+                context,
+                fraction: 0.06,
+              ).copyWith(top: 32, bottom: 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -580,7 +650,6 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       height: 5,
                       margin: EdgeInsets.only(bottom: 18),
                       decoration: BoxDecoration(
-                        
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -597,8 +666,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                         ),
                       ),
                       Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(20),
@@ -618,35 +689,45 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                   Divider(),
                   SizedBox(height: 10),
                   // Project Info
-                  Text("Project Info",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                          color: Theme.of(context).colorScheme.primary)),
+                  Text(
+                    "Project Info",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                   SizedBox(height: 3),
                   _RowInfo(
-                      label: "Project Name",
-                      value: request['projectName'] ?? '',
-                      icon: Icons.business),
+                    label: "Project Name",
+                    value: request['projectName'] ?? '',
+                    icon: Icons.business,
+                  ),
                   _RowInfo(
-                      label: "Site ID",
-                      value: request['siteId'] ?? '',
-                      icon: Icons.location_on),
+                    label: "Site ID",
+                    value: request['siteId'] ?? '',
+                    icon: Icons.location_on,
+                  ),
                   _RowInfo(
-                      label: "Supervisor",
-                      value: request['supervisorName'] ?? '',
-                      icon: Icons.person),
+                    label: "Supervisor",
+                    value: request['supervisorName'] ?? '',
+                    icon: Icons.person,
+                  ),
                   _RowInfo(
-                      label: "Project Stage",
-                      value: request['projectStage'] ?? '',
-                      icon: Icons.account_tree),
+                    label: "Project Stage",
+                    value: request['projectStage'] ?? '',
+                    icon: Icons.account_tree,
+                  ),
                   SizedBox(height: 14),
                   // Approved Labour Requirements
-                  Text("Approved Labour Requirements",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                          color: Theme.of(context).colorScheme.primary)),
+                  Text(
+                    "Approved Labour Requirements",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                   SizedBox(height: 5),
                   ...List.generate(approvedLabours.length, (index) {
                     final labour = approvedLabours[index];
@@ -658,8 +739,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     final labourId = matched['labourId']?.toString() ?? '';
                     final salary =
                         int.tryParse(matched['salary']?.toString() ?? '0') ?? 0;
-                    final count = int.tryParse(
-                            labour['labourCount']?.toString() ?? '0') ??
+                    final count =
+                        int.tryParse(
+                          labour['labourCount']?.toString() ?? '0',
+                        ) ??
                         0;
                     final totalSalary = count * salary;
                     return _LabourRequirementCard(
@@ -674,25 +757,33 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                   }),
                   SizedBox(height: 17),
                   // Approved Details
-                  Text("Approved Details",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                          color: Theme.of(context).colorScheme.primary)),
+                  Text(
+                    "Approved Details",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                   SizedBox(height: 6),
                   Row(
                     children: [
-                      Text("Days: ",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueGrey)),
+                      Text(
+                        "Days: ",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 8.0),
                           child: Text(
                             approvedDays.toString(),
                             style: TextStyle(
-                                fontSize: 16, color: Colors.blueGrey[900]),
+                              fontSize: 16,
+                              color: Colors.blueGrey[900],
+                            ),
                           ),
                         ),
                       ),
@@ -700,17 +791,21 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                   ),
                   Row(
                     children: [
-                      Text("Approved Amount: ",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueGrey)),
+                      Text(
+                        "Approved Amount: ",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           '₹$approvedPayment',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Colors.green[700]),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.green[700],
+                          ),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -719,8 +814,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                   SizedBox(height: 22),
                   Center(
                     child: Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green[100],
                         borderRadius: BorderRadius.circular(8),
@@ -733,9 +830,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                           Text(
                             "Status: Approved",
                             style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -754,7 +852,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   void _updateRequestStatus(String wsReqId, String status) {
     setState(() {
       allRequests.firstWhere(
-          (req) => req['wsReqId'] == wsReqId)['approvalStatus'] = status;
+        (req) => req['wsReqId'] == wsReqId,
+      )['approvalStatus'] = status;
       pendingRequests = allRequests
           .where((req) => req["approvalStatus"] == "Pending")
           .toList();
@@ -765,14 +864,17 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     Navigator.pop(context);
   }
 
-  Widget _buildRequestList(List<Map<String, dynamic>> requests,
-      {bool isApprovedTab = false}) {
+  Widget _buildRequestList(
+    List<Map<String, dynamic>> requests, {
+    bool isApprovedTab = false,
+  }) {
     List<Map<String, dynamic>> filteredRequests = List.from(requests);
     if (_searchText.isNotEmpty) {
-      final idx = filteredRequests.indexWhere((req) => (req['wsReqId'] ?? '')
-          .toString()
-          .toLowerCase()
-          .contains(_searchText.toLowerCase()));
+      final idx = filteredRequests.indexWhere(
+        (req) => (req['wsReqId'] ?? '').toString().toLowerCase().contains(
+          _searchText.toLowerCase(),
+        ),
+      );
       if (idx != -1) {
         final match = filteredRequests.removeAt(idx);
         filteredRequests.insert(0, match);
@@ -788,9 +890,10 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             Text(
               "No requests found",
               style: TextStyle(
-                  color: Colors.blueGrey,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500),
+                color: Colors.blueGrey,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -803,7 +906,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
         final request = filteredRequests[index];
         final status = request['approvalStatus'] ?? '';
         final isApproved = status == 'Approved';
-        
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: GlassCard(
@@ -817,16 +920,34 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.location_on, color: Theme.of(context).colorScheme.primary, size: 16),
+                    Icon(
+                      Icons.location_on,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 16,
+                    ),
                     const SizedBox(width: 4),
-                    Text(request['siteId'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    Text(
+                      request['siteId'] ?? '',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isApproved ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                        color: isApproved
+                            ? Colors.green.withOpacity(0.2)
+                            : Colors.orange.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: isApproved ? Colors.green : Colors.orange, width: 0.5),
+                        border: Border.all(
+                          color: isApproved ? Colors.green : Colors.orange,
+                          width: 0.5,
+                        ),
                       ),
                       child: Text(
                         status,
@@ -846,15 +967,34 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Supervisor', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                        Text(request['supervisorName'] ?? '-', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                        const Text(
+                          'Supervisor',
+                          style: TextStyle(color: Colors.white54, fontSize: 11),
+                        ),
+                        Text(
+                          request['supervisorName'] ?? '-',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Labours', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                        Text('${(request['reqLabours'] ?? []).length}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Labours',
+                          style: TextStyle(color: Colors.white54, fontSize: 11),
+                        ),
+                        Text(
+                          '${(request['reqLabours'] ?? []).length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -871,7 +1011,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return GlassScaffold(
       title: 'Schedule Approval',
       appBarBackgroundColor: colorScheme.primary,
@@ -882,14 +1022,17 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             color: theme.cardColor,
             child: TabBar(
               controller: _tabController,
-              tabs: const [Tab(text: "PENDING"), Tab(text: "APPROVED")],
+              tabs: const [
+                Tab(text: "PENDING"),
+                Tab(text: "APPROVED"),
+              ],
               labelColor: colorScheme.primary,
               unselectedLabelColor: colorScheme.onSurfaceVariant,
               indicatorColor: colorScheme.primary,
               indicatorWeight: 3,
             ),
           ),
-          
+
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -972,8 +1115,17 @@ class _RowInfo extends StatelessWidget {
         children: [
           Icon(icon, color: Theme.of(context).colorScheme.primary, size: 18),
           const SizedBox(width: 10),
-          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
+          Text(
+            "$label: ",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -1046,7 +1198,10 @@ class _LabourRequirementCard extends StatelessWidget {
                               flex: 3,
                               child: TextField(
                                 controller: designationController,
-                                decoration: const InputDecoration(labelText: 'Designation', isDense: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Designation',
+                                  isDense: true,
+                                ),
                                 style: const TextStyle(fontSize: 14),
                                 onChanged: (v) => onChanged?.call(),
                               ),
@@ -1057,8 +1212,14 @@ class _LabourRequirementCard extends StatelessWidget {
                               child: TextField(
                                 controller: countController,
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(labelText: 'Count', isDense: true),
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                decoration: const InputDecoration(
+                                  labelText: 'Count',
+                                  isDense: true,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 onChanged: (v) => onChanged?.call(),
                               ),
                             ),
@@ -1068,8 +1229,17 @@ class _LabourRequirementCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('ID: $labourId', style: theme.textTheme.bodySmall),
-                            Text('Total: ₹$total', style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                            Text(
+                              'ID: $labourId',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            Text(
+                              'Total: ₹$total',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -1080,8 +1250,20 @@ class _LabourRequirementCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(designation, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text('x$count', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(
+                              designation,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'x$count',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -1090,8 +1272,18 @@ class _LabourRequirementCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Salary: ₹$salary', style: theme.textTheme.bodySmall),
-                            Text('Total: ₹$total', style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 16)),
+                            Text(
+                              'Salary: ₹$salary',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            Text(
+                              'Total: ₹$total',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                                fontSize: 16,
+                              ),
+                            ),
                           ],
                         ),
                       ],
