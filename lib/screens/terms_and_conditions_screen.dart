@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/location_service.dart';
@@ -8,6 +9,7 @@ import 'package:demo_cst/screens/supervisor_dashboard.dart';
 import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/org_subscription_page.dart';
+import 'package:demo_cst/screens/landing_page.dart';
 
 class TermsAndConditionsScreen extends StatefulWidget {
   const TermsAndConditionsScreen({super.key});
@@ -109,10 +111,16 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
           );
           break;
         default:
-          Navigator.pushReplacementNamed(context, '/landing');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LandingPage()),
+          );
       }
     } else {
-      Navigator.pushReplacementNamed(context, '/landing');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LandingPage()),
+      );
     }
   }
 
@@ -138,93 +146,38 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey[300]!),
                       ),
-                      child: const SingleChildScrollView(
+                      child: SingleChildScrollView(
                         child: Text(
                           '''Terms and Conditions for eBicks App
 
-Effective Date: [Insert Date]
+Effective Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}
 
-1. Introduction
+1. Acceptance of Terms
+By accessing or using the eBicks App, you agree to comply with and be bound by these Terms and Conditions.
 
-Welcome to the eBicks App (“App”), operated by Rooks and Brooks Technologies Pvt Ltd (“Company”, “we”, “our”, “us”).
-These Terms and Conditions (“Terms”) govern your use of the App and its services.
+2. Account Security
+You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.
 
-By accessing or using the App, you agree to comply with these Terms. If you do not agree, please do not use the App.
+3. Authorized Use
+The App is intended for professional use by authorized personnel. You agree not to misuse the App or attempt unauthorized access to any part of the system.
 
-2. Definitions
-“App” refers to eBicks App.
-“User” refers to any authorized individual using the App.
-“Organization Owner” refers to the primary account holder with full administrative control.
-“Manager” refers to users assigned management-level access by the Organization Owner.
-“Supervisor” refers to users responsible for monitoring operations and reporting.
-“Customer” refers to end-users or clients associated with the organization.
-“Services” refers to all features, functionalities, and content provided through the App.
-3. Eligibility
-Access to the App is restricted to authorized users only.
-Accounts are created and assigned by the Organization Owner or authorized personnel.
-Public self-registration may be restricted or subject to approval.
-4. User Roles and Responsibilities
-4.1 Organization Owner
-Full control over the organization account
-Can create, modify, or delete Manager, Supervisor, and Customer accounts
-Responsible for overall data accuracy and compliance
-4.2 Manager
-Manages operational activities within the App
-Oversees Supervisors and Customers as permitted
-Ensures proper usage within assigned scope
-4.3 Supervisor
-Monitors day-to-day activities
-Updates records, reports, and operational data
-Reports to Manager or Organization Owner
-4.4 Customer
-Can access limited features provided by the organization
-Must not attempt to access restricted areas
-5. Account Responsibility
-Users must maintain confidentiality of login credentials.
-The Organization Owner is responsible for all activities under their organization.
-Unauthorized access must be reported immediately.
-6. Acceptable Use
+4. Data Privacy
+We value your privacy. Data collected is used solely for providing and improving our services. Please refer to our Privacy Policy for more details.
 
-Users agree not to:
+5. Subscription & Payments
+Access to features depends on your organization's subscription plan. All payments are processed securely, and no sensitive payment details are stored on our servers.
 
-Use the App for unlawful purposes
-Attempt unauthorized access to systems or data
-Interfere with the App’s functionality or security
-7. Data and Privacy
-Data is handled in accordance with our Privacy Policy.
-Organizations retain ownership of their operational data.
-We implement reasonable security measures to protect information.
-8. Intellectual Property
-All rights, including software, design, and content, belong to Rooks and Brooks Technologies Pvt Ltd.
-Users are granted a limited, non-transferable license for business use only.
-9. Service Availability
-We strive for continuous service but do not guarantee uninterrupted availability.
-Maintenance or technical issues may cause downtime.
-10. Limitation of Liability
-We are not liable for indirect or consequential damages.
-Use of the App is at your own risk.
-11. Termination
-We may suspend or terminate access for violation of these Terms.
-Organization Owners may remove users within their organization.
-12. Changes to Terms
-These Terms may be updated periodically.
-Continued use indicates acceptance of the revised Terms.
-13. Governing Law
-These Terms shall be governed by the laws of India.
-14. Subscription and Billing
-The application follows a subscription-based billing model. Each plan (Silver, Gold, Platinum) provides different features.
-Payments are securely processed via ICICI Bank Payment Gateway. No sensitive payment details are stored on our servers.
-Subscriptions are non-transferable between organizations.
-Each organization’s data is strictly isolated and securely maintained.
+6. Limitation of Liability
+Rooks and Brooks Technologies Pvt Ltd is not liable for any indirect, incidental, or consequential damages resulting from the use of this App.
 
-15. Refund Policy
-Refunds (if applicable) are processed within 5–7 working days based on company policy.
+7. Service Availability
+We aim for maximum uptime but do not guarantee uninterrupted access. Maintenance may be performed periodically.
 
-16. Contact Information
+8. Termination
+We reserve the right to terminate or suspend access for violations of these Terms or for security reasons.
 
-For any questions or concerns:
-Company: Rooks and Brooks Technologies Pvt Ltd
-Email: support@rookstechnologies.com''',
+9. Contact Support
+For any queries, please reach out to us at support@rookstechnologies.com.''',
                           textAlign: TextAlign.justify,
                           style: TextStyle(
                             fontSize: 15,
@@ -250,23 +203,28 @@ Email: support@rookstechnologies.com''',
                             : Colors.transparent,
                       ),
                     ),
-                    child: CheckboxListTile(
-                      value: _isAccepted,
-                      onChanged: (value) {
-                        setState(() {
-                          _isAccepted = value ?? false;
-                        });
-                      },
-                      title: const Text(
-                        'I have read and agree to the Terms and Conditions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        value: _isAccepted,
+                        onChanged: (value) {
+                          setState(() {
+                            _isAccepted = value ?? false;
+                          });
+                        },
+                        title: const Text(
+                          'I have read and agree to the Terms and Conditions',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        activeColor: Theme.of(context).colorScheme.primary,
                       ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      activeColor: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 20),
