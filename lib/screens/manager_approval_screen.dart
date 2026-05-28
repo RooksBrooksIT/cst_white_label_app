@@ -66,37 +66,38 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   }
 
   void _showRequestDetails(Map<String, dynamic> request) async {
-    TextEditingController dateController = TextEditingController(
-      text: request['reqDays'].toString(),
+    final TextEditingController dateController = TextEditingController(
+      text: request['reqDays']?.toString() ?? '',
     );
-    TextEditingController paymentController = TextEditingController(
-      text: request['estimatedPayment'].toString(),
+    final TextEditingController paymentController = TextEditingController(
+      text: request['estimatedPayment']?.toString() ?? '',
     );
-    List<Map<String, dynamic>> labours = List<Map<String, dynamic>>.from(
+    final List<Map<String, dynamic>> labours = List<Map<String, dynamic>>.from(
       request['reqLabours'] ?? [],
     );
-    List<TextEditingController> labourCountControllers = labours
+
+    final List<TextEditingController> labourCountControllers = labours
         .map(
           (labour) => TextEditingController(
             text: labour['labourCount']?.toString() ?? '',
           ),
         )
         .toList();
-    List<TextEditingController> labourDesignationControllers = labours
+    final List<TextEditingController> labourDesignationControllers = labours
         .map(
           (labour) =>
               TextEditingController(text: labour['labourDesignation'] ?? ''),
         )
         .toList();
 
-    List<Map<String, dynamic>> allLabours = await fetchAllLabours();
+    final List<Map<String, dynamic>> allLabours = await fetchAllLabours();
 
     String? approvedDaysError;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => SafeArea(
@@ -134,479 +135,408 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
               setState(() {});
             }
 
-            void validateApprovedDays(String value) {
-              final approvedDays = int.tryParse(value) ?? 0;
-              final estimatedDays = getEstimatedDays();
-              if (approvedDays > estimatedDays) {
-                setState(() {
-                  approvedDaysError =
-                      "Approved Days ($approvedDays) cannot be greater than Estimated Days ($estimatedDays).";
-                });
-              } else {
-                setState(() {
-                  approvedDaysError = null;
-                });
-              }
-            }
+            return StatefulBuilder(
+              builder: (context, setStateModal) {
+                void validateApprovedDays(String value) {
+                  final approvedDays = int.tryParse(value) ?? 0;
+                  final estimatedDays = getEstimatedDays();
+                  setStateModal(() {
+                    if (approvedDays > estimatedDays) {
+                      approvedDaysError =
+                          "Approved Days ($approvedDays) cannot be greater than Estimated Days ($estimatedDays).";
+                    } else {
+                      approvedDaysError = null;
+                    }
+                  });
+                  setState(() {}); // Sync main state if needed
+                }
 
-            return SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: getSymmetricPadding(
-                  context,
-                  fraction: 0.06,
-                ).copyWith(top: 32, bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 50,
-                        height: 5,
-                        margin: EdgeInsets.only(bottom: 18),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  child: Padding(
+                    padding: getSymmetricPadding(
+                      context,
+                      fraction: 0.06,
+                    ).copyWith(top: 32, bottom: 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Req ID: ${request['wsReqId'] ?? ''}",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: request['approvalStatus'] == 'Approved'
-                                ? Colors.green[100]
-                                : Colors.orange,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            request['approvalStatus'] ?? '',
-                            style: TextStyle(
-                              color: request['approvalStatus'] == 'Approved'
-                                  ? Colors.green[800]
-                                  : Colors.orange,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
+                        Center(
+                          child: Container(
+                            width: 50,
+                            height: 5,
+                            margin: const EdgeInsets.only(bottom: 18),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 18),
-                    Divider(),
-                    SizedBox(height: 10),
-                    // Project Info
-                    Text(
-                      "Project Info",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    _RowInfo(
-                      label: "Project Name",
-                      value: request['projectName'] ?? '',
-                      icon: Icons.business,
-                    ),
-                    _RowInfo(
-                      label: "Site ID",
-                      value: request['siteId'] ?? '',
-                      icon: Icons.location_on,
-                    ),
-                    _RowInfo(
-                      label: "Supervisor",
-                      value: request['supervisorName'] ?? '',
-                      icon: Icons.person,
-                    ),
-                    _RowInfo(
-                      label: "Project Stage",
-                      value: request['projectStage'] ?? '',
-                      icon: Icons.account_tree,
-                    ),
-                    SizedBox(height: 14),
-                    // Labour Requirements
-                    Text(
-                      "Labour Requirements",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(height: 5),
-                    ...List.generate(request['reqLabours']?.length ?? 0, (
-                      index,
-                    ) {
-                      final labour = request['reqLabours'][index];
-                      final designation = labour['labourDesignation'] ?? '';
-                      final matched = allLabours.firstWhere(
-                        (l) => l['designation'] == designation,
-                        orElse: () => {},
-                      );
-                      final labourId = matched['labourId']?.toString() ?? '';
-                      final salary =
-                          int.tryParse(matched['salary']?.toString() ?? '0') ??
-                          0;
-                      final count =
-                          int.tryParse(
-                            labour['labourCount']?.toString() ?? '0',
-                          ) ??
-                          0;
-                      final totalSalary = count * salary;
-                      return _LabourRequirementCard(
-                        designation: designation,
-                        labourId: labourId,
-                        salary: salary,
-                        count: count,
-                        total: totalSalary,
-                        color: Theme.of(context).colorScheme.primary,
-                      );
-                    }),
-                    SizedBox(height: 17),
-                    // Days
-                    Text(
-                      "Edit Details",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Text(
-                          "Days: ",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey,
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text(
-                              request['reqDays'].toString(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Req ID: ${request['wsReqId'] ?? ''}",
                               style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.blueGrey[900],
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          "Requested Amount: ",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey,
-                          ),
-                        ),
-                        Expanded(
-                          child: TextFormField(
-                            controller: paymentController,
-                            keyboardType: TextInputType.number,
-                            readOnly: true,
-                            style: TextStyle(
-                              color: Colors.green[800],
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    // Editable Days field
-                    Row(
-                      children: [
-                        Text(
-                          "Days: ",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey,
-                          ),
-                        ),
-                        Expanded(
-                          child: TextFormField(
-                            controller: dateController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Days',
-                              isDense: true,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).dividerColor,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: request['approvalStatus'] == 'Approved'
+                                    ? Colors.green[100]
+                                    : Colors.orange[100],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                request['approvalStatus'] ?? '',
+                                style: TextStyle(
+                                  color: request['approvalStatus'] == 'Approved'
+                                      ? Colors.green[800]
+                                      : Colors.orange[800],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
                                 ),
                               ),
-                              errorText: approvedDaysError,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.05),
-                              filled: true,
                             ),
-                            onChanged: (val) {
-                              recalculate();
-                              validateApprovedDays(val);
-                            },
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                    if (approvedDaysError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0, left: 8.0),
-                        child: Text(
-                          approvedDaysError!,
+                        const SizedBox(height: 18),
+                        const Divider(),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Project Info",
                           style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
                             color: Theme.of(context).colorScheme.primary,
-                            fontSize: 12,
                           ),
                         ),
-                      ),
-                    SizedBox(height: 10),
-                    ...List.generate(labours.length, (index) {
-                      final designation =
-                          labourDesignationControllers[index].text;
-                      final matched = allLabours.firstWhere(
-                        (l) => l['designation'] == designation,
-                        orElse: () => {},
-                      );
-                      final labourId = matched['labourId']?.toString() ?? '';
-                      final salary =
-                          int.tryParse(matched['salary']?.toString() ?? '0') ??
-                          0;
-                      final count =
-                          int.tryParse(labourCountControllers[index].text) ?? 0;
-                      final totalSalary = count * salary;
-                      return _LabourRequirementCard(
-                        designation: designation,
-                        labourId: labourId,
-                        salary: salary,
-                        count: count,
-                        total: totalSalary,
-                        color: Theme.of(context).colorScheme.primary,
-                        editable: true,
-                        countController: labourCountControllers[index],
-                        designationController:
-                            labourDesignationControllers[index],
-                        onChanged: recalculate,
-                      );
-                    }),
-                    SizedBox(height: 18),
-                    // Actual amount
-                    Container(
-                      width: double.infinity,
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.green.shade100, Colors.green.shade50],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        const SizedBox(height: 12),
+                        _RowInfo(
+                          label: "Project Name",
+                          value: request['projectName'] ?? '',
+                          icon: Icons.business,
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.payments, color: Colors.green[700]),
-                          SizedBox(width: 10),
-                          Text(
-                            "Actual Payment: ",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                              fontSize: 16,
+                        _RowInfo(
+                          label: "Site ID",
+                          value: request['siteId'] ?? '',
+                          icon: Icons.location_on,
+                        ),
+                        _RowInfo(
+                          label: "Supervisor",
+                          value: request['supervisorName'] ?? '',
+                          icon: Icons.person,
+                        ),
+                        _RowInfo(
+                          label: "Project Stage",
+                          value: request['projectStage'] ?? '',
+                          icon: Icons.account_tree,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          "Labour Requirements",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ...List.generate(request['reqLabours']?.length ?? 0, (
+                          index,
+                        ) {
+                          final labour = request['reqLabours'][index];
+                          final designation = labour['labourDesignation'] ?? '';
+                          final matched = allLabours.firstWhere(
+                            (l) => l['designation'] == designation,
+                            orElse: () => {},
+                          );
+                          final labourId =
+                              matched['labourId']?.toString() ?? '';
+                          final salary =
+                              int.tryParse(
+                                matched['salary']?.toString() ?? '0',
+                              ) ??
+                              0;
+                          final count =
+                              int.tryParse(
+                                labour['labourCount']?.toString() ?? '0',
+                              ) ??
+                              0;
+                          return _LabourRequirementCard(
+                            designation: designation,
+                            labourId: labourId,
+                            salary: salary,
+                            count: count,
+                            total: count * salary,
+                            color: Theme.of(context).colorScheme.primary,
+                          );
+                        }),
+                        const SizedBox(height: 24),
+                        Text(
+                          "Edit Details",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Text(
+                              "Estimated Days: ",
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '₹${getApprovedDays() * calculateLabourTotal()}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                            Text(request['reqDays']?.toString() ?? '0'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Text(
+                              "Estimated Payment: ",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              '₹${request['estimatedPayment'] ?? 0}',
+                              style: const TextStyle(
                                 color: Colors.green,
+                                fontWeight: FontWeight.bold,
                               ),
-                              textAlign: TextAlign.right,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: dateController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Approved Days',
+                            errorText: approvedDaysError,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withOpacity(0.05),
                           ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 17),
-                    if (request['approvalStatus'] == "Pending")
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ElevatedButton.icon(
-                            icon: Icon(Icons.check),
-                            label: Text("Approve", style: TextStyle()),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[700],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                          onChanged: (val) {
+                            setState(() {}); // Main UI
+                            setStateModal(() {}); // Modal UI
+                            validateApprovedDays(val);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ...List.generate(labours.length, (index) {
+                          final designation =
+                              labourDesignationControllers[index].text;
+                          final matched = allLabours.firstWhere(
+                            (l) => l['designation'] == designation,
+                            orElse: () => {},
+                          );
+                          final salary =
+                              int.tryParse(
+                                matched['salary']?.toString() ?? '0',
+                              ) ??
+                              0;
+                          final count =
+                              int.tryParse(
+                                labourCountControllers[index].text,
+                              ) ??
+                              0;
+                          return _LabourRequirementCard(
+                            designation: designation,
+                            labourId: matched['labourId']?.toString() ?? '',
+                            salary: salary,
+                            count: count,
+                            total: count * salary,
+                            color: Theme.of(context).colorScheme.primary,
+                            editable: true,
+                            countController: labourCountControllers[index],
+                            onChanged: () {
+                              setState(() {});
+                              setStateModal(() {});
+                            },
+                          );
+                        }),
+                        const SizedBox(height: 24),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "Actual Payment:",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 22,
-                                vertical: 14,
+                              Text(
+                                '₹${getApprovedDays() * calculateLabourTotal()}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.green,
+                                ),
                               ),
-                            ),
-                            onPressed: (approvedDaysError != null)
-                                ? null
-                                : () async {
-                                    final wsReqId = request['wsReqId'];
-                                    final approvedDays =
-                                        int.tryParse(dateController.text) ??
-                                        request['reqDays'];
-                                    final estimatedDays =
-                                        request['reqDays'] ?? 0;
-                                    if (approvedDays > estimatedDays) {
-                                      setState(() {
-                                        approvedDaysError =
-                                            "Approved Days ($approvedDays) cannot be greater than Estimated Days ($estimatedDays).";
-                                      });
-                                      return;
-                                    }
-                                    final docSnapshot = await FirestoreService
-                                        .siteSupervisorProjectStageSchedule
-                                        .where('wsReqId', isEqualTo: wsReqId)
-                                        .limit(1)
-                                        .get();
-                                    if (docSnapshot.docs.isNotEmpty) {
-                                      final docRef =
-                                          docSnapshot.docs.first.reference;
-                                      final approvedPayment =
-                                          getApprovedDays() *
-                                          calculateLabourTotal();
-                                      final approvedLabours = List.generate(
-                                        labours.length,
-                                        (i) => {
-                                          'labourCount':
-                                              int.tryParse(
-                                                labourCountControllers[i].text,
-                                              ) ??
-                                              0,
-                                          'labourDesignation':
-                                              labourDesignationControllers[i]
-                                                  .text,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        if (request['approvalStatus'] == "Pending")
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.check),
+                                label: const Text("Approve"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green[700],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed: approvedDaysError != null
+                                    ? null
+                                    : () async {
+                                        final wsReqId = request['wsReqId'];
+                                        final approvedDays =
+                                            int.tryParse(dateController.text) ??
+                                            request['reqDays'];
+
+                                        final docSnapshot = await FirestoreService
+                                            .siteSupervisorProjectStageSchedule
+                                            .where(
+                                              'wsReqId',
+                                              isEqualTo: wsReqId,
+                                            )
+                                            .limit(1)
+                                            .get();
+
+                                        if (docSnapshot.docs.isNotEmpty) {
+                                          final docRef =
+                                              docSnapshot.docs.first.reference;
+                                          final approvedPayment =
+                                              getApprovedDays() *
+                                              calculateLabourTotal();
+                                          final approvedLabours = List.generate(
+                                            labours.length,
+                                            (i) => {
+                                              'labourCount':
+                                                  int.tryParse(
+                                                    labourCountControllers[i]
+                                                        .text,
+                                                  ) ??
+                                                  0,
+                                              'labourDesignation':
+                                                  labourDesignationControllers[i]
+                                                      .text,
+                                            },
+                                          );
+
+                                          await docRef.update({
+                                            'appDays': approvedDays,
+                                            'appLabours': approvedLabours,
+                                            'approvedPayment': approvedPayment,
+                                            'approvalStatus': 'Approved',
+                                          });
+
+                                          // Update local state
+                                          _fetchData();
+
+                                          // Notify supervisor
+                                          final supName =
+                                              request['supervisorName']
+                                                  ?.toString() ??
+                                              '';
+                                          if (supName.isNotEmpty) {
+                                            await NotificationService.notifySupervisor(
+                                              supervisorName: supName,
+                                              title:
+                                                  '✅ Worker Request Approved',
+                                              body:
+                                                  'Your request $wsReqId has been approved.',
+                                              data: {
+                                                'type': 'worker_approval',
+                                                'wsReqId': wsReqId,
+                                                'status': 'Approved',
+                                              },
+                                            );
+                                          }
+                                        }
+                                        Navigator.pop(context);
+                                      },
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.close),
+                                label: const Text("Reject"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red[700],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final wsReqId = request['wsReqId'];
+                                  final docSnapshot = await FirestoreService
+                                      .siteSupervisorProjectStageSchedule
+                                      .where('wsReqId', isEqualTo: wsReqId)
+                                      .limit(1)
+                                      .get();
+
+                                  if (docSnapshot.docs.isNotEmpty) {
+                                    await docSnapshot.docs.first.reference
+                                        .update({'approvalStatus': 'Rejected'});
+                                    _fetchData();
+
+                                    final supName =
+                                        request['supervisorName']?.toString() ??
+                                        '';
+                                    if (supName.isNotEmpty) {
+                                      await NotificationService.notifySupervisor(
+                                        supervisorName: supName,
+                                        title: '❌ Worker Request Rejected',
+                                        body:
+                                            'Your request $wsReqId has been rejected.',
+                                        data: {
+                                          'type': 'worker_rejection',
+                                          'wsReqId': wsReqId,
+                                          'status': 'Rejected',
                                         },
                                       );
-                                      await docRef.update({
-                                        'appDays': approvedDays,
-                                        'appLabours': approvedLabours,
-                                        'approvedPayment': approvedPayment,
-                                        'approvalStatus': 'Approved',
-                                      });
-                                      request['appDays'] = approvedDays;
-                                      request['appLabours'] = approvedLabours;
-                                      request['approvedPayment'] =
-                                          approvedPayment;
-
-                                      // Notify supervisor of approval
-                                      final supName =
-                                          request['supervisorName']
-                                              ?.toString() ??
-                                          '';
-                                      if (supName.isNotEmpty) {
-                                        await NotificationService.notifySupervisor(
-                                          supervisorName: supName,
-                                          title: '✅ Worker Request Approved',
-                                          body:
-                                              'Your request ${request['wsReqId'] ?? ''} '
-                                              'has been approved for $approvedDays day(s).',
-                                          data: {
-                                            'type': 'worker_approval',
-                                            'wsReqId': request['wsReqId'],
-                                            'status': 'Approved',
-                                          },
-                                        );
-                                      }
                                     }
-                                    setState(() {
-                                      request['approvalStatus'] = 'Approved';
-                                      pendingRequests = allRequests
-                                          .where(
-                                            (req) =>
-                                                req["approvalStatus"] ==
-                                                "Pending",
-                                          )
-                                          .toList();
-                                      approvedRequests = allRequests
-                                          .where(
-                                            (req) =>
-                                                req["approvalStatus"] ==
-                                                "Approved",
-                                          )
-                                          .toList();
-                                    });
-                                    Navigator.pop(context);
-                                  },
-                          ),
-                          SizedBox(width: 10),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            label: const Text("Reject"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                  }
+                                  Navigator.pop(context);
+                                },
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 22,
-                                vertical: 14,
-                              ),
-                            ),
-                            onPressed: () async {
-                              final supName =
-                                  request['supervisorName']?.toString() ?? '';
-                              if (supName.isNotEmpty) {
-                                await NotificationService.notifySupervisor(
-                                  supervisorName: supName,
-                                  title: '❌ Worker Request Rejected',
-                                  body:
-                                      'Your request ${request['wsReqId'] ?? ''} '
-                                      'has been rejected.',
-                                  data: {
-                                    'type': 'worker_rejection',
-                                    'wsReqId': request['wsReqId'],
-                                    'status': 'Rejected',
-                                  },
-                                );
-                              }
-                              _updateRequestStatus(
-                                request['wsReqId'],
-                                "Rejected",
-                              );
-                            },
+                            ],
                           ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -1013,9 +943,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     final colorScheme = theme.colorScheme;
 
     return GlassScaffold(
-      title: 'Schedule Approval',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
+      title: 'Manager Approval',
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
           Container(

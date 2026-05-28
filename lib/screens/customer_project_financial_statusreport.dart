@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import 'financial_status_report.dart';
 import 'project_indicator.dart';
 import '../services/firestore_service.dart';
@@ -37,61 +37,89 @@ class _customerProjectFinancialStatusReportPageState
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _initAndLoad();
+  }
+
+  Future<void> _initAndLoad() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    await _loadUserData();
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    _userSiteId = prefs.getString('siteId');
+    final auth = AuthService();
+    _userSiteId = auth.userData['siteId'];
     await _fetchSiteIds();
   }
 
   Future<void> _fetchSiteIds() async {
     try {
-      Query query = FirestoreService.getCollection('projects');
+      if (!FirestoreService.isReady) await FirestoreService.initialize();
+
+      // If we have _userSiteId from auth, use it directly
       if (_userSiteId != null && _userSiteId!.isNotEmpty) {
-        query = query.where('siteId', isEqualTo: _userSiteId);
+        if (mounted) {
+          setState(() {
+            siteIds = [_userSiteId!];
+            selectedSiteId = _userSiteId;
+            isLoadingSites = false;
+          });
+          await _loadSiteDetails(_userSiteId!);
+        }
+        return;
       }
+
+      Query<Map<String, dynamic>> query = FirestoreService.getCollection(
+        'projects',
+      );
 
       final snapshot = await query.get();
       final ids = snapshot.docs
-          .map((doc) => doc.data() is Map ? (doc.data() as Map)['siteId']?.toString() : null)
+          .map(
+            (doc) => doc.data() is Map
+                ? (doc.data() as Map)['siteId']?.toString()
+                : null,
+          )
           .where((v) => v != null && v!.trim().isNotEmpty)
           .map((v) => v!)
           .toSet()
           .toList();
       ids.sort();
 
-      setState(() {
-        siteIds = ids;
-        isLoadingSites = false;
-        if (_userSiteId != null && siteIds.contains(_userSiteId)) {
-          selectedSiteId = _userSiteId;
-          _loadSiteDetails(_userSiteId!);
-        } else if (siteIds.isNotEmpty) {
-          selectedSiteId = siteIds.first;
-          _loadSiteDetails(siteIds.first);
-        }
-      });
+      if (mounted) {
+        setState(() {
+          siteIds = ids;
+          isLoadingSites = false;
+          if (_userSiteId != null && siteIds.contains(_userSiteId)) {
+            selectedSiteId = _userSiteId;
+            _loadSiteDetails(_userSiteId!);
+          } else if (siteIds.isNotEmpty) {
+            selectedSiteId = siteIds.first;
+            _loadSiteDetails(siteIds.first);
+          }
+        });
+      }
     } catch (e) {
-      setState(() => isLoadingSites = false);
+      if (mounted) setState(() => isLoadingSites = false);
     }
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
-          .where('siteId', isEqualTo: siteId)
-          .limit(1)
-          .get();
+      if (!FirestoreService.isReady) await FirestoreService.initialize();
+      final query = await FirestoreService.getCollection(
+        'projects',
+      ).where('siteId', isEqualTo: siteId).limit(1).get();
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
-        setState(() {
-          siteNameController.text = data['siteId']?.toString() ?? '';
-          projectNameController.text = data['projectName']?.toString() ?? '';
-          ownerNameController.text = data['ownerName']?.toString() ?? '';
-        });
+        if (mounted) {
+          setState(() {
+            siteNameController.text = data['siteId']?.toString() ?? '';
+            projectNameController.text = data['projectName']?.toString() ?? '';
+            ownerNameController.text = data['ownerName']?.toString() ?? '';
+          });
+        }
       }
     } catch (e) {
       // Handle error quietly
@@ -144,8 +172,23 @@ class _customerProjectFinancialStatusReportPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('MY ACTIVE SITE', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                Text(_userSiteId!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  'YOUR SITE',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Text(
+                  _userSiteId!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -159,13 +202,28 @@ class _customerProjectFinancialStatusReportPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('PROJECT INFORMATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+          const Text(
+            'PROJECT INFORMATION',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 20),
           _displayField('Site ID', siteNameController.text, Icons.tag),
           const SizedBox(height: 16),
-          _displayField('Project Name', projectNameController.text, Icons.assignment_outlined),
+          _displayField(
+            'Project Name',
+            projectNameController.text,
+            Icons.assignment_outlined,
+          ),
           const SizedBox(height: 16),
-          _displayField('Owner Name', ownerNameController.text, Icons.person_outline),
+          _displayField(
+            'Owner Name',
+            ownerNameController.text,
+            Icons.person_outline,
+          ),
         ],
       ),
     );
@@ -176,7 +234,12 @@ class _customerProjectFinancialStatusReportPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -189,7 +252,12 @@ class _customerProjectFinancialStatusReportPageState
             children: [
               Icon(icon, size: 18, color: theme.primaryColor),
               const SizedBox(width: 12),
-              Expanded(child: Text(value.isNotEmpty ? value : '-', style: const TextStyle(fontWeight: FontWeight.w500))),
+              Expanded(
+                child: Text(
+                  value.isNotEmpty ? value : '-',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
             ],
           ),
         ),

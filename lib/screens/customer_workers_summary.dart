@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
@@ -16,7 +17,25 @@ class CustomerWorkersSummary extends StatefulWidget {
 }
 
 class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isServiceReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initService();
+  }
+
+  Future<void> _initService() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    if (mounted) {
+      setState(() {
+        _isServiceReady = true;
+      });
+    }
+  }
+
   String _filterType = 'all';
   DateTime? _selectedDate;
   DateTime? _selectedMonth;
@@ -24,6 +43,13 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isServiceReady && !FirestoreService.isReady) {
+      return const GlassScaffold(
+        title: 'Worker Summary',
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return GlassScaffold(
       title: 'Worker Summary',
       onBack: () => Navigator.pop(context),
@@ -51,21 +77,26 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Colors.white));
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
                       'No worker data found',
-                      style: TextStyle(fontSize: Responsive.fontSize(context, 16), color: Colors.white70),
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 16),
+                        color: Colors.white70,
+                      ),
                     ),
                   );
                 }
 
                 // Process data to group by worker
                 final workerSummary = _processWorkerSummary(
-                  snapshot.data!.docs,
+                  snapshot.data!.docs.cast<QueryDocumentSnapshot>(),
                 );
 
                 return ListView.builder(
@@ -110,7 +141,6 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -141,7 +171,9 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
           return const SizedBox();
         }
 
-        final stats = _calculateOverallStatistics(snapshot.data!.docs);
+        final stats = _calculateOverallStatistics(
+          snapshot.data!.docs.cast<QueryDocumentSnapshot>(),
+        );
 
         return GlassCard(
           margin: const EdgeInsets.all(12),
@@ -240,72 +272,29 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
   }
 
   Stream<QuerySnapshot> _getFilteredStream() {
-    Query query = _firestore
-        .collection('workersAttendance')
-        .where('site', isEqualTo: widget.siteId);
+    Query query = FirestoreService.getCollection(
+      'workersAttendance',
+    ).where('site', isEqualTo: widget.siteId);
 
     switch (_filterType) {
       case 'date':
         if (_selectedDate != null) {
-          final startOfDay = DateTime(
-            _selectedDate!.year,
-            _selectedDate!.month,
-            _selectedDate!.day,
-          );
-          final endOfDay = startOfDay.add(const Duration(days: 1));
-          query = query
-              .where(
-                'day',
-                isGreaterThanOrEqualTo: DateFormat(
-                  'yyyy-MM-dd',
-                ).format(startOfDay),
-              )
-              .where(
-                'day',
-                isLessThan: DateFormat('yyyy-MM-dd').format(endOfDay),
-              );
+          final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate!);
+          query = query.where('Day', isEqualTo: formattedDate);
         }
         break;
       case 'month':
         if (_selectedMonth != null) {
-          final firstDay = DateTime(
-            _selectedMonth!.year,
-            _selectedMonth!.month,
-            1,
-          );
-          final lastDay = DateTime(
-            _selectedMonth!.year,
-            _selectedMonth!.month + 1,
-            0,
-          );
-          query = query
-              .where(
-                'day',
-                isGreaterThanOrEqualTo: DateFormat(
-                  'yyyy-MM-dd',
-                ).format(firstDay),
-              )
-              .where(
-                'day',
-                isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(lastDay),
-              );
+          final formattedMonth = DateFormat('MM-yyyy').format(_selectedMonth!);
+          query = query.where('month', isEqualTo: formattedMonth);
         }
         break;
       case 'year':
         if (_selectedYear != null) {
-          final firstDay = DateTime(_selectedYear!.year, 1, 1);
-          final lastDay = DateTime(_selectedYear!.year, 12, 31);
-          query = query
-              .where(
-                'day',
-                isGreaterThanOrEqualTo: DateFormat(
-                  'yyyy-MM-dd',
-                ).format(firstDay),
-              )
-              .where(
-                'day',
-                isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(lastDay),
-              );
+          final yearStr = DateFormat('yyyy').format(_selectedYear!);
+          // Since month is stored as MM-yyyy, we can't easily filter by year in Firestore
+          // We'll filter in-memory if needed, but let's try to match the month format
+          // Or just fetch all and filter in memory for year.
         }
         break;
     }
@@ -376,7 +365,9 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
       trailing: value != null
           ? Chip(
               label: Text(value, style: const TextStyle(fontSize: 12)),
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withOpacity(0.1),
             )
           : null,
       onTap: onTap,
@@ -580,10 +571,14 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
                   child: Text(
                     worker.name.isNotEmpty ? worker.name[0].toUpperCase() : '?',
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -601,7 +596,10 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
                       ),
                       Text(
                         worker.designation,
-                        style: const TextStyle(fontSize: 14, color: Colors.white60),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white60,
+                        ),
                       ),
                     ],
                   ),

@@ -43,7 +43,7 @@ class SupervisorEntry {
           : null,
       amount: data['amount'],
       totalamount: data['totalamount'],
-      projectStage: data['projectStage'],
+      projectStage: data['projectStage'] ?? data['projectField'],
     );
   }
 }
@@ -118,6 +118,9 @@ class _ProjectstageInsightsDashboardState
   String? selectedProjectStage;
   List<SupervisorEntry> siteSupervisorEntries = [];
 
+  double currentStageCost = 0.0;
+  bool isLoadingCost = false;
+
   ReportType selectedReportType = ReportType.dailyExpense;
 
   DateTime? selectedDate;
@@ -168,11 +171,10 @@ class _ProjectstageInsightsDashboardState
           collection,
         ).where('siteId', isEqualTo: siteId).get();
         for (var doc in snapshot.docs) {
-          if (doc.data().containsKey('projectStage')) {
-            final stage = doc['projectStage'];
-            if (stage != null && stage.toString().trim().isNotEmpty) {
-              stageSet.add(stage.toString());
-            }
+          final data = doc.data();
+          final stage = data['projectStage'] ?? data['projectField'];
+          if (stage != null && stage.toString().trim().isNotEmpty) {
+            stageSet.add(stage.toString().trim());
           }
         }
       }).toList();
@@ -186,6 +188,11 @@ class _ProjectstageInsightsDashboardState
             : null;
 
         _updateSelectedSupervisorEntry();
+        if (selectedProjectStage != null) {
+          _calculateStageCost();
+        } else {
+          currentStageCost = 0.0;
+        }
       });
     } catch (e) {
       debugPrint("Error fetching project stages: $e");
@@ -193,8 +200,177 @@ class _ProjectstageInsightsDashboardState
         projectStages = [];
         selectedProjectStage = null;
         selectedSupervisorEntry = null;
+        currentStageCost = 0.0;
       });
     }
+  }
+
+  Future<void> _calculateStageCost() async {
+    final siteId = selectedSiteId?.trim();
+    final stage = selectedProjectStage?.trim();
+
+    if (siteId == null || stage == null) return;
+
+    // For Daily/Range reports, only calculate if dates are selected
+    if (selectedReportType == ReportType.dailyExpense && selectedDate == null) {
+      setState(() => currentStageCost = 0.0);
+      return;
+    }
+    if (selectedReportType == ReportType.expenseRange &&
+        (fromDate == null || toDate == null)) {
+      setState(() => currentStageCost = 0.0);
+      return;
+    }
+
+    setState(() => isLoadingCost = true);
+
+    double total = 0.0;
+    try {
+      final collections = [
+        'siteSupervisorEntries',
+        'contractorEntries',
+        'managerEntries',
+        'organizationEntries',
+      ];
+
+      final formattedDateYMD = selectedDate != null
+          ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+          : null;
+      final formattedDateDMY = selectedDate != null
+          ? DateFormat('ddMMyyyy').format(selectedDate!)
+          : null;
+      final start = fromDate;
+      final end = toDate;
+
+      debugPrint(
+        'ProjectstageInsights: Calculating cost for Site: $siteId, Stage: $stage, Type: $selectedReportType',
+      );
+
+      for (var collection in collections) {
+        // Special case for supervisor entries in daily mode: fetch by document ID
+        if (collection == 'siteSupervisorEntries' &&
+            selectedReportType == ReportType.dailyExpense &&
+            formattedDateDMY != null) {
+          final docId = '${siteId}_$formattedDateDMY';
+          final doc = await FirestoreService.getCollection(
+            collection,
+          ).doc(docId).get();
+          if (doc.exists) {
+            final val = _toNum(doc.data()?['totalAmount']);
+            debugPrint(
+              'ProjectstageInsights: Found Supervisor Entry $docId: $val',
+            );
+            total += val;
+          }
+          continue;
+        }
+
+        Query<Map<String, dynamic>> query = FirestoreService.getCollection(
+          collection,
+        ).where('siteId', isEqualTo: siteId);
+
+        // Apply date filter for other collections in daily mode
+        if (selectedReportType == ReportType.dailyExpense &&
+            formattedDateYMD != null) {
+          final dateField =
+              (collection == 'managerEntries' ||
+                  collection == 'organizationEntries')
+              ? 'entryDate'
+              : 'date';
+          query = query.where(dateField, isEqualTo: formattedDateYMD);
+        }
+
+        final snapshot = await query.get();
+        debugPrint(
+          'ProjectstageInsights: Collection $collection returned ${snapshot.docs.length} docs',
+        );
+
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+
+          // Filter by projectStage field (handle both projectStage and projectField)
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != stage) continue;
+
+          // Apply range filter manually for expenseRange mode
+          if (selectedReportType == ReportType.expenseRange &&
+              start != null &&
+              end != null) {
+            final dateField =
+                (collection == 'managerEntries' ||
+                    collection == 'organizationEntries')
+                ? 'entryDate'
+                : 'date';
+            final rawDate = data[dateField];
+            DateTime? entryDate;
+            if (rawDate is Timestamp) {
+              entryDate = rawDate.toDate();
+            } else if (rawDate is String) {
+              entryDate = DateTime.tryParse(rawDate);
+            }
+
+            if (entryDate == null ||
+                entryDate.isBefore(start.subtract(const Duration(days: 1))) ||
+                entryDate.isAfter(end.add(const Duration(days: 1)))) {
+              continue;
+            }
+          }
+
+          if (collection == 'siteSupervisorEntries' ||
+              collection == 'contractorEntries') {
+            total += _toNum(data['totalAmount'] ?? data['amount']);
+          } else {
+            if (data.containsKey('bills')) {
+              final bills = data['bills'] as List? ?? [];
+              for (var bill in bills) {
+                if (bill is Map) {
+                  // For Daily Expense, we must also check the date of each bill if they are in a list
+                  if (selectedReportType == ReportType.dailyExpense &&
+                      formattedDateYMD != null) {
+                    final billDateRaw = bill['billDate'];
+                    String? billDateStr;
+                    if (billDateRaw is String) {
+                      billDateStr = billDateRaw;
+                    } else if (billDateRaw is Timestamp) {
+                      billDateStr = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(billDateRaw.toDate());
+                    }
+
+                    if (billDateStr != formattedDateYMD) continue;
+                  }
+                  total += _toNum(bill['billAmount']);
+                }
+              }
+            } else {
+              total += _toNum(data['totalAmount'] ?? data['amount']);
+            }
+          }
+        }
+      }
+
+      debugPrint('ProjectstageInsights: Total calculated: $total');
+
+      if (mounted) {
+        setState(() {
+          currentStageCost = total;
+          isLoadingCost = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error calculating stage cost: $e");
+      if (mounted) {
+        setState(() => isLoadingCost = false);
+      }
+    }
+  }
+
+  double _toNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
   }
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
@@ -259,6 +435,7 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         selectedDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
@@ -286,6 +463,7 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         fromDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
@@ -313,20 +491,29 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         toDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
   void _openReport() {
+    if (selectedSiteId == null) {
+      _showErrorSnackBar(Theme.of(context), 'Please select a Site ID.');
+      return;
+    }
+
+    final currentSupervisorId =
+        selectedSupervisorEntry?.supervisorId ??
+        allSiteEntries
+            .where((e) => e.site == selectedSiteId)
+            .firstOrNull
+            ?.supervisorId ??
+        '';
+
     if (selectedReportType == ReportType.dailyExpense) {
-      if (selectedSupervisorEntry == null ||
-          selectedDate == null ||
-          selectedProjectStage == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Missing report criteria'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+      if (selectedDate == null || selectedProjectStage == null) {
+        _showErrorSnackBar(
+          Theme.of(context),
+          'Missing report criteria (Date/Stage)',
         );
         return;
       }
@@ -334,24 +521,18 @@ class _ProjectstageInsightsDashboardState
         context,
         MaterialPageRoute(
           builder: (_) => ProjectStageDailySiteExpensesReportPage(
-            supervisorId: selectedSupervisorEntry!.supervisorId,
-            siteId: selectedSupervisorEntry!.siteId!,
+            supervisorId: currentSupervisorId,
+            siteId: selectedSiteId!,
             date: selectedDate!,
             projectStage: selectedProjectStage!,
           ),
         ),
       );
     } else if (selectedReportType == ReportType.expenseRange) {
-      if (selectedSupervisorEntry == null ||
-          fromDate == null ||
-          toDate == null ||
-          selectedProjectStage == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Missing report criteria for Expense Range'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+      if (fromDate == null || toDate == null || selectedProjectStage == null) {
+        _showErrorSnackBar(
+          Theme.of(context),
+          'Missing report criteria for Expense Range',
         );
         return;
       }
@@ -359,7 +540,7 @@ class _ProjectstageInsightsDashboardState
         context,
         MaterialPageRoute(
           builder: (_) => ProjectStageExpensesReportPage(
-            siteId: selectedSupervisorEntry!.siteId!,
+            siteId: selectedSiteId!,
             fromDate: fromDate!,
             toDate: toDate!,
             projectStage: selectedProjectStage!,
@@ -367,21 +548,11 @@ class _ProjectstageInsightsDashboardState
         ),
       );
     } else if (selectedReportType == ReportType.siteSummary) {
-      if (selectedSupervisorEntry == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Missing site selection for summary'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-        return;
-      }
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ProjectstageSiteSummaryReport(
-            siteId: selectedSupervisorEntry!.siteId!,
+            siteId: selectedSiteId!,
             projectStage: selectedProjectStage ?? '',
           ),
         ),
@@ -536,6 +707,7 @@ class _ProjectstageInsightsDashboardState
                             selectedProjectStage = newStage;
                             _updateSelectedSupervisorEntry();
                           });
+                          _calculateStageCost();
                         },
                         decoration: _inputDecoration(theme),
                         borderRadius: BorderRadius.circular(8),
@@ -550,6 +722,60 @@ class _ProjectstageInsightsDashboardState
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // Display Stage Cost
+                if (selectedProjectStage != null)
+                  GlassCard(
+                    color: theme.primaryColor.withValues(alpha: 0.1),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selectedReportType == ReportType.dailyExpense
+                                  ? 'DAILY COST'
+                                  : selectedReportType ==
+                                        ReportType.expenseRange
+                                  ? 'RANGE COST'
+                                  : 'TOTAL STAGE COST',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              selectedProjectStage!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isLoadingCost)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Text(
+                            '₹ ${currentStageCost.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 20),
 
                 // Report Type Selection
@@ -666,18 +892,20 @@ class _ProjectstageInsightsDashboardState
     ThemeData theme,
     List<SupervisorEntry> supervisorEntries,
   ) {
+    if (selectedSiteId == null || selectedSiteId!.isEmpty) {
+      _showErrorSnackBar(theme, 'Please select a Site ID.');
+      return;
+    }
+
     if (selectedReportType == ReportType.dailyExpense) {
-      if (selectedSiteId == null ||
-          selectedSiteId!.isEmpty ||
-          selectedDate == null ||
+      if (selectedDate == null ||
           selectedProjectStage == null ||
           selectedProjectStage!.isEmpty) {
-        _showErrorSnackBar(
-          theme,
-          'Please select a Site ID, Date, and Project Stage.',
-        );
+        _showErrorSnackBar(theme, 'Please select a Date and Project Stage.');
         return;
       }
+
+      // Try to find an entry to get a specific supervisor if multiple exist
       final filteredEntries = supervisorEntries.where((entry) {
         final entryDate = entry.date != null
             ? DateTime(entry.date!.year, entry.date!.month, entry.date!.day)
@@ -689,35 +917,28 @@ class _ProjectstageInsightsDashboardState
         );
         return (entry.siteId?.trim().toLowerCase() ?? '') ==
                 (selectedSiteId?.trim().toLowerCase() ?? '') &&
-            (entry.projectStage == selectedProjectStage) &&
+            (entry.projectStage?.trim() == selectedProjectStage?.trim()) &&
             (entryDate == selectedDateOnly);
       }).toList();
 
-      if (filteredEntries.isEmpty) {
-        _showErrorSnackBar(theme, 'No data found for the selected criteria.');
-        return;
+      if (filteredEntries.isNotEmpty) {
+        selectedSupervisorEntry = filteredEntries.first;
       }
-      selectedSupervisorEntry = filteredEntries.first;
+
       _openReport();
     } else if (selectedReportType == ReportType.expenseRange) {
-      if (selectedSiteId == null ||
-          selectedSiteId!.isEmpty ||
-          fromDate == null ||
+      if (fromDate == null ||
           toDate == null ||
           selectedProjectStage == null ||
           selectedProjectStage!.isEmpty) {
         _showErrorSnackBar(
           theme,
-          'Please select a Site ID, Project Stage, and Date Range.',
+          'Please select a Project Stage and Date Range.',
         );
         return;
       }
       _openReport();
     } else if (selectedReportType == ReportType.siteSummary) {
-      if (selectedSiteId == null || selectedSiteId!.isEmpty) {
-        _showErrorSnackBar(theme, 'Please select a Site ID.');
-        return;
-      }
       _openReport();
     }
   }
@@ -740,12 +961,18 @@ class _ProjectstageInsightsDashboardState
   }) {
     final isSelected = selectedReportType == type;
     return InkWell(
-      onTap: () => setState(() {
-        selectedReportType = type;
-        selectedDate = null;
-        fromDate = null;
-        toDate = null;
-      }),
+      onTap: () {
+        setState(() {
+          selectedReportType = type;
+          selectedDate = null;
+          fromDate = null;
+          toDate = null;
+          currentStageCost = 0.0; // Reset cost on type change
+        });
+        if (type == ReportType.siteSummary) {
+          _calculateStageCost(); // Site summary calculates total immediately
+        }
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(

@@ -40,8 +40,7 @@ class _ManagerMaterialApprovalScreenState
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Approval',
-      appBarBackgroundColor: theme.colorScheme.primary,
-      appBarForegroundColor: theme.colorScheme.onPrimary,
+      onBack: () => Navigator.pop(context),
       body: Column(
         children: [
           Container(

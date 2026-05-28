@@ -8,6 +8,7 @@ import 'customer_worker_details.dart';
 import 'customer_workers_summary.dart';
 import '../widgets/glass_scaffold.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
@@ -40,6 +41,9 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
   }
 
   Future<void> _loadStoredUserInfo() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
     final auth = AuthService();
     if (auth.isLoggedIn && auth.userRole == UserRole.customer) {
       final data = auth.userData;
@@ -57,14 +61,15 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
 
   Future<void> _fetchSiteId() async {
     try {
+      if (!FirestoreService.isReady) await FirestoreService.initialize();
+
       final String ownerNameToUse = _storedOwnerName ?? widget.ownerName;
       final String ownerPhoneToUse =
           _storedOwnerPhoneNumber ?? widget.ownerPhoneNumber;
 
       print('Fetching siteId for: $ownerNameToUse, $ownerPhoneToUse');
 
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('projects')
+      final querySnapshot = await FirestoreService.getCollection('Site')
           .where('ownerName', isEqualTo: ownerNameToUse)
           .where('ownerPhoneNumber', isEqualTo: ownerPhoneToUse)
           .get();

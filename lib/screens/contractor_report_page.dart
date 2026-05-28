@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../utils/pdf_templates.dart';
+import '../services/firestore_service.dart';
 
 class ContractorReportPage extends StatefulWidget {
   const ContractorReportPage({super.key});
@@ -31,32 +32,66 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
   @override
   void initState() {
     super.initState();
-    _fetchContractorNames();
+    _initializeAndFetch();
+  }
+
+  Future<void> _initializeAndFetch() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    await _fetchContractorNames();
   }
 
   Future<void> _fetchContractorNames() async {
     if (mounted) setState(() => isLoadingContractors = true);
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('contractors')
+      debugPrint(
+        'ContractorReportPage: Fetching contractors from ${FirestoreService.contractors.path}',
+      );
+
+      // 1. Fetch from contractors collection
+      final contractorsSnapshot = await FirestoreService.contractors
           .orderBy('contractorName')
-          .limit(100)
+          .limit(500)
           .get();
-      if (!mounted) return;
-      final names = querySnapshot.docs
-          .map((doc) => (doc.data()['contractorName'] as String?)?.trim())
-          .where((name) => name != null && name.isNotEmpty)
-          .map((name) => name!)
-          .toSet()
-          .toList();
-      names.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      final Set<String> allNames = {};
+
+      for (var doc in contractorsSnapshot.docs) {
+        final name = (doc.data()['contractorName'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) allNames.add(name);
+      }
+
+      // 2. Also check contractorEntries to ensure we have everyone who has entries
+      final entriesSnapshot = await FirestoreService.contractorEntries
+          .limit(500) // Just a sample to find active contractors
+          .get();
+
+      for (var doc in entriesSnapshot.docs) {
+        final name = (doc.data()['contractorName'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) allNames.add(name);
+      }
+
+      final sortedNames = allNames.toList();
+      sortedNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      debugPrint(
+        'ContractorReportPage: Found ${sortedNames.length} contractors',
+      );
       if (mounted) {
         setState(() {
-          contractorNames = names;
+          contractorNames = sortedNames;
+          if (sortedNames.isNotEmpty) {
+            selectedContractor = sortedNames.first;
+          }
           isLoadingContractors = false;
         });
+        if (selectedContractor != null) {
+          await _fetchSiteIdsForContractor(selectedContractor!);
+        }
       }
     } catch (e) {
+      debugPrint('ContractorReportPage: Error fetching contractors: $e');
       if (mounted) setState(() => isLoadingContractors = false);
     }
   }
@@ -70,25 +105,57 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
       });
     }
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projects')
-          .where('isContractWork', isEqualTo: true)
-          .where('contractorName', isEqualTo: contractorName)
-          .limit(100)
-          .get();
-      if (!mounted) return;
-      final ids = snapshot.docs
-          .map((doc) => doc.data()['siteId']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toList();
+      debugPrint('ContractorReportPage: Fetching site IDs for $contractorName');
+
+      final Set<String> allSiteIds = {};
+
+      // 1. Fetch from projects collection
+      Query<Map<String, dynamic>> projectQuery = FirestoreService.projects
+          .where('isContractWork', isEqualTo: true);
+
+      projectQuery = projectQuery.where(
+        'contractorName',
+        isEqualTo: contractorName,
+      );
+
+      final projectSnapshot = await projectQuery.limit(500).get();
+      for (var doc in projectSnapshot.docs) {
+        final sid = doc.data()['siteId']?.toString().trim();
+        if (sid != null && sid.isNotEmpty) allSiteIds.add(sid);
+      }
+
+      // 2. Fetch from contractorEntries to ensure we have all sites with data
+      Query<Map<String, dynamic>> entriesQuery =
+          FirestoreService.contractorEntries;
+      entriesQuery = entriesQuery.where(
+        'contractorName',
+        isEqualTo: contractorName,
+      );
+
+      final entriesSnapshot = await entriesQuery.limit(500).get();
+      for (var doc in entriesSnapshot.docs) {
+        final sid = doc.data()['siteId']?.toString().trim();
+        if (sid != null && sid.isNotEmpty) allSiteIds.add(sid);
+      }
+
+      final sortedIds = allSiteIds.toList();
+      sortedIds.sort();
+
+      debugPrint('ContractorReportPage: Found ${sortedIds.length} site IDs');
       if (mounted) {
         setState(() {
-          siteIdOptions = ids;
-          if (ids.isNotEmpty) selectedSiteId = ids.first;
+          siteIdOptions = sortedIds;
+          if (sortedIds.isNotEmpty) {
+            selectedSiteId = sortedIds.first;
+          }
           isLoadingSites = false;
         });
+        if (selectedSiteId != null) {
+          _fetchExpenses();
+        }
       }
     } catch (e) {
+      debugPrint('ContractorReportPage: Error fetching site IDs: $e');
       if (mounted) setState(() => isLoadingSites = false);
     }
   }
@@ -103,12 +170,16 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
       });
     }
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      debugPrint(
+        'ContractorReportPage: Fetching expenses for $selectedContractor at $selectedSiteId',
+      );
+
+      final querySnapshot = await FirestoreService.contractorEntries
           .where('contractorName', isEqualTo: selectedContractor)
           .where('siteId', isEqualTo: selectedSiteId)
-          .limit(50)
+          .limit(1000)
           .get();
+
       if (!mounted) return;
       double sum = 0.0;
       final List<Map<String, dynamic>> fetched = [];
@@ -120,6 +191,9 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             : (double.tryParse(amt.toString()) ?? 0.0);
         fetched.add(data);
       }
+      debugPrint(
+        'ContractorReportPage: Found ${fetched.length} entries, total: $sum',
+      );
       if (mounted) {
         setState(() {
           expenses = fetched;
@@ -128,7 +202,13 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
         });
       }
     } catch (e) {
+      debugPrint('ContractorReportPage: Error fetching expenses: $e');
       if (mounted) setState(() => isLoadingExpenses = false);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading report: $e')));
+      }
     }
   }
 
@@ -183,20 +263,20 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             'Contractor Name',
             contractorNames,
             selectedContractor,
-            (v) {
+            (v) async {
               setState(() => selectedContractor = v);
-              if (v != null) _fetchSiteIdsForContractor(v);
+              if (v != null) {
+                await _fetchSiteIdsForContractor(v);
+                _fetchExpenses(); // Auto-refresh report
+              }
             },
             isLoadingContractors,
           ),
           const SizedBox(height: 16),
-          _buildDropdown(
-            'Site ID',
-            siteIdOptions,
-            selectedSiteId,
-            (v) => setState(() => selectedSiteId = v),
-            isLoadingSites,
-          ),
+          _buildDropdown('Site ID', siteIdOptions, selectedSiteId, (v) {
+            setState(() => selectedSiteId = v);
+            _fetchExpenses(); // Auto-refresh report
+          }, isLoadingSites),
           const SizedBox(height: 24),
           GlassButton(
             label: 'GENERATE REPORT',
@@ -414,9 +494,12 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
       ),
     );
   }
+
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.value,
+    );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(
@@ -432,9 +515,21 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Contractor', selectedContractor ?? 'N/A', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Site ID', selectedSiteId ?? 'N/A', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Total Payable', '₹ ${totalAmount.toStringAsFixed(2)}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Contractor',
+                selectedContractor ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                selectedSiteId ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Total Payable',
+                '₹ ${totalAmount.toStringAsFixed(2)}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -443,10 +538,14 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             data: expenses.map((exp) {
               final date = _formatDate(exp['date']);
               final amt = exp['totalAmount'] ?? exp['amount'] ?? 0;
-              final details = 'Food: ${exp['food'] ?? 0}, Fuel: ${exp['fuel'] ?? 0}, Trans: ${exp['transport'] ?? 0}';
+              final details =
+                  'Food: ${exp['food'] ?? 0}, Fuel: ${exp['fuel'] ?? 0}, Trans: ${exp['transport'] ?? 0}';
               return [date, details, '₹ $amt'];
             }).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),

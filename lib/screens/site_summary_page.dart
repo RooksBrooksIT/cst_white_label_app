@@ -12,8 +12,9 @@ import '../utils/app_theme.dart';
 
 class SiteSummaryPage extends StatefulWidget {
   final String siteId;
+  final String? projectStage;
 
-  const SiteSummaryPage({super.key, required this.siteId});
+  const SiteSummaryPage({super.key, required this.siteId, this.projectStage});
 
   @override
   State<SiteSummaryPage> createState() => _SiteSummaryPageState();
@@ -56,7 +57,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     try {
       final query = await FirestoreService.getCollection(
         'siteSupervisorEntries',
-      ).get();
+      ).where('siteId', isEqualTo: widget.siteId).get();
 
       final List<String> expenseFields = ['food', 'fuel', 'transport'];
       Map<String, num> totals = {
@@ -66,53 +67,60 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
       };
 
       for (var doc in query.docs) {
-        if (doc.id.startsWith('${widget.siteId}_')) {
-          final data = doc.data();
-          for (var field in expenseFields) {
-            final value = data[field];
-            if (value != null) {
-              if (value is int || value is double) {
-                totals[field] = (totals[field] ?? 0) + value;
-              } else if (value is String) {
+        final data = doc.data();
+
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
+        for (var field in expenseFields) {
+          final value = data[field];
+          if (value != null) {
+            if (value is int || value is double) {
+              totals[field] = (totals[field] ?? 0) + value;
+            } else if (value is String) {
+              final parsed = num.tryParse(
+                value.replaceAll(RegExp(r'[^0-9.]'), ''),
+              );
+              if (parsed != null) {
+                totals[field] = (totals[field] ?? 0) + parsed;
+              }
+            }
+          }
+        }
+        if (data['labours'] != null && data['labours'] is List) {
+          for (var labour in data['labours']) {
+            if (labour is Map && labour['amount'] != null) {
+              final amount = labour['amount'];
+              if (amount is int || amount is double) {
+                totals['labours'] = (totals['labours'] ?? 0) + amount;
+              } else if (amount is String) {
                 final parsed = num.tryParse(
-                  value.replaceAll(RegExp(r'[^0-9.]'), ''),
+                  amount.replaceAll(RegExp(r'[^0-9.]'), ''),
                 );
                 if (parsed != null) {
-                  totals[field] = (totals[field] ?? 0) + parsed;
+                  totals['labours'] = (totals['labours'] ?? 0) + parsed;
                 }
               }
             }
           }
-          if (data['labours'] != null && data['labours'] is List) {
-            for (var labour in data['labours']) {
-              if (labour is Map && labour['amount'] != null) {
-                final amount = labour['amount'];
-                if (amount is int || amount is double) {
-                  totals['labours'] = (totals['labours'] ?? 0) + amount;
-                } else if (amount is String) {
-                  final parsed = num.tryParse(
-                    amount.replaceAll(RegExp(r'[^0-9.]'), ''),
-                  );
-                  if (parsed != null) {
-                    totals['labours'] = (totals['labours'] ?? 0) + parsed;
-                  }
-                }
-              }
-            }
-          }
-          if (data['materials'] != null && data['materials'] is List) {
-            for (var material in data['materials']) {
-              if (material is Map && material['amount'] != null) {
-                final amount = material['amount'];
-                if (amount is int || amount is double) {
-                  totals['materials'] = (totals['materials'] ?? 0) + amount;
-                } else if (amount is String) {
-                  final parsed = num.tryParse(
-                    amount.replaceAll(RegExp(r'[^0-9.]'), ''),
-                  );
-                  if (parsed != null) {
-                    totals['materials'] = (totals['materials'] ?? 0) + parsed;
-                  }
+        }
+        if (data['materials'] != null && data['materials'] is List) {
+          for (var material in data['materials']) {
+            if (material is Map && material['amount'] != null) {
+              final amount = material['amount'];
+              if (amount is int || amount is double) {
+                totals['materials'] = (totals['materials'] ?? 0) + amount;
+              } else if (amount is String) {
+                final parsed = num.tryParse(
+                  amount.replaceAll(RegExp(r'[^0-9.]'), ''),
+                );
+                if (parsed != null) {
+                  totals['materials'] = (totals['materials'] ?? 0) + parsed;
                 }
               }
             }
@@ -130,21 +138,28 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     try {
       final query = await FirestoreService.getCollection(
         'managerExpenses',
-      ).get();
+      ).where('siteId', isEqualTo: widget.siteId).get();
       num total = 0;
       for (var doc in query.docs) {
         final data = doc.data();
-        if (data['siteId'] == widget.siteId) {
-          final value = data['totalAmount'];
-          if (value != null) {
-            if (value is int || value is double) {
-              total += value;
-            } else if (value is String) {
-              final parsed = num.tryParse(
-                value.replaceAll(RegExp(r'[^0-9.]'), ''),
-              );
-              if (parsed != null) total += parsed;
-            }
+
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
+        final value = data['totalAmount'];
+        if (value != null) {
+          if (value is int || value is double) {
+            total += value;
+          } else if (value is String) {
+            final parsed = num.tryParse(
+              value.replaceAll(RegExp(r'[^0-9.]'), ''),
+            );
+            if (parsed != null) total += parsed;
           }
         }
       }
@@ -159,21 +174,28 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     try {
       final query = await FirestoreService.getCollection(
         'organizationEntries',
-      ).get();
+      ).where('siteId', isEqualTo: widget.siteId).get();
       num total = 0;
       for (var doc in query.docs) {
         final data = doc.data();
-        if (data['siteId'] == widget.siteId) {
-          final value = data['totalAmount'];
-          if (value != null) {
-            if (value is int || value is double) {
-              total += value;
-            } else if (value is String) {
-              final parsed = num.tryParse(
-                value.replaceAll(RegExp(r'[^0-9.]'), ''),
-              );
-              if (parsed != null) total += parsed;
-            }
+
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
+        final value = data['totalAmount'];
+        if (value != null) {
+          if (value is int || value is double) {
+            total += value;
+          } else if (value is String) {
+            final parsed = num.tryParse(
+              value.replaceAll(RegExp(r'[^0-9.]'), ''),
+            );
+            if (parsed != null) total += parsed;
           }
         }
       }
@@ -195,6 +217,15 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
       for (var doc in query.docs) {
         final data = doc.data();
+
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
         if (data['totalContractorExpense'] != null) {
           final value = data['totalContractorExpense'];
           if (value is int || value is double) {

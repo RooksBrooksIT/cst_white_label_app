@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/Customer_insights_screen.dart';
-import 'package:demo_cst/screens/Customer_project_financial_statusreport.dart';
-import 'package:demo_cst/screens/Customer_site_status_report.dart';
+import 'customer_insights_screen.dart';
+import 'customer_project_financial_statusreport.dart';
+import 'customer_site_status_report.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';

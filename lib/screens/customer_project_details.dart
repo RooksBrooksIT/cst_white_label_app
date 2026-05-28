@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/customer_dashboard.dart';
+import '../services/firestore_service.dart';
+import 'customer_dashboard.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
@@ -136,7 +136,7 @@ class Project {
   }
 }
 
-class ProjectDetailsPage extends StatelessWidget {
+class ProjectDetailsPage extends StatefulWidget {
   final String siteId;
   final String ownerName;
   final String ownerPhoneNumber;
@@ -149,22 +149,54 @@ class ProjectDetailsPage extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
+}
+
+class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
+  bool _isServiceReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initService();
+  }
+
+  Future<void> _initService() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    if (mounted) {
+      setState(() {
+        _isServiceReady = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Debug logging
     print('=== ProjectDetailsPage Debug ===');
-    print('siteId: "$siteId"');
-    print('ownerName: "$ownerName"');
-    print('ownerPhoneNumber: "$ownerPhoneNumber"');
+    print('siteId: "${widget.siteId}"');
+    print('ownerName: "${widget.ownerName}"');
+    print('ownerPhoneNumber: "${widget.ownerPhoneNumber}"');
+    print('FirestoreService ready: ${FirestoreService.isReady}');
+    print('OrgPath: ${FirestoreService.currentOrgId}');
     print('================================');
+
+    if (!_isServiceReady && !FirestoreService.isReady) {
+      return const GlassScaffold(
+        title: 'Project Details',
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return GlassScaffold(
       title: 'Project Details',
       onBack: () => Navigator.pop(context),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('projects')
-            .where('siteId', isEqualTo: siteId)
-            .snapshots(),
+        stream: FirestoreService.getCollection(
+          'projects',
+        ).where('siteId', isEqualTo: widget.siteId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -175,11 +207,18 @@ class ProjectDetailsPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Color(0xFF64748B), size: 64),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Color(0xFF64748B),
+                    size: 64,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Error loading project',
-                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: const Color(0xFF1E293B)),
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 18),
+                      color: const Color(0xFF1E293B),
+                    ),
                   ),
                 ],
               ),
@@ -191,11 +230,18 @@ class ProjectDetailsPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.find_in_page_rounded, color: Color(0xFF64748B), size: 64),
+                  const Icon(
+                    Icons.find_in_page_rounded,
+                    color: Color(0xFF64748B),
+                    size: 64,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Project not found',
-                    style: TextStyle(fontSize: Responsive.fontSize(context, 18), color: const Color(0xFF1E293B)),
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 18),
+                      color: const Color(0xFF1E293B),
+                    ),
                   ),
                 ],
               ),
@@ -216,12 +262,28 @@ class ProjectDetailsPage extends StatelessWidget {
                   title: 'Project Overview',
                   icon: Icons.business_center_rounded,
                   children: [
-                    _buildDetailRow(context, 'Project Name', project.projectName),
-                    _buildDetailRow(context, 'Category', project.projectCategory),
-                    _buildDetailRow(context, 'Sub Category', project.projectSubCategory),
+                    _buildDetailRow(
+                      context,
+                      'Project Name',
+                      project.projectName,
+                    ),
+                    _buildDetailRow(
+                      context,
+                      'Category',
+                      project.projectCategory,
+                    ),
+                    _buildDetailRow(
+                      context,
+                      'Sub Category',
+                      project.projectSubCategory,
+                    ),
                     _buildDetailRow(context, 'Type', project.projectType),
                     _buildDetailRow(context, 'Stage', project.projectStage),
-                    _buildDetailRow(context, 'Contract Type', project.projectContract),
+                    _buildDetailRow(
+                      context,
+                      'Contract Type',
+                      project.projectContract,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -231,7 +293,11 @@ class ProjectDetailsPage extends StatelessWidget {
                   icon: Icons.people_rounded,
                   children: [
                     _buildDetailRow(context, 'Owner', project.ownerName),
-                    _buildDetailRow(context, 'Contractor', project.contractorName),
+                    _buildDetailRow(
+                      context,
+                      'Contractor',
+                      project.contractorName,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -242,7 +308,12 @@ class ProjectDetailsPage extends StatelessWidget {
                   children: [
                     _buildDetailRow(context, 'Site ID', project.siteId),
                     _buildDetailRow(context, 'Site Name', project.siteName),
-                    _buildDetailRow(context, 'Location', project.siteLocation, isMultiLine: true),
+                    _buildDetailRow(
+                      context,
+                      'Location',
+                      project.siteLocation,
+                      isMultiLine: true,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -251,9 +322,21 @@ class ProjectDetailsPage extends StatelessWidget {
                   title: 'Timeline',
                   icon: Icons.calendar_today_rounded,
                   children: [
-                    _buildDateRow(context, 'Planned Start', project.plannedStartDate),
-                    _buildDateRow(context, 'Planned End', project.plannedEndDate),
-                    _buildDateRow(context, 'Actual Start', project.actualStartDate),
+                    _buildDateRow(
+                      context,
+                      'Planned Start',
+                      project.plannedStartDate,
+                    ),
+                    _buildDateRow(
+                      context,
+                      'Planned End',
+                      project.plannedEndDate,
+                    ),
+                    _buildDateRow(
+                      context,
+                      'Actual Start',
+                      project.actualStartDate,
+                    ),
                     _buildDateRow(context, 'Actual End', project.actualEndDate),
                   ],
                 ),
@@ -270,7 +353,9 @@ class ProjectDetailsPage extends StatelessWidget {
                       context,
                       'Balance',
                       project.amountBalance,
-                      color: project.amountBalance >= 0 ? Colors.greenAccent : Colors.redAccent,
+                      color: project.amountBalance >= 0
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
                     ),
                   ],
                 ),
@@ -355,9 +440,7 @@ class ProjectDetailsPage extends StatelessWidget {
         ),
         GlassCard(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: children,
-          ),
+          child: Column(children: children),
         ),
       ],
     );
@@ -372,7 +455,9 @@ class ProjectDetailsPage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
-        crossAxisAlignment: isMultiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: isMultiLine
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 120,
@@ -404,7 +489,12 @@ class ProjectDetailsPage extends StatelessWidget {
     return _buildDetailRow(context, label, _formatDate(date));
   }
 
-  Widget _buildCurrencyRow(BuildContext context, String label, double amount, {Color? color}) {
+  Widget _buildCurrencyRow(
+    BuildContext context,
+    String label,
+    double amount, {
+    Color? color,
+  }) {
     return _buildDetailRow(context, label, '₹${_formatCurrency(amount)}');
   }
 
@@ -437,7 +527,11 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const CustomerDashboardPage(ownerName: '', ownerPhoneNumber: '', siteId: ''),
+      home: const CustomerDashboardPage(
+        ownerName: '',
+        ownerPhoneNumber: '',
+        siteId: '',
+      ),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -460,11 +554,21 @@ class ProjectListPage extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Color(0xFF1E293B))));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Color(0xFF1E293B)),
+              ),
+            );
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No projects found', style: TextStyle(color: Color(0xFF64748B))));
+            return const Center(
+              child: Text(
+                'No projects found',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            );
           }
 
           final projects = snapshot.data!.docs;
@@ -494,13 +598,19 @@ class ProjectListPage extends StatelessWidget {
                     ),
                     title: Text(
                       projectData['projectName'] ?? 'Unnamed Project',
-                      style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Color(0xFF1E293B),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     subtitle: Text(
                       projectData['projectCategory'] ?? 'No Category',
                       style: const TextStyle(color: Color(0xFF64748B)),
                     ),
-                    trailing: const Icon(Icons.chevron_right, color: Color(0xFFCBD5E1)),
+                    trailing: const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFFCBD5E1),
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -508,7 +618,8 @@ class ProjectListPage extends StatelessWidget {
                           builder: (context) => ProjectDetailsPage(
                             siteId: projectData['siteId'] ?? '',
                             ownerName: projectData['ownerName'] ?? '',
-                            ownerPhoneNumber: projectData['ownerPhoneNumber'] ?? '',
+                            ownerPhoneNumber:
+                                projectData['ownerPhoneNumber'] ?? '',
                           ),
                         ),
                       );

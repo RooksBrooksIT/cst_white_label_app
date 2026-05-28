@@ -24,9 +24,7 @@ class FirestoreService {
 
     if (path == null || path.isEmpty) {
       // If unified key is missing, check which role was last logged in
-      final roleStr = prefs.getString(
-        'user_role_key',
-      ); // This is the _userRoleKey from AuthService
+      final roleStr = prefs.getString('auth_user_role');
       if (roleStr != null) {
         if (roleStr.contains('manager')) {
           path = prefs.getString('config_org_path');
@@ -193,15 +191,14 @@ class FirestoreService {
   static Future<DocumentReference<Map<String, dynamic>>>
   getOrgDataRoot() async {
     if (_cachedDynamicPath == null) await initialize();
-    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
+    final orgId = _getOrgIdFromPath();
+    if (orgId == 'uninitialized') {
       return FirebaseFirestore.instance
           .collection('organisation')
           .doc('uninitialized')
           .collection('admin')
           .doc('data');
     }
-    final pathParts = _cachedDynamicPath!.split('/');
-    final String orgId = pathParts[0];
 
     return FirebaseFirestore.instance
         .collection('organisation')

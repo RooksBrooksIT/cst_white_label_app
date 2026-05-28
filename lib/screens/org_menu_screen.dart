@@ -15,10 +15,10 @@ import 'org_reset_password_screen.dart';
 import 'org_subscription_page.dart';
 import 'org_information_screen.dart';
 import 'about_us_screen.dart';
+import '../widgets/glass_scaffold.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   /// When [standalone] is true (default), the screen is shown as a separate
-
   final bool standalone;
   const OrgMenuScreen({super.key, this.standalone = true});
 
@@ -47,7 +47,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       }
 
       // ── Referral code ────────────────────────────────────────────────────
-      // Primary: organisation/{id}/admin/referral
       final referralDoc = await FirestoreService.referralDoc.get();
 
       String? code;
@@ -149,39 +148,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       return content;
     }
 
-    // Standalone: wrap in a full Scaffold with AppBar.
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        toolbarHeight: 70,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shadowColor: Colors.black26,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(32),
-            bottomRight: Radius.circular(32),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Menu',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      body: SafeArea(child: content),
+    // Standalone: wrap in a GlassScaffold
+    return GlassScaffold(
+      title: 'Menu',
+      onBack: () => Navigator.pop(context),
+      body: content,
     );
   }
 
@@ -189,21 +160,21 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     return Column(
       children: [
         Container(
-          width: 65,
-          height: 65,
+          width: 70,
+          height: 70,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
             border: Border.all(
-              color: colorScheme.primary.withOpacity(0.1),
+              color: colorScheme.primary.withOpacity(0.2),
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -225,7 +196,8 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               style: TextStyle(
                 color: const Color(0xFF1E293B),
                 fontSize: Responsive.fontSize(context, 24),
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
               ),
             );
           },
@@ -249,7 +221,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 style: TextStyle(
                   color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -281,10 +253,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         ),
         const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
@@ -295,8 +267,8 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 style: TextStyle(
                   color: colorScheme.primary,
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
                 ),
               ),
               IconButton(
@@ -340,7 +312,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 style: TextStyle(
                   color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -357,7 +329,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               ),
             ),
           ),
-
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.color_lens_outlined,
@@ -365,7 +336,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             subtitle: 'Change app theme color',
             onTap: () => Navigator.pushNamed(context, '/branding'),
           ),
-
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.lock_reset_rounded,
@@ -378,7 +348,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               ),
             ),
           ),
-
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.headset_mic_rounded,
@@ -391,7 +360,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               ),
             ),
           ),
-
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.privacy_tip_rounded,
@@ -412,7 +380,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               }
             },
           ),
-
           const Divider(color: Color(0xFFF1F5F9), height: 24),
           _buildSettingsTile(
             icon: Icons.info_outline_rounded,
@@ -445,7 +412,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 style: TextStyle(
                   color: const Color(0xFF1E293B),
                   fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -480,16 +447,16 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         label: const Text(
           'LOGOUT',
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
             color: Colors.white,
           ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red[600],
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -533,13 +500,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
 
     if (result == true) {
-      // Clear global auth state
       await AuthService().logout();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('org_isLoggedIn');
       await prefs.remove('org_username');
-      // We keep branding keys so the login screen stays branded for the org
 
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
@@ -558,27 +523,61 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: const Color(0xFF64748B)),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF1E293B),
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: theme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              trailing ??
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                    size: 20,
+                  ),
+            ],
+          ),
         ),
       ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-            )
-          : null,
-      trailing:
-          trailing ??
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
-      onTap: onTap,
     );
   }
 }

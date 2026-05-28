@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
-import 'package:demo_cst/screens/daily_site_report.dart';
-import 'package:demo_cst/screens/site_expenses_reportpage.dart';
-import 'package:demo_cst/screens/site_summary_page.dart';
+import '../services/auth_service.dart';
+import 'daily_site_report.dart';
+import 'site_expenses_reportpage.dart';
+import 'site_summary_page.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,10 +46,13 @@ class CustomerEntry {
 enum ReportType { dailyExpense, expenseRange, siteSummary }
 
 class CustomerInsightsScreen extends StatefulWidget {
+  final String loggedInUserName;
+  final String ownerphonenumber;
+
   const CustomerInsightsScreen({
     super.key,
-    required String loggedInUserName,
-    required String ownerphonenumber,
+    required this.loggedInUserName,
+    required this.ownerphonenumber,
   });
 
   @override
@@ -63,6 +67,10 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
   String? _ownerPhoneNumber;
   String? _userSiteId;
 
+  List<String> _ownerSiteIds = [];
+  double _totalSiteCost = 0.0;
+  bool _isLoadingCost = false;
+
   ReportType selectedReportType = ReportType.dailyExpense;
   DateTime? selectedDate;
   DateTime? fromDate;
@@ -71,38 +79,217 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserDataAndFetchEntries();
-    _fetchSupervisorEntries();
+    _initAndLoad();
+  }
+
+  Future<void> _initAndLoad() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    await _loadUserDataAndFetchEntries();
   }
 
   Future<void> _loadUserDataAndFetchEntries() async {
-    // Load user data from SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _ownerName = prefs.getString('ownerName');
-      _ownerPhoneNumber = prefs.getString('ownerPhoneNumber');
-      _userSiteId = prefs.getString('siteId');
-    });
+    // Load user data from AuthService
+    final auth = AuthService();
+    if (mounted) {
+      final data = auth.userData;
+      setState(() {
+        _ownerName = data['ownerName'];
+        _ownerPhoneNumber = data['ownerPhoneNumber'];
+        _userSiteId = data['siteId'];
+      });
 
-    // Initialize the future
-    setState(() {
-      supervisorEntriesFuture = _fetchSupervisorEntries();
-    });
+      // 1. Fetch all sites owned by this customer
+      await _fetchOwnerSites();
+
+      // 2. Fetch entries for those sites
+      setState(() {
+        supervisorEntriesFuture = _fetchSupervisorEntries();
+      });
+    }
+  }
+
+  Future<void> _fetchOwnerSites() async {
+    try {
+      if (!FirestoreService.isReady) await FirestoreService.initialize();
+
+      // Fetch siteId stored in AuthService
+      final auth = AuthService();
+      String? loginSiteId = auth.userData['siteId'];
+
+      if (loginSiteId != null && loginSiteId.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _userSiteId = loginSiteId;
+            _ownerSiteIds = [loginSiteId];
+          });
+        }
+        await _calculateTotalCost();
+        return;
+      }
+
+      // If no siteId found, we can't find sites
+      if (mounted) setState(() => _ownerSiteIds = []);
+    } catch (e) {
+      print('Error fetching owner sites: $e');
+    }
+  }
+
+  Future<void> _calculateTotalCost() async {
+    final siteId = _userSiteId?.trim();
+
+    if (siteId == null) return;
+
+    // For Daily/Range reports, only calculate if dates are selected
+    if (selectedReportType == ReportType.dailyExpense && selectedDate == null) {
+      setState(() => _totalSiteCost = 0.0);
+      return;
+    }
+    if (selectedReportType == ReportType.expenseRange &&
+        (fromDate == null || toDate == null)) {
+      setState(() => _totalSiteCost = 0.0);
+      return;
+    }
+
+    setState(() => _isLoadingCost = true);
+
+    double total = 0.0;
+    try {
+      final collections = [
+        'siteSupervisorEntries',
+        'contractorEntries',
+        'managerEntries',
+        'organizationEntries',
+      ];
+
+      final formattedDateYMD = selectedDate != null
+          ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+          : null;
+      final formattedDateDMY = selectedDate != null
+          ? DateFormat('ddMMyyyy').format(selectedDate!)
+          : null;
+      final start = fromDate;
+      final end = toDate;
+
+      for (var collection in collections) {
+        // Special case for supervisor entries in daily mode: fetch by document ID
+        if (collection == 'siteSupervisorEntries' &&
+            selectedReportType == ReportType.dailyExpense &&
+            formattedDateDMY != null) {
+          final docId = '${siteId}_$formattedDateDMY';
+          final doc = await FirestoreService.getCollection(
+            collection,
+          ).doc(docId).get();
+          if (doc.exists) {
+            final data = doc.data();
+            total += _toNum(data?['totalAmount']);
+          }
+          continue;
+        }
+
+        Query<Map<String, dynamic>> query = FirestoreService.getCollection(
+          collection,
+        ).where('siteId', isEqualTo: siteId);
+
+        if (selectedReportType == ReportType.dailyExpense &&
+            formattedDateYMD != null) {
+          final dateField =
+              (collection == 'managerEntries' ||
+                  collection == 'organizationEntries')
+              ? 'entryDate'
+              : 'date';
+          query = query.where(dateField, isEqualTo: formattedDateYMD);
+        }
+
+        final snapshot = await query.get();
+
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+
+          if (selectedReportType == ReportType.expenseRange &&
+              start != null &&
+              end != null) {
+            final dateField =
+                (collection == 'managerEntries' ||
+                    collection == 'organizationEntries')
+                ? 'entryDate'
+                : 'date';
+            final rawDate = data[dateField];
+            DateTime? entryDate;
+            if (rawDate is Timestamp)
+              entryDate = rawDate.toDate();
+            else if (rawDate is String)
+              entryDate = DateTime.tryParse(rawDate);
+
+            if (entryDate == null ||
+                entryDate.isBefore(start.subtract(const Duration(days: 1))) ||
+                entryDate.isAfter(end.add(const Duration(days: 1)))) {
+              continue;
+            }
+          }
+
+          if (collection == 'siteSupervisorEntries' ||
+              collection == 'contractorEntries') {
+            total += _toNum(data['totalAmount'] ?? data['amount']);
+          } else {
+            if (data.containsKey('bills')) {
+              final bills = data['bills'] as List? ?? [];
+              for (var bill in bills) {
+                if (bill is Map) {
+                  if (selectedReportType == ReportType.dailyExpense &&
+                      formattedDateYMD != null) {
+                    final billDateRaw = bill['billDate'];
+                    String? billDateStr;
+                    if (billDateRaw is String)
+                      billDateStr = billDateRaw;
+                    else if (billDateRaw is Timestamp)
+                      billDateStr = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(billDateRaw.toDate());
+
+                    if (billDateStr != formattedDateYMD) continue;
+                  }
+                  total += _toNum(bill['billAmount']);
+                }
+              }
+            } else {
+              total += _toNum(data['totalAmount'] ?? data['amount']);
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalSiteCost = total;
+          _isLoadingCost = false;
+        });
+      }
+    } catch (e) {
+      print("Error calculating cost: $e");
+      if (mounted) setState(() => _isLoadingCost = false);
+    }
+  }
+
+  double _toNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
   }
 
   Future<List<CustomerEntry>> _fetchSupervisorEntries() async {
     try {
-      // First, fetch user's siteId if we have user data
-      if (_ownerName != null && _ownerPhoneNumber != null) {
-        await _fetchUserSiteId();
-      }
+      if (!FirestoreService.isReady) await FirestoreService.initialize();
 
-      Query query = FirestoreService.siteSupervisorEntries;
+      if (_ownerSiteIds.isEmpty) return [];
 
-      // If user has a siteId, filter by it
-      if (_userSiteId != null && _userSiteId!.isNotEmpty) {
-        query = query.where('siteId', isEqualTo: _userSiteId);
-      }
+      Query<Map<String, dynamic>> query = FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      );
+
+      // Strictly filter by owner's sites only
+      query = query.where('siteId', whereIn: _ownerSiteIds);
 
       final querySnapshot = await query.get();
 
@@ -112,23 +299,6 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
     } catch (e) {
       print('Error fetching supervisor entries: $e');
       return [];
-    }
-  }
-
-  Future<void> _fetchUserSiteId() async {
-    try {
-      final querySnapshot = await FirestoreService.projects
-          .where('ownerName', isEqualTo: _ownerName)
-          .where('ownerPhoneNumber', isEqualTo: _ownerPhoneNumber)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        setState(() {
-          _userSiteId = querySnapshot.docs.first['siteId'].toString();
-        });
-      }
-    } catch (e) {
-      print('Error fetching user siteId: $e');
     }
   }
 
@@ -143,6 +313,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       setState(() {
         selectedDate = picked;
       });
+      _calculateTotalCost();
     }
   }
 
@@ -157,6 +328,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       setState(() {
         fromDate = picked;
       });
+      _calculateTotalCost();
     }
   }
 
@@ -171,11 +343,12 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       setState(() {
         toDate = picked;
       });
+      _calculateTotalCost();
     }
   }
 
   void _openReport() {
-    if (selectedSupervisorEntry == null) return;
+    if (_userSiteId == null) return;
 
     if (selectedReportType == ReportType.dailyExpense) {
       if (selectedDate == null) {
@@ -188,8 +361,8 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => DailySiteExpensesReportPage(
-            supervisorId: selectedSupervisorEntry!.supervisorId,
-            siteId: selectedSupervisorEntry!.siteId,
+            supervisorId: '', // Customer doesn't need this
+            siteId: _userSiteId!,
             date: selectedDate!,
           ),
         ),
@@ -205,7 +378,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => SiteExpensesReportPage(
-            siteId: selectedSupervisorEntry!.siteId!,
+            siteId: _userSiteId!,
             fromDate: fromDate!,
             toDate: toDate!,
             supervisorId: '',
@@ -216,8 +389,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              SiteSummaryPage(siteId: selectedSupervisorEntry!.siteId!),
+          builder: (_) => SiteSummaryPage(siteId: _userSiteId!),
         ),
       );
     }
@@ -230,7 +402,10 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       appBar: AppBar(
         title: const Text(
           'CST Insights',
-          style: TextStyle(fontWeight: FontWeight.bold, ),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFFFFFFFF),
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -242,336 +417,186 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
           ),
         ),
       ),
-      body: supervisorEntriesFuture == null
+      body: _userSiteId == null && (supervisorEntriesFuture == null)
           ? const Center(child: CircularProgressIndicator())
-          : FutureBuilder<List<CustomerEntry>>(
-              future: supervisorEntriesFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+
+                  // Site Cost Card
+                  _buildModernCard(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _userSiteId != null
-                              ? 'No data found for your site'
-                              : 'No supervisor entries found',
-                          style: TextStyle(),
-                        ),
-                        if (_userSiteId != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Site ID: $_userSiteId',
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                }
-
-                final supervisorEntries = snapshot.data!;
-                final uniqueSiteIds = supervisorEntries
-                    .where(
-                      (entry) =>
-                          entry.siteId != null && entry.siteId!.isNotEmpty,
-                    )
-                    .map((entry) => entry.siteId!)
-                    .toSet()
-                    .toList();
-
-                selectedSupervisorEntry ??= supervisorEntries.firstWhere(
-                  (entry) => entry.siteId == uniqueSiteIds.first,
-                  orElse: () => supervisorEntries.first,
-                );
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // // User Info Card - Displaying login credentials
-                      // _buildModernCard(
-                      //   child: Column(
-                      //     crossAxisAlignment: CrossAxisAlignment.start,
-                      //     children: [
-                      //       const Text('LOGIN INFORMATION',
-                      //           style: TextStyle(
-                      //             fontSize: 12,
-                      //             fontWeight: FontWeight.bold,
-                      //             color: Colors.grey,
-                      //             letterSpacing: 1.2,
-                      //           )),
-                      //       const SizedBox(height: 12),
-                      //       // Display Owner Name
-                      //       Row(
-                      //         children: [
-                      //           Icon(Icons.person, color: Color(0xFF772323)),
-                      //           const SizedBox(width: 12),
-                      //           Expanded(
-                      //             child: Column(
-                      //               crossAxisAlignment:
-                      //                   CrossAxisAlignment.start,
-                      //               children: [
-                      //                 Text(
-                      //                   'Name',
-                      //                   style: TextStyle(
-                      //                     fontSize: 12,
-                      //                     
-                      //                   ),
-                      //                 ),
-                      //                 Text(
-                      //                   _ownerName ?? 'Not available',
-                      //                   style: const TextStyle(
-                      //                     fontSize: 16,
-                      //                     fontWeight: FontWeight.bold,
-                      //                   ),
-                      //                 ),
-                      //               ],
-                      //             ),
-                      //           ),
-                      //         ],
-                      //       ),
-                      //       const SizedBox(height: 16),
-                      //       // Display Phone Number (Password)
-                      //       Row(
-                      //         children: [
-                      //           Icon(Icons.phone, color: Color(0xFF772323)),
-                      //           const SizedBox(width: 12),
-                      //           Expanded(
-                      //             child: Column(
-                      //               crossAxisAlignment:
-                      //                   CrossAxisAlignment.start,
-                      //               children: [
-                      //                 Text(
-                      //                   'Phone Number',
-                      //                   style: TextStyle(
-                      //                     fontSize: 12,
-                      //                     
-                      //                   ),
-                      //                 ),
-                      //                 Text(
-                      //                   _ownerPhoneNumber ?? 'Not available',
-                      //                   style: const TextStyle(
-                      //                     fontSize: 16,
-                      //                     fontWeight: FontWeight.bold,
-                      //                   ),
-                      //                 ),
-                      //               ],
-                      //             ),
-                      //           ),
-                      //         ],
-                      //       ),
-                      //     ],
-                      //   ),
-                      // ),
-                      const SizedBox(height: 16),
-
-                      // Site Information Card
-                      if (_userSiteId != null)
-                        _buildModernCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'YOUR SITE',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.business,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Site ID',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            
-                                          ),
-                                        ),
-                                        Text(
-                                          _userSiteId!,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      const SizedBox(height: 16),
-
-                      // Site Selection Card (only show if multiple sites)
-                      if (uniqueSiteIds.length > 1)
-                        _buildModernCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'SELECT SITE',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: selectedSupervisorEntry?.siteId,
-                                items: uniqueSiteIds.map((siteId) {
-                                  return DropdownMenuItem<String>(
-                                    value: siteId,
-                                    child: Text(
-                                      siteId,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newSiteId) {
-                                  setState(() {
-                                    selectedSupervisorEntry = supervisorEntries
-                                        .firstWhere(
-                                          (entry) => entry.siteId == newSiteId,
-                                          orElse: () => supervisorEntries.first,
-                                        );
-                                  });
-                                },
-                                decoration: _inputDecoration(),
-                                borderRadius: BorderRadius.circular(12),
-                                elevation: 2,
-                                isExpanded: true,
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (uniqueSiteIds.length == 1)
-                        // Dynamic Input Section (Date/Range)
-                        if (selectedReportType == ReportType.dailyExpense)
-                          _buildDateInputSection(
-                            title: 'SELECT DATE',
-                            date: selectedDate,
-                            onTap: () => _selectDate(context),
-                          ),
-
-                      if (selectedReportType == ReportType.expenseRange)
                         Column(
-                          children: [
-                            _buildDateInputSection(
-                              title: 'FROM DATE',
-                              date: fromDate,
-                              onTap: () => _selectFromDate(context),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildDateInputSection(
-                              title: 'TO DATE',
-                              date: toDate,
-                              onTap: () => _selectToDate(context),
-                            ),
-                          ],
-                        ),
-
-                      const SizedBox(height: 24),
-
-                      // Report Type Selection
-                      _buildModernCard(
-                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'REPORT TYPE',
+                            Text(
+                              selectedReportType == ReportType.dailyExpense
+                                  ? 'DAILY COST'
+                                  : selectedReportType ==
+                                        ReportType.expenseRange
+                                  ? 'RANGE COST'
+                                  : 'TOTAL SITE COST',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.grey,
+                                color: Theme.of(context).primaryColor,
                                 letterSpacing: 1.2,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            _buildReportOption(
-                              type: ReportType.dailyExpense,
-                              icon: Icons.today,
-                              title: 'Daily Expense',
-                              subtitle: 'View expenses for a specific day',
-                            ),
-                            const Divider(height: 24, thickness: 0.5),
-                            _buildReportOption(
-                              type: ReportType.expenseRange,
-                              icon: Icons.date_range,
-                              title: 'Expense Range',
-                              subtitle: 'View expenses between dates',
-                            ),
-                            const Divider(height: 24, thickness: 0.5),
-                            _buildReportOption(
-                              type: ReportType.siteSummary,
-                              icon: Icons.summarize,
-                              title: 'Site Summary',
-                              subtitle: 'Overview of site progress',
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Overall Expenses',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Generate Report Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _openReport,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'GENERATE REPORT',
+                        if (_isLoadingCost)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Text(
+                            '₹ ${_totalSiteCost.toStringAsFixed(2)}',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
+                              color: Theme.of(context).primaryColor,
                             ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Dynamic Input Section (Date/Range)
+                  if (selectedReportType == ReportType.dailyExpense)
+                    _buildDateInputSection(
+                      title: 'SELECT DATE',
+                      date: selectedDate,
+                      onTap: () => _selectDate(context),
+                    ),
+
+                  if (selectedReportType == ReportType.expenseRange)
+                    Column(
+                      children: [
+                        _buildDateInputSection(
+                          title: 'FROM DATE',
+                          date: fromDate,
+                          onTap: () => _selectFromDate(context),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDateInputSection(
+                          title: 'TO DATE',
+                          date: toDate,
+                          onTap: () => _selectToDate(context),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 24),
+
+                  // Report Type Selection
+                  _buildModernCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'REPORT TYPE',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1.2,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        _buildReportOption(
+                          type: ReportType.dailyExpense,
+                          icon: Icons.today,
+                          title: 'Daily Expense',
+                          subtitle: 'View expenses for a specific day',
+                        ),
+                        const Divider(height: 24, thickness: 0.5),
+                        _buildReportOption(
+                          type: ReportType.expenseRange,
+                          icon: Icons.date_range,
+                          title: 'Expense Range',
+                          subtitle: 'View expenses between dates',
+                        ),
+                        const Divider(height: 24, thickness: 0.5),
+                        _buildReportOption(
+                          type: ReportType.siteSummary,
+                          icon: Icons.summarize,
+                          title: 'Site Summary',
+                          subtitle: 'Overview of site progress',
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
+
+                  const SizedBox(height: 24),
+
+                  // Generate Report Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _openReport,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 2,
+                      ),
+                      child: const Text(
+                        'GENERATE REPORT',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Show empty state message at bottom if no entries found
+                  if (_userSiteId != null)
+                    FutureBuilder<List<CustomerEntry>>(
+                      future: supervisorEntriesFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.done &&
+                            (!snapshot.hasData || snapshot.data!.isEmpty)) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: Center(
+                              child: Text(
+                                'Note: No historical supervisor logs found for this site.',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox();
+                      },
+                    ),
+                ],
+              ),
             ),
     );
   }
@@ -581,7 +606,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -620,7 +645,9 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selectedReportType == type
-                    ? Theme.of(context).primaryColor.withOpacity(0.1) // 10% opacity of primary
+                    ? Theme.of(context).primaryColor.withOpacity(
+                        0.1,
+                      ) // 10% opacity of primary
                     : Colors.grey[50],
                 shape: BoxShape.circle,
               ),
@@ -720,7 +747,10 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       color: date != null ? Colors.black : Colors.grey,
                     ),
                   ),
-                  Icon(Icons.calendar_month, color: Theme.of(context).primaryColor),
+                  Icon(
+                    Icons.calendar_month,
+                    color: Theme.of(context).primaryColor,
+                  ),
                 ],
               ),
             ),

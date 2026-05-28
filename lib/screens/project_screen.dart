@@ -1285,7 +1285,10 @@ class _ProjectScreenState extends State<ProjectScreen>
                                 builder: (context, snapshot) {
                                   List<String> fetchedStages = [];
                                   if (snapshot.hasData) {
-                                    final docs = List<QueryDocumentSnapshot>.from(snapshot.data!.docs);
+                                    final docs =
+                                        List<QueryDocumentSnapshot>.from(
+                                          snapshot.data!.docs,
+                                        );
                                     docs.sort((a, b) {
                                       final idA = a.id;
                                       final idB = b.id;
@@ -1383,7 +1386,9 @@ class _ProjectScreenState extends State<ProjectScreen>
                                           final data =
                                               d.data() as Map<String, dynamic>;
                                           final n = data['contractorName'];
-                                          return n == null ? '' : n.toString().trim();
+                                          return n == null
+                                              ? ''
+                                              : n.toString().trim();
                                         })
                                         .where((e) => e.isNotEmpty)
                                         .toSet()
@@ -1666,7 +1671,7 @@ class _ProjectScreenState extends State<ProjectScreen>
                                     _amountPaidController.text,
                                   );
                                   if (budget == null) return 'Invalid number';
-                                  if (paid != null && budget <= paid)
+                                  if (paid != null && budget < paid)
                                     return 'Budget must be greater than Amount Received';
                                   return null;
                                 },
@@ -1826,7 +1831,9 @@ class _ProjectScreenState extends State<ProjectScreen>
         .toList();
 
     return DropdownButtonFormField<String>(
-      value: (value != null && uniqueItems.contains(value.trim())) ? value.trim() : null,
+      value: (value != null && uniqueItems.contains(value.trim()))
+          ? value.trim()
+          : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: primaryColor),

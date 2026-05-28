@@ -10,6 +10,8 @@ import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/org_subscription_page.dart';
 import 'package:demo_cst/screens/landing_page.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 class TermsAndConditionsScreen extends StatefulWidget {
   const TermsAndConditionsScreen({super.key});
@@ -126,29 +128,20 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Terms and Conditions'),
-        centerTitle: true,
-      ),
+    final theme = Theme.of(context);
+    return GlassScaffold(
+      title: 'Terms and Conditions',
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          '''Terms and Conditions for eBicks App
+          : Column(
+              children: [
+                Expanded(
+                  child: GlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Text(
+                        '''Terms and Conditions for eBicks App
 
 Effective Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}
 
@@ -178,83 +171,85 @@ We reserve the right to terminate or suspend access for violations of these Term
 
 9. Contact Support
 For any queries, please reach out to us at support@rookstechnologies.com.''',
-                          textAlign: TextAlign.justify,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: Colors.black87,
-                          ),
+                        textAlign: TextAlign.justify,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: theme.colorScheme.onSurface.withOpacity(0.85),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  decoration: BoxDecoration(
+                    color: _isAccepted
+                        ? theme.colorScheme.primary.withOpacity(0.08)
+                        : theme.cardColor.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
                       color: _isAccepted
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _isAccepted
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                      ),
+                          ? theme.colorScheme.primary
+                          : theme.dividerColor.withOpacity(0.1),
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: CheckboxListTile(
-                        value: _isAccepted,
-                        onChanged: (value) {
-                          setState(() {
-                            _isAccepted = value ?? false;
-                          });
-                        },
-                        title: const Text(
-                          'I have read and agree to the Terms and Conditions',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      value: _isAccepted,
+                      onChanged: (value) {
+                        setState(() {
+                          _isAccepted = value ?? false;
+                        });
+                      },
+                      title: Text(
+                        'I have read and agree to the Terms and Conditions',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        activeColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      activeColor: theme.colorScheme.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isAccepted ? _onAccept : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey[300],
-                        disabledForegroundColor: Colors.grey[600],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: _isAccepted ? 2 : 0,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isAccepted ? _onAccept : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: theme.dividerColor.withOpacity(
+                        0.1,
                       ),
-                      child: const Text(
-                        'Accept & Continue',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      disabledForegroundColor: theme.disabledColor,
+                      elevation: _isAccepted ? 4 : 0,
+                      shadowColor: theme.colorScheme.primary.withOpacity(0.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'Accept & Continue',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                ],
-              ),
+                ),
+                const SizedBox(height: 10),
+              ],
             ),
     );
   }

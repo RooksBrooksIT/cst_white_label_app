@@ -15,12 +15,14 @@ class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
   final String? siteId;
   final DateTime date;
+  final String? projectStage;
 
   const DailySiteExpensesReportPage({
     super.key,
     required this.supervisorId,
     required this.siteId,
     required this.date,
+    this.projectStage,
   });
 
   @override
@@ -39,21 +41,84 @@ class _DailySiteExpensesReportPageState
     final supervisorDoc = await FirestoreService.getCollection(
       'siteSupervisorEntries',
     ).doc(_documentId).get();
+
+    // Check if supervisor entry matches projectStage if provided
+    DocumentSnapshot? filteredSupervisorDoc;
+    if (supervisorDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredSupervisorDoc = supervisorDoc;
+        }
+      } else {
+        filteredSupervisorDoc = supervisorDoc;
+      }
+    }
+
     final managerDoc = await FirestoreService.getCollection(
       'managerExpenses',
     ).doc(_documentId).get();
-    final orgQuery = await FirestoreService.getCollection(
+
+    // Check if manager entry matches projectStage if provided
+    DocumentSnapshot? filteredManagerDoc;
+    if (managerDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = managerDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredManagerDoc = managerDoc;
+        }
+      } else {
+        filteredManagerDoc = managerDoc;
+      }
+    }
+
+    Query<Map<String, dynamic>> orgQuery = FirestoreService.getCollection(
       'organizationExpenses',
-    ).where('siteId', isEqualTo: widget.siteId).limit(20).get();
-    final contractorQuery =
-        await FirestoreService.getCollection('contractorEntries')
+    ).where('siteId', isEqualTo: widget.siteId);
+
+    if (widget.projectStage != null) {
+      // organizationEntries often use projectField or projectStage
+      // We'll fetch and filter in memory to be safe, or use multiple where if possible
+    }
+
+    final orgSnapshot = await orgQuery.limit(50).get();
+    List<DocumentSnapshot> filteredOrgEntries = orgSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredOrgEntries = orgSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
+    Query<Map<String, dynamic>> contractorQuery =
+        FirestoreService.getCollection('contractorEntries')
             .where('siteId', isEqualTo: widget.siteId)
             .where(
               'date',
               isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-            )
-            .limit(20)
-            .get();
+            );
+
+    final contractorSnapshot = await contractorQuery.limit(50).get();
+    List<DocumentSnapshot> filteredContractorEntries = contractorSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredContractorEntries = contractorSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
     final incentiveQuery =
         await FirestoreService.getCollection('totalSiteExpensesPerDay')
             .where('siteId', isEqualTo: widget.siteId)
@@ -64,14 +129,30 @@ class _DailySiteExpensesReportPageState
             .limit(1)
             .get();
 
+    DocumentSnapshot? filteredIncentiveDoc;
+    if (incentiveQuery.docs.isNotEmpty) {
+      final doc = incentiveQuery.docs.first;
+      if (widget.projectStage != null) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredIncentiveDoc = doc;
+        }
+      } else {
+        filteredIncentiveDoc = doc;
+      }
+    }
+
     return {
-      'supervisor': supervisorDoc.exists ? supervisorDoc : null,
-      'managerEntries': managerDoc.exists ? [managerDoc] : [],
-      'organizationEntries': orgQuery.docs,
-      'contractorEntries': contractorQuery.docs,
-      'incentiveDoc': incentiveQuery.docs.isNotEmpty
-          ? incentiveQuery.docs.first
-          : null,
+      'supervisor': filteredSupervisorDoc,
+      'managerEntries': filteredManagerDoc != null
+          ? <DocumentSnapshot>[filteredManagerDoc]
+          : <DocumentSnapshot>[],
+      'organizationEntries': filteredOrgEntries,
+      'contractorEntries': filteredContractorEntries,
+      'incentiveDoc': filteredIncentiveDoc,
     };
   }
 
@@ -99,12 +180,12 @@ class _DailySiteExpensesReportPageState
 
           final data = snapshot.data!;
           final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
-          final managerEntries =
-              data['managerEntries'] as List<DocumentSnapshot>;
-          final orgEntries =
-              data['organizationEntries'] as List<DocumentSnapshot>;
-          final contractorEntries =
-              data['contractorEntries'] as List<DocumentSnapshot>;
+          final managerEntries = (data['managerEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
+          final orgEntries = (data['organizationEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
+          final contractorEntries = (data['contractorEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
           final incentiveDoc = data['incentiveDoc'] as DocumentSnapshot?;
 
           if (supervisorDoc == null &&
@@ -439,19 +520,24 @@ class _DailySiteExpensesReportPageState
       total +=
           (supervisorDoc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
 
-    for (var doc in data['managerEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['managerEntries'] as List? ?? []).cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
       for (var b in bills) total += _parseAmount(b['billAmount']);
     }
 
-    for (var doc in data['organizationEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['organizationEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
       for (var b in bills) total += _parseAmount(b['billAmount']);
     }
 
-    for (var doc in data['contractorEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['contractorEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
       total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
     }
 
@@ -484,12 +570,12 @@ class _DailySiteExpensesReportPageState
 
     final supervisorDoc = reportData['supervisor'] as DocumentSnapshot?;
     final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
-    final managerEntries =
-        reportData['managerEntries'] as List<DocumentSnapshot>;
-    final orgEntries =
-        reportData['organizationEntries'] as List<DocumentSnapshot>;
-    final contractorEntries =
-        reportData['contractorEntries'] as List<DocumentSnapshot>;
+    final managerEntries = (reportData['managerEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final orgEntries = (reportData['organizationEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final contractorEntries = (reportData['contractorEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
 
     pdf.addPage(
       pw.MultiPage(

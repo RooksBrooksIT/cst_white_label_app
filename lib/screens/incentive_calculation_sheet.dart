@@ -47,7 +47,8 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   Color get _accentColor => Theme.of(context).colorScheme.secondary;
   Color get _backgroundColor => Theme.of(context).scaffoldBackgroundColor;
   Color get _cardColor => Theme.of(context).cardColor;
-  Color get _textColor => Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2d3748);
+  Color get _textColor =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2d3748);
 
   List<LabourData> _labourData = [];
   double _incentivePercentage = 10.0;
@@ -66,35 +67,108 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   int actualDays = 0;
 
   bool _loading = true;
+  String? _resolvedProjectName;
 
   @override
   void initState() {
     super.initState();
+    _fetchProjectName();
     _fetchLabourData();
+  }
+
+  Future<void> _fetchProjectName() async {
+    try {
+      final siteSnap = await FirestoreService.sites.doc(widget.siteId).get();
+      if (siteSnap.exists) {
+        setState(() {
+          _resolvedProjectName = siteSnap.data()?['siteName']?.toString();
+        });
+      }
+
+      if (_resolvedProjectName == null) {
+        final projectSnap = await FirestoreService.projects
+            .where('siteId', isEqualTo: widget.siteId)
+            .limit(1)
+            .get();
+        if (projectSnap.docs.isNotEmpty) {
+          setState(() {
+            _resolvedProjectName = projectSnap.docs.first
+                .data()['projectName']
+                ?.toString();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching project name: $e');
+    }
   }
 
   Future<void> _fetchLabourData() async {
     if (!mounted) return;
     setState(() => _loading = true);
 
-    final scheduleQuery = await FirestoreService.siteSupervisorProjectStageSchedule
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .limit(1)
+    debugPrint(
+      'IncentiveSheet: Fetching data for Site="${widget.siteId}", Stage="${widget.projectStage}"',
+    );
+    debugPrint('IncentiveSheet: OrgID is "${FirestoreService.currentOrgId}"');
+
+    final scheduleSnapshot = await FirestoreService
+        .siteSupervisorProjectStageSchedule
         .get();
 
-    final actualQuery = await FirestoreService.siteSupervisorProjectStageActual
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .limit(1)
+    final actualSnapshot = await FirestoreService
+        .siteSupervisorProjectStageActual
         .get();
+
+    // Filter in memory for robustness (case-insensitive and trimmed)
+    final siteId = widget.siteId.trim().toLowerCase();
+    final stage = widget.projectStage.trim().toLowerCase();
+
+    final scheduleDocs = scheduleSnapshot.docs.where((doc) {
+      final data = doc.data();
+      final dbSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+      final dbStage = (data['projectStage'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final isMatch = dbSiteId == siteId && dbStage == stage;
+      if (!isMatch && scheduleSnapshot.docs.length < 10) {
+        debugPrint(
+          'IncentiveSheet: No match for schedule doc ${doc.id}. DB(Site: "$dbSiteId", Stage: "$dbStage") vs Search(Site: "$siteId", Stage: "$stage")',
+        );
+      }
+      return isMatch;
+    }).toList();
+
+    final actualDocs = actualSnapshot.docs.where((doc) {
+      final data = doc.data();
+      final dbSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+      final dbStage = (data['projectStage'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final isMatch = dbSiteId == siteId && dbStage == stage;
+      if (!isMatch && actualSnapshot.docs.length < 10) {
+        debugPrint(
+          'IncentiveSheet: No match for actual doc ${doc.id}. DB(Site: "$dbSiteId", Stage: "$dbStage") vs Search(Site: "$siteId", Stage: "$stage")',
+        );
+      }
+      return isMatch;
+    }).toList();
+
+    debugPrint(
+      'IncentiveSheet: Schedule Docs Found (filtered): ${scheduleDocs.length}',
+    );
+    debugPrint(
+      'IncentiveSheet: Actual Docs Found (filtered): ${actualDocs.length}',
+    );
 
     Map<String, int> actualCounts = {};
     double actualAmountPerDay = 0; // per-day actual amount
     int fetchedActualDays = 0;
 
-    if (actualQuery.docs.isNotEmpty) {
-      final actualDoc = actualQuery.docs.first.data();
+    if (actualDocs.isNotEmpty) {
+      final actualDoc = actualDocs.first.data();
       actualAmountPerDay = (actualDoc['actPayment'] ?? 0).toDouble();
       final List actLabours = actualDoc['actLabours'] ?? [];
       for (var l in actLabours) {
@@ -109,11 +183,16 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       fetchedActualDays = (actualDoc['actDays'] ?? 0) as int;
     }
 
-    // Fetch days summary (requested/approved/actual)
-    final daysSummary = await _fetchDaysSummary();
+    // Days summary variables
+    int rDays = 0;
+    int aDays = 0;
+    int actDaysCount = fetchedActualDays;
 
-    if (scheduleQuery.docs.isNotEmpty) {
-      final doc = scheduleQuery.docs.first.data();
+    if (scheduleDocs.isNotEmpty) {
+      final doc = scheduleDocs.first.data();
+      rDays = (doc['reqDays'] ?? 0) as int;
+      aDays = (doc['appDays'] ?? 0) as int;
+
       final List reqLabours = doc['reqLabours'] ?? [];
       final List appLabours = doc['appLabours'] ?? [];
 
@@ -136,7 +215,9 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
       List<LabourData> loadedLabourData = allDesignations.map((designation) {
         return LabourData(
-          labourType: designation[0].toUpperCase() + designation.substring(1),
+          labourType: designation.isNotEmpty
+              ? designation[0].toUpperCase() + designation.substring(1)
+              : '',
           requested: requestedMap[designation] ?? 0,
           approved: approvedMap[designation] ?? 0,
           actual: actualCounts[designation] ?? 0,
@@ -157,9 +238,9 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         // Monetary math: clamp savings to >= 0
         savedAmount = math.max(approvedTotal - actualTotal, 0);
 
-        requestedDays = daysSummary['requested'] ?? 0;
-        approvedDays = daysSummary['approved'] ?? 0;
-        actualDays = daysSummary['actual'] ?? 0;
+        requestedDays = rDays;
+        approvedDays = aDays;
+        actualDays = actDaysCount;
 
         _loading = false;
       });
@@ -176,42 +257,13 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
         savedAmount = math.max(approvedTotal - actualTotal, 0);
 
-        requestedDays = daysSummary['requested'] ?? 0;
-        approvedDays = daysSummary['approved'] ?? 0;
-        actualDays = daysSummary['actual'] ?? 0;
+        requestedDays = 0;
+        approvedDays = 0;
+        actualDays = actDaysCount;
 
         _loading = false;
       });
     }
-  }
-
-  Future<Map<String, int>> _fetchDaysSummary() async {
-    final scheduleQuery = await FirestoreService.siteSupervisorProjectStageSchedule
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .limit(1)
-        .get();
-
-    int rDays = 0;
-    int aDays = 0;
-    if (scheduleQuery.docs.isNotEmpty) {
-      final doc = scheduleQuery.docs.first.data();
-      rDays = (doc['reqDays'] ?? 0) as int;
-      aDays = (doc['appDays'] ?? 0) as int;
-    }
-
-    final actualQuery = await FirestoreService.siteSupervisorProjectStageActual
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .limit(1)
-        .get();
-
-    int actDays = 0;
-    if (actualQuery.docs.isNotEmpty) {
-      actDays = (actualQuery.docs.first.data()['actDays'] ?? 0) as int;
-    }
-
-    return {'requested': rDays, 'approved': aDays, 'actual': actDays};
   }
 
   Future<bool> _showUnsavedChangesDialog() async {
@@ -240,18 +292,13 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (requestedDays == 0 ||
-        approvedDays == 0 ||
-        actualDays == 0 && !_loading) {
-      // Show message when requestedDays is 0 and data loading complete
+    if (!_loading && requestedDays == 0 && actualDays == 0) {
+      // Show message when no data is found after loading
       return Scaffold(
         backgroundColor: _backgroundColor,
         appBar: AppBar(
           backgroundColor: _primaryColor,
-          title: const Text(
-            'Incentive Sheet',
-            style: TextStyle(),
-          ),
+          title: const Text('Incentive Sheet', style: TextStyle()),
           iconTheme: const IconThemeData(),
           elevation: 0,
         ),
@@ -264,7 +311,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                 Icon(Icons.info_outline, size: 48, color: _primaryColor),
                 const SizedBox(height: 16),
                 Text(
-                  'Request is not available for this site.',
+                  'No request data found for this site and stage.',
                   style: TextStyle(
                     color: _primaryColor,
                     fontWeight: FontWeight.bold,
@@ -272,10 +319,39 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Site ID: ${widget.siteId}\nStage: ${widget.projectStage}',
+                  style: TextStyle(color: _textColor.withOpacity(0.7)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _fetchLabourData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                  ),
+                  child: const Text(
+                    'RETRY',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      );
+    }
+
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: _backgroundColor,
+        appBar: AppBar(
+          backgroundColor: _primaryColor,
+          title: const Text('Incentive Sheet'),
+          elevation: 0,
+        ),
+        body: Center(child: CircularProgressIndicator(color: _primaryColor)),
       );
     }
 
@@ -287,10 +363,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         backgroundColor: _backgroundColor,
         appBar: AppBar(
           backgroundColor: _primaryColor,
-          title: const Text(
-            'Incentive Sheet',
-            style: TextStyle(),
-          ),
+          title: const Text('Incentive Sheet', style: TextStyle()),
           iconTheme: const IconThemeData(),
           elevation: 0,
           actions: [
@@ -300,31 +373,25 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
             ),
           ],
         ),
-        body: _loading
-            ? Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    _headerCard(),
-                    const SizedBox(height: 20),
-                    _daysSummaryCard(),
-                    const SizedBox(height: 20),
-                    _labourTableSection(),
-                    const SizedBox(height: 20),
-                    _summaryCards(),
-                    const SizedBox(height: 20),
-                    _incentiveSlider(),
-                    const SizedBox(height: 30),
-                    _actionButtons(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _headerCard(),
+              const SizedBox(height: 20),
+              _daysSummaryCard(),
+              const SizedBox(height: 20),
+              _labourTableSection(),
+              const SizedBox(height: 20),
+              _summaryCards(),
+              const SizedBox(height: 20),
+              _incentiveSlider(),
+              const SizedBox(height: 30),
+              _actionButtons(),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -345,7 +412,6 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
             _primaryColor.withOpacity(0.9),
           ),
           headingTextStyle: const TextStyle(
-            
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
@@ -472,10 +538,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                   ),
                   child: Text(
                     '${_incentivePercentage.round()}%',
-                    style: const TextStyle(
-                      
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 Text('20%', style: TextStyle(color: _primaryColor)),
@@ -762,30 +825,25 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
     try {
       // 1) Save detailed incentive document for history/audit
-      await FirestoreService.siteSupervisorIncentives
-          .doc(docId)
-          .set({
-            'siteId': widget.siteId,
-            'projectName':
-                widget.siteId, // Adjust if you have a separate project name
-            'projectStage': widget.projectStage,
-            'supervisorName': widget.supervisor,
-            'actualAmount': actualTotal,
-            'approvedAmount': approvedTotal,
-            'estimatedAmount': requestedTotal,
-            'savedAmount': savedAmount,
-            'incentivePercentage': _incentivePercentage.round(),
-            'incentiveAmount': amountToAdd,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      await FirestoreService.siteSupervisorIncentives.doc(docId).set({
+        'siteId': widget.siteId,
+        'projectName': _resolvedProjectName ?? widget.siteId,
+        'projectStage': widget.projectStage,
+        'supervisorName': widget.supervisor,
+        'actualAmount': actualTotal,
+        'approvedAmount': approvedTotal,
+        'estimatedAmount': requestedTotal,
+        'savedAmount': savedAmount,
+        'incentivePercentage': _incentivePercentage.round(),
+        'incentiveAmount': amountToAdd,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       // 2) Update totalIncentiveExpenses in totalSiteExpensesPerDay for this siteId
-      await FirestoreService.totalSiteExpensesPerDay
-          .doc(widget.siteId)
-          .set({
-            'totalIncentiveExpenses': amountToAdd,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      await FirestoreService.totalSiteExpensesPerDay.doc(widget.siteId).set({
+        'totalIncentiveExpenses': amountToAdd,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       // 3) Trigger totals recalculation for this site (sync all values)
       await ExpenseService.updateTotalSiteExpense(widget.siteId);
@@ -845,44 +903,107 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Site ID', widget.siteId, pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Supervisor', widget.supervisor, pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Stage', widget.projectStage, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Project',
+                _resolvedProjectName ?? widget.siteId,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                widget.siteId,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Supervisor',
+                widget.supervisor,
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Stage',
+                widget.projectStage,
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Saved Amount', '₹ ${savedAmount.toStringAsFixed(2)}', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Incentive %', '${_incentivePercentage.round()}%', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Incentive Amount', '₹ ${(savedAmount * (_incentivePercentage / 100)).toStringAsFixed(2)}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Saved Amount',
+                '₹ ${savedAmount.toStringAsFixed(2)}',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Incentive %',
+                '${_incentivePercentage.round()}%',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Incentive Amount',
+                '₹ ${(savedAmount * (_incentivePercentage / 100)).toStringAsFixed(2)}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 32),
-          pw.Text('Labour Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+          pw.Text(
+            'Labour Breakdown',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+          ),
           pw.SizedBox(height: 12),
           pw.Table.fromTextArray(
             headers: ['Labour Type', 'Requested', 'Approved', 'Actual'],
-            data: _labourData.map((l) => [
-              l.labourType,
-              l.requested.toString(),
-              l.approved.toString(),
-              l.actual.toString()
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            data: _labourData
+                .map(
+                  (l) => [
+                    l.labourType,
+                    l.requested.toString(),
+                    l.approved.toString(),
+                    l.actual.toString(),
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
           pw.SizedBox(height: 24),
           pw.Table.fromTextArray(
-            headers: ['Metric', 'Requested Total', 'Approved Total', 'Actual Total'],
-            data: [
-              ['Amount', '₹ ${requestedTotal.toStringAsFixed(2)}', '₹ ${approvedTotal.toStringAsFixed(2)}', '₹ ${actualTotal.toStringAsFixed(2)}'],
-              ['Days', requestedDays.toString(), approvedDays.toString(), actualDays.toString()],
+            headers: [
+              'Metric',
+              'Requested Total',
+              'Approved Total',
+              'Actual Total',
             ],
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            data: [
+              [
+                'Amount',
+                '₹ ${requestedTotal.toStringAsFixed(2)}',
+                '₹ ${approvedTotal.toStringAsFixed(2)}',
+                '₹ ${actualTotal.toStringAsFixed(2)}',
+              ],
+              [
+                'Days',
+                requestedDays.toString(),
+                approvedDays.toString(),
+                actualDays.toString(),
+              ],
+            ],
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
           ),

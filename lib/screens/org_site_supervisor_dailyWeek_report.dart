@@ -8,6 +8,7 @@ import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/pdf_templates.dart';
 import 'dart:async';
+import '../widgets/glass_scaffold.dart';
 
 class DailySitePaymentReportScreen extends StatefulWidget {
   const DailySitePaymentReportScreen({super.key});
@@ -92,7 +93,9 @@ class _DailySitePaymentReportScreenState
         final siteId = data['siteId']?.toString();
         final fetchedProjectName = data['projectName']?.toString() ?? '';
         // Only override if we get a non-empty name from projects collection
-        if (siteId != null && details.containsKey(siteId) && fetchedProjectName.isNotEmpty) {
+        if (siteId != null &&
+            details.containsKey(siteId) &&
+            fetchedProjectName.isNotEmpty) {
           details[siteId]!['project'] = fetchedProjectName;
         }
       }
@@ -246,7 +249,7 @@ class _DailySitePaymentReportScreenState
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
-    
+
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     final now = DateTime.now();
@@ -292,7 +295,11 @@ class _DailySitePaymentReportScreenState
                 DateFormat.MMMM().format(DateTime(0, selectedMonth)),
                 pdfPrimaryColor,
               ),
-              PdfTemplates.buildMetaBox('Year', selectedYear.toString(), pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Year',
+                selectedYear.toString(),
+                pdfPrimaryColor,
+              ),
               PdfTemplates.buildMetaBox(
                 'Week',
                 selectedWeekIndex != null
@@ -382,31 +389,9 @@ class _DailySitePaymentReportScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Site Payment Report',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Site Payment Report',
+      onBack: () => Navigator.pop(context),
       body: _buildBody(context),
     );
   }

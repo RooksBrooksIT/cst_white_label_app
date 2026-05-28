@@ -5,9 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import '../services/firestore_service.dart';
 import 'package:demo_cst/utils/responsive.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SitePaymentScreen extends StatefulWidget {
-
   const SitePaymentScreen({super.key});
 
   @override
@@ -96,18 +96,15 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchProjectStages() async {
     try {
-      final snapshot = await FirestoreService.projectStages
-          .get()
-          .timeout(
+      final snapshot = await FirestoreService.projectStages.get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException(
+            'Project stages query timeout',
             const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException(
-                'Project stages query timeout',
-                const Duration(seconds: 10),
-              );
-            },
           );
-
+        },
+      );
 
       if (!mounted) return;
 
@@ -143,7 +140,6 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             },
           );
 
-
       if (!mounted) return;
 
       setState(() {
@@ -167,9 +163,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Future<void> _fetchSupervisorForSite(String siteId) async {
     try {
-      final doc = await FirestoreService.siteSupervisorMap
-          .doc(siteId)
-          .get();
+      final doc = await FirestoreService.siteSupervisorMap.doc(siteId).get();
 
       if (doc.exists) {
         setState(() {
@@ -262,7 +256,6 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
       final paymentDocRef = FirestoreService.siteSupervisorPayments.doc(docId);
 
-
       final paymentDocSnap = await paymentDocRef.get();
       List<dynamic> payments = [];
       if (paymentDocSnap.exists) {
@@ -324,31 +317,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Site Payment',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Site Payment',
+      onBack: () => Navigator.pop(context),
       body: _buildBody(context),
     );
   }

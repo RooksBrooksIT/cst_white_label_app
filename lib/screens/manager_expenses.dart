@@ -390,8 +390,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
     return GlassScaffold(
       title: 'Manager Expenses',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
@@ -894,10 +892,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }

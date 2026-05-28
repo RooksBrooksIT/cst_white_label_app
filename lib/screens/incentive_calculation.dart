@@ -70,8 +70,6 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
 
     return GlassScaffold(
       title: 'Incentive Calculation',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
       body: _loading
           ? Center(
               child: CircularProgressIndicator(

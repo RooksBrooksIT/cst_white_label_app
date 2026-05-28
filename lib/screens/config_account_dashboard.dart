@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
-import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -35,7 +34,6 @@ import 'package:demo_cst/screens/workers_site_mapping_page.dart';
 import 'package:demo_cst/screens/workers_availability_report_page.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
 import '../services/auth_service.dart';
-import '../widgets/glass_scaffold.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -324,25 +322,62 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return GlassScaffold(
-      title: 'Management Console',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: widget.showLogout
-          ? [
-              IconButton(
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.white,
-                  size: 26,
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      // STRAIGHT TOP BAR – no curves
+      appBar: AppBar(
+        toolbarHeight: 70,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Management Console',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: Colors.white,
+          ),
+        ),
+        actions: widget.showLogout
+            ? [
+                IconButton(
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                  onPressed: () => _showLogoutConfirmation(context),
+                  tooltip: 'Logout',
                 ),
-                onPressed: () => _showLogoutConfirmation(context),
-                tooltip: 'Logout',
+                const SizedBox(width: 8),
+              ]
+            : null,
+      ),
+      body: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [_buildDashboardSections(context)],
               ),
-              const SizedBox(width: 8),
-            ]
-          : null,
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddOptions(context),
         backgroundColor: colorScheme.primary,
@@ -372,7 +407,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     () {},
                   ),
                 ),
-                const SizedBox(width: 80), // Reserve space for the docked FAB
+                const SizedBox(width: 80),
                 Expanded(
                   child: _buildNavItem(
                     context,
@@ -386,193 +421,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
           ),
         ),
-      ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDashboardSections(context),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWelcomeSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary.withOpacity(0.1),
-                  colorScheme.primary.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.admin_panel_settings_rounded,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  "Configuration Panel",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Welcome back,",
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _managerName,
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-              letterSpacing: -1.0,
-              fontSize: 32,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Configure and manage your organization settings",
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickStats(BuildContext context) {
-    final theme = Theme.of(context);
-    final stats = [
-      {
-        'icon': Icons.category_rounded,
-        'label': 'Categories',
-        'value': '12',
-        'color': Colors.orange,
-      },
-      {
-        'icon': Icons.inventory_2_rounded,
-        'label': 'Materials',
-        'value': '156',
-        'color': Colors.green,
-      },
-      {
-        'icon': Icons.people_rounded,
-        'label': 'Workers',
-        'value': '89',
-        'color': Colors.blue,
-      },
-      {
-        'icon': Icons.engineering_rounded,
-        'label': 'Sites',
-        'value': '8',
-        'color': Colors.purple,
-      },
-    ];
-
-    return SizedBox(
-      height: 90,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: stats.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final stat = stats[index];
-          return Container(
-            width: (MediaQuery.of(context).size.width - 64) / 2.2,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: (stat['color'] as Color).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    stat['icon'] as IconData,
-                    color: stat['color'] as Color,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        stat['value'] as String,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                      Text(
-                        stat['label'] as String,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
@@ -629,7 +477,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                // Icon with Gradient Background
                 Container(
                   width: 64,
                   height: 64,
@@ -651,7 +498,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   child: Icon(firstItem.icon, color: Colors.white, size: 32),
                 ),
                 const SizedBox(width: 20),
-                // Text Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -674,7 +520,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Progress/Status indicator hint
                       Row(
                         children: [
                           Container(
@@ -699,7 +544,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     ],
                   ),
                 ),
-                // Arrow Action
                 Container(
                   width: 44,
                   height: 44,

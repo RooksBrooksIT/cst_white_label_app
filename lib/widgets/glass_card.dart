@@ -41,14 +41,21 @@ class GlassCard extends StatelessWidget {
       margin: margin ?? const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: color ?? theme.cardColor,
-        borderRadius: BorderRadius.circular(borderRadius ?? 12),
-        border: border ?? Border.all(color: theme.dividerColor, width: 1),
+        borderRadius: BorderRadius.circular(borderRadius ?? 20),
+        border: border ?? Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(borderRadius ?? 12),
+          borderRadius: BorderRadius.circular(borderRadius ?? 20),
           child: Padding(
             padding: currentPadding,
             child: Column(
@@ -65,24 +72,35 @@ class GlassCard extends StatelessWidget {
                           children: [
                             Text(
                               title!,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontSize: isMobile ? 18 : 20,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
+                                fontSize: isMobile ? 16 : 18,
+                                letterSpacing: -0.3,
                               ),
                             ),
                             if (subtitle != null) ...[
                               const SizedBox(height: 4),
                               Text(
                                 subtitle!,
-                                style: theme.textTheme.bodyMedium,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12.5,
+                                  height: 1.3,
+                                ),
                               ),
                             ],
                           ],
                         ),
                       ),
+                      if (onTap != null)
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 16,
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  const Divider(height: 1),
                   const SizedBox(height: 16),
                 ],
                 if ((mainAxisSize ?? MainAxisSize.min) == MainAxisSize.max)

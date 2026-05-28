@@ -128,7 +128,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             })
             .where((site) => site['siteId']!.isNotEmpty)
             .toList();
-        if(!mounted) return;
+        if (!mounted) return;
         setState(() {
           supervisorSites = sites;
           if (sites.isNotEmpty) {
@@ -147,14 +147,16 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   }
 
   Future<void> _fetchMaterialOptions() async {
-    if(!mounted) return;
+    if (!mounted) return;
     setState(() {
       isLoadingMaterials = true;
       materialError = null;
     });
     try {
       // 1. Fetch materialCategories to build a lookup map
-      final categoriesSnapshot = await FirestoreService.getCollection('materialCategories').get();
+      final categoriesSnapshot = await FirestoreService.getCollection(
+        'materialCategories',
+      ).get();
       final categoryMap = <String, String>{};
       for (var doc in categoriesSnapshot.docs) {
         final data = doc.data();
@@ -171,18 +173,25 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        
+
         // Resolve materialCategory reference
         String? resolvedCategory;
         final catRef = data['materialCategory'];
         if (catRef is DocumentReference) {
           resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
         } else if (catRef is String && catRef.isNotEmpty) {
-          resolvedCategory = categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
+          resolvedCategory =
+              categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
         }
-        
+
         // Fallback if not resolved
-        final name = (resolvedCategory ?? data['materialName'] ?? data['matCategory'] ?? '').toString().trim();
+        final name =
+            (resolvedCategory ??
+                    data['materialName'] ??
+                    data['matCategory'] ??
+                    '')
+                .toString()
+                .trim();
         if (name.isNotEmpty) {
           options.add(name);
           final priceRaw = data['materialPrice'];
@@ -190,28 +199,32 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
           if (priceRaw is num) {
             price = priceRaw;
           } else if (priceRaw is String) {
-            price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            price =
+                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
           prices[name] = price;
         }
       }
-      if(!mounted) return;
+      if (!mounted) return;
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial = materialOptions.isNotEmpty ? materialOptions.first : null;
+        selectedMaterial = materialOptions.isNotEmpty
+            ? materialOptions.first
+            : null;
         isLoadingMaterials = false;
       });
     } catch (e) {
-      if(mounted) setState(() {
-        materialError = 'Failed to load materials';
-        isLoadingMaterials = false;
-      });
+      if (mounted)
+        setState(() {
+          materialError = 'Failed to load materials';
+          isLoadingMaterials = false;
+        });
     }
   }
 
   Future<void> _fetchLabourOptions() async {
-    if(!mounted) return;
+    if (!mounted) return;
     setState(() {
       isLoadingLabours = true;
       labourError = null;
@@ -231,13 +244,15 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             if (salaryRaw is num) {
               salary = salaryRaw;
             } else if (salaryRaw is String) {
-              salary = num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+              salary =
+                  num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ??
+                  0;
             }
             salaries[designation] = salary;
           }
         }
       }
-      if(!mounted) return;
+      if (!mounted) return;
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
@@ -245,10 +260,11 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         isLoadingLabours = false;
       });
     } catch (e) {
-      if(mounted) setState(() {
-        labourError = 'Failed to load labours';
-        isLoadingLabours = false;
-      });
+      if (mounted)
+        setState(() {
+          labourError = 'Failed to load labours';
+          isLoadingLabours = false;
+        });
     }
   }
 
@@ -363,7 +379,9 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         selectedDate == null ||
         siteIdForEntry.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select contractor, project field, date and site ID')),
+        const SnackBar(
+          content: Text('Select contractor, project field, date and site ID'),
+        ),
       );
       return;
     }
@@ -396,7 +414,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       }).toList();
 
       final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate!);
-      final contractorNameForId = _selectedContractorName!.trim().replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '-');
+      final contractorNameForId = _selectedContractorName!.trim().replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]'),
+        '-',
+      );
       final docId = '${contractorNameForId}_$dateStr';
 
       final data = {
@@ -412,14 +433,19 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         'siteId': siteIdForEntry,
       };
 
-      await FirebaseFirestore.instance.collection('contractorEntries').doc(docId).set(data);
+      await FirestoreService.contractorEntries.doc(docId).set(data);
       await ExpenseService.recalcTotalsAndSyncProject(siteIdForEntry);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contractor entry saved')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Contractor entry saved')));
       _resetForm();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -450,7 +476,13 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
           onPressed: () {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => SupervisorDashboard(username: widget.userName, supervisorId: '', supervisorName: '')),
+              MaterialPageRoute(
+                builder: (_) => SupervisorDashboard(
+                  username: widget.userName,
+                  supervisorId: '',
+                  supervisorName: '',
+                ),
+              ),
               (route) => false,
             );
           },
@@ -462,7 +494,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             padding: const EdgeInsets.all(16.0),
             child: Center(
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 600, minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(
+                  maxWidth: 600,
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -471,39 +506,77 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildInfoRow('Site ID', siteCode, Icons.construction),
-                          _buildInfoRow('Supervisor', widget.supervisorName, Icons.person),
+                          _buildInfoRow(
+                            'Site ID',
+                            siteCode,
+                            Icons.construction,
+                          ),
+                          _buildInfoRow(
+                            'Supervisor',
+                            widget.supervisorName,
+                            Icons.person,
+                          ),
                           const SizedBox(height: 16),
                           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                            stream: FirebaseFirestore.instance.collection('contractors').orderBy('contractorName').snapshots(),
+                            stream: FirestoreService.contractors
+                                .orderBy('contractorName')
+                                .snapshots(),
                             builder: (context, snapshot) {
                               final docs = snapshot.data?.docs ?? [];
                               final names = <String>[];
                               final fieldByName = <String, String>{};
                               for (final d in docs) {
                                 final data = d.data();
-                                final name = (data['contractorName'] ?? '').toString();
+                                final name = (data['contractorName'] ?? '')
+                                    .toString();
                                 if (name.isNotEmpty) {
                                   names.add(name);
-                                  fieldByName[name] = (data['contractorField'] ?? '').toString();
+                                  fieldByName[name] =
+                                      (data['contractorField'] ?? '')
+                                          .toString();
                                 }
                               }
                               return DropdownButtonFormField<String>(
-                                value: names.contains(_selectedContractorName) ? _selectedContractorName : null,
-                                decoration: const InputDecoration(labelText: 'Select Contractor', border: OutlineInputBorder()),
-                                items: names.map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
+                                value: names.contains(_selectedContractorName)
+                                    ? _selectedContractorName
+                                    : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Select Contractor',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: names
+                                    .map(
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text(n),
+                                      ),
+                                    )
+                                    .toList(),
                                 onChanged: (val) => setState(() {
                                   _selectedContractorName = val;
-                                  _selectedProjectField = val != null ? fieldByName[val] : null;
-                                  _projectFieldController.text = _selectedProjectField ?? '';
+                                  _selectedProjectField = val != null
+                                      ? fieldByName[val]
+                                      : null;
+                                  _projectFieldController.text =
+                                      _selectedProjectField ?? '';
                                 }),
                               );
                             },
                           ),
                           const SizedBox(height: 12),
-                          _buildTextField('Project Field', _projectFieldController, readOnly: true),
+                          _buildTextField(
+                            'Project Field',
+                            _projectFieldController,
+                            readOnly: true,
+                          ),
                           const SizedBox(height: 12),
-                          _buildTextField('Date', _dateController, readOnly: true, onTap: _pickDate, icon: Icons.calendar_today),
+                          _buildTextField(
+                            'Date',
+                            _dateController,
+                            readOnly: true,
+                            onTap: _pickDate,
+                            icon: Icons.calendar_today,
+                          ),
                         ],
                       ),
                     ),
@@ -517,23 +590,60 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
                                   value: selectedMaterial,
-                                  decoration: const InputDecoration(labelText: 'Select Material', border: OutlineInputBorder()),
-                                  items: materialOptions.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                                  onChanged: (v) => setState(() => selectedMaterial = v),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Select Material',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: materialOptions
+                                      .map(
+                                        (m) => DropdownMenuItem(
+                                          value: m,
+                                          child: Text(m),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => selectedMaterial = v),
                                 ),
                           const SizedBox(height: 12),
                           _buildQtyField('Quantity', materialQtyController),
                           const SizedBox(height: 12),
-                          GlassButton(label: 'ADD MATERIAL', icon: Icons.add, onPressed: _addMaterial, isSecondary: true),
-                          TextButton(onPressed: () => setState(() => _showCustomMaterialFields = !_showCustomMaterialFields), child: Text(_showCustomMaterialFields ? 'Hide Custom' : 'Add Custom Material')),
+                          GlassButton(
+                            label: 'ADD MATERIAL',
+                            icon: Icons.add,
+                            onPressed: _addMaterial,
+                            isSecondary: true,
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _showCustomMaterialFields =
+                                  !_showCustomMaterialFields,
+                            ),
+                            child: Text(
+                              _showCustomMaterialFields
+                                  ? 'Hide Custom'
+                                  : 'Add Custom Material',
+                            ),
+                          ),
                           if (_showCustomMaterialFields) ...[
-                            _buildTextField('Material Name', _customMaterialNameController),
+                            _buildTextField(
+                              'Material Name',
+                              _customMaterialNameController,
+                            ),
                             const SizedBox(height: 8),
                             _buildQtyField('Qty', _customMaterialQtyController),
                             const SizedBox(height: 8),
-                            _buildQtyField('Price', _customMaterialPriceController),
+                            _buildQtyField(
+                              'Price',
+                              _customMaterialPriceController,
+                            ),
                             const SizedBox(height: 8),
-                            GlassButton(label: 'ADD CUSTOM', icon: Icons.check, onPressed: _addCustomMaterial, isSecondary: true),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomMaterial,
+                              isSecondary: true,
+                            ),
                           ],
                         ],
                       ),
@@ -548,21 +658,58 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
                                   value: selectedLabour,
-                                  decoration: const InputDecoration(labelText: 'Select Labour', border: OutlineInputBorder()),
-                                  items: labourOptions.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                                  onChanged: (v) => setState(() => selectedLabour = v),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Select Labour',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: labourOptions
+                                      .map(
+                                        (l) => DropdownMenuItem(
+                                          value: l,
+                                          child: Text(l),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => selectedLabour = v),
                                 ),
                           const SizedBox(height: 12),
                           _buildQtyField('Count', labourQtyController),
                           const SizedBox(height: 12),
-                          GlassButton(label: 'ADD LABOUR', icon: Icons.person_add, onPressed: _addLabour, isSecondary: true),
-                          TextButton(onPressed: () => setState(() => _showCustomLabourFields = !_showCustomLabourFields), child: Text(_showCustomLabourFields ? 'Hide Custom' : 'Add Custom Labour')),
+                          GlassButton(
+                            label: 'ADD LABOUR',
+                            icon: Icons.person_add,
+                            onPressed: _addLabour,
+                            isSecondary: true,
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _showCustomLabourFields =
+                                  !_showCustomLabourFields,
+                            ),
+                            child: Text(
+                              _showCustomLabourFields
+                                  ? 'Hide Custom'
+                                  : 'Add Custom Labour',
+                            ),
+                          ),
                           if (_showCustomLabourFields) ...[
-                            _buildTextField('Labour Type', _customLabourNameController),
+                            _buildTextField(
+                              'Labour Type',
+                              _customLabourNameController,
+                            ),
                             const SizedBox(height: 8),
-                            _buildQtyField('Salary', _customLabourSalaryController),
+                            _buildQtyField(
+                              'Salary',
+                              _customLabourSalaryController,
+                            ),
                             const SizedBox(height: 8),
-                            GlassButton(label: 'ADD CUSTOM', icon: Icons.check, onPressed: _addCustomLabour, isSecondary: true),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomLabour,
+                              isSecondary: true,
+                            ),
                           ],
                         ],
                       ),
@@ -573,11 +720,23 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                       title: 'Other Expenses',
                       child: Column(
                         children: [
-                          _buildQtyField('Food (₹)', foodCost, icon: Icons.fastfood),
+                          _buildQtyField(
+                            'Food (₹)',
+                            foodCost,
+                            icon: Icons.fastfood,
+                          ),
                           const SizedBox(height: 8),
-                          _buildQtyField('Transport (₹)', transportCost, icon: Icons.directions_car),
+                          _buildQtyField(
+                            'Transport (₹)',
+                            transportCost,
+                            icon: Icons.directions_car,
+                          ),
                           const SizedBox(height: 8),
-                          _buildQtyField('Fuel (₹)', fuelCost, icon: Icons.local_gas_station),
+                          _buildQtyField(
+                            'Fuel (₹)',
+                            fuelCost,
+                            icon: Icons.local_gas_station,
+                          ),
                         ],
                       ),
                     ),
@@ -585,16 +744,31 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
                     if (materials.isNotEmpty || labours.isNotEmpty)
                       GlassCard(
-                        title: 'Today\'s Summary (Total: ₹${_getTotalAmount()})',
+                        title:
+                            'Today\'s Summary (Total: ₹${_getTotalAmount()})',
                         child: _buildSummaryTable(),
                       ),
                     const SizedBox(height: 24),
 
                     Row(
                       children: [
-                        Expanded(child: GlassButton(label: 'SAVE ENTRY', icon: Icons.save, onPressed: _saveToFirestore, isLoading: isSaving)),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'SAVE ENTRY',
+                            icon: Icons.save,
+                            onPressed: _saveToFirestore,
+                            isLoading: isSaving,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        Expanded(child: GlassButton(label: 'RESET', icon: Icons.refresh, onPressed: _resetForm, isSecondary: true)),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'RESET',
+                            icon: Icons.refresh,
+                            onPressed: _resetForm,
+                            isSecondary: true,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -615,14 +789,32 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         children: [
           Icon(icon, size: 18, color: primaryColor),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
-          Expanded(child: Text(value, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis)),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool readOnly = false, VoidCallback? onTap, IconData? icon}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl, {
+    bool readOnly = false,
+    VoidCallback? onTap,
+    IconData? icon,
+  }) {
     return TextField(
       controller: ctrl,
       readOnly: readOnly,
@@ -637,7 +829,11 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
     );
   }
 
-  Widget _buildQtyField(String label, TextEditingController ctrl, {IconData? icon}) {
+  Widget _buildQtyField(
+    String label,
+    TextEditingController ctrl, {
+    IconData? icon,
+  }) {
     return TextField(
       controller: ctrl,
       keyboardType: TextInputType.number,
@@ -657,24 +853,91 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       child: DataTable(
         columnSpacing: 20,
         columns: const [
-          DataColumn(label: Text('Item', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Qty', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('Amt', style: TextStyle(color: Colors.white70))),
-          DataColumn(label: Text('', style: TextStyle(color: Colors.white70)))
+          DataColumn(
+            label: Text('Item', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Qty', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Amt', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('', style: TextStyle(color: Colors.white70)),
+          ),
         ],
         rows: [
-          ...materials.asMap().entries.map((e) => DataRow(cells: [
-            DataCell(Text(e.value['type'], style: const TextStyle(color: Colors.white))),
-            DataCell(Text('${e.value['quantity']}', style: const TextStyle(color: Colors.white))),
-            DataCell(Text(_calculateMaterialAmount(e.value['type'], e.value['quantity']), style: const TextStyle(color: Colors.white))),
-            DataCell(IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18), onPressed: () => _removeMaterial(e.key)))
-          ])),
-          ...labours.asMap().entries.map((e) => DataRow(cells: [
-            DataCell(Text(e.value['type'], style: const TextStyle(color: Colors.white))),
-            DataCell(Text('${e.value['count']}', style: const TextStyle(color: Colors.white))),
-            DataCell(Text(_calculateLabourAmount(e.value['type'], e.value['count']), style: const TextStyle(color: Colors.white))),
-            DataCell(IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18), onPressed: () => _removeLabour(e.key)))
-          ]))
+          ...materials.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['quantity']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateMaterialAmount(
+                      e.value['type'],
+                      e.value['quantity'],
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _removeMaterial(e.key),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...labours.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['count']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateLabourAmount(e.value['type'], e.value['count']),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => _removeLabour(e.key),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -32,13 +32,13 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Fetch org details if available
     setState(() {
       _tempOrgName = prefs.getString('temp_org_name');
       _tempLogoUrl = prefs.getString('temp_logo_url');
       _actualReferralCode = prefs.getString('temp_referral_code');
-      
+
       if (_tempOrgName != null) {
         _referralController.text = _tempOrgName!;
       } else if (_actualReferralCode != null) {
@@ -58,7 +58,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
           MaterialPageRoute(
             builder: (context) => CustomerDashboardPage(
               ownerName: ownerName,
-              ownerPhoneNumber: '', 
+              ownerPhoneNumber: '',
               siteId: siteId,
             ),
           ),
@@ -80,8 +80,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       setState(() => _isLoading = true);
 
       try {
-        final referralCode = _actualReferralCode ?? _referralController.text.trim();
-        
+        final referralCode =
+            _actualReferralCode ?? _referralController.text.trim();
+
         // Validate referral code by searching across all admin/referal documents
         final orgId = await FirestoreService.findOrgIdByReferralCode(
           referralCode,
@@ -97,28 +98,27 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         final String resolvedPath = 'organisation/$orgId/data/admin';
         await prefs.setString('cust_org_doc_path', resolvedPath);
 
-        
         await FirestoreService.initialize();
 
         final projectsCollection = await FirestoreService.projects;
         final querySnapshot = await projectsCollection
             .where('ownerName', isEqualTo: _usernameController.text.trim())
-            .where('ownerPhoneNumber', isEqualTo: _passwordController.text.trim())
+            .where(
+              'ownerPhoneNumber',
+              isEqualTo: _passwordController.text.trim(),
+            )
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
           final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
           final siteId = data['siteId'] ?? '';
 
-          await AuthService().login(
-            UserRole.customer,
-            {
-              'ownerName': _usernameController.text.trim(),
-              'siteId': siteId,
-              'orgId': orgId,
-              'cust_org_doc_path': resolvedPath,
-            },
-          );
+          await AuthService().login(UserRole.customer, {
+            'ownerName': _usernameController.text.trim(),
+            'siteId': siteId,
+            'orgId': orgId,
+            'cust_org_doc_path': resolvedPath,
+          });
 
           if (mounted) {
             _showSuccess('Login Successful!');
@@ -154,19 +154,13 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
     );
   }
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
@@ -180,8 +174,11 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF1E293B), size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF1E293B),
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -283,11 +280,18 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                         readOnly: _referralController.text.isNotEmpty,
                         decoration: InputDecoration(
                           labelText: 'Referral Code',
-                          prefixIcon: Icon(Icons.business_outlined, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.business_outlined,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
@@ -298,11 +302,18 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                         controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline_rounded, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
@@ -315,11 +326,18 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                         keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
                           labelText: 'Phone Number',
-                          prefixIcon: Icon(Icons.phone_outlined, color: colorScheme.primary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(
+                            Icons.phone_outlined,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
@@ -339,16 +357,27 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
                           child: _isLoading
                               ? const SizedBox(
                                   height: 24,
                                   width: 24,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
                                 )
-                              : const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              : const Text(
+                                  'LOGIN',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

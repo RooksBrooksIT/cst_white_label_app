@@ -148,18 +148,19 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   Future<void> _fetchSupervisorData() async {
     try {
       final orgId = getOrgId();
-      final String? passedSupervisorId = widget.userDetails['supervisorId']?.toString();
+      final String? passedSupervisorId = widget.userDetails['supervisorId']
+          ?.toString();
       Query query = FirebaseFirestore.instance
           .collection('organisation')
           .doc(orgId)
           .collection('siteSupervisorMap');
-          
+
       if (passedSupervisorId != null && passedSupervisorId.isNotEmpty) {
         query = query.where('Supervisor ID', isEqualTo: passedSupervisorId);
       } else {
         query = query.where('supervisor', isEqualTo: widget.userName);
       }
-      
+
       final snapshot = await query.get();
       if (snapshot.docs.isNotEmpty) {
         final sites = snapshot.docs
@@ -179,11 +180,14 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         setState(() {
           supervisorSites = sites;
           if (sites.isNotEmpty) {
-            String passedSiteId = widget.userDetails['siteId']?.toString() ?? '';
+            String passedSiteId =
+                widget.userDetails['siteId']?.toString() ?? '';
             var matchedSite = sites.first;
             if (passedSiteId.isNotEmpty) {
               try {
-                matchedSite = sites.firstWhere((s) => s['siteId'] == passedSiteId);
+                matchedSite = sites.firstWhere(
+                  (s) => s['siteId'] == passedSiteId,
+                );
               } catch (_) {
                 // If not found, fallback to first
               }
@@ -473,11 +477,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     setState(() {
       isSaving = true;
     });
-    final orgId = getOrgId();
-    final entriesColl = FirebaseFirestore.instance
-        .collection('organisation')
-        .doc(orgId)
-        .collection('siteSupervisorEntries');
+    final entriesColl = FirestoreService.siteSupervisorEntries;
 
     final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
     final docId = '${siteCode}_$dateForId';
@@ -556,12 +556,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
         final List<dynamic> mergedMaterials = [
           ...existingMaterials,
-          ...newMaterials
+          ...newMaterials,
         ];
-        final List<dynamic> mergedLabours = [
-          ...existingLabours,
-          ...newLabours
-        ];
+        final List<dynamic> mergedLabours = [...existingLabours, ...newLabours];
         final int mergedFood =
             existingFood + (int.tryParse(foodCost.text) ?? 0);
         final int mergedFuel =
@@ -612,9 +609,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       // Update total site expense aggregation
       await ExpenseService.updateTotalSiteExpense(siteCode);
       // --- Update siteSupervisorProjectStageActual collection ---
-      final actualColl = FirebaseFirestore.instance.collection(
-        'siteSupervisorProjectStageActual',
-      );
+      final actualColl = FirestoreService.siteSupervisorProjectStageActual;
       final actualDocId =
           '${siteCode}_${widget.userName}_${selectedProjectPhase ?? ''}';
       final actualDoc = await actualColl.doc(actualDocId).get();
@@ -640,10 +635,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             existingActData['actLabours'] as List? ?? [];
         final List<dynamic> mergedActLabours = [
           ...existingActLabours,
-          ...actLabours
+          ...actLabours,
         ];
-        final double existingActPayment =
-            (existingActData['actPayment'] ?? 0).toDouble();
+        final double existingActPayment = (existingActData['actPayment'] ?? 0)
+            .toDouble();
         int prevDays = (existingActData['actDays'] ?? 0) as int;
 
         if (isSameDate) {
@@ -678,7 +673,6 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     }
   }
 
-
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0),
@@ -699,9 +693,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20, color: const Color(0xFF772323)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -1129,213 +1121,208 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                     GlassCard(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.construction,
-                                  size: 22,
-                                  color: theme.primaryColor,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    value: selectedSiteId,
-                                    isExpanded: true,
-                                    decoration: InputDecoration(
-                                      labelText: 'Site Id (Supervisor Only)',
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.grey[50],
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.construction,
+                                size: 22,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: selectedSiteId,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Site Id (Supervisor Only)',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    items: supervisorSites
-                                        .map(
-                                          (site) => DropdownMenuItem(
-                                            value: site['siteId'],
-                                            child: Text(
-                                              site['siteId'] ?? '',
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: supervisorSites.isEmpty
-                                        ? null
-                                        : (value) {
-                                            final selected = supervisorSites
-                                                .firstWhere(
-                                                  (site) =>
-                                                      site['siteId'] == value,
-                                                  orElse: () =>
-                                                      <String, String>{
-                                                        'siteId': '',
-                                                        'supervisor': '',
-                                                        'location': 'Unknown',
-                                                        'supervisorId': '',
-                                                        'projectStage': '',
-                                                      },
-                                                );
-                                            setState(() {
-                                              selectedSiteId = value;
-                                              siteCode =
-                                                  selected['siteId'] ?? '';
-                                              supervisorName =
-                                                  selected['supervisor'] ?? '';
-                                              siteLocation =
-                                                  selected['location'] ??
-                                                  'Unknown';
-                                              supervisorId =
-                                                  selected['supervisorId'] ??
-                                                  '';
-                                              projectName =
-                                                  selected['projectName'] ??
-                                                  'Not found';
-                                              selectedProjectPhase =
-                                                  selected['projectStage']!
-                                                      .isNotEmpty
-                                                  ? selected['projectStage']
-                                                  : (projectPhases.isNotEmpty
-                                                        ? projectPhases.first
-                                                        : null);
-                                            });
-                                          },
+                                    filled: true,
+                                    fillColor: Colors.grey[50],
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                   ),
+                                  items: supervisorSites
+                                      .map(
+                                        (site) => DropdownMenuItem(
+                                          value: site['siteId'],
+                                          child: Text(
+                                            site['siteId'] ?? '',
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: supervisorSites.isEmpty
+                                      ? null
+                                      : (value) {
+                                          final selected = supervisorSites
+                                              .firstWhere(
+                                                (site) =>
+                                                    site['siteId'] == value,
+                                                orElse: () => <String, String>{
+                                                  'siteId': '',
+                                                  'supervisor': '',
+                                                  'location': 'Unknown',
+                                                  'supervisorId': '',
+                                                  'projectStage': '',
+                                                },
+                                              );
+                                          setState(() {
+                                            selectedSiteId = value;
+                                            siteCode = selected['siteId'] ?? '';
+                                            supervisorName =
+                                                selected['supervisor'] ?? '';
+                                            siteLocation =
+                                                selected['location'] ??
+                                                'Unknown';
+                                            supervisorId =
+                                                selected['supervisorId'] ?? '';
+                                            projectName =
+                                                selected['projectName'] ??
+                                                'Not found';
+                                            selectedProjectPhase =
+                                                selected['projectStage']!
+                                                    .isNotEmpty
+                                                ? selected['projectStage']
+                                                : (projectPhases.isNotEmpty
+                                                      ? projectPhases.first
+                                                      : null);
+                                          });
+                                        },
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 20,
-                                  color: theme.primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person,
+                                size: 20,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Supervisor: ${supervisorName ?? widget.userName}',
+                                      style: const TextStyle(fontSize: 16),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (supervisorId != null &&
+                                        supervisorId!.isNotEmpty)
                                       Text(
-                                        'Supervisor: ${supervisorName ?? widget.userName}',
-                                        style: const TextStyle(fontSize: 16),
+                                        'ID: $supervisorId',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      if (supervisorId != null &&
-                                          supervisorId!.isNotEmpty)
-                                        Text(
-                                          'ID: $supervisorId',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                    ],
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 20,
-                                  color: theme.primaryColor,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 20,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Project Name: $projectName',
+                                  style: const TextStyle(fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Project Name: $projectName',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 20,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Location: $siteLocation',
+                                  style: const TextStyle(fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 20,
-                                  color: theme.primaryColor,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 20,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Project Stage: ${selectedProjectPhase ?? "Not selected"}',
+                                  style: const TextStyle(fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Location: $siteLocation',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: 20,
+                                color: theme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  selectedDate != null
+                                      ? '${selectedDate!.toLocal()}'.split(
+                                          ' ',
+                                        )[0]
+                                      : 'No date chosen',
+                                  style: const TextStyle(fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 20,
-                                  color: theme.primaryColor,
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: _pickDate,
+                                icon: const Icon(Icons.edit, size: 16),
+                                label: const Text('Change'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: theme.primaryColor,
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Project Stage: ${selectedProjectPhase ?? "Not selected"}',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  size: 20,
-                                  color: theme.primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    selectedDate != null
-                                        ? '${selectedDate!.toLocal()}'.split(
-                                            ' ',
-                                          )[0]
-                                        : 'No date chosen',
-                                    style: const TextStyle(fontSize: 16),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Spacer(),
-                                TextButton.icon(
-                                  onPressed: _pickDate,
-                                  icon: const Icon(Icons.edit, size: 16),
-                                  label: const Text('Change'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: theme.primaryColor,
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
                     const SizedBox(height: 16),
 
                     // Add Entry Text
@@ -1688,9 +1675,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       onPressed: _addCustomMaterial,
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        backgroundColor: const Color(0xFF772323),
+                                        backgroundColor: const Color(
+                                          0xFF772323,
+                                        ),
                                         foregroundColor: Colors.white,
                                       ),
                                       child: const Text('Add Material'),
@@ -1706,7 +1697,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       },
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         backgroundColor: Colors.grey[200],
                                         foregroundColor: Colors.black87,
@@ -2056,9 +2049,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       onPressed: _addCustomLabour,
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        backgroundColor: const Color(0xFF772323),
+                                        backgroundColor: const Color(
+                                          0xFF772323,
+                                        ),
                                         foregroundColor: Colors.white,
                                       ),
                                       child: const Text('Add Labour'),
@@ -2074,7 +2071,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       },
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         backgroundColor: Colors.grey[200],
                                         foregroundColor: Colors.black87,

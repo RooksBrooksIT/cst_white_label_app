@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import '../widgets/glass_scaffold.dart';
@@ -61,14 +62,39 @@ class _ProjectstageSiteSummaryReportState
   }
 
   Future<Map<String, num>> _fetchExpenseTotals() async {
-    final query = await FirestoreService.getCollection('siteSupervisorEntries')
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .get();
+    final results = await Future.wait([
+      FirestoreService.getCollection(
+        'siteSupervisorEntries',
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        'managerExpenses',
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        'organizationExpenses',
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        'contractorEntries',
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+    ]);
+
+    final supervisorSnap = results[0] as QuerySnapshot;
+    final managerSnap = results[1] as QuerySnapshot;
+    final orgSnap = results[2] as QuerySnapshot;
+    final contractorSnap = results[3] as QuerySnapshot;
+
+    final targetStage = widget.projectStage.trim();
 
     num food = 0, fuel = 0, transport = 0, labours = 0, materials = 0;
-    for (var doc in query.docs) {
-      final data = doc.data();
+    num managerTotal = 0, organizationTotal = 0, contractorTotal = 0;
+
+    // 1. Supervisor
+    for (var doc in supervisorSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+
       food += _toNum(data['food']);
       fuel += _toNum(data['fuel']);
       transport += _toNum(data['transport']);
@@ -80,12 +106,46 @@ class _ProjectstageSiteSummaryReportState
         for (var m in data['materials']) materials += _toNum(m['amount']);
       }
     }
+
+    // 2. Manager
+    for (var doc in managerSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+      managerTotal += _toNum(data['totalAmount']);
+    }
+
+    // 3. Organization
+    for (var doc in orgSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+      organizationTotal += _toNum(data['totalAmount']);
+    }
+
+    // 4. Contractor
+    for (var doc in contractorSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+      contractorTotal += _toNum(data['totalAmount']);
+    }
+
     return {
       'Food': food,
       'Fuel': fuel,
       'Transport': transport,
       'Labours': labours,
       'Materials': materials,
+      'Manager Expenses': managerTotal,
+      'Organization Expenses': organizationTotal,
+      'Contractor Expenses': contractorTotal,
     };
   }
 

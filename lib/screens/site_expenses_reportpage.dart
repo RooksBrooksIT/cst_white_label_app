@@ -13,6 +13,7 @@ class SiteExpensesReportPage extends StatefulWidget {
   final String siteId;
   final DateTime fromDate;
   final DateTime toDate;
+  final String? projectStage;
 
   const SiteExpensesReportPage({
     super.key,
@@ -20,6 +21,7 @@ class SiteExpensesReportPage extends StatefulWidget {
     required this.fromDate,
     required this.toDate,
     required String supervisorId,
+    this.projectStage,
   });
 
   @override
@@ -58,7 +60,20 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       final supervisorDoc = await FirestoreService.getCollection(
         'siteSupervisorEntries',
       ).doc(docId).get();
-      final supervisorData = supervisorDoc.exists ? supervisorDoc.data() : null;
+      Map<String, dynamic>? supervisorData;
+      if (supervisorDoc.exists) {
+        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        if (widget.projectStage != null) {
+          final docStage = (data?['projectStage'] ?? data?['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage == widget.projectStage?.trim()) {
+            supervisorData = data;
+          }
+        } else {
+          supervisorData = data;
+        }
+      }
 
       // Manager bills for this date
       final managerQuery = await FirestoreService.getCollection(
@@ -67,6 +82,14 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       List<Map<String, dynamic>> managerBills = [];
       for (final doc in managerQuery.docs) {
         final data = doc.data();
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
         if (data['bills'] != null) {
           for (final bill in data['bills']) {
             DateTime? billDateObj;
@@ -92,6 +115,14 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       List<Map<String, dynamic>> orgBills = [];
       for (final doc in orgQuery.docs) {
         final data = doc.data();
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
         if (data['bills'] != null) {
           for (final bill in data['bills']) {
             DateTime? billDateObj;
@@ -111,17 +142,25 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // Contractor expenses for this date
-      final contractorQuery =
-          await FirestoreService.getCollection('contractorEntries')
+      Query<Map<String, dynamic>> contractorQuery =
+          FirestoreService.getCollection('contractorEntries')
               .where('siteId', isEqualTo: widget.siteId)
               .where(
                 'date',
                 isEqualTo: DateFormat('yyyy-MM-dd').format(current),
-              )
-              .get();
+              );
+
+      final contractorSnapshot = await contractorQuery.get();
       List<Map<String, dynamic>> contractorEntries = [];
-      for (final doc in contractorQuery.docs) {
+      for (final doc in contractorSnapshot.docs) {
         final data = doc.data();
+        // Filter by stage if provided
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
         contractorEntries.add(data);
       }
 

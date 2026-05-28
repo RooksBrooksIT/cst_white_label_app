@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
@@ -16,22 +17,42 @@ class CustomerWorkerDetails extends StatefulWidget {
 }
 
 class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  DateTime? _selectedDate;
-  String _selectedMonth = '';
-  String _selectedYear = '';
+  bool _isServiceReady = false;
 
   @override
   void initState() {
     super.initState();
+    _initService();
     // Initialize with current date
     final now = DateTime.now();
     _selectedMonth = DateFormat('MMMM').format(now);
     _selectedYear = now.year.toString();
   }
 
+  Future<void> _initService() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    if (mounted) {
+      setState(() {
+        _isServiceReady = true;
+      });
+    }
+  }
+
+  DateTime? _selectedDate;
+  String _selectedMonth = '';
+  String _selectedYear = '';
+
   @override
   Widget build(BuildContext context) {
+    if (!_isServiceReady && !FirestoreService.isReady) {
+      return const GlassScaffold(
+        title: 'Worker Details',
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return GlassScaffold(
       title: 'Worker Details',
       onBack: () => Navigator.pop(context),
@@ -41,10 +62,9 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
           _buildFilterSection(),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('workersAttendance')
-                  .where('site', isEqualTo: widget.siteId)
-                  .snapshots(),
+              stream: FirestoreService.getCollection(
+                'workersAttendance',
+              ).where('site', isEqualTo: widget.siteId).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
@@ -69,7 +89,9 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 final documents = snapshot.data!.docs;
 
                 // Filter documents based on selected date/month/year
-                final filteredDocs = _filterDocuments(documents);
+                final filteredDocs = _filterDocuments(
+                  documents.cast<QueryDocumentSnapshot>(),
+                );
 
                 if (filteredDocs.isEmpty) {
                   return Center(

@@ -62,7 +62,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
           bool isExpired = false;
           if (endDate != null) {
-            // Add a small buffer (e.g. 1 hour) to handle clock skews
             isExpired = DateTime.now().isAfter(
               endDate.toDate().add(const Duration(hours: 1)),
             );
@@ -102,21 +101,60 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: AppTheme.appName,
-      builder: (context, appName, _) {
-        return GlassScaffold(
-          title: appName.isNotEmpty ? appName : 'Organization Dashboard',
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              tooltip: 'Menu',
-              color: Theme.of(context).colorScheme.onPrimary,
-              onPressed: () => _navigateToOrgMenu(context),
-            ),
-          ],
-          drawer: null,
-          body: _buildBody(context),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        return Theme(
+          data: AppTheme.getTheme(primaryColor),
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              return ValueListenableBuilder<String>(
+                valueListenable: AppTheme.appName,
+                builder: (context, appName, _) {
+                  return GlassScaffold(
+                    title: appName.isNotEmpty
+                        ? "$appName's Dashboard"
+                        : 'Organization Dashboard',
+                    actions: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.menu_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'Menu',
+                        onPressed: () => _navigateToOrgMenu(context),
+                      ),
+                    ],
+                    padding: EdgeInsets.zero,
+                    body: CustomScrollView(
+                      controller: _scrollController,
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 24,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildWelcomeSection(theme),
+                                const SizedBox(height: 32),
+                                _buildDashboardSections(context, theme),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -261,131 +299,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    final theme = Theme.of(context);
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeSection(theme),
-                const SizedBox(height: 32),
-                // _buildQuickStats(context, theme),
-                // const SizedBox(height: 32),
-                _buildDashboardSections(context, theme),
-              ],
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: const SizedBox(height: 40), // Spacing for gesture bar
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickStats(BuildContext context, ThemeData theme) {
-    final stats = [
-      {
-        'icon': Icons.payments_rounded,
-        'label': 'Pending',
-        'value': '12',
-        'color': Colors.orange,
-      },
-      {
-        'icon': Icons.check_circle_rounded,
-        'label': 'Approved',
-        'value': '45',
-        'color': Colors.green,
-      },
-      {
-        'icon': Icons.pending_actions_rounded,
-        'label': 'Requests',
-        'value': '8',
-        'color': Colors.blue,
-      },
-      {
-        'icon': Icons.trending_up_rounded,
-        'label': 'Revenue',
-        'value': '₹2.4L',
-        'color': Colors.purple,
-      },
-    ];
-
-    return Container(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: stats.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final stat = stats[index];
-          return Container(
-            width: (MediaQuery.of(context).size.width - 64) / 2.2,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: (stat['color'] as Color).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    stat['icon'] as IconData,
-                    color: stat['color'] as Color,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        stat['value'] as String,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                      Text(
-                        stat['label'] as String,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
+  // Updated category tile design – more professional, clean, and modern
   Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
     final categories = [
       _CategoryData(
@@ -575,13 +489,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(
+          20,
+        ), // slightly reduced for cleaner look
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: theme.shadowColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -597,32 +513,33 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ),
             ),
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Row(
               children: [
+                // Icon container with subtle gradient
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: category.gradientColors,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: category.color.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: category.color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Icon(category.icon, color: Colors.white, size: 28),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 18),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,26 +547,26 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       Text(
                         category.title,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: theme.colorScheme.onSurface,
-                          fontSize: 17,
-                          letterSpacing: -0.4,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         category.subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 13,
+                          fontSize: 12.5,
                           height: 1.3,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+                          horizontal: 8,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: category.color.withOpacity(0.1),
@@ -659,7 +576,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           '${category.items.length} options',
                           style: TextStyle(
                             color: category.color,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -667,18 +584,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     ],
                   ),
                 ),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 16,
-                  ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 16,
                 ),
               ],
             ),
@@ -688,7 +597,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // Navigation methods remain the same
+  // ---- ALL NAVIGATION METHODS REMAIN IDENTICAL ----
   void _navigateToConfiguration(BuildContext context) {
     Navigator.push(
       context,

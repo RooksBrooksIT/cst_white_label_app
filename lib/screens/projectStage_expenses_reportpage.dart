@@ -73,11 +73,17 @@ class _ProjectStageExpensesReportPageState
     double total = 0;
     final snap = await FirestoreService.getCollection(collection)
         .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
         .get();
 
     for (var doc in snap.docs) {
       final data = doc.data();
+
+      // Filter by stage manually to check both possible field names
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != widget.projectStage.trim()) continue;
+
       DateTime? entryDate;
       final rawDate = data[dateField];
       if (rawDate is Timestamp)
