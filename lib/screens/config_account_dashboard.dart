@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -50,6 +52,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0.0;
   DateTime? _lastBackPressTime;
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -322,46 +325,57 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      // STRAIGHT TOP BAR – no curves
-      appBar: AppBar(
-        toolbarHeight: 70,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Management Console',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-            color: Colors.white,
-          ),
-        ),
-        actions: widget.showLogout
-            ? [
-                IconButton(
-                  icon: const Icon(
-                    Icons.logout_rounded,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                  onPressed: () => _showLogoutConfirmation(context),
-                  tooltip: 'Logout',
+    return GlassScaffold(
+      title: 'Management Console',
+      onBack: () => Navigator.pop(context),
+      actions: widget.showLogout
+          ? [
+              IconButton(
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 26,
                 ),
-                const SizedBox(width: 8),
-              ]
-            : null,
+                onPressed: () => _showLogoutConfirmation(context),
+                tooltip: 'Logout',
+              ),
+              const SizedBox(width: 8),
+            ]
+          : null,
+      padding: EdgeInsets.zero,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddOptions(context),
+        backgroundColor: theme.primaryColor,
+        elevation: 4,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
+      ),
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        color: theme.cardColor,
+        elevation: 8,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(
+              context,
+              Icons.dashboard_rounded,
+              'Dashboard',
+              _currentIndex == 0,
+              () => setState(() => _currentIndex = 0),
+            ),
+            const SizedBox(width: 40), // Space for FAB
+            _buildNavItem(
+              context,
+              Icons.settings_rounded,
+              'Settings',
+              _currentIndex == 1,
+              () => setState(() => _currentIndex = 1),
+            ),
+          ],
+        ),
       ),
       body: CustomScrollView(
         controller: _scrollController,
@@ -372,60 +386,109 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [_buildDashboardSections(context)],
+                children: [
+                  _buildWelcomeCard(theme),
+                  const SizedBox(height: 24),
+                  _buildDashboardSections(context),
+                ],
               ),
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddOptions(context),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: Colors.white,
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: const Icon(Icons.add_rounded, size: 32),
+    );
+  }
+
+  Widget _buildWelcomeCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 10,
-        color: theme.cardColor,
-        elevation: 20,
-        surfaceTintColor: theme.cardColor,
-        child: SafeArea(
-          child: SizedBox(
-            height: 50,
-            child: Row(
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white.withOpacity(0.2),
+            child: const Icon(
+              Icons.manage_accounts_rounded,
+              color: Colors.white,
+              size: 35,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildNavItem(
-                    context,
-                    Icons.dashboard_rounded,
-                    'Console',
-                    true,
-                    () {},
+                Text(
+                  'Welcome,',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(width: 80),
-                Expanded(
-                  child: _buildNavItem(
-                    context,
-                    Icons.support_agent_rounded,
-                    'Support',
-                    false,
-                    () => _navigateToScreen(context, 'Support'),
+                Text(
+                  _managerName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Project Manager Console',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildDashboardSections(BuildContext context) {
+    if (_currentIndex == 1) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.settings_suggest_rounded,
+                size: 64,
+                color: Colors.grey,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Settings Screen',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Configure your preferences here',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Column(
       children: groupedItems.entries.map((entry) {
         return TweenAnimationBuilder<double>(
@@ -450,7 +513,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     List<DashboardItem> items,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final firstItem = items.first;
     final color = firstItem.color;
 
@@ -458,13 +520,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: theme.shadowColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -472,90 +534,62 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _openCategorySubMenu(context, title),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Row(
               children: [
+                // Icon container with subtle gradient
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [color, color.withOpacity(0.7)],
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: Icon(firstItem.icon, color: Colors.white, size: 32),
+                  child: Icon(firstItem.icon, color: Colors.white, size: 28),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 18),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                          letterSpacing: -0.5,
-                          fontSize: 18,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "${items.length} Configuration Options",
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 13,
+                        '${items.length} configuration ${items.length == 1 ? 'option' : 'options'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                          height: 1.3,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'General Settings',
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: color,
-                    size: 18,
-                  ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 16,
                 ),
               ],
             ),
@@ -692,8 +726,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     VoidCallback onTap,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final color = isActive ? colorScheme.primary : colorScheme.onSurfaceVariant;
+    final color = isActive ? theme.primaryColor : Colors.grey;
 
     return InkWell(
       onTap: onTap,

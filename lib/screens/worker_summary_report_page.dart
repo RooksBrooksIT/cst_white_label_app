@@ -238,6 +238,7 @@ class _WorkerAttendanceSalaryPageState
 
     return GlassScaffold(
       title: 'Worker Attendance & Summary',
+      onBack: () => Navigator.pop(context),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(

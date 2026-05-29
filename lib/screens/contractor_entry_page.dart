@@ -115,7 +115,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   final _customLabourNameController = TextEditingController();
   final _customLabourSalaryController = TextEditingController(text: '0');
   final _customLabourQtyController = TextEditingController(text: '0');
- 
+
   @override
   void initState() {
     super.initState();
@@ -172,14 +172,16 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       // 2. Fetch projects matching contractor
       final contractor =
           _selectedContractorName ?? widget.userDetails['contractorName'];
-          
-      Query<Map<String, dynamic>> query = FirestoreService.projects
-          .where('isContractWork', isEqualTo: true);
-          
+
+      Query<Map<String, dynamic>> query = FirestoreService.projects.where(
+        'isContractWork',
+        isEqualTo: true,
+      );
+
       if (widget.showLogout && contractor != null) {
-          query = query.where('contractorName', isEqualTo: contractor);
+        query = query.where('contractorName', isEqualTo: contractor);
       }
-      
+
       final snapshot = await query.get();
       final ids = <String>[];
       for (var doc in snapshot.docs) {
@@ -217,10 +219,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         contractStartDate = null;
         contractEndDate = null;
         if (!widget.showLogout) {
-           _contractorNameController.clear();
-           _projectFieldController.clear();
-           _selectedContractorName = null;
-           _selectedProjectField = null;
+          _contractorNameController.clear();
+          _projectFieldController.clear();
+          _selectedContractorName = null;
+          _selectedProjectField = null;
         }
       });
       return;
@@ -228,16 +230,16 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     try {
       final contractor =
           _selectedContractorName ?? widget.userDetails['contractorName'];
-          
+
       Query<Map<String, dynamic>> query = FirestoreService.projects
           .where('siteId', isEqualTo: siteId)
           .limit(1);
 
       // Only filter by contractor if it's a contractor logging in
       if (widget.showLogout && contractor != null) {
-          query = query.where('contractorName', isEqualTo: contractor);
+        query = query.where('contractorName', isEqualTo: contractor);
       }
-      
+
       final snapshot = await query.get();
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data() as Map<String, dynamic>;
@@ -245,10 +247,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
           contractStartDate = data['contractStartDate'];
           contractEndDate = data['contractEndDate'];
           if (!widget.showLogout) {
-              _contractorNameController.text = data['contractorName'] ?? '';
-              _selectedContractorName = data['contractorName'] ?? '';
-              _projectFieldController.text = data['projectStage'] ?? '';
-              _selectedProjectField = data['projectStage'] ?? '';
+            _contractorNameController.text = data['contractorName'] ?? '';
+            _selectedContractorName = data['contractorName'] ?? '';
+            _projectFieldController.text = data['projectStage'] ?? '';
+            _selectedProjectField = data['projectStage'] ?? '';
           }
         });
       } else {
@@ -272,7 +274,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     });
     try {
       // 1. Fetch materialCategories to build a lookup map
-      final categoriesSnapshot = await FirestoreService.getCollection('materialCategories').get();
+      final categoriesSnapshot = await FirestoreService.getCollection(
+        'materialCategories',
+      ).get();
       final categoryMap = <String, String>{};
       for (var doc in categoriesSnapshot.docs) {
         final data = doc.data();
@@ -289,18 +293,25 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        
+
         // Resolve materialCategory reference
         String? resolvedCategory;
         final catRef = data['materialCategory'];
         if (catRef is DocumentReference) {
           resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
         } else if (catRef is String && catRef.isNotEmpty) {
-          resolvedCategory = categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
+          resolvedCategory =
+              categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
         }
-        
+
         // Fallback if not resolved
-        final name = (resolvedCategory ?? data['materialName'] ?? data['matCategory'] ?? '').toString().trim();
+        final name =
+            (resolvedCategory ??
+                    data['materialName'] ??
+                    data['matCategory'] ??
+                    '')
+                .toString()
+                .trim();
         if (name.isNotEmpty) {
           options.add(name);
           var priceRaw = data['materialPrice'];
@@ -626,9 +637,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         'contractorEndDate': contractEndDate,
       };
 
-      await FirestoreService.contractorEntries
-          .doc(docId)
-          .set(data);
+      await FirestoreService.contractorEntries.doc(docId).set(data);
 
       // If manager is editing, update the project details as well
       if (!widget.showLogout && selectedSiteIdForEntry != null) {
@@ -641,13 +650,13 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             await projectQuery.docs.first.reference.update({
               'contractStartDate': contractStartDate != null
                   ? (contractStartDate is DateTime
-                      ? Timestamp.fromDate(contractStartDate)
-                      : contractStartDate)
+                        ? Timestamp.fromDate(contractStartDate)
+                        : contractStartDate)
                   : null,
               'contractEndDate': contractEndDate != null
                   ? (contractEndDate is DateTime
-                      ? Timestamp.fromDate(contractEndDate)
-                      : contractEndDate)
+                        ? Timestamp.fromDate(contractEndDate)
+                        : contractEndDate)
                   : null,
               'contractorName': _selectedContractorName,
               'projectStage': _selectedProjectField,
@@ -1031,12 +1040,14 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   // --------- Section Cards -----------
   Future<void> _pickContractStartDate() async {
     if (widget.showLogout) return;
-    DateTime? initial = contractStartDate is DateTime 
-        ? contractStartDate 
-        : (contractStartDate != null && contractStartDate.runtimeType.toString() == 'Timestamp' && contractStartDate.toDate != null
-            ? contractStartDate.toDate() 
-            : DateTime.now());
-            
+    DateTime? initial = contractStartDate is DateTime
+        ? contractStartDate
+        : (contractStartDate != null &&
+                  contractStartDate.runtimeType.toString() == 'Timestamp' &&
+                  contractStartDate.toDate != null
+              ? contractStartDate.toDate()
+              : DateTime.now());
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -1060,12 +1071,14 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   Future<void> _pickContractEndDate() async {
     if (widget.showLogout) return;
-    DateTime? initial = contractEndDate is DateTime 
-        ? contractEndDate 
-        : (contractEndDate != null && contractEndDate.runtimeType.toString() == 'Timestamp' && contractEndDate.toDate != null
-            ? contractEndDate.toDate() 
-            : DateTime.now());
-            
+    DateTime? initial = contractEndDate is DateTime
+        ? contractEndDate
+        : (contractEndDate != null &&
+                  contractEndDate.runtimeType.toString() == 'Timestamp' &&
+                  contractEndDate.toDate != null
+              ? contractEndDate.toDate()
+              : DateTime.now());
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -1144,6 +1157,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                     _buildInputField(
                       label: 'Site ID',
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: selectedSiteIdForEntry,
                         items: siteIdOptions
                             .map(
@@ -1151,6 +1165,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                                 value: id,
                                 child: Text(
                                   '$id - ${siteNameMap[id] ?? "Unnamed Site"}',
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             )
@@ -1168,11 +1183,17 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                           child: _buildInputField(
                             label: 'Contract Start Date',
                             child: InkWell(
-                              onTap: widget.showLogout ? null : _pickContractStartDate,
+                              onTap: widget.showLogout
+                                  ? null
+                                  : _pickContractStartDate,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 child: Text(
-                                  _formatDate(contractStartDate).isEmpty ? 'Select Date' : _formatDate(contractStartDate),
+                                  _formatDate(contractStartDate).isEmpty
+                                      ? 'Select Date'
+                                      : _formatDate(contractStartDate),
                                   style: TextStyle(fontSize: 14),
                                 ),
                               ),
@@ -1184,11 +1205,17 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                           child: _buildInputField(
                             label: 'Contract End Date',
                             child: InkWell(
-                              onTap: widget.showLogout ? null : _pickContractEndDate,
+                              onTap: widget.showLogout
+                                  ? null
+                                  : _pickContractEndDate,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 child: Text(
-                                  _formatDate(contractEndDate).isEmpty ? 'Select Date' : _formatDate(contractEndDate),
+                                  _formatDate(contractEndDate).isEmpty
+                                      ? 'Select Date'
+                                      : _formatDate(contractEndDate),
                                   style: TextStyle(fontSize: 14),
                                 ),
                               ),
@@ -1248,7 +1275,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: (_filteredMaterialOptions ?? materialOptions).contains(selectedMaterial) ? selectedMaterial : null,
+                          value:
+                              (_filteredMaterialOptions ?? materialOptions)
+                                  .contains(selectedMaterial)
+                              ? selectedMaterial
+                              : null,
                           decoration: InputDecoration(
                             labelText: 'Material',
                             border: OutlineInputBorder(
@@ -1415,7 +1446,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: (_filteredLabourOptions ?? labourOptions).contains(selectedLabour) ? selectedLabour : null,
+                          value:
+                              (_filteredLabourOptions ?? labourOptions)
+                                  .contains(selectedLabour)
+                              ? selectedLabour
+                              : null,
                           decoration: InputDecoration(
                             labelText: 'Labour',
                             border: OutlineInputBorder(
@@ -1598,6 +1633,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
     return GlassScaffold(
       title: 'CONTRACTOR ENTRY',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: widget.showLogout
           ? [
               IconButton(

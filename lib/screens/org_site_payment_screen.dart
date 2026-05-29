@@ -6,6 +6,8 @@ import 'dart:async';
 import '../services/firestore_service.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
 
 class SitePaymentScreen extends StatefulWidget {
   const SitePaymentScreen({super.key});
@@ -381,103 +383,109 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Site Details'),
+              const SizedBox(height: 20),
+              _buildSiteDropdown(context),
+              const SizedBox(height: 20),
+              _buildSupervisorField(context),
+              const SizedBox(height: 20),
+              _buildAmountField(context),
+              const SizedBox(height: 20),
+              _buildProjectStageDropdown(context),
+            ],
           ),
-        ],
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildSectionTitle(context, 'Site Details'),
-          const SizedBox(height: 16),
-          _buildSiteDropdown(context),
-          const SizedBox(height: 16),
-          _buildSupervisorField(context),
-          const SizedBox(height: 16),
-          _buildAmountField(context),
-          const SizedBox(height: 16),
-          _buildProjectStageDropdown(context),
-          const SizedBox(height: 32),
-          _buildSectionTitle(context, 'Payment Period'),
-          const SizedBox(height: 16),
-          _buildPeriodSelection(context),
-          const SizedBox(height: 24),
-          _buildWeeksSelection(context),
-          const SizedBox(height: 24),
-          if (selectedPaymentWeekIndex != null)
-            _buildDatePickerSection(context),
-          const SizedBox(height: 40),
-          _buildActionButtons(context),
-        ],
-      ),
+        ),
+        const SizedBox(height: 24),
+        GlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle(context, 'Payment Period'),
+              const SizedBox(height: 20),
+              _buildPeriodSelection(context),
+              const SizedBox(height: 24),
+              _buildWeeksSelection(context),
+              if (selectedPaymentWeekIndex != null) ...[
+                const SizedBox(height: 24),
+                _buildDatePickerSection(context),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 40),
+        _buildActionButtons(context),
+      ],
     );
   }
 
   Widget _buildSiteDropdown(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return DropdownButtonFormField<String>(
-      value: selectedSiteId,
-      isExpanded: true,
-      dropdownColor: theme.cardColor,
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: _inputDecoration(
-        context,
-        'Select Site ID',
-        Icons.place_rounded,
+    return _buildDropdownContainer(
+      context,
+      label: 'Site ID',
+      child: DropdownButtonFormField<String>(
+        value: selectedSiteId,
+        isExpanded: true,
+        dropdownColor: theme.cardColor,
+        decoration: InputDecoration(
+          hintText: 'Select Site ID',
+          prefixIcon: Icon(
+            Icons.place_rounded,
+            color: theme.primaryColor,
+            size: 20,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+        items: siteList.map((site) {
+          return DropdownMenuItem<String>(
+            value: site['id'],
+            child: Text(site['display'] ?? ''),
+          );
+        }).toList(),
+        onChanged: (value) async {
+          setState(() {
+            selectedSiteId = value;
+            supervisor = '';
+            amount = 0;
+            amountController.text = '';
+          });
+          if (value != null) {
+            await _fetchSupervisorForSite(value);
+          }
+        },
       ),
-      items: siteList.map((site) {
-        return DropdownMenuItem<String>(
-          value: site['id'],
-          child: Text(site['display'] ?? ''),
-        );
-      }).toList(),
-      onChanged: (value) async {
-        setState(() {
-          selectedSiteId = value;
-          supervisor = '';
-          amount = 0;
-          amountController.text = '';
-        });
-        if (value != null) {
-          await _fetchSupervisorForSite(value);
-        }
-      },
     );
   }
 
   Widget _buildSupervisorField(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return TextFormField(
-      readOnly: true,
+    return GlassTextField(
       controller: TextEditingController(text: supervisor),
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: _inputDecoration(context, 'Supervisor', Icons.person_rounded),
+      label: 'Supervisor',
+      icon: Icons.person_rounded,
+      readOnly: true,
     );
   }
 
   Widget _buildAmountField(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return TextFormField(
+    return GlassTextField(
       controller: amountController,
+      label: 'Amount',
+      icon: Icons.currency_rupee_rounded,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: _inputDecoration(
-        context,
-        'Amount',
-        Icons.currency_rupee_rounded,
-      ),
       onChanged: (value) {
         setState(() {
           amount = int.tryParse(value) ?? 0;
@@ -488,78 +496,218 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   Widget _buildProjectStageDropdown(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return DropdownButtonFormField<String>(
-      value: selectedProjectStage,
-      isExpanded: true,
-      dropdownColor: theme.cardColor,
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: _inputDecoration(
-        context,
-        'Project Stage',
-        Icons.flag_rounded,
+    return _buildDropdownContainer(
+      context,
+      label: 'Project Stage',
+      child: DropdownButtonFormField<String>(
+        value: selectedProjectStage,
+        isExpanded: true,
+        dropdownColor: theme.cardColor,
+        decoration: InputDecoration(
+          hintText: 'Select Project Stage',
+          prefixIcon: Icon(
+            Icons.flag_rounded,
+            color: theme.primaryColor,
+            size: 20,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+        items: projectStages.map((stage) {
+          return DropdownMenuItem<String>(value: stage, child: Text(stage));
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedProjectStage = value;
+          });
+        },
       ),
-      items: projectStages.map((stage) {
-        return DropdownMenuItem<String>(value: stage, child: Text(stage));
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          selectedProjectStage = value;
-        });
-      },
     );
   }
 
   Widget _buildPeriodSelection(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (isMobile) {
+      return Column(
+        children: [
+          _buildDropdownContainer(
+            context,
+            label: 'Year',
+            child: DropdownButtonFormField<int>(
+              value: selectedPaymentYear,
+              isExpanded: true,
+              dropdownColor: theme.cardColor,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.calendar_today_rounded,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              items: paymentYears.map((y) {
+                return DropdownMenuItem<int>(
+                  value: y,
+                  child: Text(y.toString()),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedPaymentYear = value!;
+                  selectedPaymentWeekIndex = null;
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildDropdownContainer(
+            context,
+            label: 'Month',
+            child: DropdownButtonFormField<int>(
+              value: selectedPaymentMonth,
+              isExpanded: true,
+              dropdownColor: theme.cardColor,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.calendar_month_rounded,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              items: List.generate(12, (i) => i + 1).map((m) {
+                return DropdownMenuItem<int>(
+                  value: m,
+                  child: Text(DateFormat.MMMM().format(DateTime(0, m))),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedPaymentMonth = value!;
+                  selectedPaymentWeekIndex = null;
+                });
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(
-          child: DropdownButtonFormField<int>(
-            value: selectedPaymentYear,
-            dropdownColor: theme.cardColor,
-            style: TextStyle(color: colorScheme.onSurface),
-            decoration: _inputDecoration(
-              context,
-              'Year',
-              Icons.calendar_today_rounded,
+          child: _buildDropdownContainer(
+            context,
+            label: 'Year',
+            child: DropdownButtonFormField<int>(
+              value: selectedPaymentYear,
+              isExpanded: true,
+              dropdownColor: theme.cardColor,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.calendar_today_rounded,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              items: paymentYears.map((y) {
+                return DropdownMenuItem<int>(
+                  value: y,
+                  child: Text(y.toString()),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedPaymentYear = value!;
+                  selectedPaymentWeekIndex = null;
+                });
+              },
             ),
-            items: paymentYears.map((y) {
-              return DropdownMenuItem<int>(value: y, child: Text(y.toString()));
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                selectedPaymentYear = value!;
-                selectedPaymentWeekIndex = null;
-              });
-            },
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
-          child: DropdownButtonFormField<int>(
-            value: selectedPaymentMonth,
-            dropdownColor: theme.cardColor,
-            style: TextStyle(color: colorScheme.onSurface),
-            decoration: _inputDecoration(
-              context,
-              'Month',
-              Icons.calendar_month_rounded,
+          child: _buildDropdownContainer(
+            context,
+            label: 'Month',
+            child: DropdownButtonFormField<int>(
+              value: selectedPaymentMonth,
+              isExpanded: true,
+              dropdownColor: theme.cardColor,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.calendar_month_rounded,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              items: List.generate(12, (i) => i + 1).map((m) {
+                return DropdownMenuItem<int>(
+                  value: m,
+                  child: Text(DateFormat.MMMM().format(DateTime(0, m))),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedPaymentMonth = value!;
+                  selectedPaymentWeekIndex = null;
+                });
+              },
             ),
-            items: List.generate(12, (i) => i + 1).map((m) {
-              return DropdownMenuItem<int>(
-                value: m,
-                child: Text(DateFormat.MMMM().format(DateTime(0, m))),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                selectedPaymentMonth = value!;
-                selectedPaymentWeekIndex = null;
-              });
-            },
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownContainer(
+    BuildContext context, {
+    required String label,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: child,
         ),
       ],
     );
@@ -590,7 +738,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: ElevatedButton(
             onPressed: _submitPayment,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: colorScheme.primary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -611,44 +759,17 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(
-    BuildContext context,
-    String label,
-    IconData icon,
-  ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF64748B)),
-      prefixIcon: Icon(icon, color: colorScheme.primary, size: 20),
-      filled: true,
-      fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: theme.dividerColor),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: theme.dividerColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: colorScheme.primary, width: 2),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    );
-  }
-
   Widget _buildSectionTitle(BuildContext context, String title) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: colorScheme.onSurfaceVariant,
-        letterSpacing: 0.5,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: theme.textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -666,81 +787,100 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         weeks.isEmpty
             ? Container(
                 padding: const EdgeInsets.all(16),
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: theme.dividerColor),
                 ),
                 child: Text(
                   'No weeks available for selected month',
                   style: TextStyle(
-                    color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                 ),
               )
-            : Wrap(
-                spacing: 8,
-                runSpacing: 12,
-                children: List.generate(weeks.length, (i) {
-                  final week = weeks[i];
-                  final startDate = DateFormat('MMM dd').format(week.first);
-                  final endDate = DateFormat('MMM dd').format(week.last);
-                  final isSelected = selectedPaymentWeekIndex == i;
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final double width = (constraints.maxWidth - 12) / 2;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: List.generate(weeks.length, (i) {
+                      final week = weeks[i];
+                      final startDate = DateFormat('MMM dd').format(week.first);
+                      final endDate = DateFormat('MMM dd').format(week.last);
+                      final isSelected = selectedPaymentWeekIndex == i;
 
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        selectedPaymentWeekIndex = i;
-                        selectedDate = week.first;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width:
-                          (MediaQuery.of(context).size.width - 80) /
-                          2, // Explicit width for 2-column layout to prevent overflow
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? colorScheme.primary
-                            : const Color(0xFFF8FAFC),
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            selectedPaymentWeekIndex = i;
+                            selectedDate = week.first;
+                          });
+                        },
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? colorScheme.primary
-                              : const Color(0xFFE2E8F0),
+                        child: Container(
+                          width: width,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? colorScheme.primary
+                                : theme.scaffoldBackgroundColor.withValues(
+                                    alpha: 0.5,
+                                  ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? colorScheme.primary
+                                  : theme.dividerColor,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: colorScheme.primary.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                'Week ${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? colorScheme.onPrimary
+                                      : colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$startDate - $endDate',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isSelected
+                                      ? colorScheme.onPrimary.withValues(
+                                          alpha: 0.9,
+                                        )
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Week ${i + 1}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$startDate - $endDate',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isSelected
-                                  ? colorScheme.onPrimary.withOpacity(0.9)
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                      );
+                    }),
                   );
-                }),
+                },
               ),
       ],
     );
@@ -775,6 +915,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   : weekStart,
               firstDate: weekStart,
               lastDate: weekEnd,
+              builder: (context, child) {
+                return Theme(
+                  data: theme.copyWith(
+                    colorScheme: colorScheme.copyWith(
+                      primary: colorScheme.primary,
+                      onPrimary: colorScheme.onPrimary,
+                      surface: theme.cardColor,
+                      onSurface: colorScheme.onSurface,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
             );
             if (picked != null) {
               setState(() => selectedDate = picked);
@@ -783,36 +936,54 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
-              color: theme.cardColor,
+              color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
               border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  selectedDate != null
-                      ? DateFormat('EEE, MMM dd, yyyy').format(selectedDate!)
-                      : 'Select Date',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      selectedDate != null
+                          ? DateFormat(
+                              'EEE, MMM dd, yyyy',
+                            ).format(selectedDate!)
+                          : 'Select Date',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
                 Icon(
-                  Icons.calendar_today_rounded,
-                  color: colorScheme.primary,
-                  size: 20,
+                  Icons.arrow_forward_ios_rounded,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  size: 16,
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Available: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            'Available: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
         ),
       ],
     );

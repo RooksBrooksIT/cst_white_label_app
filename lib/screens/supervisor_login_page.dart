@@ -5,6 +5,10 @@ import '../services/notification_service.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
 import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import '../utils/firestore_error_handler.dart';
 
@@ -547,61 +551,52 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.isMobile(context) ? 20 : 32,
-          ),
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
+      body: Center(        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Icon Header or Org Logo
               if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    image: DecorationImage(
-                      image: NetworkImage(_tempLogoUrl!),
-                      fit: BoxFit.cover,
+                    border: Border.all(color: colorScheme.outline, width: 2),
+                  ),
+                  child: Image.network(
+                    _tempLogoUrl!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.engineering_rounded,
+                      size: 60,
+                      color: colorScheme.primary,
                     ),
                   ),
                 )
               else
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: colorScheme.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      width: 2,
+                    ),
                   ),
                   child: Icon(
-                    Icons.supervisor_account_rounded,
-                    size: 64,
+                    Icons.engineering_rounded,
+                    size: 40,
                     color: colorScheme.primary,
                   ),
                 ),
@@ -609,247 +604,56 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
               Text(
                 _tempOrgName ?? 'Supervisor Login',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
               ),
-              if (_tempOrgName != null) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Supervisor Account',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to your dashboard',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
-              Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                ),
+              GlassCard(
+                padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      TextFormField(
+                      GlassTextField(
                         controller: _referralController,
-                        readOnly: _referralController.text.isNotEmpty,
-                        decoration: InputDecoration(
-                          labelText: 'Referral Code',
-                          prefixIcon: Icon(
-                            Icons.business_outlined,
-                            color: colorScheme.primary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.outlineVariant,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                        ),
-                        validator: (value) => (value == null || value.isEmpty)
-                            ? 'Referral Code is required'
-                            : null,
+                        label: 'Referral Code / Org Name',
+                        icon: Icons.business_rounded,
+                        enabled: _actualReferralCode == null && _tempOrgName == null,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
+                      const SizedBox(height: 20),
+                      GlassTextField(
                         controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          prefixIcon: Icon(
-                            Icons.person_outline_rounded,
-                            color: colorScheme.primary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.outlineVariant,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                        ),
-                        validator: (value) => (value == null || value.isEmpty)
-                            ? 'UserName is required'
-                            : null,
+                        label: 'Username',
+                        icon: Icons.person_outline_rounded,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
+                      const SizedBox(height: 20),
+                      GlassTextField(
                         controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(
-                            Icons.lock_outline_rounded,
-                            color: colorScheme.primary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.outlineVariant,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                        ),
-                        validator: (value) => (value == null || value.isEmpty)
-                            ? 'Password is required'
-                            : null,
+                        label: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        isPassword: true,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: CheckboxListTile(
-                          title: Text(
-                            'Is Contractor',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          value: _isContractor,
-                          activeColor: colorScheme.primary,
-                          onChanged: (val) {
-                            setState(() {
-                              _isContractor = val ?? false;
-                              if (!_isContractor) {
-                                _selectedSupervisorName = null;
-                              }
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      if (_isContractor) ...[
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            labelText: 'Contractor Name',
-                            prefixIcon: Icon(
-                              Icons.supervisor_account_outlined,
-                              color: colorScheme.primary,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                          ),
-                          value: _selectedSupervisorName,
-                          items: _supervisorNames.map((name) {
-                            return DropdownMenuItem<String>(
-                              value: name,
-                              child: Text(name),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() => _selectedSupervisorName = val);
-                          },
-                          validator: (value) => _isContractor && value == null
-                              ? 'Required'
-                              : null,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _showForgotPasswordDialog,
-                          child: const Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'LOGIN',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                        child: GlassButton(
+                          label: 'LOGIN',
+                          isLoading: _isLoading,
+                          onPressed: _login,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

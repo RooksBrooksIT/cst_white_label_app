@@ -859,7 +859,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     Text(
                       request['siteId'] ?? '',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: Colors.black87,
                         fontSize: 13,
                       ),
                     ),
@@ -899,12 +899,12 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       children: [
                         const Text(
                           'Supervisor',
-                          style: TextStyle(color: Colors.white54, fontSize: 11),
+                          style: TextStyle(color: Colors.black54, fontSize: 11),
                         ),
                         Text(
                           request['supervisorName'] ?? '-',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black,
                             fontSize: 14,
                           ),
                         ),
@@ -915,12 +915,12 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       children: [
                         const Text(
                           'Labours',
-                          style: TextStyle(color: Colors.white54, fontSize: 11),
+                          style: TextStyle(color: Colors.black54, fontSize: 11),
                         ),
                         Text(
                           '${(request['reqLabours'] ?? []).length}',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -956,7 +956,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                 Tab(text: "APPROVED"),
               ],
               labelColor: colorScheme.primary,
-              unselectedLabelColor: colorScheme.onSurfaceVariant,
+              unselectedLabelColor: Colors.black54,
               indicatorColor: colorScheme.primary,
               indicatorWeight: 3,
             ),
@@ -1046,12 +1046,16 @@ class _RowInfo extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             "$label: ",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Colors.black87,
+            ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(fontSize: 13, color: Colors.black),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1184,6 +1188,7 @@ class _LabourRequirementCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
+                                color: Colors.black,
                               ),
                             ),
                             Text(
@@ -1191,19 +1196,28 @@ class _LabourRequirementCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
+                                color: Colors.black,
                               ),
                             ),
                           ],
                         ),
+                        
                         const SizedBox(height: 4),
-                        Text('ID: $labourId', style: theme.textTheme.bodySmall),
+                        Text(
+                          'ID: $labourId',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.black54,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'Salary: ₹$salary',
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.black54,
+                              ),
                             ),
                             Text(
                               'Total: ₹$total',

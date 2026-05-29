@@ -13,7 +13,6 @@ import '../widgets/glass_button.dart';
 import '../utils/enums.dart';
 import '../services/auth_service.dart';
 
-
 class PricingScreen extends StatefulWidget {
   final String orgName;
   final String email;
@@ -65,8 +64,9 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final orgRef =
-            FirebaseFirestore.instance.collection('organisation').doc(orgId);
+        final orgRef = FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId);
         final adminColl = orgRef.collection('admin');
 
         // 1. Branding Document
@@ -103,16 +103,14 @@ class _PricingScreenState extends State<PricingScreen> {
         });
 
         // Also add the admin as the first entry in the organizationUser subcollection
-        transaction.set(
-          orgRef.collection('organizationUser').doc(widget.username),
-          {
-            'username': widget.username,
-            'password': widget.password,
-            'role': 'admin',
-            'orgId': orgId,
-            'createdAt': FieldValue.serverTimestamp(),
-          },
-        );
+        transaction
+            .set(orgRef.collection('organizationUser').doc(widget.username), {
+              'username': widget.username,
+              'password': widget.password,
+              'role': 'admin',
+              'orgId': orgId,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
       });
 
       // Auto-login using AuthService to ensure all unified keys are set
@@ -320,204 +318,266 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.getTheme(widget.selectedColor),
-      child: Builder(
-        builder: (context) {
-          final theme = Theme.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-          return GlassScaffold(
-            title: 'Pricing',
-            onBack: () => Navigator.pop(context),
-            body: Column(
+    return GlassScaffold(
+      title: 'Pricing & Registration',
+      onBack: () => Navigator.pop(context),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
               children: [
+                _buildStepIndicator(theme),
                 const SizedBox(height: 24),
-                // Step Indicator
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: _buildStepIndicator(theme),
-                ),
-                const SizedBox(height: 12),
-
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Choose a Plan',
-                          style: theme.textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Start growing your business with zero upfront cost',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 40),
-
-                        // Pricing Card
-                        GlassCard(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF00A86B,
-                                  ).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: const Text(
-                                  'RECOMMENDED',
-                                  style: TextStyle(
-                                    color: Color(0xFF00A86B),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Text(
-                                '30 Days Free Trial',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Full access to all features to see if we\'re the right fit for your organization. No credit card required.',
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 32),
-                              const Divider(),
-                              const SizedBox(height: 32),
-                              _buildFeatureRow('Unlimited user seats', theme),
-                              const SizedBox(height: 16),
-                              _buildFeatureRow(
-                                'Advanced reporting & analytics',
-                                theme,
-                              ),
-                              const SizedBox(height: 16),
-                              _buildFeatureRow('Custom branding tools', theme),
-                              const SizedBox(height: 16),
-                              _buildFeatureRow('Priority 24/7 support', theme),
-                              const SizedBox(height: 40),
-
-                              // Register Final Actions
-                              GlassButton(
-                                label: 'START FREE TRIAL',
-                                isLoading: _isLoading,
-                                onPressed: _register,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildPricingContent(theme),
               ],
             ),
-          );
-        },
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildFeatureRow(String text, ThemeData theme) {
-    return Row(
-      children: [
-        const Icon(
-          Icons.check_circle_rounded,
-          color: Color(0xFF00A86B),
-          size: 22,
-        ),
-        const SizedBox(width: 16),
-        Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
-      ],
     );
   }
 
   Widget _buildStepIndicator(ThemeData theme) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 2;
-    final primaryColor = theme.primaryColor;
     final colorScheme = theme.colorScheme;
 
-    return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          return Expanded(
-            child: Container(
-              height: 2,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                color: activeStep >= i ~/ 2 + 1
-                    ? primaryColor
-                    : colorScheme.outlineVariant,
-              ),
-            ),
-          );
-        }
-        final idx = i ~/ 2;
-        final done = idx < activeStep;
-        final active = idx == activeStep;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(steps.length, (index) {
+          final isActive = activeStep == index;
+          final isDone = activeStep > index;
 
-        return Column(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: done || active ? primaryColor : colorScheme.surface,
-                border: Border.all(
-                  color: done || active ? primaryColor : colorScheme.outline,
-                  width: 2,
-                ),
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Step circle and label
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone
+                          ? colorScheme.primary
+                          : (isActive
+                                ? colorScheme.primary
+                                : colorScheme.surfaceVariant),
+                    ),
+                    child: Center(
+                      child: isDone
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 20,
+                            )
+                          : Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isActive
+                                    ? Colors.white
+                                    : colorScheme.onSurfaceVariant,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    steps[index],
+                    style: TextStyle(
+                      color: isActive
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              child: Center(
-                child: done
-                    ? const Icon(Icons.check, color: Colors.white, size: 18)
-                    : Text(
-                        '${idx + 1}',
+              // Connector line
+              if (index < steps.length - 1)
+                Container(
+                  width: 40,
+                  height: 2,
+                  margin: const EdgeInsets.only(
+                    bottom: 24,
+                    left: 12,
+                    right: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: activeStep > index
+                        ? colorScheme.primary
+                        : colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildPricingContent(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Select Your Plan',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: colorScheme.onSurface,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Choose a plan that fits your organization needs.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Single Plan for now
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.primary,
+                colorScheme.primary.withOpacity(0.8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Standard Plan',
                         style: TextStyle(
-                          color: active
-                              ? Colors.white
-                              : colorScheme.onSurfaceVariant,
+                          color: Colors.white,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
                         ),
                       ),
+                      Text(
+                        'Trial Period',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '30 DAYS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              steps[idx],
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: active || done
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurfaceVariant,
-                fontWeight: active ? FontWeight.bold : FontWeight.normal,
+              const SizedBox(height: 24),
+              const Divider(color: Colors.white24),
+              const SizedBox(height: 24),
+              _buildPricingFeature('All core dashboard features'),
+              _buildPricingFeature('Unlimited site management'),
+              _buildPricingFeature('Custom branding support'),
+              _buildPricingFeature('Advanced financial reports'),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _register,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'COMPLETE REGISTRATION',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                ),
               ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPricingFeature(String feature) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 12),
+          Text(
+            feature,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        );
-      }),
+          ),
+        ],
+      ),
     );
   }
 }

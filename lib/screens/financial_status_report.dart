@@ -78,8 +78,8 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     final colorScheme = theme.colorScheme;
     return GlassScaffold(
       title: 'Financial Status Report',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMsg != null

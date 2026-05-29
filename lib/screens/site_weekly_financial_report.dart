@@ -237,6 +237,7 @@ class _SiteWeeklyFinancialReportState
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedYear,
+          isExpanded: true,
           decoration: _inputDecoration(context, 'Select Year'),
           dropdownColor: theme.cardColor,
           style: TextStyle(color: colorScheme.onSurface),
@@ -247,11 +248,15 @@ class _SiteWeeklyFinancialReportState
               child: Text((DateTime.now().year - 2 + i).toString()),
             ),
           ),
-          onChanged: (val) => setState(() => _selectedYear = val),
+          onChanged: (val) => setState(() {
+            _selectedYear = val;
+            _selectedWeek = null;
+          }),
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedMonth,
+          isExpanded: true,
           decoration: _inputDecoration(context, 'Select Month'),
           dropdownColor: theme.cardColor,
           style: TextStyle(color: colorScheme.onSurface),
@@ -259,7 +264,10 @@ class _SiteWeeklyFinancialReportState
             12,
             (i) => DropdownMenuItem(value: i + 1, child: Text(_monthNames[i])),
           ),
-          onChanged: (val) => setState(() => _selectedMonth = val),
+          onChanged: (val) => setState(() {
+            _selectedMonth = val;
+            _selectedWeek = null;
+          }),
         ),
         const SizedBox(height: 24),
         Text(

@@ -567,6 +567,8 @@ class _ProjectstageInsightsDashboardState
 
     return GlassScaffold(
       title: 'Project Stage Insights',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: FutureBuilder<List<SupervisorEntry>>(
         future: supervisorEntriesFuture,
         builder: (context, snapshot) {

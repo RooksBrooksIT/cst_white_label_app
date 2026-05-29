@@ -173,46 +173,95 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              // Month Dropdown
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Month',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 400) {
+                return Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Month',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getMonths(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedMonth = value!;
+                          _selectedDate =
+                              null; // Clear date when month is selected
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Year',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getYears(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedYear = value!;
+                          _selectedDate =
+                              null; // Clear date when year is selected
+                        });
+                      },
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  // Month Dropdown
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Month',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getMonths(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedMonth = value!;
+                          _selectedDate =
+                              null; // Clear date when month is selected
+                        });
+                      },
+                    ),
                   ),
-                  items: _getMonths(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedMonth = value!;
-                      _selectedDate = null; // Clear date when month is selected
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Year Dropdown
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedYear.isNotEmpty ? _selectedYear : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Year',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  const SizedBox(width: 12),
+                  // Year Dropdown
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Year',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getYears(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedYear = value!;
+                          _selectedDate =
+                              null; // Clear date when year is selected
+                        });
+                      },
+                    ),
                   ),
-                  items: _getYears(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedYear = value!;
-                      _selectedDate = null; // Clear date when year is selected
-                    });
-                  },
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
           // Clear All Filters

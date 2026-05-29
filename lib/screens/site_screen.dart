@@ -80,8 +80,9 @@ class _SiteScreenState extends State<SiteScreen>
 
       // Add default status options if they are not already present
       final defaultStatuses = [
-        'Not Started',
-        'Ongoing',
+        'Planning',
+        'Started',
+        'In Progress',
         'On Hold',
         'Completed',
         'Cancelled',
@@ -249,6 +250,7 @@ class _SiteScreenState extends State<SiteScreen>
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Site Details',
           style: TextStyle(color: Colors.white),
@@ -267,7 +269,8 @@ class _SiteScreenState extends State<SiteScreen>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -705,7 +708,9 @@ class _SiteScreenState extends State<SiteScreen>
                         ? 'Select $label'
                         : DateFormat('MMM d, yyyy').format(date),
                     style: TextStyle(
-                      color: date == null ? Colors.grey.shade600 : Colors.black87,
+                      color: date == null
+                          ? Colors.grey.shade600
+                          : Colors.black87,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -928,66 +933,112 @@ class _SiteScreenState extends State<SiteScreen>
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        final primaryColor = Theme.of(dialogContext).primaryColor;
-        return Center(
+        final theme = Theme.of(dialogContext);
+        final primaryColor = theme.primaryColor;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
           child: Container(
-            width: 280,
-            padding: const EdgeInsets.all(30),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Lottie.asset(
-                  'assets/animation/success.json',
-                  width: 140,
-                  height: 140,
-                  repeat: false,
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Lottie.asset(
+                      'assets/animation/success.json',
+                      width: 120,
+                      height: 120,
+                      repeat: false,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 24),
                 Text(
-                  'Site Created!',
-                  style: TextStyle(
-                    fontSize: 22,
+                  'Success!',
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Project created with ID $siteId.\nPlease update the project details.',
+                RichText(
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 17, color: Colors.black87),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.5,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
-                    ),
-                    elevation: 5,
-                  ),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProjectScreen(projectId: projectId),
+                    children: [
+                      const TextSpan(text: 'New site registered as '),
+                      TextSpan(
+                        text: siteId,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
                       ),
-                    );
-                  },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                      const TextSpan(
+                        text:
+                            '.\n\nPlease proceed to update the project configuration.',
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ProjectScreen(projectId: projectId),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

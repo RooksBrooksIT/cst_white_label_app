@@ -324,8 +324,9 @@ class _MaterialScreenState extends State<MaterialScreen>
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Config',
+      onBack: () => Navigator.pop(context),
       appBarBackgroundColor: theme.colorScheme.primary,
-      appBarForegroundColor: theme.colorScheme.onPrimary,
+      appBarForegroundColor: Colors.white,
       body: Column(
         children: [
           Container(

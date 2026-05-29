@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_theme.dart';
+import '../utils/terms_helper.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -173,6 +174,21 @@ class LandingPage extends StatelessWidget {
                           Navigator.pushNamed(context, '/joinByReferral'),
                     ),
                     const SizedBox(height: 24),
+                    TextButton(
+                      onPressed: () {
+                        TermsHelper.showTermsDialog(context, onAccepted: () {});
+                      },
+                      child: Text(
+                        'Terms & Conditions',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),

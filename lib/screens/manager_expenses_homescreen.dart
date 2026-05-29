@@ -18,13 +18,16 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
 
     return GlassScaffold(
       title: 'Manager Expenses',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
         child: Column(
           children: [
             GlassCard(
               title: 'Site Supervisor Entry',
-              subtitle: 'Add, view, and manage site supervisor expenses and entries.',
+              subtitle:
+                  'Add, view, and manage site supervisor expenses and entries.',
               onTap: () {
                 Navigator.push(
                   context,
@@ -45,11 +48,14 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             GlassCard(
               title: 'Manager Entry',
-              subtitle: 'Add, view, and manage manager-level expenses and approvals.',
+              subtitle:
+                  'Add, view, and manage manager-level expenses and approvals.',
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ManagerExpenses()),
+                  MaterialPageRoute(
+                    builder: (context) => const ManagerExpenses(),
+                  ),
                 );
               },
               child: _buildCardContent(
@@ -64,7 +70,11 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCardContent(BuildContext context, {required IconData icon, required String label}) {
+  Widget _buildCardContent(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+  }) {
     final theme = Theme.of(context);
     return Row(
       children: [

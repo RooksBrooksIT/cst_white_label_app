@@ -450,6 +450,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     return GlassScaffold(
       title: 'Worker Site Mapping',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -520,6 +521,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           children: [
             // Site Dropdown
             DropdownButtonFormField<String>(
+              isExpanded: true,
               value: _selectedSite,
               decoration: InputDecoration(
                 labelText: 'Site *',
@@ -539,7 +541,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                           : site['site'] ?? '';
                       return DropdownMenuItem<String>(
                         value: site['site'] as String?,
-                        child: Text(displayName),
+                        child: Text(
+                          displayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
               onChanged: _onSiteSelected,
@@ -589,34 +594,43 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-            // Worker Dropdown and Add Button Section
+                // Worker Dropdown and Add Button Section
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                    value: _selectedWorkerId,
-                    decoration: InputDecoration(
-                      labelText: 'Select Worker',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    items: _isLoadingWorkers
-                        ? [
-                            DropdownMenuItem(
-                              value: null,
-                              child: Text('Loading workers...'),
-                            ),
-                          ]
-                        : availableWorkers.map<DropdownMenuItem<String>>((worker) {
-                            final String name = worker['name']?.toString().trim() ?? '';
-                            final String displayName = name.isNotEmpty ? name : 'Unnamed (${worker['id']})';
-                            return DropdownMenuItem<String>(
-                              value: worker['id'] as String?,
-                              child: Text(displayName),
-                            );
-                          }).toList(),
-                    onChanged: _onWorkerSelected,
+                        isExpanded: true,
+                        value: _selectedWorkerId,
+                        decoration: InputDecoration(
+                          labelText: 'Select Worker',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        items: _isLoadingWorkers
+                            ? [
+                                DropdownMenuItem(
+                                  value: null,
+                                  child: Text('Loading workers...'),
+                                ),
+                              ]
+                            : availableWorkers.map<DropdownMenuItem<String>>((
+                                worker,
+                              ) {
+                                final String name =
+                                    worker['name']?.toString().trim() ?? '';
+                                final String displayName = name.isNotEmpty
+                                    ? name
+                                    : 'Unnamed (${worker['id']})';
+                                return DropdownMenuItem<String>(
+                                  value: worker['id'] as String?,
+                                  child: Text(
+                                    displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                        onChanged: _onWorkerSelected,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -639,35 +653,35 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                   ],
                 ),
 
-            SizedBox(height: 16),
+                SizedBox(height: 16),
 
-            // Auto-filled Worker Details
-            if (_selectedWorkerDesignation != null ||
-                _selectedWorkerSalary != null)
-              Column(
-                children: [
-                  _buildReadOnlyField(
-                    'Designation',
-                    _selectedWorkerDesignation ?? 'Not available',
+                // Auto-filled Worker Details
+                if (_selectedWorkerDesignation != null ||
+                    _selectedWorkerSalary != null)
+                  Column(
+                    children: [
+                      _buildReadOnlyField(
+                        'Designation',
+                        _selectedWorkerDesignation ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      _buildReadOnlyField(
+                        'Salary',
+                        _selectedWorkerSalary ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      if (_selectedWorkerPhone != null)
+                        _buildReadOnlyField(
+                          'Phone',
+                          _selectedWorkerPhone ?? 'Not available',
+                        ),
+                    ],
+                  )
+                else if (_selectedWorkerId != null)
+                  Text(
+                    'No details found for this worker',
+                    style: TextStyle(color: Colors.orange),
                   ),
-                  SizedBox(height: 12),
-                  _buildReadOnlyField(
-                    'Salary',
-                    _selectedWorkerSalary ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  if (_selectedWorkerPhone != null)
-                    _buildReadOnlyField(
-                      'Phone',
-                      _selectedWorkerPhone ?? 'Not available',
-                    ),
-                ],
-              )
-            else if (_selectedWorkerId != null)
-              Text(
-                'No details found for this worker',
-                style: TextStyle(color: Colors.orange),
-              ),
               ],
             ),
           ),

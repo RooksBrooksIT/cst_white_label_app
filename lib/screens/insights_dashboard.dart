@@ -18,6 +18,8 @@ class InsightsDashboard extends StatelessWidget {
 
     return GlassScaffold(
       title: 'Insights Dashboard',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(

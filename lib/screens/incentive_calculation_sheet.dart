@@ -298,8 +298,11 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         backgroundColor: _backgroundColor,
         appBar: AppBar(
           backgroundColor: _primaryColor,
-          title: const Text('Incentive Sheet', style: TextStyle()),
-          iconTheme: const IconThemeData(),
+          title: const Text(
+            'Incentive Sheet',
+            style: TextStyle(color: Colors.white),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
         ),
         body: Center(
@@ -348,7 +351,11 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         backgroundColor: _backgroundColor,
         appBar: AppBar(
           backgroundColor: _primaryColor,
-          title: const Text('Incentive Sheet'),
+          title: const Text(
+            'Incentive Sheet',
+            style: TextStyle(color: Colors.white),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
         ),
         body: Center(child: CircularProgressIndicator(color: _primaryColor)),
@@ -363,8 +370,11 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         backgroundColor: _backgroundColor,
         appBar: AppBar(
           backgroundColor: _primaryColor,
-          title: const Text('Incentive Sheet', style: TextStyle()),
-          iconTheme: const IconThemeData(),
+          title: const Text(
+            'Incentive Sheet',
+            style: TextStyle(color: Colors.white),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
           actions: [
             IconButton(

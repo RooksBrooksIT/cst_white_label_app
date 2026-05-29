@@ -292,7 +292,10 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
         _selectedStage = null;
       });
 
-      await DialogUtils.showSuccessDialog(context, message: 'Stage deleted successfully!');
+      await DialogUtils.showSuccessDialog(
+        context,
+        message: 'Stage deleted successfully!',
+      );
     } catch (e) {
       _showErrorModal(context, 'Error', 'Failed to delete stage: $e');
     }
@@ -306,6 +309,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
 
     return GlassScaffold(
       title: 'Project Stage Configuration',
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
@@ -336,11 +340,15 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                 'projectStages',
                               ).snapshots(),
                               builder: (context, snapshot) {
-                                if (!snapshot.hasData || snapshot.data == null) {
+                                if (!snapshot.hasData ||
+                                    snapshot.data == null) {
                                   return const LinearProgressIndicator();
                                 }
                                 final stages = snapshot.data!.docs
-                                    .map((doc) => doc['projectStage']?.toString() ?? '')
+                                    .map(
+                                      (doc) =>
+                                          doc['projectStage']?.toString() ?? '',
+                                    )
                                     .where((val) => val.isNotEmpty)
                                     .toSet()
                                     .toList();

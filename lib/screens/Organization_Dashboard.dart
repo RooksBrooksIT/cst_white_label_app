@@ -140,8 +140,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildWelcomeSection(theme),
-                                const SizedBox(height: 32),
                                 _buildDashboardSections(context, theme),
                               ],
                             ),
@@ -231,72 +229,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         );
       }
     }
-  }
-
-  Widget _buildWelcomeSection(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.primaryColor.withOpacity(0.1),
-                  theme.primaryColor.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.waving_hand_rounded,
-                  size: 18,
-                  color: theme.primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  "Welcome back,",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          ValueListenableBuilder<String>(
-            valueListenable: AppTheme.appName,
-            builder: (context, appName, _) {
-              return Text(
-                appName,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -1.0,
-                  fontSize: 34,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Manage your organization efficiently",
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   // Updated category tile design – more professional, clean, and modern

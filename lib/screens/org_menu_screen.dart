@@ -124,20 +124,22 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final content = SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          _buildProfileSection(colorScheme),
-          const SizedBox(height: 32),
           _buildReferralSection(colorScheme),
           const SizedBox(height: 16),
           _buildSettingsSection(colorScheme),
           const SizedBox(height: 16),
           _buildSubscriptionSection(colorScheme),
           const SizedBox(height: 32),
-          _buildLogoutSection(colorScheme),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildLogoutSection(colorScheme),
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -207,33 +209,40 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildReferralSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Referral Program',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.w700,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Referral Program',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Share these codes with your team members to register them under your organization.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 13,
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Share these codes with your team members to register them under your organization.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          _buildCodeRow('Referral', _orgCode, colorScheme),
-        ],
+            ),
+            const SizedBox(height: 20),
+            _buildCodeRow('Referral', _orgCode, colorScheme),
+          ],
+        ),
       ),
     );
   }
@@ -294,146 +303,160 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildSettingsSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.settings_suggest_rounded,
-                color: colorScheme.secondary,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Settings',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.w700,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.settings_suggest_rounded,
+                  color: colorScheme.secondary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Settings',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsTile(
+              icon: Icons.business_rounded,
+              title: 'Organisation Information',
+              subtitle: 'Update address and phone details',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrgInformationScreen(),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingsTile(
-            icon: Icons.business_rounded,
-            title: 'Organisation Information',
-            subtitle: 'Update address and phone details',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrgInformationScreen(),
-              ),
             ),
-          ),
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.color_lens_outlined,
-            title: 'Brand Color',
-            subtitle: 'Change app theme color',
-            onTap: () => Navigator.pushNamed(context, '/branding'),
-          ),
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.lock_reset_rounded,
-            title: 'Reset Password',
-            subtitle: 'Update your account password',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrgResetPasswordScreen(),
-              ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.color_lens_outlined,
+              title: 'Brand Color',
+              subtitle: 'Change app theme color',
+              onTap: () => Navigator.pushNamed(context, '/branding'),
             ),
-          ),
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.headset_mic_rounded,
-            title: 'Contact Support',
-            subtitle: 'Get help from our team',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ContactSupportScreen(),
-              ),
-            ),
-          ),
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.privacy_tip_rounded,
-            title: 'Privacy Policy',
-            subtitle: 'View our privacy policy',
-            onTap: () async {
-              final Uri url = Uri.parse(
-                'https://sites.google.com/view/cst-whitelabel-app/home',
-              );
-              if (!await launchUrl(url)) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not open privacy policy'),
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.info_outline_rounded,
-            title: 'About Us',
-            subtitle: 'Learn more about eBicks',
-            onTap: () {
-              Navigator.push(
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.lock_reset_rounded,
+              title: 'Reset Password',
+              subtitle: 'Update your account password',
+              onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AboutUsScreen()),
-              );
-            },
-          ),
-        ],
+                MaterialPageRoute(
+                  builder: (context) => const OrgResetPasswordScreen(),
+                ),
+              ),
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.headset_mic_rounded,
+              title: 'Contact Support',
+              subtitle: 'Get help from our team',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ContactSupportScreen(),
+                ),
+              ),
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.privacy_tip_rounded,
+              title: 'Privacy Policy',
+              subtitle: 'View our privacy policy',
+              onTap: () async {
+                final Uri url = Uri.parse(
+                  'https://sites.google.com/view/cst-whitelabel-app/home',
+                );
+                if (!await launchUrl(url)) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not open privacy policy'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.info_outline_rounded,
+              title: 'About Us',
+              subtitle: 'Learn more about eBicks',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AboutUsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSubscriptionSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.stars_rounded, color: colorScheme.tertiary, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Subscription',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.w700,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.stars_rounded,
+                  color: colorScheme.tertiary,
+                  size: 24,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingsTile(
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'Manage Subscription',
-            subtitle: _isSubscriptionActive
-                ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
-                : 'Current: $_subscriptionPlan (Inactive)',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrganizationSubscriptionPage(),
+                const SizedBox(width: 12),
+                Text(
+                  'Subscription',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsTile(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Manage Subscription',
+              subtitle: _isSubscriptionActive
+                  ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
+                  : 'Current: $_subscriptionPlan (Inactive)',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrganizationSubscriptionPage(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

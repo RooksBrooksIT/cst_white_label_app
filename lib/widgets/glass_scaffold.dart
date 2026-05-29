@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_theme.dart';
+import '../utils/responsive.dart';
 
 class GlassScaffold extends StatelessWidget {
   final Widget body;
@@ -64,7 +65,7 @@ class GlassScaffold extends StatelessWidget {
                       ? Text(
                           title!,
                           style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 22,
+                            fontSize: Responsive.fontSize(context, 20),
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
                             color: Colors.white,
@@ -73,9 +74,9 @@ class GlassScaffold extends StatelessWidget {
                       : null,
                   leading: onBack != null
                       ? IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white,
+                            color: effectiveFgColor,
                             size: 18,
                           ),
                           onPressed: onBack,
@@ -110,9 +111,9 @@ class GlassScaffold extends StatelessWidget {
               child: Padding(
                 padding:
                     (padding ??
-                            const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 24,
+                            EdgeInsets.symmetric(
+                              horizontal: Responsive.spacing(context, 20),
+                              vertical: Responsive.spacing(context, 24),
                             ))
                         .copyWith(top: 0),
                 child: body,

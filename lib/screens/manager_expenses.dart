@@ -390,6 +390,8 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
     return GlassScaffold(
       title: 'Manager Expenses',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
@@ -662,6 +664,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: value,
       decoration: InputDecoration(
         labelText: label,

@@ -602,6 +602,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Material Master',
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

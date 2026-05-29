@@ -469,6 +469,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Contractor Entry',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
@@ -537,6 +538,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                                 }
                               }
                               return DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: names.contains(_selectedContractorName)
                                     ? _selectedContractorName
                                     : null,
@@ -548,7 +550,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                                     .map(
                                       (n) => DropdownMenuItem(
                                         value: n,
-                                        child: Text(n),
+                                        child: Text(
+                                          n,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     )
                                     .toList(),
@@ -589,6 +594,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                           isLoadingMaterials
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   value: selectedMaterial,
                                   decoration: const InputDecoration(
                                     labelText: 'Select Material',
@@ -598,7 +604,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                                       .map(
                                         (m) => DropdownMenuItem(
                                           value: m,
-                                          child: Text(m),
+                                          child: Text(
+                                            m,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       )
                                       .toList(),
@@ -657,6 +666,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                           isLoadingLabours
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   value: selectedLabour,
                                   decoration: const InputDecoration(
                                     labelText: 'Select Labour',
@@ -666,7 +676,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                                       .map(
                                         (l) => DropdownMenuItem(
                                           value: l,
-                                          child: Text(l),
+                                          child: Text(
+                                            l,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       )
                                       .toList(),

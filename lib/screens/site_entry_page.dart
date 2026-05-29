@@ -6,6 +6,7 @@ import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
+import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;
@@ -1078,30 +1079,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SupervisorDashboard(
-                  username: widget.userName,
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
-              ),
-            );
-          },
-          child: const Text(
-            'Daily Site Entry',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF772323),
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: 'Daily Site Entry',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(

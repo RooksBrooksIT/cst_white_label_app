@@ -3,6 +3,7 @@ import 'package:demo_cst/utils/app_theme.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
+import '../utils/terms_helper.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -40,8 +41,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       fontSize: Responsive.fontSize(context, 12),
                     ),
                   ),
-                  leading: const Icon(Icons.color_lens_rounded,
-                      color: Color(0xFF64748B)),
+                  leading: const Icon(
+                    Icons.color_lens_rounded,
+                    color: Color(0xFF64748B),
+                  ),
                   trailing: ValueListenableBuilder<Color>(
                     valueListenable: AppTheme.primaryColor,
                     builder: (context, color, _) {
@@ -51,7 +54,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
                         ),
                       );
                     },
@@ -85,6 +91,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   icon: Icons.help_rounded,
                   onTap: () {},
                 ),
+                _buildSettingsTile(
+                  title: 'Terms & Conditions',
+                  icon: Icons.gavel_rounded,
+                  onTap: () {
+                    TermsHelper.showTermsDialog(context, onAccepted: () {});
+                  },
+                ),
               ],
             ),
           ),
@@ -107,7 +120,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         ),
       ),
       leading: Icon(icon, color: const Color(0xFF64748B)),
-      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: Color(0xFFCBD5E1),
+      ),
       onTap: onTap,
     );
   }

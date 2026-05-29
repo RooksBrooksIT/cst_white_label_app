@@ -219,9 +219,11 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
 
     return GlassScaffold(
       title: 'Contractor Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: expenses.isNotEmpty ? _generatePdf : null,
         ),
       ],

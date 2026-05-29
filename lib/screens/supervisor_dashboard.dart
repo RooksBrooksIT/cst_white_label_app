@@ -15,6 +15,8 @@ import '../services/auth_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
+import 'org_sub_menu_screen.dart';
+
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
@@ -30,147 +32,32 @@ class SupervisorDashboard extends StatefulWidget {
   _SupervisorDashboardState createState() => _SupervisorDashboardState();
 }
 
+class _CategoryData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<SubMenuItem> items;
+
+  _CategoryData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.items,
+  });
+}
+
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
-  late Map<String, List<DashboardItem>> groupedItems;
+  final ScrollController _scrollController = ScrollController();
   DateTime? _lastBackPressTime;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final colorScheme = Theme.of(context).colorScheme;
-    groupedItems = {
-      "Expenses": [
-        DashboardItem(
-          'Site Supervisor Expenses',
-          Icons.monetization_on_outlined,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            SupervisorVerificationPage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Requests": [
-        DashboardItem(
-          'Materials Request Form',
-          Icons.inventory_2_outlined,
-          colorScheme.secondary,
-          () => _navigate(
-            context,
-            MaterialRequestForm(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Work Schedule Request',
-          Icons.schedule_outlined,
-          colorScheme.tertiary,
-          () => _navigate(
-            context,
-            SupervisorWorkSchedulePage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Site Info": [
-        DashboardItem(
-          'Materials',
-          Icons.warehouse_outlined,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            MaterialAtSiteEntryPage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Materials information',
-          Icons.info_outline,
-          colorScheme.primary,
-          () => _navigate(context, SupervisorMaterialInfoScreen()),
-        ),
-        DashboardItem(
-          'Tools Movement',
-          Icons.handyman_outlined,
-          colorScheme.secondary,
-          () => _navigate(
-            context,
-            SiteToCompanyReturn(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Others": [
-        DashboardItem(
-          'Site Approvals',
-          Icons.check_circle_outline,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            ViewApprovalScreen(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Materials Approvals',
-          Icons.fact_check_outlined,
-          colorScheme.secondary,
-          () {
-            _navigate(
-              context,
-              SupervisorMaterialViewRequestScreen(
-                supervisorId: widget.supervisorId,
-                supervisorName: widget.supervisorName,
-              ),
-            );
-          },
-        ),
-        DashboardItem(
-          'Workers Attendance',
-          Icons.people_alt_rounded,
-          colorScheme.tertiary,
-          () {
-            _navigate(context, AttendanceManagementPage());
-          },
-        ),
-        DashboardItem(
-          'Privacy Policy',
-          Icons.privacy_tip_rounded,
-          colorScheme.primary,
-          () async {
-            final Uri url = Uri.parse(
-              'https://sites.google.com/view/cst-whitelabel-app/home',
-            );
-            if (!await launchUrl(url)) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Could not open privacy policy'),
-                  ),
-                );
-              }
-            }
-          },
-        ),
-      ],
-    };
-  }
-
-  void _navigate(BuildContext context, Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -178,24 +65,40 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text(
-          "Logout",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+          ],
         ),
-        content: const Text("Are you sure you want to logout?"),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(fontSize: 16),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: Text(
-              "No",
+              'Cancel',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
               ),
             ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await AuthService().logout();
@@ -207,12 +110,17 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 );
               }
             },
-            child: Text(
-              "Yes",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.bold,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
           ),
         ],
@@ -222,6 +130,180 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final categories = [
+      _CategoryData(
+        title: "Expenses & Finance",
+        subtitle: "Manage site expenses and verifications",
+        icon: Icons.account_balance_wallet_rounded,
+        color: colorScheme.primary,
+        gradientColors: [
+          colorScheme.primary,
+          colorScheme.primary.withOpacity(0.7),
+        ],
+        items: [
+          SubMenuItem(
+            title: 'Site Supervisor Expenses',
+            subtitle: 'Log and track daily site expenses',
+            icon: Icons.monetization_on_rounded,
+            color: colorScheme.primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorVerificationPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Material Requests",
+        subtitle: "Request and track materials and tools",
+        icon: Icons.inventory_2_rounded,
+        color: Colors.orange,
+        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Materials Request Form',
+            subtitle: 'Submit new material requests',
+            icon: Icons.add_shopping_cart_rounded,
+            color: Colors.orange,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialRequestForm(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Materials Approvals',
+            subtitle: 'Check status of material requests',
+            icon: Icons.fact_check_rounded,
+            color: Colors.orangeAccent,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorMaterialViewRequestScreen(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Site Operations",
+        subtitle: "Schedules, attendance and site info",
+        icon: Icons.engineering_rounded,
+        color: Colors.blue,
+        gradientColors: [Colors.blue, Colors.blue.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Work Schedule Request',
+            subtitle: 'Manage site work schedules',
+            icon: Icons.calendar_today_rounded,
+            color: Colors.blue,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorWorkSchedulePage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Site Approvals',
+            subtitle: 'View pending site approvals',
+            icon: Icons.check_circle_rounded,
+            color: Colors.blueAccent,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ViewApprovalScreen(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Workers Attendance',
+            subtitle: 'Track worker daily attendance',
+            icon: Icons.people_rounded,
+            color: Colors.indigo,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AttendanceManagementPage(),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Inventory & Tools",
+        subtitle: "Manage materials and tool movements",
+        icon: Icons.construction_rounded,
+        color: Colors.teal,
+        gradientColors: [Colors.teal, Colors.teal.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Materials at Site',
+            subtitle: 'Current material stock at site',
+            icon: Icons.warehouse_rounded,
+            color: Colors.teal,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialAtSiteEntryPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Materials Information',
+            subtitle: 'General material specifications',
+            icon: Icons.info_rounded,
+            color: Colors.tealAccent[700]!,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorMaterialInfoScreen(),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Tools Movement',
+            subtitle: 'Track tools return and movement',
+            icon: Icons.handyman_rounded,
+            color: Colors.cyan,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SiteToCompanyReturn(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -250,103 +332,105 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         title: 'Supervisor Dashboard',
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.logout_rounded,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
             tooltip: 'Logout',
             onPressed: () => _showLogoutDialog(context),
           ),
         ],
-        body: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.isMobile(context) ? 16 : 32,
-            vertical: 24,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildProfileSection(),
-              const SizedBox(height: 32),
-              ...groupedItems.entries.map((entry) {
-                return Column(
+        padding: EdgeInsets.zero,
+        body: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionHeader(entry.key),
-                    ...entry.value.map((item) => _buildMenuCard(item)),
+                    // Welcome Card
+                    _buildWelcomeCard(theme),
+                    const SizedBox(height: 24),
+                    // Categories
+                    ...categories.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final category = entry.value;
+                      return AnimatedContainer(
+                        duration: Duration(milliseconds: 300 + (index * 50)),
+                        curve: Curves.easeOutCubic,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: _buildCategoryTile(context, category: category),
+                      );
+                    }),
+                    const SizedBox(height: 40),
                   ],
-                );
-              }),
-              const SizedBox(height: 40),
-            ],
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileSection() {
+  Widget _buildWelcomeCard(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: theme.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.24),
-              shape: BoxShape.circle,
-            ),
-            child: CircleAvatar(
-              radius: 30,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              child: Icon(
-                Icons.person_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 32,
-              ),
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white.withOpacity(0.2),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 35,
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.supervisorName,
+                  'Welcome,',
                   style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 24),
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  widget.supervisorName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    letterSpacing: -0.5,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Site Supervisor • ID: ${widget.supervisorId}',
+                  'ID: ${widget.supervisorId}',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onPrimary.withOpacity(0.9),
-                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -357,78 +441,97 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 40, bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 20,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 12),
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 2.0,
-            ),
+  Widget _buildCategoryTile(
+    BuildContext context, {
+    required _CategoryData category,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMenuCard(DashboardItem item) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        onTap: item.onTap,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrgSubMenuScreen(
+                title: category.title,
+                items: category.items,
               ),
-              child: Icon(item.icon, color: item.color, size: 24),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: category.gradientColors,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: category.color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(category.icon, color: Colors.white, size: 28),
                 ),
-              ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        category.subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 16,
+                ),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              size: 24,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
-}
-
-class DashboardItem {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  DashboardItem(this.title, this.icon, this.color, this.onTap);
 }

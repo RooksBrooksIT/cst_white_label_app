@@ -271,16 +271,15 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Workers Configuration',
       onBack: () => Navigator.pop(context),
       bottom: TabBar(
         controller: _tabController,
-        indicatorColor: theme.colorScheme.primary,
+        indicatorColor: Colors.white,
         indicatorWeight: 3,
-        labelColor: theme.colorScheme.primary,
-        unselectedLabelColor: Colors.grey[600],
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w500,
@@ -293,10 +292,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildCreateWorkerTab(),
-          _buildWorkersListTab(),
-        ],
+        children: [_buildCreateWorkerTab(), _buildWorkersListTab()],
       ),
     );
   }
@@ -424,13 +420,21 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
             isExpanded: true,
             decoration: InputDecoration(
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              prefixIcon: Icon(Icons.work_outline, color: theme.colorScheme.primary, size: 20),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              prefixIcon: Icon(
+                Icons.work_outline,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
             ),
             hint: const Text('Select Designation'),
             dropdownColor: theme.cardColor,
             items: _designations.map<DropdownMenuItem<String>>((designation) {
-              final designationValue = designation['designation']?.toString() ?? '';
+              final designationValue =
+                  designation['designation']?.toString() ?? '';
               final salaryValue = designation['salary']?.toString() ?? '';
 
               return DropdownMenuItem<String>(
@@ -440,7 +444,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   setState(() {
                     _salaryController.text = salaryValue;
                     // Keep it editable or set to true if we want to allow immediate override
-                    _isSalaryEditable = true; 
+                    _isSalaryEditable = true;
                   });
                 },
               );
@@ -537,7 +541,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -554,12 +560,20 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 20,
+                                  color: Colors.blue,
+                                ),
                                 onPressed: () => _startEditing(docId, data),
                                 tooltip: 'Edit',
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: Colors.red,
+                                ),
                                 onPressed: () => _showDeleteDialog(docId),
                                 tooltip: 'Delete',
                               ),
@@ -570,12 +584,20 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
+                                icon: const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 20,
+                                  color: Colors.green,
+                                ),
                                 onPressed: () => _saveEditing(docId),
                                 tooltip: 'Save',
                               ),
                               IconButton(
-                                icon: const Icon(Icons.cancel_outlined, size: 20, color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.cancel_outlined,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () => _cancelEditing(docId),
                                 tooltip: 'Cancel',
                               ),
@@ -584,9 +606,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    if (isEditing) 
+                    if (isEditing)
                       _buildEditableFields(docId, data)
-                    else 
+                    else
                       _buildReadOnlyFields(data),
                   ],
                 ),
@@ -609,8 +631,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
         const SizedBox(height: 12),
         _buildInfoRow(Icons.phone_outlined, data['phoneNumber'] ?? ''),
         _buildInfoRow(Icons.work_outline, '${data['designation'] ?? ''}'),
-        _buildInfoRow(Icons.attach_money_rounded, 'Salary: ₹${data['salary']?.toString() ?? '0'}'),
-        _buildInfoRow(Icons.calendar_today_outlined, 'Joined: ${data['joiningDate'] ?? 'N/A'}'),
+        _buildInfoRow(
+          Icons.attach_money_rounded,
+          'Salary: ₹${data['salary']?.toString() ?? '0'}',
+        ),
+        _buildInfoRow(
+          Icons.calendar_today_outlined,
+          'Joined: ${data['joiningDate'] ?? 'N/A'}',
+        ),
         if (data['address'] != null && data['address'].isNotEmpty)
           _buildInfoRow(Icons.location_on_outlined, data['address'] ?? ''),
       ],
@@ -716,7 +744,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           content: const Text(
             'Are you sure you want to delete this worker? This action cannot be undone.',
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -730,7 +760,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('DELETE'),
             ),

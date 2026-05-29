@@ -9,7 +9,7 @@ import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:demo_cst/screens/org_subscription_page.dart';
-import 'package:demo_cst/screens/terms_and_conditions_screen.dart';
+import '../utils/terms_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -72,7 +72,6 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('org_isLoggedIn') ?? false;
     final orgId = prefs.getString('org_dynamic_path');
-    final hasAcceptedTerms = prefs.getBool('has_accepted_terms') ?? false;
 
     if (isLoggedIn && orgId != null && orgId.isNotEmpty) {
       // Refresh branding from Firestore if logged in
@@ -82,98 +81,104 @@ class _SplashScreenState extends State<SplashScreen>
     // After animation and sync, navigate
     Future.delayed(const Duration(milliseconds: 3000), () async {
       if (mounted) {
-        if (!hasAcceptedTerms) {
-          Navigator.pushReplacement(
+        final accepted = await TermsHelper.hasAcceptedTerms();
+        if (!accepted) {
+          TermsHelper.showTermsDialog(
             context,
-            MaterialPageRoute(
-              builder: (context) => const TermsAndConditionsScreen(),
-            ),
+            onAccepted: () {
+              _navigateToNext();
+            },
           );
-          return;
-        }
-
-        // Request location permissions on startup
-        await LocationService.handleLocationPermission(context);
-
-        final auth = AuthService();
-        if (auth.isLoggedIn) {
-          final data = auth.userData;
-          switch (auth.userRole) {
-            case UserRole.organization:
-              final isSubscriptionValid = await auth.checkSubscriptionStatus();
-              if (isSubscriptionValid) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OrganizationDashboard(),
-                  ),
-                );
-              } else {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OrganizationSubscriptionPage(),
-                  ),
-                );
-              }
-              break;
-            case UserRole.manager:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ConfigAccountDashboard(),
-                ),
-              );
-              break;
-            case UserRole.supervisor:
-              final isContractor = data['isContractor'] ?? false;
-              if (isContractor) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ContractorEntryPage(
-                      userName: data['username'] ?? '',
-                      userDetails: {
-                        'supervisorId': data['supervisorId'] ?? '',
-                        'contractorName': data['contractorName'] ?? '',
-                        'contractorField': data['contractorField'] ?? '',
-                      },
-                    ),
-                  ),
-                );
-              } else {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SupervisorDashboard(
-                      supervisorId: data['supervisorId'] ?? '',
-                      supervisorName: data['supervisorName'] ?? '',
-                      username: data['username'] ?? '',
-                    ),
-                  ),
-                );
-              }
-              break;
-            case UserRole.customer:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CustomerDashboardPage(
-                    ownerName: data['ownerName'] ?? '',
-                    ownerPhoneNumber: '',
-                    siteId: data['siteId'] ?? '',
-                  ),
-                ),
-              );
-              break;
-            default:
-              Navigator.pushReplacementNamed(context, '/landing');
-          }
         } else {
-          Navigator.pushReplacementNamed(context, '/landing');
+          _navigateToNext();
         }
       }
     });
+  }
+
+  Future<void> _navigateToNext() async {
+    if (!mounted) return;
+
+    // Request location permissions on startup
+    await LocationService.handleLocationPermission(context);
+
+    final auth = AuthService();
+    if (auth.isLoggedIn) {
+      final data = auth.userData;
+      switch (auth.userRole) {
+        case UserRole.organization:
+          final isSubscriptionValid = await auth.checkSubscriptionStatus();
+          if (isSubscriptionValid) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizationDashboard(),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizationSubscriptionPage(),
+              ),
+            );
+          }
+          break;
+        case UserRole.manager:
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ConfigAccountDashboard(),
+            ),
+          );
+          break;
+        case UserRole.supervisor:
+          final isContractor = data['isContractor'] ?? false;
+          if (isContractor) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ContractorEntryPage(
+                  userName: data['username'] ?? '',
+                  userDetails: {
+                    'supervisorId': data['supervisorId'] ?? '',
+                    'contractorName': data['contractorName'] ?? '',
+                    'contractorField': data['contractorField'] ?? '',
+                  },
+                ),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorDashboard(
+                  supervisorId: data['supervisorId'] ?? '',
+                  supervisorName: data['supervisorName'] ?? '',
+                  username: data['username'] ?? '',
+                ),
+              ),
+            );
+          }
+          break;
+        case UserRole.customer:
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CustomerDashboardPage(
+                ownerName: data['ownerName'] ?? '',
+                ownerPhoneNumber: '',
+                siteId: data['siteId'] ?? '',
+              ),
+            ),
+          );
+          break;
+        default:
+          Navigator.pushReplacementNamed(context, '/landing');
+      }
+    } else {
+      Navigator.pushReplacementNamed(context, '/landing');
+    }
   }
 
   @override

@@ -118,9 +118,11 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
 
     return GlassScaffold(
       title: 'Tools Inventory',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: _loadInventoryData,
           tooltip: 'Refresh',
         ),

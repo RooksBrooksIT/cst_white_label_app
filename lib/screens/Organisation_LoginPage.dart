@@ -13,6 +13,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
 import '../utils/firestore_error_handler.dart';
+import '../utils/responsive.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -28,7 +29,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   bool _isLoading = false;
   String? _tempOrgName;
   String? _tempLogoUrl;
-  
+
   @override
   void initState() {
     super.initState();
@@ -119,7 +120,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           userData = legacyDoc.data();
           dynamicPath = legacyDoc.id;
           fullConfigPath = legacyDoc.reference.path;
-          debugPrint('Organisation_LoginPage: Logged in via legacy root fallback for $username');
+          debugPrint(
+            'Organisation_LoginPage: Logged in via legacy root fallback for $username',
+          );
         }
       }
 
@@ -207,7 +210,6 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                     ),
                   ),
                 )
-                
               else
                 Container(
                   width: 80,
@@ -233,22 +235,20 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                     color: colorScheme.primary,
                   ),
                 ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text(
                 _tempOrgName ?? 'Organization Login',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(fontSize: 28),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: Responsive.fontSize(context, 26),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Enter your credentials to continue',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-              ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
 
               GlassCard(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -259,7 +259,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                         icon: Icons.person_outline_rounded,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       GlassTextField(
                         controller: _passwordController,
                         label: 'Password',
@@ -268,10 +268,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 32),
-                      GlassButton(
-                        label: 'LOGIN',
-                        isLoading: _isLoading,
-                        onPressed: _login,
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassButton(
+                          label: 'LOGIN',
+                          isLoading: _isLoading,
+                          onPressed: _login,
+                        ),
                       ),
                     ],
                   ),

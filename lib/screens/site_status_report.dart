@@ -30,7 +30,9 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final projectsSnapshot = await FirestoreService.getCollection('projects').get();
+      final projectsSnapshot = await FirestoreService.getCollection(
+        'projects',
+      ).get();
 
       Set<String> uniqueStatuses = {};
       double totalBudget = 0.0;
@@ -38,7 +40,7 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
       for (var doc in projectsSnapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
+
         // Extract status
         final statusVal = (data['currentStatus'] ?? data['status'])?.toString();
         if (statusVal != null && statusVal.trim().isNotEmpty) {
@@ -46,8 +48,10 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
         }
 
         // Aggregate finances
-        final budget = double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0.0;
-        final spent = double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0.0;
+        final budget =
+            double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0.0;
+        final spent =
+            double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0.0;
 
         totalBudget += budget;
         totalSpent += spent;
@@ -55,14 +59,22 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
       // Ensure there is always a fallback list of statuses to pick from if empty
       if (uniqueStatuses.isEmpty) {
-        uniqueStatuses.addAll(['In-Progress', 'Pending', 'Planning', 'On-Hold', 'Complete']);
+        uniqueStatuses.addAll([
+          'In-Progress',
+          'Pending',
+          'Planning',
+          'On-Hold',
+          'Complete',
+        ]);
       }
 
       if (mounted) {
         setState(() {
           _budgetAmount = totalBudget;
           _spentAmount = totalSpent;
-          _spendingPercentage = _budgetAmount > 0 ? _spentAmount / _budgetAmount : 0.0;
+          _spendingPercentage = _budgetAmount > 0
+              ? _spentAmount / _budgetAmount
+              : 0.0;
           _statusOptions = uniqueStatuses.toList()..sort();
           _selectedStatus = _statusOptions.first;
           _isLoading = false;
@@ -114,6 +126,8 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
     return GlassScaffold(
       title: 'Site Status Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null

@@ -7,6 +7,7 @@ import 'Organisation_LoginPage.dart';
 import 'config_login.dart';
 import 'customer_login_page.dart';
 import 'supervisor_login_page.dart';
+import '../utils/responsive.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -96,7 +97,10 @@ class _MainDashboardState extends State<MainDashboard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
-                            border: Border.all(color: colorScheme.outline, width: 2),
+                            border: Border.all(
+                              color: colorScheme.outline,
+                              width: 2,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.05),
@@ -114,14 +118,18 @@ class _MainDashboardState extends State<MainDashboard> {
                             color: colorScheme.primary.withOpacity(0.08),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.business_rounded, size: 60, color: colorScheme.primary),
+                          child: Icon(
+                            Icons.business_rounded,
+                            size: 60,
+                            color: colorScheme.primary,
+                          ),
                         ),
                       const SizedBox(height: 24),
                       Text(
                         _orgName ?? 'Organization',
                         textAlign: TextAlign.center,
                         style: textTheme.headlineMedium?.copyWith(
-                          fontSize: 28,
+                          fontSize: Responsive.fontSize(context, 28),
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.5,
                         ),
@@ -131,15 +139,15 @@ class _MainDashboardState extends State<MainDashboard> {
                         'Select your role to continue',
                         textAlign: TextAlign.center,
                         style: textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
+                          fontSize: Responsive.fontSize(context, 14),
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ] else ...[
                       // Generic Header
                       Container(
-                        width: 120,
-                        height: 120,
+                        width: Responsive.scaleH(context, 120),
+                        height: Responsive.scaleH(context, 120),
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withOpacity(0.08),
@@ -154,32 +162,25 @@ class _MainDashboardState extends State<MainDashboard> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(60),
-                          child: Image.asset('assets/images/logo_main.png', fit: BoxFit.contain),
+                          child: Image.asset(
+                            'assets/images/logo_main.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
                       Text(
                         'Select Your Role',
                         textAlign: TextAlign.center,
                         style: textTheme.headlineMedium?.copyWith(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -1.0,
+                          fontSize: Responsive.fontSize(context, 28),
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Choose how you\'d like to sign in',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 48),
-                    // Role Cards
-                    if (!_isFromReferral) ...[
+                      const SizedBox(height: 48),
+
+                      // Role Cards
                       _buildRoleCard(
                         context: context,
                         title: 'Organization',
@@ -189,34 +190,34 @@ class _MainDashboardState extends State<MainDashboard> {
                         destination: const Organisation_LoginPage(),
                       ),
                       const SizedBox(height: 16),
+                      _buildRoleCard(
+                        context: context,
+                        title: 'Manager',
+                        subtitle: 'Configure settings & control',
+                        icon: Icons.manage_accounts_rounded,
+                        accentColor: colorScheme.secondary,
+                        destination: const ConfigLoginPage(),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRoleCard(
+                        context: context,
+                        title: 'Supervisor',
+                        subtitle: 'Manage site activities',
+                        icon: Icons.supervisor_account_rounded,
+                        accentColor: const Color(0xFF0EA5E9),
+                        destination: const SupervisorLoginPage(),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRoleCard(
+                        context: context,
+                        title: 'Customer',
+                        subtitle: 'View your project status',
+                        icon: Icons.person_rounded,
+                        accentColor: const Color(0xFF10B981),
+                        destination: const CustomerLoginPage(),
+                      ),
+                      const SizedBox(height: 40), // Extra bottom padding
                     ],
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Manager',
-                      subtitle: 'Configure settings & control',
-                      icon: Icons.manage_accounts_rounded,
-                      accentColor: colorScheme.secondary,
-                      destination: const ConfigLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Supervisor',
-                      subtitle: 'Manage site activities',
-                      icon: Icons.supervisor_account_rounded,
-                      accentColor: const Color(0xFF0EA5E9),
-                      destination: const SupervisorLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Customer',
-                      subtitle: 'View your project status',
-                      icon: Icons.person_rounded,
-                      accentColor: const Color(0xFF10B981),
-                      destination: const CustomerLoginPage(),
-                    ),
-                    const SizedBox(height: 40), // Extra bottom padding
                   ],
                 ),
               ),
@@ -276,7 +277,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    fontSize: 18,
+                    fontSize: Responsive.fontSize(context, 18),
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -284,7 +285,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 14,
+                    fontSize: Responsive.fontSize(context, 14),
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),

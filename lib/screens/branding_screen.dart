@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'pricing_screen.dart';
 import '../utils/app_theme.dart';
+import '../widgets/glass_scaffold.dart';
 
 class BrandingScreen extends StatefulWidget {
   final String orgName;
@@ -235,243 +236,127 @@ class _BrandingScreenState extends State<BrandingScreen> {
           final theme = Theme.of(context);
           final headerColor = const Color(0xFF003668);
 
-          return Scaffold(
-            backgroundColor: const Color(0xFFF8FAFC),
-            appBar: AppBar(
-              backgroundColor: headerColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              centerTitle: false,
-              title: const Text(
-                'Branding',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                  color: Colors.white,
-                ),
-              ),
-              leading: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  size: 20,
-                  color: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            body: Column(
-              children: [
-                // Rectangular Header with Step Indicator
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  decoration: BoxDecoration(
-                    color: headerColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: _buildStepIndicator(theme, headerColor),
-                ),
-
-                // Responsive Branding Content Area (Customization Top, Mockup Bottom)
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        // Top Section: Customization Controls
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 24 : screenWidth * 0.15,
-                            vertical: 40,
-                          ),
-                          decoration: const BoxDecoration(color: Colors.white),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                'App Personalization',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF1E293B),
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Configure your custom app identity and see live changes below.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 40),
-
-                              // App Section Area
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildFieldLabel('Display Name'),
-                                    const SizedBox(height: 8),
-                                    _buildProfessionalField(
-                                      controller: _appNameController,
-                                      hint: widget.orgName,
-                                      icon: Icons.edit_rounded,
-                                    ),
-                                    const SizedBox(height: 32),
-                                    _buildFieldLabel('Theme Color'),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Primary: #${_selectedColor.value.toRadixString(16).toUpperCase().substring(2)}',
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: Colors.grey[500],
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Wrap(
-                                      spacing: 12,
-                                      runSpacing: 12,
-                                      children: _colorOptions.map((opt) {
-                                        final isCustom =
-                                            opt['isCustom'] == true;
-                                        final c = isCustom
-                                            ? _customColor
-                                            : opt['color'] as Color;
-                                        final sel = isCustom
-                                            ? (!_colorOptions.any(
-                                                (o) =>
-                                                    o['isCustom'] != true &&
-                                                    o['color'] ==
-                                                        _selectedColor,
-                                              ))
-                                            : _selectedColor.value == c.value;
-
-                                        return GestureDetector(
-                                          onTap: isCustom
-                                              ? _showColorPicker
-                                              : () {
-                                                  setState(() {
-                                                    _selectedColor = c;
-                                                    _customColor = c;
-                                                  });
-                                                },
-                                          child: AnimatedContainer(
-                                            duration: const Duration(
-                                              milliseconds: 200,
-                                            ),
-                                            width: 42,
-                                            height: 42,
-                                            decoration: BoxDecoration(
-                                              color: isCustom && !sel
-                                                  ? Colors.transparent
-                                                  : c,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: sel
-                                                    ? const Color(0xFF1E293B)
-                                                    : Colors.transparent,
-                                                width: 2.5,
-                                              ),
-                                              gradient: isCustom && !sel
-                                                  ? const SweepGradient(
-                                                      colors: [
-                                                        Colors.red,
-                                                        Colors.orange,
-                                                        Colors.yellow,
-                                                        Colors.green,
-                                                        Colors.blue,
-                                                        Colors.purple,
-                                                        Colors.red,
-                                                      ],
-                                                    )
-                                                  : null,
-                                              boxShadow: sel
-                                                  ? [
-                                                      BoxShadow(
-                                                        color: c.withOpacity(
-                                                          0.3,
-                                                        ),
-                                                        blurRadius: 8,
-                                                        spreadRadius: 1,
-                                                      ),
-                                                    ]
-                                                  : null,
-                                            ),
-                                            child: sel
-                                                ? const Icon(
-                                                    Icons.check,
-                                                    color: Colors.white,
-                                                    size: 20,
-                                                  )
-                                                : null,
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Bottom Section: Live Phone Preview
-                        Container(
-                          width: double.infinity,
-                          constraints: BoxConstraints(
-                            minHeight: screenHeight * 0.4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9).withOpacity(0.5),
-                            border: Border(
-                              top: BorderSide(
-                                color: const Color(0xFFE2E8F0),
-                                width: 1,
+          return GlassScaffold(
+            title: 'Branding',
+            onBack: () => Navigator.pop(context),
+            body: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      _buildStepIndicator(theme),
+                      const SizedBox(height: 24),
+                      // Responsive Branding Content Area (Customization Top, Mockup Bottom)
+                      Column(
+                        children: [
+                          // Top Section: Customization Controls
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen
+                                  ? 20
+                                  : screenWidth * 0.1,
+                              vertical: 32,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.cardColor,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: theme.dividerColor.withOpacity(0.2),
                               ),
                             ),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 40),
-                          child: Column(
-                            children: [
-                              _buildPhoneMockup(theme, screenWidth),
-                              const SizedBox(height: 48),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isSmallScreen
-                                      ? 24
-                                      : screenWidth * 0.25,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'App Personalization',
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: theme.colorScheme.onSurface,
+                                        letterSpacing: -0.5,
+                                      ),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Configure your custom app identity and see live changes below.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+
+                                // App Section Area
+                                Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceVariant
+                                        .withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFieldLabel('App Name (Brand Name)'),
+                                      const SizedBox(height: 8),
+                                      _buildBrandingField(
+                                        controller: _appNameController,
+                                        hint: widget.orgName,
+                                        icon: Icons.edit_note_rounded,
+                                      ),
+                                      const SizedBox(height: 24),
+                                      _buildFieldLabel('Primary Brand Color'),
+                                      const SizedBox(height: 12),
+                                      _buildColorPalette(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          // Phone Mockup View
+                          _buildPhoneMockup(theme, screenWidth),
+                          const SizedBox(height: 48),
+                          // Navigation
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    side: BorderSide(color: theme.dividerColor),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'BACK',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
                                 child: ElevatedButton(
                                   onPressed: _isLoading ? null : _goToNextStep,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0F172A),
+                                    backgroundColor: theme.primaryColor,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 20,
+                                      vertical: 16,
                                     ),
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    minimumSize: const Size(
-                                      double.infinity,
-                                      54,
                                     ),
                                   ),
                                   child: _isLoading
@@ -484,20 +369,19 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                           ),
                                         )
                                       : const Text(
-                                          'PREVIEW PRICING',
+                                          'CONTINUE',
                                           style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.2,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -655,116 +539,207 @@ class _BrandingScreenState extends State<BrandingScreen> {
     );
   }
 
-  Widget _buildFieldLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF475569),
-        letterSpacing: 0.5,
+  Widget _buildStepIndicator(ThemeData theme) {
+    const steps = ['Details', 'Branding', 'Pricing'];
+    const activeStep = 1;
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(steps.length, (index) {
+          final isActive = activeStep == index;
+          final isDone = activeStep > index;
+
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Step circle and label
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone
+                          ? colorScheme.primary
+                          : (isActive
+                                ? colorScheme.primary
+                                : colorScheme.surfaceVariant),
+                    ),
+                    child: Center(
+                      child: isDone
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 20,
+                            )
+                          : Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isActive
+                                    ? Colors.white
+                                    : colorScheme.onSurfaceVariant,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    steps[index],
+                    style: TextStyle(
+                      color: isActive
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              // Connector line
+              if (index < steps.length - 1)
+                Container(
+                  width: 40,
+                  height: 2,
+                  margin: const EdgeInsets.only(
+                    bottom: 24,
+                    left: 12,
+                    right: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: activeStep > index
+                        ? colorScheme.primary
+                        : colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+            ],
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildProfessionalField({
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandingField({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
   }) {
-    return TextFormField(
-      controller: controller,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF1E293B),
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
       ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-        prefixIcon: Icon(icon, color: _selectedColor, size: 18),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 16,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: _selectedColor, width: 2),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        onChanged: (v) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
       ),
-      onChanged: (_) => setState(() {}),
     );
   }
 
-  Widget _buildStepIndicator(ThemeData theme, Color headerColor) {
-    const steps = ['Details', 'Branding', 'Pricing'];
-    const activeStep = 1;
+  Widget _buildColorPalette() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: _colorOptions.map((opt) {
+        final isCustom = opt['isCustom'] == true;
+        final c = isCustom ? _customColor : opt['color'] as Color;
+        final sel = isCustom
+            ? (!_colorOptions.any(
+                (o) => o['isCustom'] != true && o['color'] == _selectedColor,
+              ))
+            : _selectedColor.value == c.value;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(steps.length, (index) {
-        final isActive = activeStep == index;
-        final isDone = activeStep > index;
-
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDone
-                        ? Colors.white
-                        : (isActive ? Colors.white : Colors.white24),
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: Center(
-                    child: isDone
-                        ? Icon(Icons.check, color: headerColor, size: 18)
-                        : Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              color: isActive ? headerColor : Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  steps[index],
-                  style: TextStyle(
-                    color: isActive ? Colors.white : Colors.white70,
-                    fontSize: 11,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            if (index < steps.length - 1)
-              Container(
-                width: 40,
-                height: 2,
-                margin: const EdgeInsets.only(bottom: 16, left: 12, right: 12),
-                decoration: BoxDecoration(
-                  color: activeStep > index ? Colors.white : Colors.white24,
-                  borderRadius: BorderRadius.circular(1),
-                ),
+        return GestureDetector(
+          onTap: isCustom
+              ? _showColorPicker
+              : () {
+                  setState(() {
+                    _selectedColor = c;
+                    _customColor = c;
+                  });
+                },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: isCustom && !sel ? Colors.transparent : c,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: sel ? const Color(0xFF1E293B) : Colors.transparent,
+                width: 2.5,
               ),
-          ],
+              gradient: isCustom && !sel
+                  ? const SweepGradient(
+                      colors: [
+                        Colors.red,
+                        Colors.orange,
+                        Colors.yellow,
+                        Colors.green,
+                        Colors.blue,
+                        Colors.purple,
+                        Colors.red,
+                      ],
+                    )
+                  : null,
+              boxShadow: sel
+                  ? [
+                      BoxShadow(
+                        color: c.withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: sel
+                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                : null,
+          ),
         );
-      }),
+      }).toList(),
     );
   }
 }

@@ -11,7 +11,7 @@ class ToolMasterPage extends StatefulWidget {
   _ToolMasterPageState createState() => _ToolMasterPageState();
 }
 
-class _ToolMasterPageState extends State<ToolMasterPage> 
+class _ToolMasterPageState extends State<ToolMasterPage>
     with SingleTickerProviderStateMixin {
   final TextEditingController _toolNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -110,12 +110,13 @@ class _ToolMasterPageState extends State<ToolMasterPage>
 
     return GlassScaffold(
       title: 'Tool Master',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       bottom: TabBar(
         controller: _tabController,
-        labelColor: theme.colorScheme.primary,
-        unselectedLabelColor: const Color.fromARGB(255, 255, 255, 255),
-        indicatorColor: theme.colorScheme.primary,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white,
+        indicatorColor: Colors.white,
         indicatorWeight: 3,
         indicatorSize: TabBarIndicatorSize.label,
         labelStyle: TextStyle(
@@ -507,16 +508,16 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       // 2. Update the 'toolsAtCompany' collection to reflect the new count backend-wide
       final toolCode = _selectedToolData?['toolCode']?.toString();
       if (toolCode != null && toolCode.isNotEmpty) {
-        await FirestoreService.getCollection('toolsAtCompany')
-            .doc(toolCode)
-            .set({
-              'toolCode': toolCode,
-              'availableCount': newCount,
-            }, SetOptions(merge: true));
+        await FirestoreService.getCollection(
+          'toolsAtCompany',
+        ).doc(toolCode).set({
+          'toolCode': toolCode,
+          'availableCount': newCount,
+        }, SetOptions(merge: true));
       }
 
       if (!mounted) return;
-      
+
       // 3. Immediately reflect changes in the UI state
       setState(() {
         if (_selectedToolData != null) {

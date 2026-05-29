@@ -103,13 +103,15 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
     return GlassScaffold(
       title: 'Material Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: reportRows.isNotEmpty ? _generatePdf : null,
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
         ),
       ],

@@ -43,14 +43,20 @@ class SiteStatusReportPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           '$status Sites',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: statusColor,
         elevation: 0,
-        iconTheme: const IconThemeData(),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+            icon: const Icon(
+              Icons.picture_as_pdf_outlined,
+              color: Colors.white,
+            ),
             onPressed: () => _generatePdf(context),
           ),
         ],
@@ -127,13 +133,15 @@ class SiteStatusReportPage extends StatelessWidget {
 
   Future<void> _generatePdf(BuildContext context) async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(getStatusColor(context, status).value);
+    final pdfPrimaryColor = PdfColor.fromInt(
+      getStatusColor(context, status).value,
+    );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
-    final snapshot = await FirestoreService.getCollection('projects')
-        .where('currentStatus', isEqualTo: status)
-        .get();
-    
+    final snapshot = await FirestoreService.getCollection(
+      'projects',
+    ).where('currentStatus', isEqualTo: status).get();
+
     final docs = snapshot.docs;
 
     pdf.addPage(
@@ -150,7 +158,11 @@ class SiteStatusReportPage extends StatelessWidget {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               PdfTemplates.buildMetaBox('Status', status, pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Total Sites', '${docs.length}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Total Sites',
+                '${docs.length}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
@@ -160,19 +172,26 @@ class SiteStatusReportPage extends StatelessWidget {
               final data = doc.data() as Map<String, dynamic>;
               final projectName = data['projectName']?.toString() ?? '-';
               final siteLocation = data['siteLocation']?.toString() ?? '-';
-              final budget = double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0;
-              final paid = double.tryParse(data['amountPaid']?.toString() ?? '0') ?? 0;
-              final spent = double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0;
+              final budget =
+                  double.tryParse(data['projectBudget']?.toString() ?? '0') ??
+                  0;
+              final paid =
+                  double.tryParse(data['amountPaid']?.toString() ?? '0') ?? 0;
+              final spent =
+                  double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0;
               final balance = paid - spent;
               return [
                 projectName,
                 siteLocation,
                 '₹${budget.toStringAsFixed(0)}',
                 '₹${spent.toStringAsFixed(0)}',
-                '₹${balance.toStringAsFixed(0)}'
+                '₹${balance.toStringAsFixed(0)}',
               ];
             }).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),

@@ -536,6 +536,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                   isLoadingSites
                       ? const Center(child: CircularProgressIndicator())
                       : DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: selectedSiteId,
                           decoration: InputDecoration(
                             labelText: 'Site ID',
@@ -553,7 +554,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                               .map(
                                 (site) => DropdownMenuItem<String>(
                                   value: site,
-                                  child: Text(site),
+                                  child: Text(
+                                    site,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),

@@ -206,6 +206,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
 
     return GlassScaffold(
       title: 'Material Sub Category Master',
+      onBack: () => Navigator.pop(context),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

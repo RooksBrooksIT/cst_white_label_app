@@ -12,6 +12,8 @@ import '../services/firestore_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
 
+import 'org_sub_menu_screen.dart';
+
 class CustomerDashboardPage extends StatefulWidget {
   final String ownerName;
   final String ownerPhoneNumber;
@@ -27,7 +29,26 @@ class CustomerDashboardPage extends StatefulWidget {
   State<CustomerDashboardPage> createState() => _CustomerDashboardPageState();
 }
 
+class _CategoryData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<SubMenuItem> items;
+
+  _CategoryData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.items,
+  });
+}
+
 class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
+  final ScrollController _scrollController = ScrollController();
   String? _siteId;
   String? _storedOwnerName;
   String? _storedOwnerPhoneNumber;
@@ -38,6 +59,12 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
   void initState() {
     super.initState();
     _loadStoredUserInfo();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadStoredUserInfo() async {
@@ -67,8 +94,6 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       final String ownerPhoneToUse =
           _storedOwnerPhoneNumber ?? widget.ownerPhoneNumber;
 
-      print('Fetching siteId for: $ownerNameToUse, $ownerPhoneToUse');
-
       final querySnapshot = await FirestoreService.getCollection('Site')
           .where('ownerName', isEqualTo: ownerNameToUse)
           .where('ownerPhoneNumber', isEqualTo: ownerPhoneToUse)
@@ -78,7 +103,6 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         final doc = querySnapshot.docs.first;
         final newSiteId = doc['siteId']?.toString() ?? '';
 
-        // Store siteId in AuthService only if we found a valid one
         if (newSiteId.isNotEmpty) {
           await AuthService().updateUserData({'siteId': newSiteId});
 
@@ -86,144 +110,88 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
             _siteId = newSiteId;
             _isLoading = false;
           });
-          print('SiteId found and stored: $_siteId');
         } else {
-          // Keep the existing siteId if new one is empty
           setState(() {
             _isLoading = false;
           });
-          print(
-            'No valid siteId found in Firestore, keeping existing: $_siteId',
-          );
         }
       } else {
-        // No projects found, but keep the existing siteId
         setState(() {
           _isLoading = false;
         });
-        print('No projects found for user, keeping existing siteId: $_siteId');
       }
     } catch (e) {
-      // On error, keep the existing siteId
       setState(() {
         _isLoading = false;
       });
-      print('Error fetching siteId, keeping existing: $e');
     }
-  }
-
-  Widget _dashboardButton({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: GestureDetector(
-        onTap: onPressed,
-        child: GlassCard(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: const Color(0xFF1E293B),
-                        fontSize: Responsive.fontSize(context, 18),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: const Color(0xFF64748B),
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Color(0xFFCBD5E1),
-                size: 16,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Logout',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color.fromARGB(153, 0, 0, 0)),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                await AuthService().logout();
-
-                if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/authSelection',
-                    (route) => false,
-                  );
-                }
-              },
-              child: const Text(
-                'Logout',
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ],
-        );
-      },
+        ),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await AuthService().logout();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/authSelection',
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -256,6 +224,120 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       );
     }
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final categories = [
+      _CategoryData(
+        title: "Project Details",
+        subtitle: "View your site and project information",
+        icon: Icons.location_city_rounded,
+        color: colorScheme.primary,
+        gradientColors: [
+          colorScheme.primary,
+          colorScheme.primary.withOpacity(0.7),
+        ],
+        items: [
+          SubMenuItem(
+            title: 'Project Information',
+            subtitle: 'Detailed site and project specifications',
+            icon: Icons.info_rounded,
+            color: colorScheme.primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProjectDetailsPage(
+                  ownerName: _displayOwnerName,
+                  ownerPhoneNumber: _displayOwnerPhoneNumber,
+                  siteId: _siteId ?? '',
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Site Workers',
+            subtitle: 'Real-time worker attendance at your site',
+            icon: Icons.people_rounded,
+            color: colorScheme.secondary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    CustomerWorkerDetails(siteId: _siteId ?? ''),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Reports & Insights",
+        subtitle: "Financial reports and project analytics",
+        icon: Icons.bar_chart_rounded,
+        color: Colors.orange,
+        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Project Analytics',
+            subtitle: 'Advanced insights and progress tracking',
+            icon: Icons.insights_rounded,
+            color: Colors.orange,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CustomerWorkProgress(
+                  ownername: _displayOwnerName,
+                  ownerphonenumber: _displayOwnerPhoneNumber,
+                  siteId: _siteId ?? '',
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Workers Summary',
+            subtitle: 'Consolidated report of site workforce',
+            icon: Icons.assignment_ind_rounded,
+            color: Colors.orangeAccent,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    CustomerWorkersSummary(siteId: _siteId ?? ''),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Support",
+        subtitle: "Get help and view policies",
+        icon: Icons.support_agent_rounded,
+        color: Colors.teal,
+        gradientColors: [Colors.teal, Colors.teal.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Privacy Policy',
+            subtitle: 'Read our data protection guidelines',
+            icon: Icons.privacy_tip_rounded,
+            color: Colors.teal,
+            onTap: () async {
+              final Uri url = Uri.parse(
+                'https://sites.google.com/view/cst-whitelabel-app/home',
+              );
+              if (!await launchUrl(url)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not open privacy policy'),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
@@ -283,190 +365,202 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: () => _showLogoutDialog(context),
             tooltip: 'Logout',
+            onPressed: () => _showLogoutDialog(context),
           ),
-          const SizedBox(width: 8),
         ],
-        body: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            vertical: 24,
-            horizontal: Responsive.isMobile(context) ? 0.0 : 24.0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: EdgeInsets.zero,
+        body: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Welcome Back!',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 18),
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _displayOwnerName,
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 32),
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    GlassCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Site ID: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              _siteId != null && _siteId!.isNotEmpty
-                                  ? _siteId!
-                                  : 'No project site found',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _siteId != null && _siteId!.isNotEmpty
-                                    ? const Color(0xFF1E293B)
-                                    : Colors.orangeAccent,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Welcome Card
+                    _buildWelcomeCard(theme),
+                    const SizedBox(height: 24),
+                    // Categories
+                    ...categories.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final category = entry.value;
+                      return AnimatedContainer(
+                        duration: Duration(milliseconds: 300 + (index * 50)),
+                        curve: Curves.easeOutCubic,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: _buildCategoryTile(context, category: category),
+                      );
+                    }),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-              // Main Dashboard Buttons
-              _dashboardButton(
-                title: "Project Summary",
-                subtitle: "View your project details and progress",
-                icon: Icons.assignment_rounded,
-                color: Colors.blueAccent,
-                onPressed: () {
-                  if (_siteId != null && _siteId!.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProjectDetailsPage(
-                          siteId: _siteId!,
-                          ownerName: _displayOwnerName,
-                          ownerPhoneNumber: _displayOwnerPhoneNumber,
-                        ),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Project siteId not found')),
-                    );
-                  }
-                },
-              ),
-              _dashboardButton(
-                title: "Workers List",
-                subtitle: "Manage your workers and their details",
-                icon: Icons.people_alt_rounded,
-                color: Colors.greenAccent,
-                onPressed: () {
-                  if (_siteId != null && _siteId!.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            CustomerWorkerDetails(siteId: _siteId!),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Project siteId not found')),
-                    );
-                  }
-                },
-              ),
-              _dashboardButton(
-                title: "Workers Summary",
-                subtitle: "View workers performance and attendance",
-                icon: Icons.summarize_rounded,
-                color: Colors.purpleAccent,
-                onPressed: () {
-                  if (_siteId != null && _siteId!.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            CustomerWorkersSummary(siteId: _siteId!),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Project siteId not found')),
-                    );
-                  }
-                },
-              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              _dashboardButton(
-                title: "Expenses Summary",
-                subtitle: "Track project expenses and budget status",
-                icon: Icons.account_balance_wallet_rounded,
-                color: Colors.orangeAccent,
-                onPressed: () {
-                  if (_siteId != null && _siteId!.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CustomerWorkProgress(
-                          ownername: _displayOwnerName,
-                          ownerphonenumber: _displayOwnerPhoneNumber,
-                          siteId: _siteId!,
+  Widget _buildWelcomeCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white.withOpacity(0.2),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 35,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome,',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  _displayOwnerName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Phone: $_displayOwnerPhoneNumber',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryTile(
+    BuildContext context, {
+    required _CategoryData category,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrgSubMenuScreen(
+                title: category.title,
+                items: category.items,
+              ),
+            ),
+          ),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: category.gradientColors,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: category.color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(category.icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Project siteId not found')),
-                    );
-                  }
-                },
-              ),
-              _dashboardButton(
-                title: "Privacy Policy",
-                subtitle: "View our privacy policy",
-                icon: Icons.privacy_tip_rounded,
-                color: Colors.blueGrey,
-                onPressed: () async {
-                  final Uri url = Uri.parse(
-                    'https://sites.google.com/view/cst-whitelabel-app/home',
-                  );
-                  if (!await launchUrl(url)) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Could not open privacy policy'),
+                      const SizedBox(height: 4),
+                      Text(
+                        category.subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                          height: 1.3,
                         ),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ),

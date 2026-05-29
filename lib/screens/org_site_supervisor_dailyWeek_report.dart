@@ -479,12 +479,25 @@ class _DailySitePaymentReportScreenState
           fontSizeBase: fontSizeBase,
         ),
         SizedBox(height: fontSizeBase * 2),
-        Row(
-          children: [
-            Expanded(child: _buildMonthDropdown(fontSizeBase)),
-            SizedBox(width: fontSizeBase),
-            Expanded(child: _buildYearDropdown(fontSizeBase)),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 400) {
+              return Column(
+                children: [
+                  _buildMonthDropdown(fontSizeBase),
+                  SizedBox(height: fontSizeBase),
+                  _buildYearDropdown(fontSizeBase),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: _buildMonthDropdown(fontSizeBase)),
+                SizedBox(width: fontSizeBase),
+                Expanded(child: _buildYearDropdown(fontSizeBase)),
+              ],
+            );
+          },
         ),
         SizedBox(height: fontSizeBase * 2.5),
         const Text(
@@ -549,6 +562,7 @@ class _DailySitePaymentReportScreenState
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Month', fontSizeBase * 0.9),
       value: selectedMonth,
+      isExpanded: true,
       dropdownColor: theme.cardColor,
       items: List.generate(12, (i) => i + 1)
           .map(
@@ -578,6 +592,7 @@ class _DailySitePaymentReportScreenState
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Year', fontSizeBase * 0.9),
       value: selectedYear,
+      isExpanded: true,
       dropdownColor: theme.cardColor,
       items: years
           .map(

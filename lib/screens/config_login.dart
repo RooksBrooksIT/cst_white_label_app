@@ -6,8 +6,9 @@ import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
 import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 import '../utils/firestore_error_handler.dart';
 import '../services/notification_service.dart';
 
@@ -49,7 +50,7 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       _tempOrgName = prefs.getString('temp_org_name');
       _tempLogoUrl = prefs.getString('temp_logo_url');
       _actualReferralCode = prefs.getString('temp_referral_code');
-      
+
       if (_tempOrgName != null) {
         _referralController.text = _tempOrgName!;
       } else if (_actualReferralCode != null) {
@@ -74,15 +75,12 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
     String orgId,
     String resolvedPath,
   ) async {
-    await AuthService().login(
-      UserRole.manager,
-      {
-        'username': username,
-        'password': password,
-        'orgId': orgId,
-        'config_org_doc_path': resolvedPath,
-      },
-    );
+    await AuthService().login(UserRole.manager, {
+      'username': username,
+      'password': password,
+      'orgId': orgId,
+      'config_org_doc_path': resolvedPath,
+    });
   }
 
   @override
@@ -134,7 +132,8 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       setState(() => _isLoading = true);
 
       try {
-        final referralCode = _actualReferralCode ?? _referralController.text.trim();
+        final referralCode =
+            _actualReferralCode ?? _referralController.text.trim();
 
         // 1. Validate Referral Code by searching across all admin/referal documents
         final orgId = await FirestoreService.findOrgIdByReferralCode(
@@ -214,71 +213,83 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       onBack: () => Navigator.pop(context),
       body: Center(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Icon Header or Org Logo
               if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
                 Container(
-                  width: 110,
-                  height: 110,
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
                     border: Border.all(color: colorScheme.outline, width: 2),
-                    image: DecorationImage(
-                      image: NetworkImage(_tempLogoUrl!),
-                      fit: BoxFit.cover,
+                  ),
+                  child: Image.network(
+                    _tempLogoUrl!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.manage_accounts_rounded,
+                      size: 60,
+                      color: colorScheme.primary,
                     ),
                   ),
                 )
               else
                 Container(
-                  padding: const EdgeInsets.all(28),
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.08),
+                    color: colorScheme.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      width: 2,
+                    ),
                   ),
                   child: Icon(
-                    Icons.settings_rounded,
-                    size: 64,
+                    Icons.manage_accounts_rounded,
+                    size: 40,
                     color: colorScheme.primary,
                   ),
                 ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text(
                 _tempOrgName ?? 'Manager Login',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Sign in to your account',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
 
               GlassCard(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
                       GlassTextField(
                         controller: _referralController,
-                        label: 'Referral Code',
-                        icon: Icons.business_outlined,
-                        readOnly: _referralController.text.isNotEmpty,
+                        label: 'Referral Code / Org Name',
+                        icon: Icons.business_rounded,
+                        enabled:
+                            _actualReferralCode == null && _tempOrgName == null,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       GlassTextField(
                         controller: _usernameController,
                         label: 'Username',
                         icon: Icons.person_outline_rounded,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       GlassTextField(
                         controller: _passwordController,
                         label: 'Password',
@@ -286,31 +297,20 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                         isPassword: true,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _showForgotPasswordDialog,
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassButton(
+                          label: 'LOGIN',
+                          isLoading: _isLoading,
+                          onPressed: _login,
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      GlassButton(
-                        label: 'LOGIN',
-                        isLoading: _isLoading,
-                        onPressed: _login,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -359,162 +359,177 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                           color: Color(0xFF1E293B),
                         ),
                       ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: usernameController,
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(
-                          Icons.person_outline_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: usernameController,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                            color: colorScheme.primary,
                           ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: newPasswordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'New Password',
-                        prefixIcon: Icon(
-                          Icons.lock_outline_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        prefixIcon: Icon(
-                          Icons.lock_reset_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
                         ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: newPasswordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          prefixIcon: Icon(
+                            Icons.lock_reset_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
                               ),
-                              side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(color: Color(0xFF64748B)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Color(0xFF64748B)),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: isUpdating
-                                ? null
-                                : () async {
-                                    if (newPasswordController.text !=
-                                        confirmPasswordController.text) {
-                                      _showErrorDialog(
-                                        'Passwords do not match',
-                                      );
-                                      return;
-                                    }
-                                    setState(() => isUpdating = true);
-
-                                    try {
-                                      // Ensure referral code is filled so org path is known
-                                      if (_referralController.text.isEmpty) {
-                                        _showErrorDialog('Please enter your Referral Code on the main screen first.');
-                                        setState(() => isUpdating = false);
-                                        return;
-                                      }
-
-                                      // Temporarily resolve the referral code
-                                      final orgId = await FirestoreService.findOrgIdByReferralCode(
-                                        _referralController.text.trim(),
-                                      );
-
-                                      if (orgId == null) {
-                                        _showErrorDialog('Invalid Referral Code on main screen');
-                                        setState(() => isUpdating = false);
-                                        return;
-                                      }
-
-                                      final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setString('config_org_path', orgId);
-                                      await FirestoreService.initialize();
-
-                                      final querySnapshot =
-                                          await FirestoreService.configUsers
-                                              .where(
-                                                'UserName',
-                                                isEqualTo: usernameController
-                                                    .text
-                                                    .trim(),
-                                              )
-                                              .get();
-
-                                      if (querySnapshot.docs.isNotEmpty) {
-                                        final docId =
-                                            querySnapshot.docs.first.id;
-
-                                        await FirestoreService.configUsers
-                                            .doc(docId)
-                                            .update({
-                                              'Password': newPasswordController
-                                                  .text
-                                                  .trim(),
-                                            });
-
-                                        if (!context.mounted) return;
-                                        Navigator.pop(context);
-                                        _showSuccessDialog(
-                                          'Password updated successfully',
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isUpdating
+                                  ? null
+                                  : () async {
+                                      if (newPasswordController.text !=
+                                          confirmPasswordController.text) {
+                                        _showErrorDialog(
+                                          'Passwords do not match',
                                         );
-                                      } else {
-                                        if (!context.mounted) return;
-                                        _showErrorDialog('Username not found in this organization');
+                                        return;
                                       }
+                                      setState(() => isUpdating = true);
+
+                                      try {
+                                        // Ensure referral code is filled so org path is known
+                                        if (_referralController.text.isEmpty) {
+                                          _showErrorDialog(
+                                            'Please enter your Referral Code on the main screen first.',
+                                          );
+                                          setState(() => isUpdating = false);
+                                          return;
+                                        }
+
+                                        // Temporarily resolve the referral code
+                                        final orgId =
+                                            await FirestoreService.findOrgIdByReferralCode(
+                                              _referralController.text.trim(),
+                                            );
+
+                                        if (orgId == null) {
+                                          _showErrorDialog(
+                                            'Invalid Referral Code on main screen',
+                                          );
+                                          setState(() => isUpdating = false);
+                                          return;
+                                        }
+
+                                        final prefs =
+                                            await SharedPreferences.getInstance();
+                                        await prefs.setString(
+                                          'config_org_path',
+                                          orgId,
+                                        );
+                                        await FirestoreService.initialize();
+
+                                        final querySnapshot =
+                                            await FirestoreService.configUsers
+                                                .where(
+                                                  'UserName',
+                                                  isEqualTo: usernameController
+                                                      .text
+                                                      .trim(),
+                                                )
+                                                .get();
+
+                                        if (querySnapshot.docs.isNotEmpty) {
+                                          final docId =
+                                              querySnapshot.docs.first.id;
+
+                                          await FirestoreService.configUsers
+                                              .doc(docId)
+                                              .update({
+                                                'Password':
+                                                    newPasswordController.text
+                                                        .trim(),
+                                              });
+
+                                          if (!context.mounted) return;
+                                          Navigator.pop(context);
+                                          _showSuccessDialog(
+                                            'Password updated successfully',
+                                          );
+                                        } else {
+                                          if (!context.mounted) return;
+                                          _showErrorDialog(
+                                            'Username not found in this organization',
+                                          );
+                                        }
                                       } catch (e) {
                                         if (context.mounted) {
                                           FirestoreErrorHandler.handleError(
@@ -527,34 +542,36 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
                                         if (context.mounted)
                                           setState(() => isUpdating = false);
                                       }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
                               ),
-                              elevation: 0,
+                              child: isUpdating
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('Update'),
                             ),
-                            child: isUpdating
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Update'),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
+              );
             },
           ),
         );

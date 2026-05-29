@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../services/expense_service.dart';
-import 'supervisor_dashboard.dart';
 import 'package:intl/intl.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -423,8 +422,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         .toList();
 
     try {
-      final existingDoc =
-          await FirestoreService.siteSupervisorEntries.doc(docId).get();
+      final existingDoc = await FirestoreService.siteSupervisorEntries
+          .doc(docId)
+          .get();
       final bool docExists = existingDoc.exists;
 
       if (docExists) {
@@ -626,25 +626,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Widget build(BuildContext context) {
     return GlassScaffold(
       title: 'Manager Daily Site Entry',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SupervisorDashboard(
-                  username: widget.userName,
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
-              ),
-              (route) => false,
-            );
-          },
-        ),
-      ],
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
