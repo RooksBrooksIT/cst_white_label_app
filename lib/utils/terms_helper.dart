@@ -28,10 +28,17 @@ class TermsHelper {
   }
 }
 
-class _TermsDialog extends StatelessWidget {
+class _TermsDialog extends StatefulWidget {
   final VoidCallback onAccepted;
 
   const _TermsDialog({required this.onAccepted});
+
+  @override
+  State<_TermsDialog> createState() => _TermsDialogState();
+}
+
+class _TermsDialogState extends State<_TermsDialog> {
+  bool _isAccepted = false;
 
   @override
   Widget build(BuildContext context) {
@@ -174,13 +181,45 @@ class _TermsDialog extends StatelessWidget {
                     top: BorderSide(color: theme.dividerColor.withOpacity(0.1)),
                   ),
                 ),
-                child: GlassButton(
-                  label: 'I AGREE',
-                  onPressed: () async {
-                    await TermsHelper.acceptTerms();
-                    Navigator.pop(context);
-                    onAccepted();
-                  },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        value: _isAccepted,
+                        onChanged: (value) {
+                          setState(() {
+                            _isAccepted = value ?? false;
+                          });
+                        },
+                        title: Text(
+                          'I agree to the Terms & Conditions',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeColor: theme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      label: 'CONTINUE',
+                      onPressed: _isAccepted
+                          ? () async {
+                              await TermsHelper.acceptTerms();
+                              if (mounted) {
+                                Navigator.pop(context);
+                                widget.onAccepted();
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
                 ),
               ),
             ],

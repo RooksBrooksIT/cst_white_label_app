@@ -35,21 +35,13 @@ class OrganizationDashboard extends StatefulWidget {
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
-
-  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
     super.initState();
     _checkSubscription();
     _startSubscriptionListener();
-    _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset = _scrollController.offset;
-      });
-    });
   }
 
   void _startSubscriptionListener() {
@@ -59,14 +51,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           final data = snapshot.data()!;
           final isActive = data['isSubscriptionActive'] as bool? ?? true;
           final endDate = data['subscriptionEndDate'] as Timestamp?;
-
           bool isExpired = false;
-          if (endDate != null) {
+          if (endDate != null)
             isExpired = DateTime.now().isAfter(
               endDate.toDate().add(const Duration(hours: 1)),
             );
-          }
-
           if (!isActive || isExpired) {
             Navigator.pushReplacement(
               context,
@@ -82,14 +71,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Future<void> _checkSubscription() async {
     final isValid = await AuthService().checkSubscriptionStatus();
-    if (!isValid && mounted) {
+    if (!isValid && mounted)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const OrganizationSubscriptionPage(),
         ),
       );
-    }
   }
 
   @override
@@ -126,26 +114,12 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         onPressed: () => _navigateToOrgMenu(context),
                       ),
                     ],
-                    padding: EdgeInsets.zero,
                     body: CustomScrollView(
                       controller: _scrollController,
                       physics: const BouncingScrollPhysics(),
                       slivers: [
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 24,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDashboardSections(context, theme),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                        ..._buildGridSections(context, theme),
+                        const SliverToBoxAdapter(child: SizedBox(height: 100)),
                       ],
                     ),
                   );
@@ -158,82 +132,179 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  void _showLogoutConfirmation(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
-            const SizedBox(width: 12),
-            const Text(
-              'Confirm Logout',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to logout?',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+  List<Widget> _buildGridSections(BuildContext context, ThemeData theme) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
+    final categories = _getCategories(theme);
+    List<Widget> slivers = [];
+
+    for (var category in categories) {
+      if (category.items.isEmpty) continue;
+
+      // Section Header
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [category.color, category.color.withOpacity(0.5)],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        category.subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${category.items.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: category.color,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        ),
+      );
+
+      // Items Grid for this section
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = category.items[index];
+              return _buildGridItem(context, item);
+            }, childCount: category.items.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.85,
             ),
           ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      await AuthService().logout();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('org_isLoggedIn');
-      await prefs.remove('org_username');
-
-      if (context.mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/authSelection',
-          (route) => false,
-        );
-      }
+        ),
+      );
     }
+
+    return slivers;
   }
 
-  // Updated category tile design – more professional, clean, and modern
-  Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
-    final categories = [
+  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: theme.cardColor,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          item.onTap();
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [item.color, item.color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(item.icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<_CategoryData> _getCategories(ThemeData theme) {
+    return [
       _CategoryData(
         title: "Administrative & Config",
         subtitle: "Manage accounts and system settings",
@@ -398,217 +469,56 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         ],
       ),
     ];
-
-    return Column(
-      children: categories.asMap().entries.map((entry) {
-        final index = entry.key;
-        final category = entry.value;
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300 + (index * 50)),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: _buildCategoryTile(context, category: category),
-        );
-      }).toList(),
-    );
   }
 
-  Widget _buildCategoryTile(
-    BuildContext context, {
-    required _CategoryData category,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(
-          20,
-        ), // slightly reduced for cleaner look
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrgSubMenuScreen(
-                title: category.title,
-                items: category.items,
-              ),
-            ),
-          ),
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                // Icon container with subtle gradient
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: category.gradientColors,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: category.color.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Icon(category.icon, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 16,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        category.subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12.5,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: category.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${category.items.length} options',
-                          style: TextStyle(
-                            color: category.color,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---- ALL NAVIGATION METHODS REMAIN IDENTICAL ----
-  void _navigateToConfiguration(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ConfigAccountDashboard(showLogout: false),
-      ),
-    );
-  }
-
-  void _navigateToManagerConfig(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
-    );
-  }
-
-  void _navigateToDailyReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
-    );
-  }
-
-  void _navigateToInsights(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => InsightsDashboard()),
-    );
-  }
-
-  void _navigateToSitePaymentEntry(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SitePaymentScreen()),
-    );
-  }
-
-  void _navigateToSiteWeeklyFinancialReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SiteWeeklyFinancialReports()),
-    );
-  }
-
-  void _navigateToIncentiveCaliculation(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => IncentiveCalculation()),
-    );
-  }
-
-  void _navigateToOrganizationExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => OrganizationExpenses()),
-    );
-  }
-
-  void _navigateToManagerExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ManagerExpenses()),
-    );
-  }
-
-  void _navigateToMaterialReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MaterialReportPage()),
-    );
-  }
-
-  void _navigateToToolsInventory(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
-    );
-  }
-
+  // All navigation methods unchanged – keep your original implementations
+  void _navigateToConfiguration(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const ConfigAccountDashboard(showLogout: false),
+    ),
+  );
+  void _navigateToManagerConfig(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
+  );
+  void _navigateToDailyReport(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
+  );
+  void _navigateToInsights(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => InsightsDashboard()),
+  );
+  void _navigateToSitePaymentEntry(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => SitePaymentScreen()),
+  );
+  void _navigateToSiteWeeklyFinancialReport(BuildContext context) =>
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SiteWeeklyFinancialReports()),
+      );
+  void _navigateToIncentiveCaliculation(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => IncentiveCalculation()),
+  );
+  void _navigateToOrganizationExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => OrganizationExpenses()),
+  );
+  void _navigateToManagerExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => ManagerExpenses()),
+  );
+  void _navigateToMaterialReport(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const MaterialReportPage()),
+  );
+  void _navigateToToolsInventory(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
+  );
   void _navigateToManagerDailyEntry(BuildContext context) {
     final userData = AuthService().userData;
     final userName = userData['username'] ?? userData['org_name'] ?? 'Admin';
@@ -621,24 +531,19 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  void _navigateToSiteExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const OrganizationSiteEntry(userName: '', userDetails: {}),
-      ),
-    );
-  }
-
-  void _navigateToOrgMenu(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OrgMenuScreen(standalone: true),
-      ),
-    );
-  }
+  void _navigateToSiteExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const OrganizationSiteEntry(userName: '', userDetails: {}),
+    ),
+  );
+  void _navigateToOrgMenu(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const OrgMenuScreen(standalone: true),
+    ),
+  );
 }
 
 class _CategoryData {
@@ -648,7 +553,6 @@ class _CategoryData {
   final Color color;
   final List<Color> gradientColors;
   final List<SubMenuItem> items;
-
   _CategoryData({
     required this.title,
     required this.subtitle,

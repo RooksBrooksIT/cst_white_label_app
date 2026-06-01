@@ -10,10 +10,12 @@ import '../widgets/glass_button.dart';
 class ManagerSiteEntryPage extends StatefulWidget {
   final String userName;
   final Map<String, dynamic> userDetails;
+  final bool hideAppBar;
   const ManagerSiteEntryPage({
     super.key,
     required this.userName,
     required this.userDetails,
+    this.hideAppBar = false,
   });
 
   @override
@@ -625,9 +627,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
-      title: 'Manager Daily Site Entry',
+      title: widget.hideAppBar ? null : 'Manager Daily Site Entry',
       appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(

@@ -15,7 +15,8 @@ import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 
 class ManagerExpenses extends StatefulWidget {
-  const ManagerExpenses({super.key});
+  final bool hideAppBar;
+  const ManagerExpenses({super.key, this.hideAppBar = false});
 
   @override
   State<ManagerExpenses> createState() => _ManagerExpensesState();
@@ -389,9 +390,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
-      title: 'Manager Expenses',
+      title: widget.hideAppBar ? null : 'Manager Expenses',
       appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(

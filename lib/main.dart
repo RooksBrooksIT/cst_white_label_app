@@ -28,7 +28,7 @@ void main() async {
   await FirestoreService.initialize();
   await AppTheme.initialize();
   await AuthService.initialize();
-  
+
   // Initialize FCM: request permissions, foreground listener
   await NotificationService.initialize(navigatorKey);
   runApp(const MyApp());

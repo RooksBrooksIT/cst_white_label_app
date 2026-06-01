@@ -11,7 +11,8 @@ import '../utils/responsive.dart';
 
 class ProjectScreen extends StatefulWidget {
   final String? projectId;
-  const ProjectScreen({super.key, this.projectId});
+  final bool hideAppBar;
+  const ProjectScreen({super.key, this.projectId, this.hideAppBar = false});
 
   @override
   State<ProjectScreen> createState() => _ProjectScreenState();
@@ -546,9 +547,9 @@ class _ProjectScreenState extends State<ProjectScreen>
     final errorColor = theme.colorScheme.error;
 
     return GlassScaffold(
-      title: "Project Configuration",
+      title: widget.hideAppBar ? null : "Project Configuration",
       appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(

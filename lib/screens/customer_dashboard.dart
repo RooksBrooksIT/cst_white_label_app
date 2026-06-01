@@ -338,6 +338,9 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
       ),
     ];
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
@@ -374,190 +377,178 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 24,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome Card
-                    _buildWelcomeCard(theme),
-                    const SizedBox(height: 24),
-                    // Categories
-                    ...categories.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final category = entry.value;
-                      return AnimatedContainer(
-                        duration: Duration(milliseconds: 300 + (index * 50)),
-                        curve: Curves.easeOutCubic,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: _buildCategoryTile(context, category: category),
-                      );
-                    }),
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-            ),
+            ..._buildGridSections(context, theme, categories, crossAxisCount),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildWelcomeCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 35,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome,',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  _displayOwnerName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Phone: $_displayOwnerPhoneNumber',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  List<Widget> _buildGridSections(
+    BuildContext context,
+    ThemeData theme,
+    List<_CategoryData> categories,
+    int crossAxisCount,
+  ) {
+    List<Widget> slivers = [];
 
-  Widget _buildCategoryTile(
-    BuildContext context, {
-    required _CategoryData category,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrgSubMenuScreen(
-                title: category.title,
-                items: category.items,
-              ),
-            ),
-          ),
-          borderRadius: BorderRadius.circular(20),
+    for (var category in categories) {
+      if (category.items.isEmpty) continue;
+
+      // Section Header
+      slivers.add(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
             child: Row(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 4,
+                  height: 24,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: category.gradientColors,
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [category.color, category.color.withOpacity(0.5)],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: category.color.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Icon(category.icon, color: Colors.white, size: 28),
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         category.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 16,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
                       Text(
                         category.subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: TextStyle(
+                          fontSize: 12,
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12.5,
-                          height: 1.3,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 16,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${category.items.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: category.color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // Items Grid for this section
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = category.items[index];
+              return _buildGridItem(context, item);
+            }, childCount: category.items.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.85,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: theme.cardColor,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          item.onTap();
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [item.color, item.color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(item.icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

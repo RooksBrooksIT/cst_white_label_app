@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
 import '../widgets/glass_scaffold.dart';
-import '../widgets/glass_card.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -14,6 +13,7 @@ import 'package:demo_cst/screens/contractor_entry_page.dart';
 import 'package:demo_cst/screens/contractor_page.dart';
 import 'package:demo_cst/screens/labour_screen.dart';
 import 'package:demo_cst/screens/manager_expenses_homescreen.dart';
+import 'package:demo_cst/screens/manager_expenses.dart';
 import 'package:demo_cst/screens/manager_site_entry_page.dart';
 import 'package:demo_cst/screens/material_screen.dart';
 import 'package:demo_cst/screens/project_category_screen.dart';
@@ -36,6 +36,7 @@ import 'package:demo_cst/screens/workers_site_mapping_page.dart';
 import 'package:demo_cst/screens/workers_availability_report_page.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
 import '../services/auth_service.dart';
+import 'package:demo_cst/screens/project_setup_wizard.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -50,19 +51,12 @@ class ConfigAccountDashboard extends StatefulWidget {
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerName = 'Manager';
   final ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
-  DateTime? _lastBackPressTime;
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchManagerData();
-    _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset = _scrollController.offset;
-      });
-    });
   }
 
   @override
@@ -324,10 +318,20 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
+
     return GlassScaffold(
-      title: 'Management Console',
-      onBack: () => Navigator.pop(context),
+      title: _currentIndex == 0
+          ? 'Management Console'
+          : _currentIndex == 1
+          ? 'Projects'
+          : _currentIndex == 2
+          ? 'Daily Site Entry'
+          : 'Manager Expenses',
+      onBack: _currentIndex == 0
+          ? () => Navigator.pop(context)
+          : () => setState(() => _currentIndex = 0),
       actions: widget.showLogout
           ? [
               IconButton(
@@ -344,20 +348,34 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           : null,
       padding: EdgeInsets.zero,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddOptions(context),
-        backgroundColor: theme.primaryColor,
-        elevation: 4,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
-      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProjectSetupWizard(),
+                  ),
+                );
+              },
+              backgroundColor: theme.primaryColor,
+              elevation: 4,
+              shape: const CircleBorder(),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            )
+          : null,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
         color: theme.cardColor,
         elevation: 8,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _buildNavItem(
               context,
@@ -366,266 +384,214 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               _currentIndex == 0,
               () => setState(() => _currentIndex = 0),
             ),
+            _buildNavItem(
+              context,
+              Icons.work_rounded,
+              'Projects',
+              _currentIndex == 1,
+              () => setState(() => _currentIndex = 1),
+            ),
             const SizedBox(width: 40), // Space for FAB
             _buildNavItem(
               context,
-              Icons.settings_rounded,
-              'Settings',
-              _currentIndex == 1,
-              () => setState(() => _currentIndex = 1),
+              Icons.edit_note_rounded,
+              'Daily Entry',
+              _currentIndex == 2,
+              () => setState(() => _currentIndex = 2),
+            ),
+            _buildNavItem(
+              context,
+              Icons.account_balance_wallet_rounded,
+              'Expenses',
+              _currentIndex == 3,
+              () => setState(() => _currentIndex = 3),
             ),
           ],
         ),
       ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeCard(theme),
-                  const SizedBox(height: 24),
-                  _buildDashboardSections(context),
-                ],
-              ),
-            ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          CustomScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              ..._buildGridSections(crossAxisCount),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+            ],
           ),
+          const ProjectScreen(hideAppBar: true),
+          ManagerSiteEntryPage(
+            userName: _managerName,
+            userDetails: AuthService().userData,
+            hideAppBar: true,
+          ),
+          const ManagerExpenses(hideAppBar: true),
         ],
       ),
     );
   }
 
-  Widget _buildWelcomeCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: const Icon(
-              Icons.manage_accounts_rounded,
-              color: Colors.white,
-              size: 35,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  List<Widget> _buildGridSections(int crossAxisCount) {
+    List<Widget> slivers = [];
+
+    for (var entry in groupedItems.entries) {
+      final sectionTitle = entry.key;
+      final items = entry.value;
+
+      if (items.isEmpty) continue;
+
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Row(
               children: [
-                Text(
-                  'Welcome,',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        items.first.color,
+                        items.first.color.withValues(alpha: 0.5),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
+                const SizedBox(width: 12),
                 Text(
-                  _managerName,
+                  sectionTitle,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Project Manager Console',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: items.first.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${items.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: items.first.color,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 
-  Widget _buildDashboardSections(BuildContext context) {
-    if (_currentIndex == 1) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.settings_suggest_rounded,
-                size: 64,
-                color: Colors.grey,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Settings Screen',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Configure your preferences here',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ],
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildGridItem(items[index]),
+              childCount: items.length,
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.85,
+            ),
           ),
         ),
       );
     }
-    return Column(
-      children: groupedItems.entries.map((entry) {
-        return TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeOutQuint,
-          builder: (context, value, child) {
-            return Transform.translate(
-              offset: Offset(0, 30 * (1 - value)),
-              child: Opacity(opacity: value, child: child),
-            );
-          },
-          child: _buildCategoryCard(context, entry.key, entry.value),
-        );
-      }).toList(),
-    );
+
+    return slivers;
   }
 
-  Widget _buildCategoryCard(
-    BuildContext context,
-    String title,
-    List<DashboardItem> items,
-  ) {
-    final theme = Theme.of(context);
-    final firstItem = items.first;
-    final color = firstItem.color;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _openCategorySubMenu(context, title),
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                // Icon container with subtle gradient
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [color, color.withOpacity(0.7)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Icon(firstItem.icon, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 16,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${items.length} configuration ${items.length == 1 ? 'option' : 'options'}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12.5,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _openCategorySubMenu(BuildContext context, String categoryName) {
-    final items = groupedItems[categoryName] ?? [];
-    if (items.isEmpty) return;
-
-    _triggerHapticFeedback();
-
-    final subMenuItems = items.map((item) {
-      return SubMenuItem(
-        title: item.title,
-        subtitle: item.subtitle,
-        icon: item.icon,
-        color: item.color,
+  Widget _buildGridItem(DashboardItem item) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: Theme.of(context).cardColor,
+      child: InkWell(
         onTap: () {
+          HapticFeedback.lightImpact();
           if (item.title == 'Privacy Policy') {
             _launchPrivacyPolicy(context);
           } else {
             _navigateToScreen(context, item.title);
           }
         },
-      );
-    }).toList();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            OrgSubMenuScreen(title: categoryName, items: subMenuItems),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [item.color, item.color.withValues(alpha: 0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(item.icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -652,7 +618,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.logout_rounded, color: Colors.red, size: 24),
@@ -732,7 +698,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -752,146 +718,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  void _showAddOptions(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.dividerColor.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Quick Actions",
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      'Site',
-                      'Manage construction sites',
-                      Icons.location_city_rounded,
-                      Colors.green,
-                      () {
-                        Navigator.pop(context);
-                        _navigateToScreen(context, 'Site');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      'Project',
-                      'Configure project details',
-                      Icons.work_rounded,
-                      Colors.orangeAccent,
-                      () {
-                        Navigator.pop(context);
-                        _navigateToScreen(context, 'Project');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    final theme = Theme.of(context);
-    return Material(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _navigateToScreen(BuildContext context, String title) {
     final routeMap = {
       'Project Category': const ProjectCategoryScreen(),
@@ -902,14 +728,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Supervisor': const SiteSupervisorConfig(),
       'Site-Supervisor Map': SiteSupervisorMapScreen(),
       'Material': MaterialScreen(),
-      'Project': ProjectScreen(),
+      'Project': const ProjectScreen(hideAppBar: false),
       'Labour': LabourScreen(),
       'Tools Master': ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
-      'Manager Expenses': const ManagerExpensesHomeScreen(),
+      'Manager Expenses': const ManagerExpenses(hideAppBar: false),
       'Manager Daily Site Entry': ManagerSiteEntryPage(
         userName: _managerName,
         userDetails: AuthService().userData,
+        hideAppBar: false,
       ),
       'Layout and Drawings': const LayoutAndDrawingsPage(),
       'Tools Inventory': const ToolsInventoryPage(),
