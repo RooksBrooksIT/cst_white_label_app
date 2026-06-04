@@ -56,28 +56,63 @@ class _ProjectStageDailySiteExpensesReportPageState
         FirestoreService.getCollection(
           'siteSupervisorEntries',
         ).doc(_documentId).get(),
-        FirestoreService.getCollection(
-          'managerExpenses',
-        ).where('siteId', isEqualTo: widget.siteId).get(),
-        FirestoreService.getCollection(
-          'organizationExpenses',
-        ).where('siteId', isEqualTo: widget.siteId).get(),
-        FirestoreService.getCollection('contractorEntries')
-            .where('siteId', isEqualTo: widget.siteId)
-            .where(
-              'date',
-              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-            )
-            .get(),
+        // Check both siteId and site for broader compatibility
+        _fetchCollectionBySite('managerExpenses'),
+        _fetchCollectionBySite('organizationExpenses'),
+        _fetchCollectionBySite('contractorEntries'),
+        _fetchCollectionBySite('managerEntries'),
+        _fetchCollectionBySite('organizationEntries'),
       ]);
 
       final supervisorDoc = results[0] as DocumentSnapshot;
-      final managerSnap = results[1] as QuerySnapshot;
-      final orgSnap = results[2] as QuerySnapshot;
-      final contractorSnap = results[3] as QuerySnapshot;
+      final managerDocs = results[1] as List<DocumentSnapshot>;
+      final orgDocs = results[2] as List<DocumentSnapshot>;
+      final contractorDocs = results[3] as List<DocumentSnapshot>;
+      final managerEntryDocs = results[4] as List<DocumentSnapshot>;
+      final orgEntryDocs = results[5] as List<DocumentSnapshot>;
 
       final targetStage = widget.projectStage.trim();
       final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+
+      bool filterEntry(DocumentSnapshot doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage != targetStage) return false;
+
+        // 1. Check top-level date
+        final rawDate = data['date'] ?? data['entryDate'];
+        DateTime? entryDate;
+        if (rawDate is Timestamp) {
+          entryDate = rawDate.toDate();
+        } else if (rawDate is String) {
+          entryDate = DateTime.tryParse(rawDate);
+        }
+
+        if (entryDate != null) {
+          final entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
+          if (entryDateStr == formattedDateYMD) return true;
+        }
+
+        // 2. Check bills list
+        final bills = data['bills'] as List? ?? [];
+        return bills.any((bill) {
+          final billDateRaw = bill['billDate'];
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            return billDateStr == formattedDateYMD;
+          }
+          return false;
+        });
+      }
 
       // 1. Supervisor Data
       if (supervisorDoc.exists) {
@@ -90,54 +125,20 @@ class _ProjectStageDailySiteExpensesReportPageState
         }
       }
 
-      // 2. Manager Data (Filter by stage and date in bills)
-      managerEntries = managerSnap.docs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage != targetStage) return false;
+      // 2. Manager Data
+      managerEntries = [
+        ...managerDocs.where(filterEntry),
+        ...managerEntryDocs.where(filterEntry),
+      ];
 
-        final bills = data['bills'] as List? ?? [];
-        return bills.any((bill) {
-          final billDateRaw = bill['billDate'];
-          String? billDateStr;
-          if (billDateRaw is String)
-            billDateStr = billDateRaw;
-          else if (billDateRaw is Timestamp)
-            billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
-          return billDateStr == formattedDateYMD;
-        });
-      }).toList();
+      // 3. Org Data
+      orgEntries = [
+        ...orgDocs.where(filterEntry),
+        ...orgEntryDocs.where(filterEntry),
+      ];
 
-      // 3. Org Data (Filter by stage and date in bills)
-      orgEntries = orgSnap.docs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage != targetStage) return false;
-
-        final bills = data['bills'] as List? ?? [];
-        return bills.any((bill) {
-          final billDateRaw = bill['billDate'];
-          String? billDateStr;
-          if (billDateRaw is String)
-            billDateStr = billDateRaw;
-          else if (billDateRaw is Timestamp)
-            billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
-          return billDateStr == formattedDateYMD;
-        });
-      }).toList();
-
-      // 4. Contractor Data (Already filtered by date in query, just check stage)
-      contractorEntries = contractorSnap.docs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        return docStage == targetStage;
-      }).toList();
+      // 4. Contractor Data
+      contractorEntries = contractorDocs.where(filterEntry).toList();
 
       _calculateGrandTotal();
 
@@ -146,6 +147,20 @@ class _ProjectStageDailySiteExpensesReportPageState
       print('Error loading report: $e');
       setState(() => isLoading = false);
     }
+  }
+
+  Future<List<DocumentSnapshot>> _fetchCollectionBySite(
+    String collection,
+  ) async {
+    final snapshots = await Future.wait([
+      FirestoreService.getCollection(
+        collection,
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        collection,
+      ).where('site', isEqualTo: widget.siteId).get(),
+    ]);
+    return [...snapshots[0].docs, ...snapshots[1].docs];
   }
 
   void _calculateGrandTotal() {
@@ -163,14 +178,18 @@ class _ProjectStageDailySiteExpensesReportPageState
       final bills = data['bills'] as List? ?? [];
       for (var bill in bills) {
         final billDateRaw = bill['billDate'];
-        String? billDateStr;
-        if (billDateRaw is String)
-          billDateStr = billDateRaw;
-        else if (billDateRaw is Timestamp)
-          billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
 
-        if (billDateStr == formattedDateYMD) {
-          total += _toNum(bill['billAmount']);
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            total += _toNum(bill['billAmount']);
+          }
         }
       }
     }
@@ -181,14 +200,18 @@ class _ProjectStageDailySiteExpensesReportPageState
       final bills = data['bills'] as List? ?? [];
       for (var bill in bills) {
         final billDateRaw = bill['billDate'];
-        String? billDateStr;
-        if (billDateRaw is String)
-          billDateStr = billDateRaw;
-        else if (billDateRaw is Timestamp)
-          billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
 
-        if (billDateStr == formattedDateYMD) {
-          total += _toNum(bill['billAmount']);
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            total += _toNum(bill['billAmount']);
+          }
         }
       }
     }
@@ -287,15 +310,19 @@ class _ProjectStageDailySiteExpensesReportPageState
       final bills = data['bills'] as List? ?? [];
       for (var bill in bills) {
         final billDateRaw = bill['billDate'];
-        String? billDateStr;
-        if (billDateRaw is String)
-          billDateStr = billDateRaw;
-        else if (billDateRaw is Timestamp)
-          billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
 
-        if (billDateStr == formattedDateYMD) {
-          dailyBills.add(bill);
-          sectionTotal += _toNum(bill['billAmount']);
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            dailyBills.add(bill);
+            sectionTotal += _toNum(bill['billAmount']);
+          }
         }
       }
     }
@@ -588,13 +615,18 @@ class _ProjectStageDailySiteExpensesReportPageState
         final bills = data['bills'] as List? ?? [];
         for (var bill in bills) {
           final billDateRaw = bill['billDate'];
-          String? billDateStr;
-          if (billDateRaw is String)
-            billDateStr = billDateRaw;
-          else if (billDateRaw is Timestamp)
-            billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
-          if (billDateStr == formattedDateYMD) {
-            managerBills.add(Map<String, dynamic>.from(bill));
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            if (billDateStr == formattedDateYMD) {
+              managerBills.add(Map<String, dynamic>.from(bill));
+            }
           }
         }
       }
@@ -606,13 +638,18 @@ class _ProjectStageDailySiteExpensesReportPageState
         final bills = data['bills'] as List? ?? [];
         for (var bill in bills) {
           final billDateRaw = bill['billDate'];
-          String? billDateStr;
-          if (billDateRaw is String)
-            billDateStr = billDateRaw;
-          else if (billDateRaw is Timestamp)
-            billDateStr = DateFormat('yyyy-MM-dd').format(billDateRaw.toDate());
-          if (billDateStr == formattedDateYMD) {
-            organizationBills.add(Map<String, dynamic>.from(bill));
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            if (billDateStr == formattedDateYMD) {
+              organizationBills.add(Map<String, dynamic>.from(bill));
+            }
           }
         }
       }

@@ -705,7 +705,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: isCustom && !sel ? Colors.transparent : c,
+              color: isCustom && !sel ? null : c,
               shape: BoxShape.circle,
               border: Border.all(
                 color: sel ? const Color(0xFF1E293B) : Colors.transparent,

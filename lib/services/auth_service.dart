@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
 
@@ -13,6 +14,7 @@ class AuthService {
   AuthService._internal();
 
   static late SharedPreferences _prefs;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Keys
   static const String _isLoggedInKey = 'auth_is_logged_in';
@@ -52,14 +54,17 @@ class AuthService {
   /// Check if the current organization's subscription is active and not expired.
   Future<bool> checkSubscriptionStatus() async {
     final role = userRole;
-    if (role != UserRole.organization) return true; // Only enforce for organizations
+    if (role != UserRole.organization)
+      return true; // Only enforce for organizations
 
     try {
       var doc = await FirestoreService.subscriptionDoc.get();
 
       // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
       if (!doc.exists) {
-        debugPrint('AuthService: Subscription doc not found in admin, falling back to root.');
+        debugPrint(
+          'AuthService: Subscription doc not found in admin, falling back to root.',
+        );
         doc = await FirestoreService.rootOrgDoc.get();
       }
 
@@ -106,8 +111,13 @@ class AuthService {
 
       // Fallback: If admin/branding doc doesn't exist, check root doc (legacy)
       if (!doc.exists) {
-        debugPrint('AuthService: Branding doc not found in admin, falling back to root.');
-        doc = await FirebaseFirestore.instance.collection('organisation').doc(orgId).get();
+        debugPrint(
+          'AuthService: Branding doc not found in admin, falling back to root.',
+        );
+        doc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .get();
       }
 
       if (doc.exists) {
@@ -148,6 +158,9 @@ class AuthService {
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userDataKey);
 
+    // Sign out from Firebase if needed
+    await _auth.signOut();
+
     // Clear all legacy keys to be safe
     final keys = _prefs.getKeys();
     for (String key in keys) {
@@ -157,6 +170,54 @@ class AuthService {
           key.startsWith('cust_')) {
         await _prefs.remove(key);
       }
+    }
+  }
+
+  /// Send a password reset email using Firebase Authentication
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+      rethrow;
+    }
+  }
+
+  /// Create a new user with email and password in Firebase Authentication
+  Future<UserCredential> registerWithEmail(
+    String email,
+    String password,
+  ) async {
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Register Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Register error: $e');
+      rethrow;
+    }
+  }
+
+  /// Sign in with email and password in Firebase Authentication
+  Future<UserCredential> loginWithEmail(String email, String password) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Login Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Login error: $e');
+      rethrow;
     }
   }
 

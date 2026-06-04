@@ -69,13 +69,22 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLoginAndSync() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('org_isLoggedIn') ?? false;
-    final orgId = prefs.getString('org_dynamic_path');
+    final auth = AuthService();
+    if (auth.isLoggedIn) {
+      final data = auth.userData;
+      final orgId = data['dynamicPath'] ?? data['orgId'];
 
-    if (isLoggedIn && orgId != null && orgId.isNotEmpty) {
-      // Refresh branding from Firestore if logged in
-      await AppTheme.syncWithFirestore(orgId);
+      if (orgId != null && orgId.toString().isNotEmpty) {
+        // Refresh branding from Firestore if logged in
+        await AppTheme.syncWithFirestore(orgId.toString());
+      }
+    } else {
+      // Also check if there's a temp org path from referral joining
+      final prefs = await SharedPreferences.getInstance();
+      final tempOrgPath = prefs.getString('temp_org_path');
+      if (tempOrgPath != null && tempOrgPath.isNotEmpty) {
+        await AppTheme.syncWithFirestore(tempOrgPath);
+      }
     }
 
     // After animation and sync, navigate

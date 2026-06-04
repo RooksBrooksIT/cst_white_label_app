@@ -135,13 +135,25 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     Map<String, dynamic> currentData,
   ) async {
     final _editFormKey = GlobalKey<FormState>();
-    TextEditingController fullNameCtrl = TextEditingController(text: currentData['FullName'] ?? '');
-    TextEditingController userNameCtrl = TextEditingController(text: currentData['UserName'] ?? '');
-    TextEditingController passwordCtrl = TextEditingController(text: currentData['Password'] ?? '');
-    TextEditingController designationCtrl = TextEditingController(text: currentData['Designation'] ?? '');
-    TextEditingController contactNoCtrl = TextEditingController(text: currentData['ContactNo'] ?? '');
-    TextEditingController emailCtrl = TextEditingController(text: currentData['Email'] ?? '');
-    
+    TextEditingController fullNameCtrl = TextEditingController(
+      text: currentData['FullName'] ?? '',
+    );
+    TextEditingController userNameCtrl = TextEditingController(
+      text: currentData['UserName'] ?? '',
+    );
+    TextEditingController passwordCtrl = TextEditingController(
+      text: currentData['Password'] ?? '',
+    );
+    TextEditingController designationCtrl = TextEditingController(
+      text: currentData['Designation'] ?? '',
+    );
+    TextEditingController contactNoCtrl = TextEditingController(
+      text: currentData['ContactNo'] ?? '',
+    );
+    TextEditingController emailCtrl = TextEditingController(
+      text: currentData['Email'] ?? '',
+    );
+
     bool isPasswordVisible = false;
     File? newImageFile;
     String existingPhotoUrl = currentData['Photo'] ?? '';
@@ -189,27 +201,51 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                           color: Colors.grey[200],
                           border: Border.all(color: primaryColor),
                           image: newImageFile != null
-                              ? DecorationImage(image: FileImage(newImageFile!), fit: BoxFit.cover)
-                              : (existingPhotoUrl.isNotEmpty && existingPhotoUrl != 'Photo URL or Placeholder'
-                                  ? DecorationImage(image: NetworkImage(existingPhotoUrl), fit: BoxFit.cover)
-                                  : null),
+                              ? DecorationImage(
+                                  image: FileImage(newImageFile!),
+                                  fit: BoxFit.cover,
+                                )
+                              : (existingPhotoUrl.isNotEmpty &&
+                                        existingPhotoUrl !=
+                                            'Photo URL or Placeholder'
+                                    ? DecorationImage(
+                                        image: NetworkImage(existingPhotoUrl),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null),
                         ),
-                        child: newImageFile == null && (existingPhotoUrl.isEmpty || existingPhotoUrl == 'Photo URL or Placeholder')
-                            ? Icon(Icons.camera_alt, size: 40, color: Colors.grey)
+                        child:
+                            newImageFile == null &&
+                                (existingPhotoUrl.isEmpty ||
+                                    existingPhotoUrl ==
+                                        'Photo URL or Placeholder')
+                            ? Icon(
+                                Icons.camera_alt,
+                                size: 40,
+                                color: Colors.grey,
+                              )
                             : null,
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: fullNameCtrl,
-                      decoration: InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
-                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                      decoration: InputDecoration(
+                        labelText: 'Full Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: userNameCtrl,
-                      decoration: InputDecoration(labelText: 'User Name', border: OutlineInputBorder()),
-                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                      decoration: InputDecoration(
+                        labelText: 'User Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -219,17 +255,29 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                         labelText: 'Password',
                         border: OutlineInputBorder(),
                         suffixIcon: IconButton(
-                          icon: Icon(isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: primaryColor),
-                          onPressed: () => setDialogState(() => isPasswordVisible = !isPasswordVisible),
+                          icon: Icon(
+                            isPasswordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: primaryColor,
+                          ),
+                          onPressed: () => setDialogState(
+                            () => isPasswordVisible = !isPasswordVisible,
+                          ),
                         ),
                       ),
-                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: designationCtrl,
-                      decoration: InputDecoration(labelText: 'Designation', border: OutlineInputBorder()),
-                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                      decoration: InputDecoration(
+                        labelText: 'Designation',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -252,7 +300,10 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: emailCtrl,
-                      decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ],
                 ),
@@ -261,50 +312,72 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           ),
           actions: [
             TextButton(
-              onPressed: isSubmittingEdit ? null : () => Navigator.of(context).pop(),
+              onPressed: isSubmittingEdit
+                  ? null
+                  : () => Navigator.of(context).pop(),
               child: Text('Cancel', style: TextStyle(color: primaryColor)),
             ),
             ElevatedButton(
-              onPressed: isSubmittingEdit ? null : () async {
-                if (_editFormKey.currentState!.validate()) {
-                  setDialogState(() => isSubmittingEdit = true);
-                  try {
-                    String photoUrl = existingPhotoUrl;
-                    if (newImageFile != null) {
-                      final storageRef = FirebaseStorage.instance
-                          .ref()
-                          .child('supervisor_photos')
-                          .child('$documentId.jpg');
-                      await storageRef.putFile(newImageFile!);
-                      photoUrl = await storageRef.getDownloadURL();
-                    }
+              onPressed: isSubmittingEdit
+                  ? null
+                  : () async {
+                      if (_editFormKey.currentState!.validate()) {
+                        setDialogState(() => isSubmittingEdit = true);
+                        try {
+                          String photoUrl = existingPhotoUrl;
+                          if (newImageFile != null) {
+                            final storageRef = FirebaseStorage.instance
+                                .ref()
+                                .child('supervisor_photos')
+                                .child('$documentId.jpg');
+                            await storageRef.putFile(newImageFile!);
+                            photoUrl = await storageRef.getDownloadURL();
+                          }
 
-                    final updatedData = {
-                      'FullName': fullNameCtrl.text.trim(),
-                      'UserName': userNameCtrl.text.trim(),
-                      'Password': passwordCtrl.text.trim(),
-                      'Designation': designationCtrl.text.trim(),
-                      'ContactNo': contactNoCtrl.text.trim(),
-                      'Email': emailCtrl.text.trim(),
-                      'Photo': photoUrl.isNotEmpty ? photoUrl : 'Photo URL or Placeholder',
-                    };
+                          final updatedData = {
+                            'FullName': fullNameCtrl.text.trim(),
+                            'UserName': userNameCtrl.text.trim(),
+                            'Password': passwordCtrl.text.trim(),
+                            'Designation': designationCtrl.text.trim(),
+                            'ContactNo': contactNoCtrl.text.trim(),
+                            'Email': emailCtrl.text.trim(),
+                            'Photo': photoUrl.isNotEmpty
+                                ? photoUrl
+                                : 'Photo URL or Placeholder',
+                          };
 
-                    await FirestoreService.getCollection('supervisor')
-                        .doc(documentId)
-                        .update(updatedData);
+                          await FirestoreService.getCollection(
+                            'supervisor',
+                          ).doc(documentId).update(updatedData);
 
-                    Navigator.of(context).pop(true);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                    setDialogState(() => isSubmittingEdit = false);
-                  }
-                }
-              },
+                          Navigator.of(context).pop(true);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          setDialogState(() => isSubmittingEdit = false);
+                        }
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: isSubmittingEdit ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text('Save', style: TextStyle(color: Colors.white)),
+              child: isSubmittingEdit
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text('Save', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -350,7 +423,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               .ref()
               .child('supervisor_photos')
               .child('$documentId.jpg');
-          
+
           await storageRef.putFile(_imageFile!);
           photoUrl = await storageRef.getDownloadURL();
         } catch (e) {
@@ -425,45 +498,45 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     height: 100,
                     repeat: false,
                   ),
-                const SizedBox(height: 16),
-                Text(
-                  'Success!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your supervisor details have been saved successfully.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
+                  const SizedBox(height: 16),
+                  Text(
+                    'Success!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('OK', style: TextStyle(fontSize: 16)),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your supervisor details have been saved successfully.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('OK', style: TextStyle(fontSize: 16)),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
   }
 
   void _resetForm() {
@@ -621,7 +694,10 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               _contactNoController,
               keyboardType: TextInputType.phone,
               isRequired: true,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -771,9 +847,9 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
     }
   }
 
@@ -821,7 +897,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 : Align(
                     alignment: Alignment.topRight,
                     child: IconButton(
-                      icon: Icon(Icons.cancel, color: Colors.white, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
+                      icon: Icon(
+                        Icons.cancel,
+                        color: Colors.white,
+                        shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                      ),
                       onPressed: () {
                         setState(() {
                           _imageFile = null;
@@ -1135,10 +1215,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                                     size: 20,
                                   ),
                                   onPressed: () {
-                                    _editSupervisorInfo(
-                                      doc.id,
-                                      data,
-                                    );
+                                    _editSupervisorInfo(doc.id, data);
                                   },
                                   tooltip: 'Edit Info',
                                 ),

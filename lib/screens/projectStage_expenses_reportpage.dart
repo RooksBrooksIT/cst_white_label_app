@@ -53,12 +53,14 @@ class _ProjectStageExpensesReportPageState
       _fetchTotal('organizationEntries', 'entryDate', 'totalAmount'),
       _fetchTotal('contractorEntries', 'date', 'totalAmount'),
       _fetchTotal('siteSupervisorIncentives', 'updatedAt', 'incentiveAmount'),
+      _fetchTotal('managerExpenses', 'entryDate', 'totalAmount'),
+      _fetchTotal('organizationExpenses', 'entryDate', 'totalAmount'),
     ]);
 
     setState(() {
       supervisorTotal = results[0];
-      managerTotal = results[1];
-      organizationTotal = results[2];
+      managerTotal = results[1] + results[5];
+      organizationTotal = results[2] + results[6];
       contractorTotal = results[3];
       incentiveTotal = results[4];
       isLoading = false;
@@ -71,32 +73,66 @@ class _ProjectStageExpensesReportPageState
     String amountField,
   ) async {
     double total = 0;
-    final snap = await FirestoreService.getCollection(collection)
-        .where('siteId', isEqualTo: widget.siteId)
-        .get();
+    // Check both siteId and site field for broader compatibility
+    final results = await Future.wait([
+      FirestoreService.getCollection(
+        collection,
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        collection,
+      ).where('site', isEqualTo: widget.siteId).get(),
+    ]);
 
-    for (var doc in snap.docs) {
+    final allDocs = {...results[0].docs, ...results[1].docs};
+
+    for (var doc in allDocs) {
       final data = doc.data();
 
-      // Filter by stage manually to check both possible field names
+      // Filter by stage manually
       final docStage = (data['projectStage'] ?? data['projectField'])
           ?.toString()
           .trim();
       if (docStage != widget.projectStage.trim()) continue;
 
-      DateTime? entryDate;
-      final rawDate = data[dateField];
-      if (rawDate is Timestamp)
-        entryDate = rawDate.toDate();
-      else if (rawDate is String)
-        entryDate = DateTime.tryParse(rawDate);
+      if (data.containsKey('bills') && data['bills'] is List) {
+        final bills = data['bills'] as List;
+        for (var bill in bills) {
+          if (bill is Map) {
+            DateTime? billDate;
+            final rawDate = bill['billDate'];
+            if (rawDate is Timestamp) {
+              billDate = rawDate.toDate();
+            } else if (rawDate is String) {
+              billDate = DateTime.tryParse(rawDate);
+            }
 
-      if (entryDate != null &&
-          entryDate.isAfter(
-            widget.fromDate.subtract(const Duration(days: 1)),
-          ) &&
-          entryDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
-        total += _toDouble(data[amountField]);
+            if (billDate != null &&
+                billDate.isAfter(
+                  widget.fromDate.subtract(const Duration(days: 1)),
+                ) &&
+                billDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
+              total += _toDouble(bill['billAmount'] ?? bill['amount']);
+            }
+          }
+        }
+      } else {
+        DateTime? entryDate;
+        final rawDate = data[dateField];
+        if (rawDate is Timestamp) {
+          entryDate = rawDate.toDate();
+        } else if (rawDate is String) {
+          entryDate = DateTime.tryParse(rawDate);
+        }
+
+        if (entryDate != null &&
+            entryDate.isAfter(
+              widget.fromDate.subtract(const Duration(days: 1)),
+            ) &&
+            entryDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
+          total += _toDouble(
+            data[amountField] ?? data['amount'] ?? data['totalAmount'],
+          );
+        }
       }
     }
     return total;
@@ -315,9 +351,9 @@ class _ProjectStageExpensesReportPageState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to generate PDF: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
     }
   }
 }

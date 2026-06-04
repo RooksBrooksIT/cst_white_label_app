@@ -11,6 +11,7 @@ import 'package:demo_cst/screens/Organisation_LoginPage.dart';
 import 'package:demo_cst/screens/config_login.dart';
 import 'package:demo_cst/screens/supervisor_login_page.dart';
 import 'package:demo_cst/screens/customer_login_page.dart';
+import 'package:demo_cst/screens/reset_password_screen.dart';
 import 'package:demo_cst/screens/Organization_Dashboard.dart';
 import 'package:demo_cst/screens/Organisation_RegistrationPage.dart';
 import 'package:demo_cst/screens/organisation_landing_page.dart';
@@ -21,7 +22,6 @@ import 'package:demo_cst/screens/branding_edit_screen.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -64,6 +64,7 @@ class MyApp extends StatelessWidget {
                 '/managerLogin': (context) => const ConfigLoginPage(),
                 '/supervisorLogin': (context) => const SupervisorLoginPage(),
                 '/customerLogin': (context) => const CustomerLoginPage(),
+                '/resetPassword': (context) => const ResetPasswordScreen(),
                 '/orgDashboard': (context) => const OrganizationDashboard(),
                 '/orgRegistration': (context) =>
                     const OrganisationLandingPage(),

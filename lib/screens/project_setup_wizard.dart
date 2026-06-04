@@ -66,6 +66,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   List<String> _subCategories = [];
   List<String> _contracts = [];
   List<String> _statuses = [];
+  List<String> _projectStagesList = [];
+  List<String> _contractors = [];
   List<Map<String, String>> _supervisors = [];
   bool _isLoadingDropdowns = true;
 
@@ -81,6 +83,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       duration: const Duration(milliseconds: 300),
     );
     _fetchDropdownData();
+    _setupAmountListeners();
     _siteNameController.addListener(() {
       if (_projectNameController.text.isEmpty ||
           _siteNameController.text.startsWith(_projectNameController.text)) {
@@ -118,6 +121,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         FirestoreService.getCollection('projectContracts').get(),
         FirestoreService.getCollection('projectStatus').get(),
         FirestoreService.getCollection('supervisor').get(),
+        FirestoreService.getCollection('projectStages').get(),
+        FirestoreService.getCollection('contractors').get(),
       ]);
 
       if (mounted) {
@@ -125,19 +130,63 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           _categories = results[0].docs
               .map((doc) => doc['projectCategory']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
+              .toSet()
               .toList();
+          if (_categories.isEmpty) {
+            _categories = [
+              'Residential',
+              'Commercial',
+              'Industrial',
+              'Infrastructure',
+            ];
+          }
+
           _subCategories = results[1].docs
               .map((doc) => doc['projectSubCategory']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
+              .toSet()
               .toList();
+          if (_subCategories.isEmpty) {
+            _subCategories = [
+              'New Construction',
+              'Renovation',
+              'Expansion',
+              'Maintenance',
+            ];
+          }
+
           _contracts = results[2].docs
               .map((doc) => doc['projectContract']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
+              .toSet()
               .toList();
+          if (_contracts.isEmpty) {
+            _contracts = [
+              'Fixed Price',
+              'Cost Plus',
+              'Unit Price',
+              'Time & Materials',
+            ];
+          }
+
           _statuses = results[3].docs
               .map((doc) => doc['projectState']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
+              .toSet()
               .toList();
+
+          _projectStagesList = results[5].docs
+              .map((doc) => doc['projectStage']?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList();
+
+          _contractors = results[6].docs
+              .map((doc) => doc['contractorName']?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList();
+
           _supervisors = results[4].docs.map((doc) {
             final data = doc.data();
             return {
@@ -145,6 +194,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               'name': data['FullName']?.toString() ?? 'Unknown',
             };
           }).toList();
+
+          // Ensure supervisors are unique by ID
+          final seenIds = <String>{};
+          _supervisors.retainWhere((s) => seenIds.add(s['id']!));
 
           if (_statuses.isEmpty) {
             _statuses = [
@@ -155,6 +208,25 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               'Cancelled',
             ];
           }
+
+          if (_projectStagesList.isEmpty) {
+            _projectStagesList = [
+              'Planning',
+              'Foundation',
+              'Structure',
+              'Finishing',
+              'Handover',
+            ];
+          }
+
+          if (_contractors.isEmpty) {
+            _contractors = [
+              'General Contractor',
+              'Sub Contractor',
+              'Independent',
+            ];
+          }
+
           _isLoadingDropdowns = false;
         });
       }
@@ -260,26 +332,36 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     }
   }
 
+  void _setupAmountListeners() {
+    _amountPaidController.addListener(_updateBalanceAmount);
+  }
+
+  void _updateBalanceAmount() {
+    // In the wizard, spent is always 0 for new projects, so balance = paid
+    // But we keep the logic consistent with project_screen.dart
+    setState(() {});
+  }
+
   Future<String> _getNextId(
     String collection,
     String prefix,
     String? field,
   ) async {
-    final snapshot = await FirestoreService.getCollection(collection).get();
+    final snapshot = await FirestoreService.getCollection(
+      collection,
+    ).orderBy(FieldPath.documentId).get();
     int maxNum = 0;
     for (var doc in snapshot.docs) {
       final id = field != null ? (doc[field]?.toString() ?? '') : doc.id;
       if (id.startsWith(prefix)) {
-        final numPart = int.tryParse(
-          id.substring(prefix.length).replaceAll(RegExp(r'[^0-9]'), ''),
-        );
+        final numPart = int.tryParse(id.substring(prefix.length));
         if (numPart != null && numPart > maxNum) maxNum = numPart;
       }
     }
     return '$prefix${(maxNum + 1).toString().padLeft(3, '0')}';
   }
 
-  Future<void> _saveAll() async {
+  Future<void> _saveAll({bool skipSupervisorMapping = false}) async {
     setState(() => _isSaving = true);
 
     showDialog(
@@ -293,7 +375,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Setting up your project...',
+              skipSupervisorMapping
+                  ? 'Saving project details...'
+                  : 'Setting up your project...',
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ],
@@ -328,12 +412,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
       // Save Project
       final projectData = {
-        'projectId': projectId,
         'projectName': _projectNameController.text.trim(),
         'ownerName': _ownerNameController.text.trim(),
         'ownerPhoneNumber': _ownerPhoneController.text.trim(),
         'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
-        'amountSpent': 0,
+        'amountSpent': 0.0,
         'amountBalance': double.tryParse(_amountPaidController.text) ?? 0,
         'projectBudget': double.tryParse(_projectBudgetController.text) ?? 0,
         'projectCategory': _siteProjectCategory ?? '',
@@ -367,9 +450,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ? (double.tryParse(_contractorBudgetController.text) ?? 0)
             : null,
         'siteId': siteDocId,
-        'siteName': _siteNameController.text.trim(),
-        'siteLocation': _locationController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
+        'projectType': _siteProjectCategory ?? '',
         'status': _projectStatus ?? 'Planning',
       };
       await FirestoreService.getCollection(
@@ -387,38 +469,40 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Map Supervisor
-      final supervisorMapId =
-          '${siteId}_${_locationController.text.trim().replaceAll(' ', '')}_$_selectedSupervisorId';
-      await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).doc(supervisorMapId).set({
-        'site': siteDocId,
-        'siteId': siteId,
-        'siteName': _siteNameController.text.trim(),
-        'projectName': _projectNameController.text.trim(),
-        'supervisor': _selectedSupervisorName,
-        'Supervisor ID': _selectedSupervisorId,
-        'supervisorId': _selectedSupervisorId,
-        'location': _locationController.text.trim(),
-        'projectStage': _mapProjectStage ?? _projectStage,
-        'siteComments': _commentsController.text.trim(),
-        'joinedOn': _joinedDate != null
-            ? DateFormat('yyyy-MM-dd').format(_joinedDate!)
-            : '',
-        'startDate': _siteStartDate != null
-            ? DateFormat('yyyy-MM-dd').format(_siteStartDate!)
-            : '',
-        'endDate': _siteEndDate != null
-            ? DateFormat('yyyy-MM-dd').format(_siteEndDate!)
-            : '',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (!skipSupervisorMapping) {
+        // Map Supervisor
+        final supervisorMapId =
+            '${siteId}_${_locationController.text.trim().replaceAll(' ', '')}_$_selectedSupervisorId';
+        await FirestoreService.getCollection(
+          'siteSupervisorMap',
+        ).doc(supervisorMapId).set({
+          'site': siteDocId,
+          'siteId': siteId,
+          'siteName': _siteNameController.text.trim(),
+          'projectName': _projectNameController.text.trim(),
+          'supervisor': _selectedSupervisorName,
+          'Supervisor ID': _selectedSupervisorId,
+          'supervisorId': _selectedSupervisorId,
+          'location': _locationController.text.trim(),
+          'projectStage': _mapProjectStage ?? _projectStage,
+          'siteComments': _commentsController.text.trim(),
+          'joinedOn': _joinedDate != null
+              ? DateFormat('yyyy-MM-dd').format(_joinedDate!)
+              : '',
+          'startDate': _siteStartDate != null
+              ? DateFormat('yyyy-MM-dd').format(_siteStartDate!)
+              : '',
+          'endDate': _siteEndDate != null
+              ? DateFormat('yyyy-MM-dd').format(_siteEndDate!)
+              : '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       Navigator.of(context).pop(); // Close loading dialog
 
       if (mounted) {
-        _showSuccessDialog();
+        _showSuccessDialog(skippedAssignment: skipSupervisorMapping);
       }
     } catch (e) {
       Navigator.of(context).pop();
@@ -428,7 +512,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog({bool skippedAssignment = false}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -444,12 +528,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Your project has been successfully configured.'),
-            SizedBox(height: 8),
+          children: [
+            const Text('Your project has been successfully configured.'),
+            const SizedBox(height: 8),
             Text(
-              '✓ Site created\n✓ Project configured\n✓ Supervisor assigned',
-              style: TextStyle(fontSize: 14),
+              '✓ Site created\n✓ Project configured${skippedAssignment ? '' : '\n✓ Supervisor assigned'}',
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
@@ -473,6 +557,25 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     return GlassScaffold(
       title: 'Project Setup Wizard',
       onBack: () => Navigator.pop(context),
+      actions: [
+        if (_currentStep == 2)
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: TextButton(
+              onPressed: _isSaving
+                  ? null
+                  : () => _saveAll(skipSupervisorMapping: true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text(
+                'Skip',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ),
+      ],
       body: Column(
         children: [
           _buildModernStepIndicator(),
@@ -504,83 +607,102 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-      child: Row(
-        children: List.generate(steps.length, (index) {
-          final isActive = index <= _currentStep;
-          final isCompleted = index < _currentStep;
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // Background Line
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Row(
+                  children: List.generate(steps.length - 1, (index) {
+                    return Expanded(
+                      child: Container(
+                        height: 2,
+                        color: index < _currentStep
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey.shade300,
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              // Step Circles
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(steps.length, (index) {
+                  final isActive = index <= _currentStep;
+                  final isCompleted = index < _currentStep;
 
-          return Expanded(
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: isActive
-                        ? LinearGradient(
-                            colors: [
-                              Theme.of(context).primaryColor,
-                              Theme.of(
-                                context,
-                              ).primaryColor.withValues(alpha: 0.7),
-                            ],
-                          )
-                        : null,
-                    color: !isActive ? Colors.grey.shade300 : null,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: Theme.of(
-                                context,
-                              ).primaryColor.withValues(alpha: 0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: isCompleted
-                        ? const Icon(Icons.check, color: Colors.white, size: 24)
-                        : Icon(
-                            steps[index]['icon'] as IconData,
-                            color: isActive
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                            size: 24,
+                  return Expanded(
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: isActive
+                                ? LinearGradient(
+                                    colors: [
+                                      Theme.of(context).primaryColor,
+                                      Theme.of(
+                                        context,
+                                      ).primaryColor.withOpacity(0.7),
+                                    ],
+                                  )
+                                : null,
+                            color: !isActive ? Colors.grey.shade300 : null,
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: Theme.of(
+                                        context,
+                                      ).primaryColor.withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
                           ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  steps[index]['title'] as String,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isActive
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade500,
-                  ),
-                ),
-                if (index < steps.length - 1)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 60),
-                      color: index < _currentStep
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade300,
+                          child: Center(
+                            child: isCompleted
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 24,
+                                  )
+                                : Icon(
+                                    steps[index]['icon'] as IconData,
+                                    color: isActive
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                    size: 24,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          steps[index]['title'] as String,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isActive
+                                ? Theme.of(context).primaryColor
+                                : Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-              ],
-            ),
-          );
-        }),
+                  );
+                }),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -592,7 +714,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.05)],
+          colors: [Colors.transparent, Colors.black.withOpacity(0.05)],
         ),
       ),
       child: Row(
@@ -604,7 +726,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -622,7 +744,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  backgroundColor: Colors.white.withValues(alpha: 0.9),
+                  backgroundColor: Colors.white.withOpacity(0.9),
                 ),
               ),
             )
@@ -633,7 +755,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
+                  color: Theme.of(context).primaryColor.withOpacity(0.4),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -744,9 +866,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       side: BorderSide(
-                        color: Theme.of(
-                          context,
-                        ).primaryColor.withValues(alpha: 0.5),
+                        color: Theme.of(context).primaryColor.withOpacity(0.5),
                       ),
                     ),
                     icon: _isGettingLocation
@@ -770,18 +890,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ],
             ),
             _buildSectionCard(
-              title: 'Timeline & Classification',
-              subtitle: 'Overall project category and estimated dates',
-              icon: Icons.category_rounded,
+              title: 'Project Timeline',
+              subtitle: 'Estimated start and end dates for the site',
+              icon: Icons.calendar_today_rounded,
               children: [
-                _buildDropdownField(
-                  'Project Category',
-                  _siteProjectCategory,
-                  _categories,
-                  (v) => setState(() => _siteProjectCategory = v),
-                  isLoading: _isLoadingDropdowns,
-                ),
-                const SizedBox(height: 16),
                 _buildDateField(
                   'Start Date',
                   _siteStartDate,
@@ -848,6 +960,72 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   label: 'Owner Phone',
                   icon: Icons.phone_rounded,
                   keyboardType: TextInputType.phone,
+                  // maxLength: 10,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Phone is required';
+                    if (v.trim().length != 10) return 'Must be 10 digits';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Customer Login Info Note
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).primaryColor.withOpacity(0.1),
+                        Theme.of(context).primaryColor.withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).primaryColor.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.lock_person_outlined,
+                          color: Theme.of(context).primaryColor,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Customer Login Info',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'The Owner Name and Phone Number will be used as the username and password for the Customer Login.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -857,6 +1035,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               subtitle: 'Categorize the project for better reporting',
               icon: Icons.class_rounded,
               children: [
+                _buildDropdownField(
+                  'Project Category',
+                  _siteProjectCategory,
+                  _categories,
+                  (v) => setState(() => _siteProjectCategory = v),
+                  isLoading: _isLoadingDropdowns,
+                ),
+                const SizedBox(height: 16),
                 _buildDropdownField(
                   'Sub Category',
                   _projectSubCategory,
@@ -876,13 +1062,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 _buildDropdownField(
                   'Project Stage',
                   _projectStage,
-                  _statuses,
+                  _projectStagesList,
                   (v) => setState(() => _projectStage = v),
                   isLoading: _isLoadingDropdowns,
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
-                  'Status',
+                  'Current Status',
                   _projectStatus,
                   _statuses,
                   (v) => setState(() => _projectStatus = v),
@@ -958,9 +1144,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
             ),
             child: Column(
               children: [
@@ -1065,10 +1251,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
           ),
         if (_isContractWork) ...[
-          GlassTextField(
-            controller: _contractorNameController,
-            label: 'Contractor Name',
-            icon: Icons.person_4_rounded,
+          _buildDropdownField(
+            'Contractor Name',
+            _contractorNameController.text.isEmpty
+                ? null
+                : _contractorNameController.text,
+            _contractors,
+            (v) => setState(() => _contractorNameController.text = v ?? ''),
+            isLoading: _isLoadingDropdowns,
           ),
           const SizedBox(height: 16),
           GlassTextField(
@@ -1141,7 +1331,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 _buildDropdownField(
                   'Project Stage',
                   _mapProjectStage,
-                  _statuses,
+                  _projectStagesList,
                   (v) => setState(() => _mapProjectStage = v),
                   isLoading: _isLoadingDropdowns,
                 ),
@@ -1175,12 +1365,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.green.shade900.withValues(alpha: 0.2),
-            Colors.green.shade800.withValues(alpha: 0.05),
+            Colors.green.shade900.withOpacity(0.2),
+            Colors.green.shade800.withOpacity(0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.green.shade700.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.green.shade700.withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -1191,7 +1381,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade700.withValues(alpha: 0.2),
+                    color: Colors.green.shade700.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1217,7 +1407,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         'Review your configuration before saving',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.green.shade100.withValues(alpha: 0.6),
+                          color: Colors.green.shade100.withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -1268,7 +1458,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       'I have reviewed and agree to the project configuration and terms and conditions.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.8),
+                        color: Colors.white.withOpacity(0.8),
                         height: 1.4,
                       ),
                     ),
@@ -1333,12 +1523,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1354,9 +1544,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).primaryColor.withValues(alpha: 0.1),
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

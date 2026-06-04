@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/glass_scaffold.dart';
 import '../utils/responsive.dart';
 import 'branding_screen.dart';
+import '../services/firestore_service.dart';
 
 // Form screen for organization registration details
 
@@ -34,6 +36,9 @@ class _OrganisationRegistrationPageState
 
   String _passwordStrength = '';
   Color _strengthColor = Colors.transparent;
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+  bool _isLoading = false;
 
   void _checkPasswordStrength(String value) {
     if (value.isEmpty) {
@@ -94,25 +99,108 @@ class _OrganisationRegistrationPageState
     super.dispose();
   }
 
-  void _goToNextStep() {
+  Future<void> _goToNextStep() async {
     if (!_formKey.currentState!.validate()) return;
     if (_passwordController.text != _confirmPasswordController.text) {
       _showError('Passwords do not match');
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BrandingScreen(
-          orgName: _orgNameController.text.trim(),
-          email: _emailController.text.trim(),
-          phone: _phoneController.text.trim(),
-          username: _usernameController.text.trim().toLowerCase(),
-          password: _passwordController.text.trim(),
-          dateStr: DateFormat('dd-MM-yyyy').format(DateTime.now()),
-        ),
-      ),
-    );
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Uniqueness checks
+      final String email = _emailController.text.trim();
+      final String phone = _phoneController.text.trim();
+      final String username = _usernameController.text.trim().toLowerCase();
+
+      final results = await Future.wait([
+        FirestoreService.isEmailUnique(email),
+        FirestoreService.isPhoneUnique(phone),
+        FirestoreService.isUsernameUnique(username),
+      ]);
+
+      final bool isEmailUnique = results[0];
+      final bool isPhoneUnique = results[1];
+      final bool isUsernameUnique = results[2];
+
+      if (!isEmailUnique) {
+        _showError('Email address already registered');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (!isPhoneUnique) {
+        _showError('Phone number already registered');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (!isUsernameUnique) {
+        _showError('Username is already taken');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BrandingScreen(
+              orgName: _orgNameController.text.trim(),
+              email: email,
+              phone: phone,
+              username: username,
+              password: _passwordController.text.trim(),
+              dateStr: DateFormat('dd-MM-yyyy').format(DateTime.now()),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Registration check error: $e');
+      String errorMsg = 'Error checking availability. Please try again.';
+
+      if (e is FirebaseException) {
+        if (e.code == 'failed-precondition' ||
+            e.message?.contains('index') == true) {
+          errorMsg = 'Firestore index required. Click to copy creation link.';
+        } else if (e.code == 'permission-denied') {
+          errorMsg = 'Permission denied. Please check security rules.';
+        }
+      } else if (e.toString().contains('index')) {
+        errorMsg = 'Firestore index required. Click to copy creation link.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 10),
+            action: e.toString().contains('http')
+                ? SnackBarAction(
+                    label: 'COPY LINK',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: e.toString()));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Link copied to clipboard!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  )
+                : null,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _goBack() {
@@ -323,9 +411,16 @@ class _OrganisationRegistrationPageState
                 hint: 'Enter mobile number',
                 icon: Icons.phone_rounded,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Phone number is required';
+                  }
+                  if (value.length != 10) {
+                    return 'Phone number must be exactly 10 digits';
                   }
                   return null;
                 },
@@ -352,6 +447,9 @@ class _OrganisationRegistrationPageState
                 hint: 'Min. 8 characters',
                 icon: Icons.lock_rounded,
                 isPassword: true,
+                obscureText: !_isPasswordVisible,
+                onToggleVisibility: () =>
+                    setState(() => _isPasswordVisible = !_isPasswordVisible),
                 onChanged: _checkPasswordStrength,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -409,6 +507,10 @@ class _OrganisationRegistrationPageState
                 hint: 'Re-enter password',
                 icon: Icons.lock_clock_rounded,
                 isPassword: true,
+                obscureText: !_isConfirmPasswordVisible,
+                onToggleVisibility: () => setState(
+                  () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please confirm your password';
@@ -447,7 +549,7 @@ class _OrganisationRegistrationPageState
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _goToNextStep,
+                      onPressed: _isLoading ? null : _goToNextStep,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: Colors.white,
@@ -457,13 +559,22 @@ class _OrganisationRegistrationPageState
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text(
-                        'CONTINUE',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'CONTINUE',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -494,7 +605,10 @@ class _OrganisationRegistrationPageState
     required String hint,
     required IconData icon,
     bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleVisibility,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     void Function(String)? onChanged,
   }) {
@@ -514,8 +628,9 @@ class _OrganisationRegistrationPageState
       ),
       child: TextFormField(
         controller: controller,
-        obscureText: isPassword,
+        obscureText: isPassword ? obscureText : false,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         validator: validator,
         onChanged: onChanged,
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
@@ -526,6 +641,18 @@ class _OrganisationRegistrationPageState
             fontSize: 14,
           ),
           prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    obscureText
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                  onPressed: onToggleVisibility,
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,

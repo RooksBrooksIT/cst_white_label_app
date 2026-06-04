@@ -415,12 +415,14 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                   if (_assignedSites.isNotEmpty)
                     DropdownButtonFormField<Map<String, dynamic>>(
                       value: _selectedSite,
+                      isExpanded: true,
                       items: _assignedSites.map((site) {
                         return DropdownMenuItem<Map<String, dynamic>>(
                           value: site,
                           child: Text(
                             site['siteName'] ?? site['siteId'],
                             style: const TextStyle(fontSize: 16),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       }).toList(),
@@ -433,6 +435,10 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       },
                       decoration: InputDecoration(
                         labelText: 'Select Site',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -470,8 +476,8 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
                       children: [
                         Text(
                           _locationValid
-                              ? '✅ Location verified'
-                              : '❌ Location mismatch',
+                              ? 'Location verified'
+                              : 'Location mismatch',
                           style: TextStyle(
                             color: _locationValid
                                 ? Colors.green

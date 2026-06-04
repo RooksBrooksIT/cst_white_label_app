@@ -8,6 +8,7 @@ import 'config_login.dart';
 import 'customer_login_page.dart';
 import 'supervisor_login_page.dart';
 import '../utils/responsive.dart';
+import '../utils/app_theme.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -37,6 +38,9 @@ class _MainDashboardState extends State<MainDashboard> {
 
       if (tempOrgPath != null && tempOrgPath.isNotEmpty) {
         _isFromReferral = true;
+
+        // Sync branding for referral users immediately
+        await AppTheme.syncWithFirestore(tempOrgPath);
 
         // Fetch org details
         final doc = await FirebaseFirestore.instance
@@ -125,14 +129,19 @@ class _MainDashboardState extends State<MainDashboard> {
                           ),
                         ),
                       const SizedBox(height: 24),
-                      Text(
-                        _orgName ?? 'Organization',
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontSize: Responsive.fontSize(context, 28),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: AppTheme.appName,
+                        builder: (context, name, _) {
+                          return Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontSize: Responsive.fontSize(context, 28),
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -169,55 +178,61 @@ class _MainDashboardState extends State<MainDashboard> {
                         ),
                       ),
                       const SizedBox(height: 28),
-                      Text(
-                        'Select Your Role',
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontSize: Responsive.fontSize(context, 28),
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: AppTheme.appName,
+                        builder: (context, name, _) {
+                          return Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontSize: Responsive.fontSize(context, 28),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 48),
-
-                      // Role Cards
-                      _buildRoleCard(
-                        context: context,
-                        title: 'Organization',
-                        subtitle: 'Manage org details & data',
-                        icon: Icons.business_center_rounded,
-                        accentColor: colorScheme.primary,
-                        destination: const Organisation_LoginPage(),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildRoleCard(
-                        context: context,
-                        title: 'Manager',
-                        subtitle: 'Configure settings & control',
-                        icon: Icons.manage_accounts_rounded,
-                        accentColor: colorScheme.secondary,
-                        destination: const ConfigLoginPage(),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildRoleCard(
-                        context: context,
-                        title: 'Supervisor',
-                        subtitle: 'Manage site activities',
-                        icon: Icons.supervisor_account_rounded,
-                        accentColor: const Color(0xFF0EA5E9),
-                        destination: const SupervisorLoginPage(),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildRoleCard(
-                        context: context,
-                        title: 'Customer',
-                        subtitle: 'View your project status',
-                        icon: Icons.person_rounded,
-                        accentColor: const Color(0xFF10B981),
-                        destination: const CustomerLoginPage(),
-                      ),
-                      const SizedBox(height: 40), // Extra bottom padding
                     ],
+
+                    const SizedBox(height: 48),
+
+                    // Role Cards
+                    _buildRoleCard(
+                      context: context,
+                      title: 'Organization',
+                      subtitle: 'Manage org details & data',
+                      icon: Icons.business_center_rounded,
+                      accentColor: colorScheme.primary,
+                      destination: const Organisation_LoginPage(),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildRoleCard(
+                      context: context,
+                      title: 'Manager',
+                      subtitle: 'Configure settings & control',
+                      icon: Icons.manage_accounts_rounded,
+                      accentColor: colorScheme.secondary,
+                      destination: const ConfigLoginPage(),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildRoleCard(
+                      context: context,
+                      title: 'Supervisor',
+                      subtitle: 'Manage site activities',
+                      icon: Icons.supervisor_account_rounded,
+                      accentColor: const Color(0xFF0EA5E9),
+                      destination: const SupervisorLoginPage(),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildRoleCard(
+                      context: context,
+                      title: 'Customer',
+                      subtitle: 'View your project status',
+                      icon: Icons.person_rounded,
+                      accentColor: const Color(0xFF10B981),
+                      destination: const CustomerLoginPage(),
+                    ),
+                    const SizedBox(height: 40), // Extra bottom padding
                   ],
                 ),
               ),

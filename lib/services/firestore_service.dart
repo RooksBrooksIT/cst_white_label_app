@@ -116,8 +116,8 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
-        .doc('data');
+        .collection('data')
+        .doc('admin');
   }
 
   static DocumentReference<Map<String, dynamic>> get brandingDoc {
@@ -125,7 +125,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('branding');
   }
 
@@ -136,7 +136,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('branding');
   }
 
@@ -146,7 +146,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('referral');
   }
 
@@ -156,7 +156,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('subscription');
   }
 
@@ -311,18 +311,19 @@ class FirestoreService {
   }
 
   /// Finds the Organization ID (document ID in /organisation collection) by search across
-  /// all admin/referral documents for a matching referralCode.
+  /// all admin documents in the 'data' collection group for a matching referralCode.
   static Future<String?> findOrgIdByReferralCode(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('admin')
+          .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
           .limit(1)
           .get();
 
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
-        // The parent of the 'admin' document is the organization document
+        // The structure is /organisation/{orgId}/data/admin
+        // So doc.reference.parent is the 'data' collection, and .parent is the organization document
         return doc.reference.parent.parent?.id;
       }
       return null;
@@ -336,7 +337,7 @@ class FirestoreService {
   static Future<bool> isReferralCodeUnique(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('admin')
+          .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
           .limit(1)
           .get();
@@ -344,6 +345,54 @@ class FirestoreService {
       return snapshot.docs.isEmpty;
     } catch (e) {
       debugPrint('Error checking referral code uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if an email is unique across all organizations.
+  static Future<bool> isEmailUnique(String email) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking email uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if a phone number is unique across all organizations.
+  static Future<bool> isPhoneUnique(String phone) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('phone', isEqualTo: phone)
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking phone uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if a username is unique across all organizations.
+  static Future<bool> isUsernameUnique(String username) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('username', isEqualTo: username.toLowerCase())
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking username uniqueness: $e');
       rethrow;
     }
   }

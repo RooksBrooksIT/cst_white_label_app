@@ -36,12 +36,24 @@ class OrganizationDashboard extends StatefulWidget {
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
+  String _userName = '';
+  String _userRole = 'Organization';
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _checkSubscription();
     _startSubscriptionListener();
+  }
+
+  Future<void> _loadUserData() async {
+    final userData = AuthService().userData;
+    setState(() {
+      _userName =
+          userData['org_name'] ?? userData['username'] ?? 'Organization';
+      _userRole = userData['role'] ?? 'Organization';
+    });
   }
 
   void _startSubscriptionListener() {
@@ -471,54 +483,65 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     ];
   }
 
-  // All navigation methods unchanged – keep your original implementations
+  // Navigation methods
   void _navigateToConfiguration(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(
       builder: (context) => const ConfigAccountDashboard(showLogout: false),
     ),
   );
+
   void _navigateToManagerConfig(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
   );
+
   void _navigateToDailyReport(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
   );
+
   void _navigateToInsights(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => InsightsDashboard()),
   );
+
   void _navigateToSitePaymentEntry(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => SitePaymentScreen()),
   );
+
   void _navigateToSiteWeeklyFinancialReport(BuildContext context) =>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => SiteWeeklyFinancialReports()),
       );
+
   void _navigateToIncentiveCaliculation(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => IncentiveCalculation()),
   );
+
   void _navigateToOrganizationExpenses(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => OrganizationExpenses()),
   );
+
   void _navigateToManagerExpenses(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => ManagerExpenses()),
   );
+
   void _navigateToMaterialReport(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => const MaterialReportPage()),
   );
+
   void _navigateToToolsInventory(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
   );
+
   void _navigateToManagerDailyEntry(BuildContext context) {
     final userData = AuthService().userData;
     final userName = userData['username'] ?? userData['org_name'] ?? 'Admin';
@@ -538,6 +561,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           const OrganizationSiteEntry(userName: '', userDetails: {}),
     ),
   );
+
   void _navigateToOrgMenu(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(
@@ -553,6 +577,7 @@ class _CategoryData {
   final Color color;
   final List<Color> gradientColors;
   final List<SubMenuItem> items;
+
   _CategoryData({
     required this.title,
     required this.subtitle,
@@ -560,5 +585,21 @@ class _CategoryData {
     required this.color,
     required this.gradientColors,
     required this.items,
+  });
+}
+
+class SubMenuItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  SubMenuItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
   });
 }

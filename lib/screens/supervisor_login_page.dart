@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'contractor_entry_page.dart';
 import 'supervisor_dashboard.dart';
+// import 'reset_password_screen.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -11,6 +12,7 @@ import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import '../utils/firestore_error_handler.dart';
+import '../utils/app_theme.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
@@ -61,6 +63,11 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
       final auth = AuthService();
       if (auth.isLoggedIn && auth.userRole == UserRole.supervisor) {
         final data = auth.userData;
+        final orgId = data['orgId'];
+        if (orgId != null && orgId.toString().isNotEmpty) {
+          await AppTheme.syncWithFirestore(orgId.toString());
+        }
+
         final username = data['username'] ?? '';
         final supervisorId = data['supervisorId'] ?? '';
         final supervisorName = data['supervisorName'] ?? '';
@@ -195,227 +202,6 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
     ),
   );
 
-  void _showForgotPasswordDialog() {
-    final usernameController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    bool isUpdating = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            final colorScheme = Theme.of(context).colorScheme;
-            return Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: usernameController,
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(
-                          Icons.person_outline_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: newPasswordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'New Password',
-                        prefixIcon: Icon(
-                          Icons.lock_outline_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        prefixIcon: Icon(
-                          Icons.lock_reset_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(color: Color(0xFF64748B)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: isUpdating
-                                ? null
-                                : () async {
-                                    if (newPasswordController.text !=
-                                        confirmPasswordController.text) {
-                                      if (context.mounted)
-                                        _showErrorDialog(
-                                          'Passwords do not match',
-                                        );
-                                      return;
-                                    }
-                                    setState(() => isUpdating = true);
-                                    try {
-                                      final supervisorCollection =
-                                          await FirestoreService.supervisors;
-                                      final querySnapshot =
-                                          await supervisorCollection
-                                              .where(
-                                                'UserName',
-                                                isEqualTo: usernameController
-                                                    .text
-                                                    .trim(),
-                                              )
-                                              .get();
-                                      if (querySnapshot.docs.isNotEmpty) {
-                                        final docId =
-                                            querySnapshot.docs.first.id;
-                                        await supervisorCollection
-                                            .doc(docId)
-                                            .update({
-                                              'Password': newPasswordController
-                                                  .text
-                                                  .trim(),
-                                            });
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          _showSuccessDialog(
-                                            'Password updated successfully',
-                                          );
-                                        }
-                                      } else {
-                                        if (context.mounted)
-                                          _showErrorDialog(
-                                            'Username not found',
-                                          );
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        FirestoreErrorHandler.handleError(
-                                          context,
-                                          e,
-                                          title: 'Password Reset Error',
-                                        );
-                                      }
-                                    } finally {
-                                      if (context.mounted)
-                                        setState(() => isUpdating = false);
-                                    }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: isUpdating
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Update'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -443,6 +229,9 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
         // Refresh FirestoreService cache
         await FirestoreService.initialize();
+
+        // Sync branding details
+        await AppTheme.syncWithFirestore(orgId);
 
         // 3. Authenticate within organization
         final supervisorCollection = await FirestoreService.supervisors;
@@ -556,7 +345,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
     return GlassScaffold(
       onBack: () => Navigator.pop(context),
-      body: Center(        child: SingleChildScrollView(
+      body: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -622,7 +412,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                         controller: _referralController,
                         label: 'Referral Code / Org Name',
                         icon: Icons.business_rounded,
-                        enabled: _actualReferralCode == null && _tempOrgName == null,
+                        enabled:
+                            _actualReferralCode == null && _tempOrgName == null,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 20),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
@@ -45,6 +46,13 @@ class _PricingScreenState extends State<PricingScreen> {
   Future<void> _register() async {
     setState(() => _isLoading = true);
     try {
+      // 1. Create Firebase Auth account first
+      final userCredential = await AuthService().registerWithEmail(
+        widget.email,
+        widget.password,
+      );
+      final String uid = userCredential.user!.uid;
+
       final String orgReferralCode =
           await FirestoreService.generateUniqueReferralCode();
 
@@ -67,34 +75,38 @@ class _PricingScreenState extends State<PricingScreen> {
         final orgRef = FirebaseFirestore.instance
             .collection('organisation')
             .doc(orgId);
-        final adminColl = orgRef.collection('admin');
+
+        // Structure: /organisation/{orgId}/data/{docName}
+        // This matches the "admin document, data collection" requirement
+        final dataColl = orgRef.collection('data');
 
         // 1. Branding Document
-        transaction.set(adminColl.doc('branding'), {
+        transaction.set(dataColl.doc('branding'), {
           'appName': widget.appName,
           'primaryColor': AppTheme.colorToHex(widget.selectedColor),
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // 2. Data Document (Credentials & Info)
-        transaction.set(adminColl.doc('data'), {
+        // 2. Admin (Data) Document (Credentials & Info)
+        transaction.set(dataColl.doc('admin'), {
           'orgName': widget.orgName,
           'email': widget.email,
           'phone': widget.phone,
           'username': widget.username,
           'password': widget.password,
+          'uid': uid, // Store Firebase Auth UID
           'createdAt': FieldValue.serverTimestamp(),
         });
 
         // 3. Referral Document
-        transaction.set(adminColl.doc('referral'), {
+        transaction.set(dataColl.doc('referral'), {
           'referralCode': orgReferralCode,
           'orgReferralCode': orgReferralCode,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
         // 4. Subscription Document
-        transaction.set(adminColl.doc('subscription'), {
+        transaction.set(dataColl.doc('subscription'), {
           'subscriptionPlan': '30 days',
           'subscriptionStartDate': Timestamp.fromDate(now),
           'subscriptionEndDate': Timestamp.fromDate(endDate),
@@ -103,14 +115,17 @@ class _PricingScreenState extends State<PricingScreen> {
         });
 
         // Also add the admin as the first entry in the organizationUser subcollection
-        transaction
-            .set(orgRef.collection('organizationUser').doc(widget.username), {
-              'username': widget.username,
-              'password': widget.password,
-              'role': 'admin',
-              'orgId': orgId,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+        transaction.set(
+          orgRef.collection('organizationUser').doc(widget.username),
+          {
+            'username': widget.username,
+            'password': widget.password,
+            'role': 'admin',
+            'orgId': orgId,
+            'uid': uid, // Store Firebase Auth UID
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
       });
 
       // Auto-login using AuthService to ensure all unified keys are set
@@ -280,7 +295,17 @@ class _PricingScreenState extends State<PricingScreen> {
       debugPrint('Registration error: $e');
       String errorMsg = 'Registration failed. Please try again.';
 
-      if (e.toString().contains('permission-denied')) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'email-already-in-use') {
+          errorMsg = 'This email address is already in use by another account.';
+        } else if (e.code == 'invalid-email') {
+          errorMsg = 'The email address is not valid.';
+        } else if (e.code == 'weak-password') {
+          errorMsg = 'The password is too weak.';
+        } else {
+          errorMsg = 'Authentication error: ${e.message}';
+        }
+      } else if (e.toString().contains('permission-denied')) {
         errorMsg = 'Permission denied. Please check Firestore security rules.';
       } else if (e.toString().contains('index')) {
         errorMsg = 'Firestore index required. Click to copy creation link.';
@@ -303,6 +328,7 @@ class _PricingScreenState extends State<PricingScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Error copied to clipboard!'),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     },

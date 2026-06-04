@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Organisation_RegistrationPage.dart';
+import 'reset_password_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -48,11 +49,19 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   // Check if organization is already logged in
   Future<void> _checkLoginStatus() async {
     final auth = AuthService();
-    if (auth.isLoggedIn && auth.userRole == UserRole.organization && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OrganizationDashboard()),
-      );
+    if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
+      final orgId = auth.userData['dynamicPath'];
+      if (orgId != null && orgId.toString().isNotEmpty) {
+        await AppTheme.syncWithFirestore(orgId.toString());
+      }
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrganizationDashboard(),
+          ),
+        );
+      }
     }
   }
 
@@ -83,18 +92,41 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       final username = _usernameController.text.trim();
       final password = _passwordController.text.trim();
 
-      // Query for the organization admin/data document by username
-      final userQuery = await FirebaseFirestore.instance
+      // 1. Search for organization credentials in 'admin' or 'data' collections
+      // This handles both path structures: /admin/data and /data/admin
+      QuerySnapshot<Map<String, dynamic>>? userQuery;
+
+      // Try 'admin' collection group first
+      userQuery = await FirebaseFirestore.instance
           .collectionGroup('admin')
           .where('username', isEqualTo: username)
           .get();
 
-      // Find the document named 'data' in the query results
       QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
-      for (var doc in userQuery.docs) {
-        if (doc.id == 'data') {
-          dataDoc = doc;
-          break;
+
+      if (userQuery.docs.isNotEmpty) {
+        for (var doc in userQuery.docs) {
+          if (doc.id == 'data' || doc.id == 'admin') {
+            dataDoc = doc;
+            break;
+          }
+        }
+      }
+
+      // If not found, try 'data' collection group
+      if (dataDoc == null) {
+        userQuery = await FirebaseFirestore.instance
+            .collectionGroup('data')
+            .where('username', isEqualTo: username)
+            .get();
+
+        if (userQuery.docs.isNotEmpty) {
+          for (var doc in userQuery.docs) {
+            if (doc.id == 'admin' || doc.id == 'data') {
+              dataDoc = doc;
+              break;
+            }
+          }
         }
       }
 
@@ -104,7 +136,9 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
       if (dataDoc != null) {
         userData = dataDoc.data();
-        // The OrgID is the document ID of the parent organization
+        // Extract OrgID from the path. Expected path structures:
+        // /organisation/{OrgID}/admin/data  -> parent.parent is Jesus_...
+        // /organisation/{OrgID}/data/admin  -> parent.parent is Jesus_...
         dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
         fullConfigPath = dataDoc.reference.path;
       } else {
@@ -127,13 +161,50 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       }
 
       if (userData != null) {
-        // Validate password
-        if (userData['password'] != password) {
-          _showError('Invalid username or password');
-          return;
-        }
-
+        final String? email = userData['email'] as String?;
         final String? storedOrgName = userData['orgName'] as String?;
+
+        if (email != null && email.isNotEmpty) {
+          // 3. Authenticate with Firebase Authentication
+          try {
+            await AuthService().loginWithEmail(email, password);
+
+            // Sync password in Firestore if it was reset via email
+            if (userData['password'] != password) {
+              final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+              // 1. Update the admin/data or data/admin document
+              batch.update(FirebaseFirestore.instance.doc(fullConfigPath!), {
+                'password': password,
+              });
+
+              // 2. Also update the organizationUser collection entry for this admin
+              if (dynamicPath != null && dynamicPath != 'uninitialized') {
+                final userDocRef = FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(dynamicPath)
+                    .collection('organizationUser')
+                    .doc(username);
+
+                batch.update(userDocRef, {'password': password});
+              }
+
+              await batch.commit();
+              debugPrint(
+                'Firestore passwords synced with Firebase Auth in both locations',
+              );
+            }
+          } catch (e) {
+            _showError('The username or password you entered is incorrect');
+            return;
+          }
+        } else {
+          // FALLBACK: If email is missing (legacy accounts), validate password manually
+          if (userData['password'] != password) {
+            _showError('Invalid username or password');
+            return;
+          }
+        }
 
         // Write organization info to AuthService
         await AuthService().login(UserRole.organization, {
@@ -276,12 +347,30 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
                           onPressed: _login,
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ResetPasswordScreen(),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: theme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

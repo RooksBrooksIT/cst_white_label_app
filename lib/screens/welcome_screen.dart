@@ -91,6 +91,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       // Dynamic path to organization details
                       await prefs.setString('temp_org_path', orgId);
 
+                      // Sync branding immediately after joining
+                      await AppTheme.syncWithFirestore(orgId);
+
                       if (mounted) {
                         Navigator.pop(context);
                         Navigator.pushNamed(context, '/authSelection');

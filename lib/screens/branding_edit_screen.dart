@@ -5,7 +5,9 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
+import '../widgets/irregular_background.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
@@ -114,9 +116,17 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
         'primaryColor': colorHex,
       }, SetOptions(merge: true));
 
+      // Also update the core organization data document (orgName)
+      await FirestoreService.orgDataDoc.set({
+        'orgName': appName,
+      }, SetOptions(merge: true));
+
       // Update local theme state immediately
       await AppTheme.updateTheme(_selectedColor);
       await AppTheme.updateAppName(appName);
+
+      // Update session data (AuthService) with the new orgName
+      await AuthService().updateUserData({'org_name': appName});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -161,132 +171,135 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
             onBack: () => Navigator.pop(context),
             appBarBackgroundColor: colorScheme.primary,
             appBarForegroundColor: colorScheme.onPrimary,
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'App Customization',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+            body: IrregularBackground(
+              color: _selectedColor,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'App Customization',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Update your app name, logo, and theme color.',
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSection(
-                    context,
-                    title: 'App Information',
-                    icon: Icons.edit_rounded,
-                    child: GlassTextField(
-                      controller: _appNameController,
-                      label: 'App Name',
-                      icon: Icons.app_registration_rounded,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Update your app name, logo, and theme color.',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSection(
-                    context,
-                    title: 'Brand Color',
-                    icon: Icons.palette_rounded,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: _colorOptions.map((opt) {
-                            final isCustom = opt['isCustom'] == true;
-                            final c = isCustom
-                                ? _customColor
-                                : opt['color'] as Color;
-                            final isSelected = isCustom
-                                ? (!_colorOptions.any(
-                                    (o) =>
-                                        o['isCustom'] != true &&
-                                        o['color'] == _selectedColor,
-                                  ))
-                                : _selectedColor.value == c.value;
+                    const SizedBox(height: 32),
+                    _buildSection(
+                      context,
+                      title: 'App Information',
+                      icon: Icons.edit_rounded,
+                      child: GlassTextField(
+                        controller: _appNameController,
+                        label: 'App Name',
+                        icon: Icons.app_registration_rounded,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSection(
+                      context,
+                      title: 'Brand Color',
+                      icon: Icons.palette_rounded,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: _colorOptions.map((opt) {
+                              final isCustom = opt['isCustom'] == true;
+                              final c = isCustom
+                                  ? _customColor
+                                  : opt['color'] as Color;
+                              final isSelected = isCustom
+                                  ? (!_colorOptions.any(
+                                      (o) =>
+                                          o['isCustom'] != true &&
+                                          o['color'] == _selectedColor,
+                                    ))
+                                  : _selectedColor.value == c.value;
 
-                            return GestureDetector(
-                              onTap: isCustom
-                                  ? _showColorPicker
-                                  : () => setState(() => _selectedColor = c),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? c.withOpacity(0.1)
-                                      : const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
+                              return GestureDetector(
+                                onTap: isCustom
+                                    ? _showColorPicker
+                                    : () => setState(() => _selectedColor = c),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: isSelected
-                                        ? c
-                                        : const Color(0xFFE2E8F0),
-                                    width: 2,
+                                        ? c.withOpacity(0.1)
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? c
+                                          : const Color(0xFFE2E8F0),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: isCustom && !isSelected
+                                              ? null
+                                              : c,
+                                          shape: BoxShape.circle,
+                                          gradient: isCustom && !isSelected
+                                              ? const SweepGradient(
+                                                  colors: [
+                                                    Colors.red,
+                                                    Colors.blue,
+                                                    Colors.green,
+                                                    Colors.red,
+                                                  ],
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        opt['label'] as String,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? c
+                                              : const Color(0xFF64748B),
+                                          fontSize: 13,
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: isCustom && !isSelected
-                                            ? null
-                                            : c,
-                                        shape: BoxShape.circle,
-                                        gradient: isCustom && !isSelected
-                                            ? const SweepGradient(
-                                                colors: [
-                                                  Colors.red,
-                                                  Colors.blue,
-                                                  Colors.green,
-                                                  Colors.red,
-                                                ],
-                                              )
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      opt['label'] as String,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? c
-                                            : const Color(0xFF64748B),
-                                        fontSize: 13,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 48),
-                  GlassButton(
-                    label: 'SAVE CHANGES',
-                    isLoading: _isLoading,
-                    onPressed: _saveChanges,
-                  ),
-                ],
+                    const SizedBox(height: 48),
+                    GlassButton(
+                      label: 'SAVE CHANGES',
+                      isLoading: _isLoading,
+                      onPressed: _saveChanges,
+                    ),
+                  ],
+                ),
               ),
             ),
           );

@@ -10,6 +10,7 @@ import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import '../utils/firestore_error_handler.dart';
+import '../utils/app_theme.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
@@ -51,8 +52,13 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     });
 
     final auth = AuthService();
-    if (auth.isLoggedIn && auth.userRole == UserRole.customer && mounted) {
+    if (auth.isLoggedIn && auth.userRole == UserRole.customer) {
       final data = auth.userData;
+      final orgId = data['orgId'];
+      if (orgId != null && orgId.toString().isNotEmpty) {
+        await AppTheme.syncWithFirestore(orgId.toString());
+      }
+
       final ownerName = data['ownerName'] ?? '';
       final siteId = data['siteId'] ?? '';
 
@@ -103,6 +109,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         await prefs.setString('cust_org_doc_path', resolvedPath);
 
         await FirestoreService.initialize();
+
+        // Sync branding details
+        await AppTheme.syncWithFirestore(orgId);
 
         final projectsCollection = await FirestoreService.projects;
         final querySnapshot = await projectsCollection
@@ -258,6 +267,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
                         controller: _passwordController,
                         label: 'Phone Number',
                         icon: Icons.phone_android_rounded,
+                        isPassword: true,
                         keyboardType: TextInputType.phone,
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),

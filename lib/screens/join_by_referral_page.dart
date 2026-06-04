@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
+import '../utils/app_theme.dart';
 
 class JoinByReferralPage extends StatefulWidget {
   const JoinByReferralPage({super.key});
@@ -34,11 +35,15 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
         await prefs.setString('temp_referral_role', 'organization');
         await prefs.setString('temp_referral_code', code);
 
+        // Sync branding immediately after joining
+        await AppTheme.syncWithFirestore(orgId);
+
         if (mounted) {
+          // Navigate to main role selection dashboard
           Navigator.pushNamedAndRemoveUntil(
             context,
             '/authSelection',
-            (route) => route.settings.name == '/landing',
+            (route) => false,
           );
         }
       } else {

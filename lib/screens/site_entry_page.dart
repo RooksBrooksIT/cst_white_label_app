@@ -689,11 +689,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     TextEditingController controller,
     IconData icon,
   ) {
+    final theme = Theme.of(context);
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: const Color(0xFF772323)),
+        prefixIcon: Icon(icon, size: 20, color: theme.primaryColor),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -701,7 +702,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF772323), width: 2),
+          borderSide: BorderSide(color: theme.primaryColor, width: 2),
         ),
         filled: true,
         fillColor: Colors.grey[50],
@@ -717,6 +718,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Widget _buildSummaryTable() {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -823,7 +825,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         child: IconButton(
                           icon: Icon(
                             Icons.delete,
-                            color: Colors.red[300],
+                            color: theme.colorScheme.error.withOpacity(0.7),
                             size: 16,
                           ),
                           onPressed: () => _removeMaterial(idx),
@@ -882,7 +884,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         child: IconButton(
                           icon: Icon(
                             Icons.delete,
-                            color: Colors.red[300],
+                            color: theme.colorScheme.error.withOpacity(0.7),
                             size: 16,
                           ),
                           onPressed: () => _removeLabour(idx),
@@ -1353,8 +1355,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               ),
                                               child: Text(
                                                 materialError!,
-                                                style: const TextStyle(
-                                                  color: Colors.red,
+                                                style: TextStyle(
+                                                  color:
+                                                      theme.colorScheme.error,
                                                 ),
                                               ),
                                             )
@@ -1504,7 +1507,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   color: total > 0
-                                                      ? const Color(0xFF772323)
+                                                      ? theme.primaryColor
                                                       : Colors.grey[500],
                                                   fontWeight: total > 0
                                                       ? FontWeight.bold
@@ -1529,7 +1532,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  backgroundColor: const Color(0xFF772323),
+                                  backgroundColor: theme.primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1556,7 +1559,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF772323),
+                                backgroundColor: theme.primaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
@@ -1639,7 +1642,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: total > 0
-                                          ? const Color(0xFF772323)
+                                          ? theme.primaryColor
                                           : Colors.grey[500],
                                       fontWeight: total > 0
                                           ? FontWeight.bold
@@ -1660,9 +1663,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                             12,
                                           ),
                                         ),
-                                        backgroundColor: const Color(
-                                          0xFF772323,
-                                        ),
+                                        backgroundColor: theme.primaryColor,
                                         foregroundColor: Colors.white,
                                       ),
                                       child: const Text('Add Material'),
@@ -1732,8 +1733,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               ),
                                               child: Text(
                                                 labourError!,
-                                                style: const TextStyle(
-                                                  color: Colors.red,
+                                                style: TextStyle(
+                                                  color:
+                                                      theme.colorScheme.error,
                                                 ),
                                               ),
                                             )
@@ -1883,7 +1885,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   color: total > 0
-                                                      ? const Color(0xFF772323)
+                                                      ? theme.primaryColor
                                                       : Colors.grey[500],
                                                   fontWeight: total > 0
                                                       ? FontWeight.bold
@@ -1908,7 +1910,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  backgroundColor: const Color(0xFF772323),
+                                  backgroundColor: theme.primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1934,7 +1936,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF772323),
+                                backgroundColor: theme.primaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 10,
@@ -2013,7 +2015,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: total > 0
-                                          ? const Color(0xFF772323)
+                                          ? theme.primaryColor
                                           : Colors.grey[500],
                                       fontWeight: total > 0
                                           ? FontWeight.bold
@@ -2034,9 +2036,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                             12,
                                           ),
                                         ),
-                                        backgroundColor: const Color(
-                                          0xFF772323,
-                                        ),
+                                        backgroundColor: theme.primaryColor,
                                         foregroundColor: Colors.white,
                                       ),
                                       child: const Text('Add Labour'),
