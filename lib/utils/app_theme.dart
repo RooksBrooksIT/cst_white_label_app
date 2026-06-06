@@ -34,27 +34,23 @@ class AppTheme {
     }
   }
 
-  /// Synchronizes branding from Firestore for a given organization.r
+  /// Synchronizes branding from Firestore for a given organization.
   static Future<void> syncWithFirestore(String orgId) async {
     try {
-      var doc = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('admin')
-          .get(); // Get the collection group search or specific doc
-
-      // Let's be more specific
+      // Use the consistent path from FirestoreService: organisation/{id}/data/branding
       final brandingDoc = await FirebaseFirestore.instance
           .collection('organisation')
           .doc(orgId)
-          .collection('admin')
+          .collection('data')
           .doc('branding')
           .get();
 
       DocumentSnapshot<Map<String, dynamic>> finalDoc = brandingDoc;
 
       if (!brandingDoc.exists) {
-        debugPrint('AppTheme: Branding doc not found in admin, falling back to root.');
+        debugPrint(
+          'AppTheme: Branding doc not found in data/branding, falling back to root.',
+        );
         finalDoc = await FirebaseFirestore.instance
             .collection('organisation')
             .doc(orgId)

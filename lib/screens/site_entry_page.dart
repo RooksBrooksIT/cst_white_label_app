@@ -113,12 +113,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     });
     try {
       final orgId = getOrgId();
-      final dateStr = DateFormat(
-        'dd-MM-yyyy',
-      ).format(selectedDate ?? DateTime.now());
       final snapshot = await FirebaseFirestore.instance
           .collection('organisation')
-          .doc('${orgId}_$dateStr')
+          .doc(orgId)
           .collection('projectStages')
           .get();
       final phases = <String>[];
@@ -133,7 +130,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       }
       setState(() {
         projectPhases = phases;
-        selectedProjectPhase = projectPhases.isNotEmpty
+        // Only set if not already set from supervisor mapping
+        selectedProjectPhase ??= projectPhases.isNotEmpty
             ? projectPhases.first
             : null;
         isLoadingProjectPhases = false;
@@ -1256,14 +1254,14 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           Row(
                             children: [
                               Icon(
-                                Icons.location_on,
+                                Icons.stairs_outlined,
                                 size: 20,
                                 color: theme.primaryColor,
                               ),
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  'Project Stage: ${selectedProjectPhase ?? "Not selected"}',
+                                  'Project Stage: ${selectedProjectPhase ?? "Not assigned"}',
                                   style: const TextStyle(fontSize: 16),
                                   overflow: TextOverflow.ellipsis,
                                 ),

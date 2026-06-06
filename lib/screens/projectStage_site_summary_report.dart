@@ -55,10 +55,38 @@ class _ProjectstageSiteSummaryReportState
   }
 
   Future<Map<String, dynamic>?> _fetchProjectInfo() async {
-    final snap = await FirestoreService.getCollection(
-      'projects',
-    ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
-    return snap.docs.isNotEmpty ? snap.docs.first.data() : null;
+    try {
+      final snap = await FirestoreService.getCollection(
+        'projects',
+      ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+
+      Map<String, dynamic>? data = snap.docs.isNotEmpty
+          ? snap.docs.first.data()
+          : null;
+
+      // Fallback to fetch from 'Site' collection if project data is missing or has no location
+      if (data == null ||
+          (data['siteLocation'] == null && data['location'] == null)) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          if (data == null) {
+            data = siteData;
+          } else {
+            // Merge missing location info into project data
+            data['siteLocation'] =
+                siteData['location'] ?? siteData['siteLocation'];
+            data['siteName'] = data['siteName'] ?? siteData['siteName'];
+          }
+        }
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Error fetching project info: $e');
+      return null;
+    }
   }
 
   Future<Map<String, num>> _fetchExpenseTotals() async {
@@ -237,7 +265,10 @@ class _ProjectstageSiteSummaryReportState
             style: theme.textTheme.bodySmall,
           ),
           const Divider(height: 24),
-          _infoRow('Site Location', projectInfo?['siteLocation'] ?? 'N/A'),
+          _infoRow(
+            'Site Location',
+            projectInfo?['siteLocation'] ?? projectInfo?['location'] ?? 'N/A',
+          ),
           _infoRow('Owner Name', projectInfo?['ownerName'] ?? 'N/A'),
           _infoRow('Status', projectInfo?['status'] ?? 'Active'),
         ],

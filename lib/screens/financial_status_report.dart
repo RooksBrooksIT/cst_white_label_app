@@ -53,9 +53,34 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             .limit(1)
             .get();
       }
+
+      Map<String, dynamic> data = {};
       if (query.docs.isNotEmpty) {
+        data = query.docs.first.data();
+      }
+
+      // Also fetch from 'Site' collection to get the location if missing
+      try {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          // Merge location and other site details if they are missing in projectData
+          if (data['siteLocation'] == null && data['location'] == null) {
+            data['siteLocation'] = siteData['location'];
+          }
+          if (data['siteName'] == null) {
+            data['siteName'] = siteData['siteName'];
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching site details: $e');
+      }
+
+      if (data.isNotEmpty) {
         setState(() {
-          projectData = query.docs.first.data();
+          projectData = data;
           isLoading = false;
         });
       } else {
@@ -220,17 +245,20 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           const SizedBox(height: 16),
           _buildInfoRow(
             'Site ID',
-            projectData?['siteid'] ?? projectData?['siteId'] ?? '-',
+            projectData?['siteId'] ?? projectData?['siteid'] ?? '-',
             Icons.tag,
           ),
           _buildInfoRow(
             'Location',
-            projectData?['siteLocation'] ?? '-',
+            projectData?['siteLocation'] ?? projectData?['location'] ?? '-',
             Icons.location_on_outlined,
           ),
           _buildInfoRow(
             'Actual Start',
-            _formatDate(projectData?['actualStateDate']),
+            _formatDate(
+              projectData?['actualStartDate'] ??
+                  projectData?['actualStateDate'],
+            ),
             Icons.calendar_today_outlined,
           ),
           _buildInfoRow(
@@ -383,7 +411,8 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   }
 
   int _calculateDuration() {
-    final start = projectData?['actualStateDate'];
+    final start =
+        projectData?['actualStartDate'] ?? projectData?['actualStateDate'];
     if (start is! Timestamp) return 0;
     return DateTime.now().difference(start.toDate()).inDays;
   }
@@ -436,7 +465,9 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             children: [
               PdfTemplates.buildMetaBox(
                 'Location',
-                projectData?['siteLocation'] ?? 'N/A',
+                projectData?['siteLocation'] ??
+                    projectData?['location'] ??
+                    'N/A',
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(

@@ -257,7 +257,22 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+            color: theme.cardColor,
+            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 4,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -316,29 +331,29 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }
 
   List<_CategoryData> _getCategories(ThemeData theme) {
+    final primary = theme.primaryColor;
+    final secondary = theme.colorScheme.secondary;
+
     return [
       _CategoryData(
         title: "Administrative & Config",
         subtitle: "Manage accounts and system settings",
         icon: Icons.admin_panel_settings_rounded,
-        color: theme.primaryColor,
-        gradientColors: [
-          theme.primaryColor,
-          theme.primaryColor.withOpacity(0.7),
-        ],
+        color: primary,
+        gradientColors: [primary, primary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: "Manager Account",
             subtitle: "Configure profiles and access permissions",
             icon: Icons.admin_panel_settings_rounded,
-            color: theme.primaryColor,
+            color: primary,
             onTap: () => _navigateToConfiguration(context),
           ),
           SubMenuItem(
             title: "Manager Config",
             subtitle: "Create and manage manager profiles",
             icon: Icons.manage_accounts_rounded,
-            color: theme.primaryColor,
+            color: primary,
             onTap: () => _navigateToManagerConfig(context),
           ),
         ],
@@ -347,28 +362,31 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Finance & Balance Sheets",
         subtitle: "Site payments, entries, and financial reports",
         icon: Icons.account_balance_wallet_rounded,
-        color: Colors.blueAccent,
-        gradientColors: [Colors.blueAccent, Colors.blueAccent.withOpacity(0.7)],
+        color: primary.withBlue(150),
+        gradientColors: [
+          primary.withBlue(150),
+          primary.withBlue(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: "Site Payment Entry",
             subtitle: "Record daily site transactions",
             icon: Icons.payments_rounded,
-            color: Colors.blueAccent,
+            color: primary.withBlue(150),
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
           SubMenuItem(
             title: "Site Payment Report",
             subtitle: "Daily site-level financial reports",
             icon: Icons.receipt_long_rounded,
-            color: Colors.indigoAccent,
+            color: primary.withBlue(180),
             onTap: () => _navigateToDailyReport(context),
           ),
           SubMenuItem(
             title: "Weekly Finance Report",
             subtitle: "Weekly financial health overview",
             icon: Icons.account_balance_rounded,
-            color: Colors.teal,
+            color: primary.withBlue(210),
             onTap: () => _navigateToSiteWeeklyFinancialReport(context),
           ),
         ],
@@ -377,35 +395,35 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Expense Management",
         subtitle: "Track organization and field expenses",
         icon: Icons.money_rounded,
-        color: Colors.orange,
-        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        color: secondary,
+        gradientColors: [secondary, secondary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: "Organization Expenses",
             subtitle: "Central operational cost monitoring",
             icon: Icons.corporate_fare_rounded,
-            color: Colors.orange,
+            color: secondary,
             onTap: () => _navigateToOrganizationExpenses(context),
           ),
           SubMenuItem(
             title: "Manager Expenses",
             subtitle: "Project management expenditures",
             icon: Icons.person_search_rounded,
-            color: Colors.deepOrange,
+            color: secondary.withOpacity(0.9),
             onTap: () => _navigateToManagerExpenses(context),
           ),
           SubMenuItem(
             title: "Organisation Daily Entry",
             subtitle: "Log daily project progress and expenses",
             icon: Icons.edit_note_rounded,
-            color: Colors.deepOrangeAccent,
+            color: secondary.withOpacity(0.8),
             onTap: () => _navigateToManagerDailyEntry(context),
           ),
           SubMenuItem(
             title: "Supervisor Daily Entry",
             subtitle: "Daily field-level operational expenses",
             icon: Icons.engineering_rounded,
-            color: Colors.amber[800]!,
+            color: secondary.withOpacity(0.7),
             onTap: () => _navigateToSiteExpenses(context),
           ),
         ],
@@ -414,14 +432,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Review & Approvals",
         subtitle: "Approve schedules, materials, and incentives",
         icon: Icons.fact_check_rounded,
-        color: Colors.green,
-        gradientColors: [Colors.green, Colors.green.withOpacity(0.7)],
+        color: primary.withGreen(150),
+        gradientColors: [
+          primary.withGreen(150),
+          primary.withGreen(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: "Schedule Request Approval",
             subtitle: "Approve project work schedules",
             icon: Icons.event_available_rounded,
-            color: Colors.green,
+            color: primary.withGreen(150),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -433,7 +454,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Material Request Approval",
             subtitle: "Authorize material procurement",
             icon: Icons.inventory_2_rounded,
-            color: Colors.lightGreen[700]!,
+            color: primary.withGreen(180),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -445,7 +466,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Incentive Calculation",
             subtitle: "Process performance-based rewards",
             icon: Icons.calculate_rounded,
-            color: Colors.purple,
+            color: primary.withGreen(210),
             onTap: () => _navigateToIncentiveCaliculation(context),
           ),
         ],
@@ -454,28 +475,28 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Reports & Insights",
         subtitle: "Stock monitoring and tool analytics",
         icon: Icons.bar_chart_rounded,
-        color: Colors.blueGrey,
-        gradientColors: [Colors.blueGrey, Colors.blueGrey.withOpacity(0.7)],
+        color: primary.withOpacity(0.8),
+        gradientColors: [primary.withOpacity(0.8), primary.withOpacity(0.5)],
         items: [
           SubMenuItem(
             title: "Advanced Financial Analytics",
             subtitle: "Detailed performance insights",
             icon: Icons.query_stats_rounded,
-            color: Colors.blueGrey,
+            color: primary.withOpacity(0.8),
             onTap: () => _navigateToInsights(context),
           ),
           SubMenuItem(
             title: "Materials Inventory",
             subtitle: "Real-time stock monitoring",
             icon: Icons.inventory_rounded,
-            color: Colors.brown,
+            color: primary.withOpacity(0.7),
             onTap: () => _navigateToMaterialReport(context),
           ),
           SubMenuItem(
             title: "Tools Inventory",
             subtitle: "Track field equipment usage",
             icon: Icons.construction_rounded,
-            color: Colors.blue[900]!,
+            color: primary.withOpacity(0.6),
             onTap: () => _navigateToToolsInventory(context),
           ),
         ],

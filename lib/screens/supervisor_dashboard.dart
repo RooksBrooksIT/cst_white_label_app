@@ -298,7 +298,22 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+            color: theme.cardColor,
+            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 4,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -357,22 +372,22 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   }
 
   List<_CategoryData> _getCategories(ColorScheme colorScheme) {
+    final primary = colorScheme.primary;
+    final secondary = colorScheme.secondary;
+
     return [
       _CategoryData(
         title: "Expenses & Finance",
         subtitle: "Manage site expenses and verifications",
         icon: Icons.account_balance_wallet_rounded,
-        color: colorScheme.primary,
-        gradientColors: [
-          colorScheme.primary,
-          colorScheme.primary.withOpacity(0.7),
-        ],
+        color: primary,
+        gradientColors: [primary, primary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: 'Site Supervisor Expenses',
             subtitle: 'Log and track daily site expenses',
             icon: Icons.monetization_on_rounded,
-            color: colorScheme.primary,
+            color: primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -389,14 +404,17 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         title: "Material Requests",
         subtitle: "Request and track materials and tools",
         icon: Icons.inventory_2_rounded,
-        color: Colors.orange,
-        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        color: primary.withBlue(150), // Use a variation of brand color
+        gradientColors: [
+          primary.withBlue(150),
+          primary.withBlue(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: 'Materials Request Form',
             subtitle: 'Submit new material requests',
             icon: Icons.add_shopping_cart_rounded,
-            color: Colors.orange,
+            color: primary.withBlue(150),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -411,7 +429,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Materials Approvals',
             subtitle: 'Check status of material requests',
             icon: Icons.fact_check_rounded,
-            color: Colors.orangeAccent,
+            color: primary.withBlue(180),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -428,14 +446,14 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         title: "Site Operations",
         subtitle: "Schedules, attendance and site info",
         icon: Icons.engineering_rounded,
-        color: Colors.blue,
-        gradientColors: [Colors.blue, Colors.blue.withOpacity(0.7)],
+        color: secondary,
+        gradientColors: [secondary, secondary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: 'Work Schedule Request',
             subtitle: 'Manage site work schedules',
             icon: Icons.calendar_today_rounded,
-            color: Colors.blue,
+            color: secondary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -450,7 +468,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Site Approvals',
             subtitle: 'View pending site approvals',
             icon: Icons.check_circle_rounded,
-            color: Colors.blueAccent,
+            color: secondary.withOpacity(0.8).withBlue(200),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -465,7 +483,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Workers Attendance',
             subtitle: 'Track worker daily attendance',
             icon: Icons.people_rounded,
-            color: Colors.indigo,
+            color: secondary.withOpacity(0.9),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -479,14 +497,17 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         title: "Inventory & Tools",
         subtitle: "Manage materials and tool movements",
         icon: Icons.construction_rounded,
-        color: Colors.teal,
-        gradientColors: [Colors.teal, Colors.teal.withOpacity(0.7)],
+        color: primary.withGreen(150),
+        gradientColors: [
+          primary.withGreen(150),
+          primary.withGreen(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: 'Materials at Site',
             subtitle: 'Current material stock at site',
             icon: Icons.warehouse_rounded,
-            color: Colors.teal,
+            color: primary.withGreen(150),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -501,7 +522,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Materials Information',
             subtitle: 'General material specifications',
             icon: Icons.info_rounded,
-            color: Colors.tealAccent[700]!,
+            color: primary.withGreen(180),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -513,7 +534,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Tools Movement',
             subtitle: 'Track tools return and movement',
             icon: Icons.handyman_rounded,
-            color: Colors.cyan,
+            color: primary.withGreen(200),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(

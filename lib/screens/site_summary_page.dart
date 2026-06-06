@@ -265,10 +265,30 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
       final query = await FirestoreService.getCollection(
         'projects',
       ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
-      if (query.docs.isNotEmpty) {
-        return query.docs.first.data();
+
+      Map<String, dynamic>? data = query.docs.isNotEmpty
+          ? query.docs.first.data()
+          : null;
+
+      // Fallback to fetch from 'Site' collection if project data is missing or has no location
+      if (data == null ||
+          (data['siteLocation'] == null && data['location'] == null)) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          if (data == null) {
+            data = siteData;
+          } else {
+            // Merge missing location info into project data
+            data['siteLocation'] =
+                siteData['location'] ?? siteData['siteLocation'];
+            data['siteName'] = data['siteName'] ?? siteData['siteName'];
+          }
+        }
       }
-      return null;
+      return data;
     } catch (e) {
       print('[fetchProjectInfo] Error: $e');
       return null;
@@ -282,7 +302,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
       appBar: AppBar(
         title: Text(
           'Site Summary',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
         backgroundColor: primaryColor,
@@ -347,7 +371,10 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             }
 
             final project = projectSnapshot.data!;
-            final site = project['siteLocation']?.toString() ?? 'N/A';
+            final site =
+                project['siteLocation']?.toString() ??
+                project['location']?.toString() ??
+                'N/A';
             final projectName = project['projectName']?.toString() ?? 'N/A';
             final budget = (project['projectBudget'] ?? 0) as num;
             final plannedStartDate = project['plannedStartDate'] as Timestamp?;

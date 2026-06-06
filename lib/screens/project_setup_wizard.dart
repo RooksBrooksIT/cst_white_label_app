@@ -554,6 +554,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   // -------------------- UI BUILD --------------------
   @override
   Widget build(BuildContext context) {
+    final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return GlassScaffold(
       title: 'Project Setup Wizard',
       onBack: () => Navigator.pop(context),
@@ -578,7 +580,6 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       ],
       body: Column(
         children: [
-          _buildModernStepIndicator(),
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -591,7 +592,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ],
             ),
           ),
-          _buildNavigationButtons(),
+          if (!isKeyboardVisible) _buildNavigationButtons(),
         ],
       ),
     );
@@ -606,7 +607,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     ];
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
       child: Column(
         children: [
           Stack(
@@ -641,8 +642,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
-                          width: 48,
-                          height: 48,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: isActive
@@ -662,8 +663,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                                       color: Theme.of(
                                         context,
                                       ).primaryColor.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ]
                                 : null,
@@ -673,22 +674,22 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                                 ? const Icon(
                                     Icons.check,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: 20,
                                   )
                                 : Icon(
                                     steps[index]['icon'] as IconData,
                                     color: isActive
                                         ? Colors.white
                                         : Colors.grey.shade600,
-                                    size: 24,
+                                    size: 20,
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           steps[index]['title'] as String,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: isActive
                                 ? Theme.of(context).primaryColor
@@ -708,59 +709,45 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   }
 
   Widget _buildNavigationButtons() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.transparent, Colors.black.withOpacity(0.05)],
-        ),
+        color: theme.scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (_currentStep > 0)
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+            Expanded(
               child: OutlinedButton.icon(
                 onPressed: _previousStep,
                 icon: const Icon(Icons.arrow_back_rounded, size: 18),
                 label: const Text('Back'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 14,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  backgroundColor: Colors.white.withOpacity(0.9),
+                  side: BorderSide(color: primaryColor.withOpacity(0.3)),
+                  foregroundColor: primaryColor,
                 ),
               ),
             )
           else
-            const SizedBox(width: 100),
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).primaryColor.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+            const Spacer(),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
             child: ElevatedButton.icon(
               onPressed: (_isSaving || (_currentStep == 2 && !_isTermsAgreed))
                   ? null
@@ -769,7 +756,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Icon(
                       _currentStep == 2
@@ -781,18 +771,20 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 _isSaving
                     ? 'Processing...'
                     : (_currentStep == 2 ? 'Complete' : 'Continue'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                elevation: 0,
+                elevation: 2,
+                shadowColor: primaryColor.withOpacity(0.5),
               ),
             ),
           ),
@@ -804,12 +796,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   // -------------------- STEP 1: SITE DETAILS --------------------
   Widget _buildSiteStep() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Form(
         key: _siteFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           children: [
+            _buildModernStepIndicator(),
             _buildStepHeader(
               'Site Information',
               'Enter the basic details of your site',
@@ -924,12 +918,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   // -------------------- STEP 2: PROJECT CONFIGURATION --------------------
   Widget _buildProjectStep() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Form(
         key: _projectFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           children: [
+            _buildModernStepIndicator(),
             _buildStepHeader(
               'Project Configuration',
               'Define project scope, financial details, and timeline',
@@ -1287,12 +1283,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   // -------------------- STEP 3: SUPERVISOR ASSIGNMENT --------------------
   Widget _buildMapStep() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Form(
         key: _mapFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           children: [
+            _buildModernStepIndicator(),
             _buildStepHeader(
               'Supervisor Assignment',
               'Assign a supervisor to manage this project on-site',

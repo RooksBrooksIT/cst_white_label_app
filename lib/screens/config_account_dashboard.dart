@@ -536,9 +536,24 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
+            color: Theme.of(context).cardColor,
             border: Border.all(
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 4,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
