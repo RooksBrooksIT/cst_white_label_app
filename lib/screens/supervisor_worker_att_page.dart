@@ -8,7 +8,14 @@ import '../utils/list_extensions.dart';
 import 'supervisor_dashboard.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
-  const AttendanceManagementPage({super.key});
+  final String supervisorId;
+  final String supervisorName;
+
+  const AttendanceManagementPage({
+    super.key,
+    required this.supervisorId,
+    required this.supervisorName,
+  });
 
   @override
   _AttendanceManagementPageState createState() =>
@@ -21,6 +28,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   String? _selectedSiteName;
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
+  List<String> _assignedSiteNames = [];
 
   // Loading states
   bool _isLoadingSites = false;
@@ -35,44 +43,134 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   @override
   void initState() {
     super.initState();
-    _loadSites();
+    _fetchAssignedSitesAndLoad();
   }
 
-  Future<void> _loadSites() async {
+  Future<void> _fetchAssignedSitesAndLoad() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingSites = true;
+      _sites = [];
     });
 
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'workerSiteMap',
-      ).get();
-      if (!mounted) return;
-      setState(() {
-        _sites = querySnapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'site': data['site'] ?? 'Unnamed Site',
-            'supervisor': data['supervisor'] ?? '',
-            'projectName': data['projectName'] ?? '',
-            'totalWorkers': data['totalWorkers'] ?? 0,
-          };
-        }).toList();
-        _isLoadingSites = false;
-      });
-    } catch (e) {
-      print('Error loading sites: $e');
-      if (!mounted) return;
-      setState(() {
-        _isLoadingSites = false;
-      });
+      if (!FirestoreService.isReady) {
+        debugPrint('FirestoreService is not ready.');
+        setState(() => _isLoadingSites = false);
+        return;
+      }
+
+      // 1. Get assigned site IDs from siteSupervisorMap
+      final mapCollection = FirestoreService.getCollection('siteSupervisorMap');
+
+      // Query by ID
+      final idSnapshot = await mapCollection
+          .where('Supervisor ID', isEqualTo: widget.supervisorId)
+          .get();
+
+      // Query by Name as fallback
+      final nameSnapshot = await mapCollection
+          .where('supervisor', isEqualTo: widget.supervisorName)
+          .get();
+
+      final Set<String> assignedSiteIds = {};
+      for (var doc in idSnapshot.docs) {
+        final siteId = doc.data()['site']?.toString();
+        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+      }
+      for (var doc in nameSnapshot.docs) {
+        final siteId = doc.data()['site']?.toString();
+        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+      }
+
+      debugPrint('Assigned Site IDs for supervisor: $assignedSiteIds');
+
+      // 2. Load worker sites
+      final workerSiteMapColl = FirestoreService.getCollection('workerSiteMap');
+      List<Map<String, dynamic>> finalSites = [];
+
+      if (assignedSiteIds.isNotEmpty) {
+        // Fetch only specific sites assigned to this supervisor
+        // Using chunks of 30 due to Firestore 'whereIn' limits
+        final idList = assignedSiteIds.toList();
+        for (var i = 0; i < idList.length; i += 30) {
+          final end = (i + 30 < idList.length) ? i + 30 : idList.length;
+          final chunk = idList.sublist(i, end);
+
+          final workerSnapshot = await workerSiteMapColl
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+
+          for (var doc in workerSnapshot.docs) {
+            final data = doc.data();
+            finalSites.add({
+              'id': doc.id,
+              'site': data['site'] ?? doc.id,
+              'supervisor': data['supervisor'] ?? '',
+              'projectName': data['projectName'] ?? '',
+              'totalWorkers': data['totalWorkers'] ?? 0,
+            });
+          }
+        }
+      }
+
+      // 3. Fallback: If no sites found by mapping, try a general query
+      // but only if finalSites is still empty (maybe mapping doc is missing but workerSiteMap has supervisor field)
+      if (finalSites.isEmpty) {
+        final searchName = widget.supervisorName.trim().toLowerCase();
+        final searchId = widget.supervisorId.trim().toLowerCase();
+
+        final allWorkerSites = await workerSiteMapColl.get();
+        finalSites = allWorkerSites.docs
+            .where((doc) {
+              final data = doc.data();
+              final docSupName =
+                  (data['supervisor'] ?? data['supervisorName'] ?? '')
+                      .toString()
+                      .toLowerCase();
+              final docSupId = (data['supervisorId'] ?? '')
+                  .toString()
+                  .toLowerCase();
+
+              return (docSupId.isNotEmpty && docSupId == searchId) ||
+                  (docSupName.isNotEmpty &&
+                      (docSupName == searchName ||
+                          docSupName.contains(searchName)));
+            })
+            .map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'site': data['site'] ?? doc.id,
+                'supervisor': data['supervisor'] ?? '',
+                'projectName': data['projectName'] ?? '',
+                'totalWorkers': data['totalWorkers'] ?? 0,
+              };
+            })
+            .toList();
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+        setState(() {
+          _sites = finalSites;
+          _isLoadingSites = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error in _fetchAssignedSitesAndLoad: $e');
+      if (mounted) {
+        setState(() => _isLoadingSites = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading sites. Please check connection.'),
+          ),
+        );
       }
     }
+  }
+
+  Future<void> _loadSites() async {
+    // This method is now handled by _fetchAssignedSitesAndLoad
   }
 
   Future<void> _loadWorkersForSite(String siteId, String siteName) async {
@@ -388,25 +486,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     return GlassScaffold(
       title: 'Attendance Management',
       onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.logout_rounded, color: Theme.of(context).colorScheme.onPrimary),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (_) => const SupervisorDashboard(
-                      username: '', // Not available in this context
-                      supervisorId: '',
-                      supervisorName: '',
-                    ),
-              ),
-              (route) => false,
-            );
-          },
-        ),
-      ],
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -766,7 +845,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             child: Text(
               status,
               style: TextStyle(
-                color: isSelected ? Theme.of(context).colorScheme.onPrimary : color,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : color,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),

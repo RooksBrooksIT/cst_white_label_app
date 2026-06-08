@@ -24,23 +24,42 @@ class _SupervisorMaterialViewRequestScreenState
     extends State<SupervisorMaterialViewRequestScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _statusFilter = 'All';
-
-  late String _currentSupervisorName;
+  List<String> _assignedSiteNames = [];
+  bool _isLoadingSites = true;
 
   @override
   void initState() {
     super.initState();
-    _currentSupervisorName = widget.supervisorName.trim().toLowerCase();
+    _fetchAssignedSites();
+  }
+
+  Future<void> _fetchAssignedSites() async {
+    try {
+      final collection = FirestoreService.getCollection('siteSupervisorMap');
+      final snapshot = await collection
+          .where('Supervisor ID', isEqualTo: widget.supervisorId)
+          .get();
+
+      final names = snapshot.docs
+          .map((doc) => doc.data()['supervisor']?.toString() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _assignedSiteNames = names;
+          _isLoadingSites = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSites = false);
+      }
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _queryStream() {
-    final col = FirestoreService.getCollection('siteMaterialsRequest')
-        .withConverter<Map<String, dynamic>>(
-          fromFirestore: (snap, _) => snap.data() ?? <String, dynamic>{},
-          toFirestore: (data, _) => data,
-        );
-
-    return col.orderBy('date', descending: true).snapshots();
+    return FirestoreService.getCollection('siteMaterialsRequest').snapshots();
   }
 
   @override
@@ -56,6 +75,21 @@ class _SupervisorMaterialViewRequestScreenState
       title: 'Material Requests',
       body: Column(
         children: [
+          if (!FirestoreService.isReady)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Firestore is not initialized. Please re-login.',
+                style: TextStyle(color: cs.onErrorContainer),
+                textAlign: TextAlign.center,
+              ),
+            ),
           _buildSearchAndFilter(cs),
           const SizedBox(height: 8),
           Expanded(
@@ -83,6 +117,18 @@ class _SupervisorMaterialViewRequestScreenState
                             fontSize: 16,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            snapshot.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: cs.error.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -99,13 +145,48 @@ class _SupervisorMaterialViewRequestScreenState
                 final filtered = docs.where((d) {
                   final data = d.data();
 
-                  final documentSupervisorName = (data['supervisorName'] ?? '')
+                  final documentSupervisorName =
+                      (data['supervisorName'] ??
+                              data['supervisor'] ??
+                              data['Supervisor Name'] ??
+                              data['supervisor_name'] ??
+                              data['Name'] ??
+                              '')
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+                  final documentSupervisorId = (data['supervisorId'] ?? '')
                       .toString()
                       .trim()
                       .toLowerCase();
 
-                  final bool supervisorMatch =
-                      documentSupervisorName == _currentSupervisorName;
+                  // Match by ID if available, otherwise by Name
+                  bool supervisorMatch = false;
+
+                  final searchId = widget.supervisorId.trim().toLowerCase();
+                  final searchName = widget.supervisorName.trim().toLowerCase();
+
+                  // 1. Check ID Match
+                  if (documentSupervisorId.isNotEmpty && searchId.isNotEmpty) {
+                    supervisorMatch = documentSupervisorId == searchId;
+                  }
+
+                  // 2. Check Name Match (permissive)
+                  if (!supervisorMatch) {
+                    final List<String> validNames = [
+                      searchName,
+                      ..._assignedSiteNames.map((e) => e.toLowerCase()),
+                    ];
+
+                    supervisorMatch = validNames.any(
+                      (name) =>
+                          documentSupervisorName == name ||
+                          (documentSupervisorName.isNotEmpty &&
+                              name.isNotEmpty &&
+                              (documentSupervisorName.contains(name) ||
+                                  name.contains(documentSupervisorName))),
+                    );
+                  }
 
                   if (!supervisorMatch) {
                     return false;
@@ -156,6 +237,8 @@ class _SupervisorMaterialViewRequestScreenState
                       dateStr = DateFormat(
                         'MMM dd, yyyy • hh:mm a',
                       ).format(rawDate.toDate());
+                    } else if (rawDate is String) {
+                      dateStr = rawDate;
                     } else {
                       dateStr = rawDate?.toString() ?? '';
                     }
@@ -302,32 +385,63 @@ class _SupervisorMaterialViewRequestScreenState
 
   Widget _buildNoResultsState(ColorScheme cs) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            color: cs.onSurface.withOpacity(0.3),
-            size: 80,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'No Matching Requests',
-            style: TextStyle(
-              color: cs.onSurface.withOpacity(0.6),
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              color: cs.onSurface.withOpacity(0.3),
+              size: 80,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try changing your search or filter',
-            style: TextStyle(
-              color: cs.onSurface.withOpacity(0.5),
-              fontSize: 14,
+            const SizedBox(height: 20),
+            Text(
+              'No Matching Requests',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.6),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'For: ${widget.supervisorName}',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.4),
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Try changing your search or filter',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.5),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: () {
+                _searchCtrl.clear();
+                setState(() => _statusFilter = 'All');
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reset Filters'),
+              style: TextButton.styleFrom(
+                foregroundColor: cs.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: cs.primary.withOpacity(0.3)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -429,6 +543,7 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return GlassCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           // Header with gradient
@@ -442,8 +557,8 @@ class _RequestCard extends StatelessWidget {
                 end: Alignment.centerRight,
               ),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
             ),
             child: Row(

@@ -487,7 +487,10 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AttendanceManagementPage(),
+                builder: (context) => AttendanceManagementPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
               ),
             ),
           ),
