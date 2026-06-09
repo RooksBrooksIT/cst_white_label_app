@@ -319,7 +319,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
+    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
 
     return GlassScaffold(
       title: _currentIndex == 0
@@ -466,7 +466,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Text(
                   sectionTitle,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.3,
                   ),
@@ -484,7 +484,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   child: Text(
                     '${items.length}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: items.first.color,
                     ),
@@ -498,7 +498,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate(
               (context, index) => _buildGridItem(items[index]),
@@ -506,9 +506,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.85,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.8,
             ),
           ),
         ),
@@ -521,7 +521,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   Widget _buildGridItem(DashboardItem item) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Theme.of(context).cardColor,
       child: InkWell(
         onTap: () {
@@ -532,58 +532,52 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             _navigateToScreen(context, item.title);
           }
         },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             color: Theme.of(context).cardColor,
             border: Border.all(
               color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 4,
-                spreadRadius: 0,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [item.color, item.color.withValues(alpha: 0.7)],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
                         color: item.color.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: 28),
+                  child: Icon(item.icon, color: Colors.white, size: 20),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   item.title,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
                   ),
@@ -591,13 +585,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   item.subtitle,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.3,
+                    height: 1.2,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,

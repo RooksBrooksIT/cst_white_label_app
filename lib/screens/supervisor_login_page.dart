@@ -27,6 +27,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _referralController = TextEditingController();
   bool _isLoading = false;
+  bool _isJoinWithCode = false;
 
   bool _isContractor = false;
   List<String> _supervisorNames = [];
@@ -34,6 +35,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   String? _tempOrgName;
   String? _tempLogoUrl;
   String? _actualReferralCode;
+  bool _isFromReferralFlow = false;
 
   @override
   void initState() {
@@ -52,6 +54,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
         _tempOrgName = prefs.getString('temp_org_name');
         _tempLogoUrl = prefs.getString('temp_logo_url');
         _actualReferralCode = prefs.getString('temp_referral_code');
+        _isFromReferralFlow = prefs.getBool('is_from_referral_flow') ?? false;
 
         if (_tempOrgName != null) {
           _referralController.text = _tempOrgName!;

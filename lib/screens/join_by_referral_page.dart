@@ -34,6 +34,10 @@ class _JoinByReferralPageState extends State<JoinByReferralPage> {
         await prefs.setString('temp_org_path', orgId);
         await prefs.setString('temp_referral_role', 'organization');
         await prefs.setString('temp_referral_code', code);
+        await prefs.setBool(
+          'is_join_with_code',
+          true,
+        ); // Flag for restricted flow
 
         // Sync branding immediately after joining
         await AppTheme.syncWithFirestore(orgId);

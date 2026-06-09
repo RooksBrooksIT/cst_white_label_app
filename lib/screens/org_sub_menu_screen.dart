@@ -67,15 +67,15 @@ class OrgSubMenuScreen extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurface,
               letterSpacing: -1.0,
-              fontSize: 34,
+              fontSize: 26,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             "${items.length} ${items.length == 1 ? 'option' : 'options'} available",
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 14,
+              fontSize: 13,
             ),
           ),
         ],
@@ -96,32 +96,32 @@ class OrgSubMenuScreen extends StatelessWidget {
         _triggerHapticFeedback();
         item.onTap();
       },
-      padding: const EdgeInsets.all(18),
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           // Animated Icon Container
           Container(
-            width: 56,
-            height: 56,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [item.color, item.color.withOpacity(0.7)],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
                   color: item.color.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: Icon(item.icon, color: Colors.white, size: 28),
+            child: Icon(item.icon, color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           // Title and Subtitle
           Expanded(
             child: Column(
@@ -132,43 +132,39 @@ class OrgSubMenuScreen extends StatelessWidget {
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: theme.colorScheme.onSurface,
-                    fontSize: 16,
+                    fontSize: 14,
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   item.subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 12.5,
+                    fontSize: 11,
                     height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+                    horizontal: 6,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: item.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.touch_app_rounded,
-                        size: 10,
-                        color: item.color,
-                      ),
+                      Icon(Icons.touch_app_rounded, size: 9, color: item.color),
                       const SizedBox(width: 4),
                       Text(
                         'Tap to continue',
                         style: TextStyle(
                           color: item.color,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -182,7 +178,7 @@ class OrgSubMenuScreen extends StatelessWidget {
           Icon(
             Icons.arrow_forward_ios_rounded,
             color: theme.colorScheme.primary,
-            size: 16,
+            size: 14,
           ),
         ],
       ),

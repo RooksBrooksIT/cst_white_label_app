@@ -146,7 +146,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   List<Widget> _buildGridSections(BuildContext context, ThemeData theme) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
+    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
     final categories = _getCategories(theme);
     List<Widget> slivers = [];
 
@@ -180,7 +180,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       Text(
                         category.title,
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
                         ),
@@ -188,7 +188,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       Text(
                         category.subtitle,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -207,7 +207,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   child: Text(
                     '${category.items.length}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: category.color,
                     ),
@@ -222,7 +222,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       // Items Grid for this section
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate((context, index) {
               final item = category.items[index];
@@ -230,9 +230,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             }, childCount: category.items.length),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.85,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.8,
             ),
           ),
         ),
@@ -246,63 +246,57 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: theme.cardColor,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           item.onTap();
         },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             color: theme.cardColor,
             border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 4,
-                spreadRadius: 0,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [item.color, item.color.withOpacity(0.7)],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
                         color: item.color.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: 28),
+                  child: Icon(item.icon, color: Colors.white, size: 20),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   item.title,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
                   ),
@@ -310,13 +304,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   item.subtitle,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.3,
+                    height: 1.2,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,

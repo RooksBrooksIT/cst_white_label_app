@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 900),
     );
 
     _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -88,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     // After animation and sync, navigate
-    Future.delayed(const Duration(milliseconds: 3000), () async {
+    Future.delayed(const Duration(milliseconds: 1000), () async {
       if (mounted) {
         final accepted = await TermsHelper.hasAcceptedTerms();
         if (!accepted) {

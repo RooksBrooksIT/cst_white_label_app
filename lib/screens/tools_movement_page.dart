@@ -65,7 +65,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     _tabController = TabController(length: 2, vsync: this);
     _fetchSiteIds();
     _fetchTools();
-
   }
 
   @override
@@ -412,12 +411,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   children: [
                     Icon(Icons.send, color: _primaryColor),
                     const SizedBox(width: 10),
-                    Text(
-                      'Transfer Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
+                    Expanded(
+                      child: Text(
+                        'Transfer Details',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -467,12 +468,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   children: [
                     Icon(Icons.build, color: _primaryColor),
                     const SizedBox(width: 10),
-                    Text(
-                      'Tools Selection',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
+                    Expanded(
+                      child: Text(
+                        'Tools Selection',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -536,12 +539,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     children: [
                       Icon(Icons.list, color: _primaryColor),
                       const SizedBox(width: 10),
-                      Text(
-                        'Selected Tools',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
+                      Expanded(
+                        child: Text(
+                          'Selected Tools',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
                         ),
                       ),
                     ],
@@ -610,12 +615,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   children: [
                     Icon(Icons.keyboard_return, color: _primaryColor),
                     const SizedBox(width: 10),
-                    Text(
-                      'Return Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
+                    Expanded(
+                      child: Text(
+                        'Return Details',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -674,12 +681,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   children: [
                     Icon(Icons.build, color: _primaryColor),
                     const SizedBox(width: 10),
-                    Text(
-                      'Tools Selection',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
+                    Expanded(
+                      child: Text(
+                        'Tools Selection',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -726,10 +735,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                       _returnSelectedToolAvailableCount != null,
                 ),
                 const SizedBox(height: 20),
-                GlassButton(
-                  label: 'Add Tool',
-                  onPressed: () => _addTool(true),
-                ),
+                GlassButton(label: 'Add Tool', onPressed: () => _addTool(true)),
               ],
             ),
           ),
@@ -743,12 +749,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     children: [
                       Icon(Icons.list, color: _primaryColor),
                       const SizedBox(width: 10),
-                      Text(
-                        'Selected Tools',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
+                      Expanded(
+                        child: Text(
+                          'Selected Tools',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
                         ),
                       ),
                     ],
@@ -1005,8 +1013,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     }
   }
 
-
-
   Widget _buildDropdownField({
     required String? value,
     required String label,
@@ -1031,10 +1037,15 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           ),
         ),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           value: safeValue,
           decoration: InputDecoration(
             hintText: 'Select $label',
             prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, size: 20),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 8,
+            ),
           ),
           items: items.asMap().entries.map((entry) {
             final index = entry.key;
@@ -1045,9 +1056,23 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 displayItems != null && displayItems.length > index
                     ? displayItems[index]
                     : item ?? '',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             );
           }).toList(),
+          selectedItemBuilder: (BuildContext context) {
+            return items.map((String? item) {
+              final index = items.indexOf(item);
+              return Text(
+                displayItems != null && displayItems.length > index
+                    ? displayItems[index]
+                    : item ?? '',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              );
+            }).toList();
+          },
           onChanged: onChanged,
           borderRadius: BorderRadius.circular(10),
           icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
@@ -1081,15 +1106,20 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  isReturn
-                      ? _returnSelectedDate == null
-                          ? 'Select date'
-                          : DateFormat('yyyy-MM-dd').format(_returnSelectedDate!)
-                      : _selectedDate == null
-                          ? 'Select date'
-                          : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-                  style: theme.textTheme.bodyLarge,
+                Expanded(
+                  child: Text(
+                    isReturn
+                        ? _returnSelectedDate == null
+                              ? 'Select date'
+                              : DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(_returnSelectedDate!)
+                        : _selectedDate == null
+                        ? 'Select date'
+                        : DateFormat('yyyy-MM-dd').format(_selectedDate!),
+                    style: theme.textTheme.bodyLarge,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -1098,8 +1128,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       ],
     );
   }
-
-
 
   Widget _buildToolsTable(
     List<Map<String, dynamic>> tools, {
@@ -1136,6 +1164,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           fontWeight: FontWeight.bold,
                           color: _textColor,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -1152,6 +1182,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           fontWeight: FontWeight.bold,
                           color: _textColor,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -1168,6 +1200,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           fontWeight: FontWeight.bold,
                           color: _textColor,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -1217,6 +1251,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         child: Text(
                           tool['tool'] ?? '',
                           style: TextStyle(color: _textColor),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -1230,6 +1266,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         child: Text(
                           toolCode,
                           style: TextStyle(color: _textColor),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -1243,6 +1281,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         child: Text(
                           tool['count'].toString(),
                           style: TextStyle(color: _textColor),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -1302,12 +1342,14 @@ class _AvailableCountWithWarning extends StatelessWidget {
         children: [
           Icon(Icons.warning, color: errorColor, size: 16),
           const SizedBox(width: 4),
-          Text(
-            'Available: 0 (Not available)',
-            style: TextStyle(
-              fontSize: 12,
-              color: errorColor,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              'Available: 0 (Not available)',
+              style: TextStyle(
+                fontSize: 12,
+                color: errorColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -1318,12 +1360,14 @@ class _AvailableCountWithWarning extends StatelessWidget {
         children: [
           Icon(Icons.warning, color: warningColor, size: 16),
           const SizedBox(width: 4),
-          Text(
-            'Available: $availableCount (Low stock!)',
-            style: TextStyle(
-              fontSize: 12,
-              color: warningColor,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              'Available: $availableCount (Low stock!)',
+              style: TextStyle(
+                fontSize: 12,
+                color: warningColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
