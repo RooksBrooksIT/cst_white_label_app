@@ -1414,7 +1414,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ],
             ),
           ),
-          const Divider(height: 1, color: Colors.white10),
+          const Divider(height: 1, color: Color.fromARGB(26, 0, 0, 0)),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -1439,9 +1439,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     value: _isTermsAgreed,
                     onChanged: (v) =>
                         setState(() => _isTermsAgreed = v ?? false),
-                    activeColor: Colors.green.shade400,
-                    checkColor: Colors.black,
-                    side: const BorderSide(color: Colors.white70, width: 1.5),
+                    activeColor: Colors.black,
+                    checkColor: Colors.white,
+                    side: const BorderSide(
+                      color: Color.fromARGB(179, 0, 0, 0),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -1456,7 +1459,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       'I have reviewed and agree to the project configuration and terms and conditions.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
+                        color: const Color.fromARGB(
+                          255,
+                          0,
+                          0,
+                          0,
+                        ).withOpacity(0.8),
                         height: 1.4,
                       ),
                     ),
