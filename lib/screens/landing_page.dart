@@ -43,9 +43,13 @@ class LandingPage extends StatelessWidget {
           ),
 
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 48),
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 48),
 
                 // Hero Image with modern glass effect
                 GestureDetector(
@@ -194,6 +198,9 @@ class LandingPage extends StatelessWidget {
                         onTap: () =>
                             Navigator.pushNamed(context, '/joinByReferral'),
                       ),
+                    ],
+                  ),
+                ),
                     ],
                   ),
                 ),
