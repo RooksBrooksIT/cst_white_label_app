@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class LabourScreen extends StatefulWidget {
   const LabourScreen({super.key});
@@ -50,8 +52,7 @@ class _LabourScreenState extends State<LabourScreen> {
 
   Future<void> _getNextLabourId() async {
     setState(() => isLoading = true);
-    final QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('labours')
+    final QuerySnapshot snapshot = await FirestoreService.getCollection('labours')
         .orderBy('labourId', descending: true)
         .limit(1)
         .get();
@@ -73,8 +74,7 @@ class _LabourScreenState extends State<LabourScreen> {
   }
 
   Future<void> _fetchAllLabours() async {
-    final QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('labours')
+    final QuerySnapshot snapshot = await FirestoreService.getCollection('labours')
         .orderBy('designation')
         .get();
     setState(() {
@@ -120,24 +120,39 @@ class _LabourScreenState extends State<LabourScreen> {
 
     try {
       // Check for duplicate labour designation
-      final duplicateQuery = await FirebaseFirestore.instance
-          .collection('labours')
+      final duplicateQuery = await FirestoreService.getCollection('labours')
           .where('designation', isEqualTo: designationController.text.trim())
           .get();
 
       if (duplicateQuery.docs.isNotEmpty) {
+        final existingDoc = duplicateQuery.docs.first;
+        final existingData = existingDoc.data();
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Labour designation already exists.'),
-            backgroundColor: Colors.red,
+            content: Text(
+              'Labour designation already exists. Switching to update view.',
+            ),
+            backgroundColor: Colors.orange,
           ),
         );
-        setState(() => isLoading = false);
+
+        setState(() {
+          mode = LabourMode.updateLabour;
+          selectedLabourId = existingData['labourId'];
+          selectedDesignation = existingData['designation'];
+          selectedSalary = existingData['salary'];
+          updateSalaryController.text = existingData['salary'] ?? '';
+          updateDesignationController.text = existingData['designation'] ?? '';
+          isSalaryEditable = false;
+          isLoading = false;
+        });
         return;
       }
 
       // Save new labour record
-      await FirebaseFirestore.instance.collection('labours').doc(labourId).set({
+      await FirestoreService.getCollection('labours').doc(labourId).set({
         'labourId': labourId,
         'designation': designationController.text.trim(),
         'salary': salaryController.text.trim(),
@@ -203,8 +218,7 @@ class _LabourScreenState extends State<LabourScreen> {
             onPressed: () async {
               setState(() => isLoading = true);
               try {
-                await FirebaseFirestore.instance
-                    .collection('labours')
+                await FirestoreService.getCollection('labours')
                     .doc(selectedLabourId)
                     .update({'salary': updateSalaryController.text.trim()});
                 if (!mounted) return;
@@ -245,19 +259,9 @@ class _LabourScreenState extends State<LabourScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "Labour Configuration",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Color(0xFF0b3470),
-        centerTitle: true,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Labour Configuration',
+      onBack: () => Navigator.pop(context),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -271,7 +275,7 @@ class _LabourScreenState extends State<LabourScreen> {
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: mode == LabourMode.newLabour
-                              ? Color(0xFF0b3470)
+                              ? Theme.of(context).colorScheme.primary
                               : Colors.grey[300],
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -291,7 +295,7 @@ class _LabourScreenState extends State<LabourScreen> {
                           style: TextStyle(
                             color: mode == LabourMode.newLabour
                                 ? Colors.white
-                                : Color(0xFF0b3470),
+                                : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -300,7 +304,7 @@ class _LabourScreenState extends State<LabourScreen> {
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: mode == LabourMode.updateLabour
-                              ? Color(0xFF0b3470)
+                              ? Theme.of(context).colorScheme.primary
                               : Colors.grey[300],
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -321,7 +325,7 @@ class _LabourScreenState extends State<LabourScreen> {
                           style: TextStyle(
                             color: mode == LabourMode.updateLabour
                                 ? Colors.white
-                                : Color(0xFF0b3470),
+                                : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -345,7 +349,7 @@ class _LabourScreenState extends State<LabourScreen> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0b3470),
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -384,7 +388,7 @@ class _LabourScreenState extends State<LabourScreen> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0b3470),
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -401,7 +405,9 @@ class _LabourScreenState extends State<LabourScreen> {
                                 ElevatedButton(
                                   onPressed: updateLabour,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF0b3470),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -445,14 +451,13 @@ class _LabourScreenState extends State<LabourScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0b3470),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
                   SizedBox(height: 16),
                   StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('labours')
+                    stream: FirestoreService.getCollection('labours')
                         .orderBy('labourId')
                         .snapshots(),
                     builder: (context, snapshot) {
@@ -468,10 +473,10 @@ class _LabourScreenState extends State<LabourScreen> {
                         child: DataTable(
                           columnSpacing: 24,
                           headingRowColor: WidgetStateProperty.resolveWith(
-                            (states) => Color(0xFF0b3470),
+                            (states) => Theme.of(context).colorScheme.primary,
                           ),
                           border: TableBorder.all(
-                            color: Colors.grey[300]!,
+                            color: Colors.grey,
                             width: 1,
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -479,28 +484,19 @@ class _LabourScreenState extends State<LabourScreen> {
                             DataColumn(
                               label: Text(
                                 'Labour ID',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
                             DataColumn(
                               label: Text(
                                 'Designation',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
                             DataColumn(
                               label: Text(
                                 'Salary',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -542,7 +538,7 @@ class _LabourScreenState extends State<LabourScreen> {
           "Labour Designation",
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF0b3470),
+            color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -584,16 +580,18 @@ class _LabourScreenState extends State<LabourScreen> {
                   decoration: InputDecoration(
                     prefixIcon: Icon(
                       Icons.engineering_outlined,
-                      color: Color(0xFF0b3470),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Color(0xFF0b3470)),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                        color: Color(0xFF0b3470),
+                        color: Theme.of(context).colorScheme.primary,
                         width: 2,
                       ),
                     ),
@@ -629,7 +627,7 @@ class _LabourScreenState extends State<LabourScreen> {
           "Labour Salary",
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF0b3470),
+            color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -644,15 +642,20 @@ class _LabourScreenState extends State<LabourScreen> {
                 decoration: InputDecoration(
                   prefixIcon: Icon(
                     Icons.currency_rupee_rounded,
-                    color: Color(0xFF0b3470),
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Color(0xFF0b3470)),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Color(0xFF0b3470), width: 2),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
+                    ),
                   ),
                   filled: true,
                   fillColor: Colors.grey[50],
@@ -660,7 +663,10 @@ class _LabourScreenState extends State<LabourScreen> {
               ),
             ),
             IconButton(
-              icon: Icon(Icons.edit, color: Color(0xFF0b3470)),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               onPressed: () {
                 setState(() {
                   isSalaryEditable = true;
@@ -682,25 +688,18 @@ class _LabourScreenState extends State<LabourScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        Text(label, style: TextStyle(fontSize: 14)),
         SizedBox(height: 4),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: Colors.grey[100],
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
           child: Row(
             children: [
-              Icon(icon, color: Colors.grey[700]),
+              Icon(icon),
               SizedBox(width: 12),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -713,9 +712,11 @@ class _LabourScreenState extends State<LabourScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    Color iconColor = const Color(0xFF0b3470),
+    Color? iconColor,
     TextInputType keyboardType = TextInputType.text,
   }) {
+    final effectiveIconColor =
+        iconColor ?? Theme.of(context).colorScheme.primary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -723,7 +724,7 @@ class _LabourScreenState extends State<LabourScreen> {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF0b3470),
+            color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -732,14 +733,19 @@ class _LabourScreenState extends State<LabourScreen> {
           controller: controller,
           keyboardType: keyboardType,
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: iconColor),
+            prefixIcon: Icon(icon, color: effectiveIconColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Color(0xFF0b3470)),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Color(0xFF0b3470), width: 2),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
             ),
             filled: true,
             fillColor: Colors.grey[50],
@@ -757,7 +763,7 @@ class _LabourScreenState extends State<LabourScreen> {
           context,
           icon: Icons.save,
           label: 'Save',
-          color: Color(0xFF0b3470),
+          color: Theme.of(context).colorScheme.primary,
           onPressed: saveData,
         ),
         _buildActionButton(

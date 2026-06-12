@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/main_dashboard.dart';
-import 'Organization_Dashboard.dart';
+import '../utils/app_theme.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class AppColors {
-  static const primaryColor = Color(0xFF003768);
-  static const primaryGradientStart = Color(0xFF003768);
-  static const primaryGradientEnd = Color(0xFF005A9E);
-}
+import 'Organisation_RegistrationPage.dart';
+import 'reset_password_screen.dart';
+import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
+import '../services/notification_service.dart';
+import 'Organization_Dashboard.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_text_field.dart';
+import '../utils/firestore_error_handler.dart';
+import '../utils/responsive.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -17,788 +23,384 @@ class Organisation_LoginPage extends StatefulWidget {
   _Organisation_LoginPageState createState() => _Organisation_LoginPageState();
 }
 
-class _Organisation_LoginPageState extends State<Organisation_LoginPage>
-    with TickerProviderStateMixin {
+class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  late AnimationController _controller;
-  late Animation<double> _opacityAnimation;
-  late Animation<double> _translateAnimation;
-  late Animation<Color?> _gradientAnimation;
-
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _showPassword = false;
   bool _isLoading = false;
-
-  late AnimationController _errorController;
-  late Animation<Offset> _errorSlideAnimation;
-  late Animation<double> _errorFadeAnimation;
-
-  late AnimationController _successController;
-  late Animation<double> _successScaleAnimation;
-  late Animation<double> _successFadeAnimation;
-
-  // SharedPreferences keys - ORGANIZATION specific
-  static const String _isLoggedInKey = 'org_isLoggedIn';
-  static const String _usernameKey = 'org_username';
-  static const String _passwordKey = 'org_password';
+  String? _tempOrgName;
+  String? _tempLogoUrl;
 
   @override
   void initState() {
     super.initState();
-
+    _checkReferralInfo();
     _checkLoginStatus();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    _opacityAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutQuint),
-    );
-
-    _translateAnimation = Tween<double>(
-      begin: 80,
-      end: 0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
-
-    _gradientAnimation = ColorTween(
-      begin: AppColors.primaryColor,
-      end: AppColors.primaryGradientEnd.withOpacity(0.8),
-    ).animate(_controller);
-
-    _errorController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _errorSlideAnimation =
-        Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _errorController,
-            curve: Curves.fastOutSlowIn,
-          ),
-        );
-
-    _errorFadeAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _errorController, curve: Curves.easeIn));
-
-    _successController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _successScaleAnimation = Tween<double>(begin: 0.5, end: 1).animate(
-      CurvedAnimation(parent: _successController, curve: Curves.elasticOut),
-    );
-
-    _successFadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _successController, curve: Curves.easeInCirc),
-    );
   }
 
-  Future<void> _checkLoginStatus() async {
+  Future<void> _checkReferralInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
+    setState(() {
+      _tempOrgName = prefs.getString('temp_org_name');
+      _tempLogoUrl = prefs.getString('temp_logo_url');
+    });
+  }
 
-    if (isLoggedIn) {
-      // Navigate automatically to main page without showing login
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, __, ___) => const OrganizationDashboard(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.5),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-        ),
-      );
-    } else {
-      _controller.forward(); // start animations if not logged in
+  // Check if organization is already logged in
+  Future<void> _checkLoginStatus() async {
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
+      final orgId = auth.userData['dynamicPath'];
+      if (orgId != null && orgId.toString().isNotEmpty) {
+        await AppTheme.syncWithFirestore(orgId.toString());
+      }
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrganizationDashboard(),
+          ),
+        );
+      }
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    _errorController.dispose();
-    _successController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return _buildScaffold(context);
-  }
-
-  Widget _buildScaffold(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Organisation Login',
-          style: TextStyle(color: Colors.white),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: AppColors.primaryColor,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              PageRouteBuilder(
-                transitionDuration: const Duration(milliseconds: 600),
-                pageBuilder: (_, __, ___) => const MainDashboard(),
-                transitionsBuilder: (_, animation, __, child) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(-1, 0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  );
-                },
-              ),
-            );
-          },
-        ),
-      ),
-      body: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  _gradientAnimation.value!,
-                  _gradientAnimation.value!.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Transform.translate(
-                offset: Offset(0, _translateAnimation.value),
-                child: Opacity(
-                  opacity: _opacityAnimation.value,
-                  child: _buildLoginCard(),
-                ),
-              ),
-            ),
-          );
-        },
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+  void _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection('organizationUser')
-            .where('Username', isEqualTo: _usernameController.text.trim())
-            .where('Password', isEqualTo: _passwordController.text.trim())
+    setState(() => _isLoading = true);
+
+    try {
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text.trim();
+
+      // 1. Search for organization credentials in 'admin' or 'data' collections
+      // This handles both path structures: /admin/data and /data/admin
+      QuerySnapshot<Map<String, dynamic>>? userQuery;
+
+      // Try 'admin' collection group first
+      userQuery = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('username', isEqualTo: username)
+          .get();
+
+      QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
+
+      if (userQuery.docs.isNotEmpty) {
+        for (var doc in userQuery.docs) {
+          if (doc.id == 'data' || doc.id == 'admin') {
+            dataDoc = doc;
+            break;
+          }
+        }
+      }
+
+      // If not found, try 'data' collection group
+      if (dataDoc == null) {
+        userQuery = await FirebaseFirestore.instance
+            .collectionGroup('data')
+            .where('username', isEqualTo: username)
             .get();
 
-        if (querySnapshot.docs.isNotEmpty) {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          await prefs.setBool(_isLoggedInKey, true);
-          await prefs.setString(_usernameKey, _usernameController.text.trim());
-
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              transitionDuration: const Duration(milliseconds: 800),
-              pageBuilder: (_, __, ___) => const OrganizationDashboard(),
-              transitionsBuilder: (_, animation, __, child) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.5),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
-            ),
-          );
-        } else {
-          _showErrorAnimation('Invalid username or password');
+        if (userQuery.docs.isNotEmpty) {
+          for (var doc in userQuery.docs) {
+            if (doc.id == 'admin' || doc.id == 'data') {
+              dataDoc = doc;
+              break;
+            }
+          }
         }
-      } catch (e) {
-        _showErrorAnimation('Login failed. Please try again.');
-      } finally {
-        setState(() => _isLoading = false);
       }
+
+      Map<String, dynamic>? userData;
+      String? dynamicPath;
+      String? fullConfigPath;
+
+      if (dataDoc != null) {
+        userData = dataDoc.data();
+        // Extract OrgID from the path. Expected path structures:
+        // /organisation/{OrgID}/admin/data  -> parent.parent is Jesus_...
+        // /organisation/{OrgID}/data/admin  -> parent.parent is Jesus_...
+        dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
+        fullConfigPath = dataDoc.reference.path;
+      } else {
+        // FALLBACK: Check root organisation collection for legacy accounts
+        final legacyQuery = await FirebaseFirestore.instance
+            .collection('organisation')
+            .where('username', isEqualTo: username)
+            .limit(1)
+            .get();
+
+        if (legacyQuery.docs.isNotEmpty) {
+          final legacyDoc = legacyQuery.docs.first;
+          userData = legacyDoc.data();
+          dynamicPath = legacyDoc.id;
+          fullConfigPath = legacyDoc.reference.path;
+          debugPrint(
+            'Organisation_LoginPage: Logged in via legacy root fallback for $username',
+          );
+        }
+      }
+
+      if (userData != null) {
+        final String? email = userData['email'] as String?;
+        final String? storedOrgName = userData['orgName'] as String?;
+
+        if (email != null && email.isNotEmpty) {
+          // 3. Authenticate with Firebase Authentication
+          try {
+            await AuthService().loginWithEmail(email, password);
+
+            // Sync password in Firestore if it was reset via email
+            if (userData['password'] != password) {
+              final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+              // 1. Update the admin/data or data/admin document
+              batch.update(FirebaseFirestore.instance.doc(fullConfigPath!), {
+                'password': password,
+              });
+
+              // 2. Also update the organizationUser collection entry for this admin
+              if (dynamicPath != null && dynamicPath != 'uninitialized') {
+                final userDocRef = FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(dynamicPath)
+                    .collection('organizationUser')
+                    .doc(username);
+
+                batch.update(userDocRef, {'password': password});
+              }
+
+              await batch.commit();
+              debugPrint(
+                'Firestore passwords synced with Firebase Auth in both locations',
+              );
+            }
+          } catch (e) {
+            _showError('The username or password you entered is incorrect');
+            return;
+          }
+        } else {
+          // FALLBACK: If email is missing (legacy accounts), validate password manually
+          if (userData['password'] != password) {
+            _showError('Invalid username or password');
+            return;
+          }
+        }
+
+        // Write organization info to AuthService
+        await AuthService().login(UserRole.organization, {
+          'username': username,
+          'dynamicPath': dynamicPath,
+          'org_name': storedOrgName,
+          'org_doc_path': fullConfigPath,
+        });
+
+        // Refresh FirestoreService cache
+        await FirestoreService.initialize();
+
+        // Synchronize branding details
+        await AppTheme.syncWithFirestore(dynamicPath ?? 'uninitialized');
+
+        // Save FCM token for push notifications
+        await NotificationService.saveToken(
+          userId: username,
+          userType: 'organisation',
+          userName: username,
+        );
+
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/orgDashboard',
+            (route) => false,
+          );
+        }
+      } else {
+        _showError('Invalid username or password');
+      }
+    } catch (e) {
+      debugPrint('Login error: $e');
+      if (mounted) {
+        FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showErrorAnimation(String message) {
-    _errorController.reset();
-    _errorController.forward();
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: SlideTransition(
-          position: _errorSlideAnimation,
-          child: FadeTransition(
-            opacity: _errorFadeAnimation,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF003768), // Primary blue start
-                    Color(0xFF005A9E), // Accent lighter blue end
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _showSuccessAnimation(String message) {
-    _successController.reset();
-    _successController.forward();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: ScaleTransition(
-          scale: _successScaleAnimation,
-          child: FadeTransition(
-            opacity: _successFadeAnimation,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green[400],
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _showForgotPasswordDialog() {
-    final usernameController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    bool isUpdating = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: StatefulBuilder(
-            builder: (context, setState) {
-              return Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.primaryColor, Color(0xFF005A9E)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: usernameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.person,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: newPasswordController,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'New Password',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: confirmPasswordController,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(
-                          Icons.lock_reset,
-                          color: Colors.white70,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: Colors.white54),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: isUpdating
-                              ? null
-                              : () async {
-                                  if (newPasswordController.text !=
-                                      confirmPasswordController.text) {
-                                    _showErrorAnimation(
-                                      'Passwords do not match',
-                                    );
-                                    return;
-                                  }
-
-                                  setState(() => isUpdating = true);
-
-                                  try {
-                                    final querySnapshot =
-                                        await FirebaseFirestore.instance
-                                            .collection('organizationUser')
-                                            .where(
-                                              'Username',
-                                              isEqualTo: usernameController.text
-                                                  .trim(),
-                                            )
-                                            .get();
-
-                                    if (querySnapshot.docs.isNotEmpty) {
-                                      final docId = querySnapshot.docs.first.id;
-
-                                      await FirebaseFirestore.instance
-                                          .collection('organizationUser')
-                                          .doc(docId)
-                                          .update({
-                                            'Password': newPasswordController
-                                                .text
-                                                .trim(),
-                                          });
-
-                                      Navigator.pop(context);
-                                      _showSuccessAnimation(
-                                        'Password updated successfully',
-                                      );
-                                    } else {
-                                      _showErrorAnimation('Username not found');
-                                    }
-                                  } catch (e) {
-                                    _showErrorAnimation(
-                                      'Failed to update password. Please try again.',
-                                    );
-                                  } finally {
-                                    setState(() => isUpdating = false);
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryColor,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: isUpdating
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Update',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLoginCard() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    return Material(
-      elevation: 20,
-      borderRadius: BorderRadius.circular(25),
-      shadowColor: Colors.black.withOpacity(0.2),
-      child: Container(
-        width: screenWidth > 600 ? 350 : 320, // Reduced width
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 28),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.97),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryColor.withOpacity(0.1),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
+      body: Center(
         child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ScaleTransition(
-                  scale: Tween<double>(begin: 0.5, end: 1).animate(
-                    CurvedAnimation(
-                      parent: _controller,
-                      curve: Curves.elasticOut,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Icon Header or Org Logo
+              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                Container(
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(8), // Small padding
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: colorScheme.outline, width: 2),
+                  ),
+                  child: Image.network(
+                    _tempLogoUrl!,
+                    fit: BoxFit.contain, // Use contain to prevent cropping
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.business_rounded,
+                      size: 60,
+                      color: colorScheme.primary,
                     ),
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primaryColor.withOpacity(0.4),
-                          blurRadius: 15,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                )
+              else
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      width: 2,
                     ),
-                    child: const Icon(
-                      Icons.account_balance_rounded,
-                      size: 48,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FadeTransition(
-                  opacity: _opacityAnimation,
-                  child: Text(
-                    'Organisation Login',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryColor,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0, 0.5),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.fastOutSlowIn,
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                  child: const Text(
-                    'Sign in to continue',
-                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.business_rounded,
+                    size: 40,
+                    color: colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 32),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(-0.5, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.easeOutBack,
-                        ),
-                      ),
-                  child: TextFormField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: Icon(
-                        Icons.person,
-                        color: AppColors.primaryColor,
-                        size: 24,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primaryColor),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
+              const SizedBox(height: 24),
+              Text(
+                _tempOrgName ?? 'Organization Login',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: Responsive.fontSize(context, 26),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
-                const SizedBox(height: 20),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0.5, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.easeOutBack,
-                        ),
-                      ),
-                  child: TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_showPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(
-                        Icons.lock,
-                        color: AppColors.primaryColor,
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showPassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: AppColors.primaryColor,
-                        ),
-                        onPressed: () =>
-                            setState(() => _showPassword = !_showPassword),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primaryColor),
-                      ),
-                    ),
-                    validator: (value) => value!.isEmpty ? 'Required' : null,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FadeTransition(
-                  opacity: _opacityAnimation,
-                  child: Row(
+              ),
+              const SizedBox(height: 32),
+
+              GlassCard(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                     children: [
-                      const Spacer(),
+                      GlassTextField(
+                        controller: _usernameController,
+                        label: 'Username',
+                        icon: Icons.person_outline_rounded,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 20),
+                      GlassTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        isPassword: true,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassButton(
+                          label: 'LOGIN',
+                          isLoading: _isLoading,
+                          onPressed: _login,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       TextButton(
-                        onPressed: _showForgotPasswordDialog,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ResetPasswordScreen(),
+                            ),
+                          );
+                        },
                         child: Text(
                           'Forgot Password?',
                           style: TextStyle(
-                            color: AppColors.primaryColor,
+                            color: theme.primaryColor,
                             fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                ScaleTransition(
-                  scale: Tween<double>(begin: 0.8, end: 1).animate(
-                    CurvedAnimation(
-                      parent: _controller,
-                      curve: const Interval(0.6, 1, curve: Curves.elasticOut),
-                    ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Don't have an account? ",
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const OrganisationRegistrationPage(),
                         ),
-                        elevation: 5,
-                        shadowColor: AppColors.primaryColor.withOpacity(0.3),
+                      );
+                    },
+                    child: Text(
+                      'Register Now',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'LOGIN',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),

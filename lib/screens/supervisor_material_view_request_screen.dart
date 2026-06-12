@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 class SupervisorMaterialViewRequestScreen extends StatefulWidget {
   final String supervisorId;
@@ -21,29 +24,42 @@ class _SupervisorMaterialViewRequestScreenState
     extends State<SupervisorMaterialViewRequestScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _statusFilter = 'All';
-
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color secondaryColor = Color(0xFF2D9CDB);
-  static const Color backgroundColor = Color(0xFFF8FAFC);
-  static const Color cardColor = Color(0xFFFFFFFF);
-
-  late String _currentSupervisorName;
+  List<String> _assignedSiteNames = [];
+  bool _isLoadingSites = true;
 
   @override
   void initState() {
     super.initState();
-    _currentSupervisorName = widget.supervisorName.trim().toLowerCase();
+    _fetchAssignedSites();
+  }
+
+  Future<void> _fetchAssignedSites() async {
+    try {
+      final collection = FirestoreService.getCollection('siteSupervisorMap');
+      final snapshot = await collection
+          .where('Supervisor ID', isEqualTo: widget.supervisorId)
+          .get();
+
+      final names = snapshot.docs
+          .map((doc) => doc.data()['supervisor']?.toString() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _assignedSiteNames = names;
+          _isLoadingSites = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSites = false);
+      }
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _queryStream() {
-    final col = FirebaseFirestore.instance
-        .collection('siteMaterialsRequest')
-        .withConverter<Map<String, dynamic>>(
-          fromFirestore: (snap, _) => snap.data() ?? <String, dynamic>{},
-          toFirestore: (data, _) => data,
-        );
-
-    return col.orderBy('date', descending: true).snapshots();
+    return FirestoreService.getCollection('siteMaterialsRequest').snapshots();
   }
 
   @override
@@ -54,35 +70,36 @@ class _SupervisorMaterialViewRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Material Requests',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
-      ),
+    final cs = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Material Requests',
       body: Column(
         children: [
-          // Header with stats
-          // _buildHeaderSection(),
-          // Search and Filter
-          _buildSearchAndFilter(),
+          if (!FirestoreService.isReady)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Firestore is not initialized. Please re-login.',
+                style: TextStyle(color: cs.onErrorContainer),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          _buildSearchAndFilter(cs),
           const SizedBox(height: 8),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _queryStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
+                  return Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
                   );
                 }
@@ -91,17 +108,25 @@ class _SupervisorMaterialViewRequestScreenState
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: Colors.red.shade400,
-                          size: 64,
-                        ),
+                        Icon(Icons.error_outline, color: cs.error, size: 64),
                         const SizedBox(height: 16),
                         Text(
                           'Error loading requests',
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: cs.onSurface.withOpacity(0.6),
                             fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            snapshot.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: cs.error.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -112,7 +137,7 @@ class _SupervisorMaterialViewRequestScreenState
                 final docs = snapshot.data?.docs ?? [];
 
                 if (docs.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(cs);
                 }
 
                 final search = _searchCtrl.text.trim().toLowerCase();
@@ -120,13 +145,48 @@ class _SupervisorMaterialViewRequestScreenState
                 final filtered = docs.where((d) {
                   final data = d.data();
 
-                  final documentSupervisorName = (data['supervisorName'] ?? '')
+                  final documentSupervisorName =
+                      (data['supervisorName'] ??
+                              data['supervisor'] ??
+                              data['Supervisor Name'] ??
+                              data['supervisor_name'] ??
+                              data['Name'] ??
+                              '')
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+                  final documentSupervisorId = (data['supervisorId'] ?? '')
                       .toString()
                       .trim()
                       .toLowerCase();
 
-                  final bool supervisorMatch =
-                      documentSupervisorName == _currentSupervisorName;
+                  // Match by ID if available, otherwise by Name
+                  bool supervisorMatch = false;
+
+                  final searchId = widget.supervisorId.trim().toLowerCase();
+                  final searchName = widget.supervisorName.trim().toLowerCase();
+
+                  // 1. Check ID Match
+                  if (documentSupervisorId.isNotEmpty && searchId.isNotEmpty) {
+                    supervisorMatch = documentSupervisorId == searchId;
+                  }
+
+                  // 2. Check Name Match (permissive)
+                  if (!supervisorMatch) {
+                    final List<String> validNames = [
+                      searchName,
+                      ..._assignedSiteNames.map((e) => e.toLowerCase()),
+                    ];
+
+                    supervisorMatch = validNames.any(
+                      (name) =>
+                          documentSupervisorName == name ||
+                          (documentSupervisorName.isNotEmpty &&
+                              name.isNotEmpty &&
+                              (documentSupervisorName.contains(name) ||
+                                  name.contains(documentSupervisorName))),
+                    );
+                  }
 
                   if (!supervisorMatch) {
                     return false;
@@ -159,7 +219,7 @@ class _SupervisorMaterialViewRequestScreenState
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return _buildNoResultsState();
+                  return _buildNoResultsState(cs);
                 }
 
                 return ListView.separated(
@@ -177,6 +237,8 @@ class _SupervisorMaterialViewRequestScreenState
                       dateStr = DateFormat(
                         'MMM dd, yyyy • hh:mm a',
                       ).format(rawDate.toDate());
+                    } else if (rawDate is String) {
+                      dateStr = rawDate;
                     } else {
                       dateStr = rawDate?.toString() ?? '';
                     }
@@ -214,58 +276,25 @@ class _SupervisorMaterialViewRequestScreenState
     );
   }
 
-  Widget _buildHeaderSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: primaryColor,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome, ${widget.supervisorName}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Manage your material requests',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchAndFilter() {
+  Widget _buildSearchAndFilter(ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         children: [
           // Search Bar
           Container(
             decoration: BoxDecoration(
-              color: cardColor,
+              color: cs.surface.withOpacity(0.3),
               borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              border: Border.all(color: cs.outlineVariant),
             ),
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
+              style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search requests...',
+                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
                 filled: true,
                 fillColor: Colors.transparent,
                 contentPadding: const EdgeInsets.symmetric(
@@ -273,10 +302,16 @@ class _SupervisorMaterialViewRequestScreenState
                   vertical: 16,
                 ),
                 border: InputBorder.none,
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: cs.onSurface.withOpacity(0.5),
+                ),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: Colors.grey.shade500),
+                        icon: Icon(
+                          Icons.clear,
+                          color: cs.onSurface.withOpacity(0.5),
+                        ),
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() {});
@@ -316,21 +351,21 @@ class _SupervisorMaterialViewRequestScreenState
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ColorScheme cs) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.inventory_2_outlined,
-            color: Colors.grey.shade400,
+            color: cs.onSurface.withOpacity(0.3),
             size: 80,
           ),
           const SizedBox(height: 20),
           Text(
             'No Requests Found',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: cs.onSurface.withOpacity(0.6),
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -338,34 +373,75 @@ class _SupervisorMaterialViewRequestScreenState
           const SizedBox(height: 8),
           Text(
             'Your material requests will appear here',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            style: TextStyle(
+              color: cs.onSurface.withOpacity(0.5),
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNoResultsState() {
+  Widget _buildNoResultsState(ColorScheme cs) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off, color: Colors.grey.shade400, size: 80),
-          const SizedBox(height: 20),
-          Text(
-            'No Matching Requests',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              color: cs.onSurface.withOpacity(0.3),
+              size: 80,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try changing your search or filter',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              'No Matching Requests',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.6),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'For: ${widget.supervisorName}',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.4),
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Try changing your search or filter',
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.5),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: () {
+                _searchCtrl.clear();
+                setState(() => _statusFilter = 'All');
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reset Filters'),
+              style: TextButton.styleFrom(
+                foregroundColor: cs.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: cs.primary.withOpacity(0.3)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -384,6 +460,7 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -391,25 +468,16 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? _FilterChip.primaryColor : Colors.white,
+            color: isSelected ? cs.primary : cs.surface.withOpacity(0.3),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected
-                  ? _FilterChip.primaryColor
-                  : Colors.grey.shade300,
+              color: isSelected ? cs.primary : cs.outlineVariant,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? cs.onPrimary : cs.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -417,8 +485,6 @@ class _FilterChip extends StatelessWidget {
       ),
     );
   }
-
-  static const Color primaryColor = Color(0xFF0b3470);
 }
 
 class _RequestCard extends StatelessWidget {
@@ -430,9 +496,6 @@ class _RequestCard extends StatelessWidget {
   final String projectStage;
   final String supervisorName;
   final List materials;
-
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color secondaryColor = Color(0xFF2D9CDB);
 
   const _RequestCard({
     super.key,
@@ -446,18 +509,18 @@ class _RequestCard extends StatelessWidget {
     required this.materials,
   });
 
-  Color _statusColor(String s) {
+  Color _statusColor(BuildContext context, String s) {
     switch (s.toLowerCase()) {
       case 'approved':
-        return Colors.green;
+        return Colors.green; // Semantic success
       case 'rejected':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'immediate':
-        return Colors.orange;
+        return Colors.orange; // Semantic warning
       case 'processing':
-        return secondaryColor;
+        return Theme.of(context).colorScheme.secondary;
       default:
-        return Colors.blueGrey;
+        return Colors.grey;
     }
   }
 
@@ -478,18 +541,9 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           // Header with gradient
@@ -498,13 +552,13 @@ class _RequestCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, secondaryColor],
+                colors: [cs.primary, cs.secondary],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
             ),
             child: Row(
@@ -516,8 +570,8 @@ class _RequestCard extends StatelessWidget {
                     children: [
                       Text(
                         'Request ID: $matReqId',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -525,8 +579,8 @@ class _RequestCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         date,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: cs.onPrimary.withOpacity(0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -539,18 +593,18 @@ class _RequestCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: cs.onPrimary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_statusIcon(status), color: Colors.white, size: 16),
+                      Icon(_statusIcon(status), color: cs.onPrimary, size: 16),
                       const SizedBox(width: 4),
                       Text(
                         status.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -567,7 +621,6 @@ class _RequestCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Project Info
                 _InfoRow(
                   icon: Icons.business,
                   label: 'Project',
@@ -589,12 +642,12 @@ class _RequestCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 // Materials Section
-                const Text(
+                Text(
                   'Materials Requested',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: primaryColor,
+                    color: cs.primary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -624,9 +677,10 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(icon, color: _InfoRow.primaryColor, size: 18),
+        Icon(icon, color: cs.primary, size: 18),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -634,14 +688,18 @@ class _InfoRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.6),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
+                  color: cs.onSurface,
                 ),
               ),
             ],
@@ -650,8 +708,6 @@ class _InfoRow extends StatelessWidget {
       ],
     );
   }
-
-  static const Color primaryColor = Color(0xFF0b3470);
 }
 
 class _MaterialItem extends StatelessWidget {
@@ -661,6 +717,7 @@ class _MaterialItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final name = (item['materialName'] ?? '').toString();
     final qty = (item['materialQty'] ?? '').toString();
     final unit = (item['materialUnit'] ?? '').toString();
@@ -670,9 +727,9 @@ class _MaterialItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: cs.surface.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Row(
         children: [
@@ -680,7 +737,7 @@ class _MaterialItem extends StatelessWidget {
             width: 4,
             height: 40,
             decoration: BoxDecoration(
-              color: _getPriorityColor(priority),
+              color: _getPriorityColor(context, priority),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -691,15 +748,19 @@ class _MaterialItem extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$qty $unit • $priority Priority',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: TextStyle(
+                    color: cs.onSurface.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -709,14 +770,14 @@ class _MaterialItem extends StatelessWidget {
     );
   }
 
-  Color _getPriorityColor(String priority) {
+  Color _getPriorityColor(BuildContext context, String priority) {
     switch (priority.toLowerCase()) {
       case 'immediate':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'high':
         return Colors.orange;
       case 'medium':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.secondary;
       case 'low':
         return Colors.green;
       default:

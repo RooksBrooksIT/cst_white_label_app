@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/expense_service.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import 'supervisor_dashboard.dart';
 
 class SiteContractorEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -23,15 +28,12 @@ class SiteContractorEntryPage extends StatefulWidget {
 }
 
 class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
-  // Section 1: Contractor fields
   final _contractorNameController = TextEditingController();
   String? _selectedContractorName;
   String? _selectedProjectField;
   final TextEditingController _projectFieldController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
 
-  // Section 2: Add Entry state (mirrors site_entry_page Add Entry functionality)
-  final Color _primaryColor = const Color(0xFF772323);
   List<Map<String, dynamic>> materials = [];
   List<Map<String, dynamic>> labours = [];
   String? selectedMaterial;
@@ -54,7 +56,6 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   String? materialError;
   String? labourError;
 
-  // Minimal supervisor/site context used only to populate dropdowns (not saved)
   String? supervisorId;
   String? projectName;
   String siteCode = '';
@@ -67,16 +68,16 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   Map<String, num> materialPrices = {};
   Map<String, num> labourSalaries = {};
 
-  // Custom material fields
   bool _showCustomMaterialFields = false;
   final _customMaterialNameController = TextEditingController();
   final _customMaterialQtyController = TextEditingController(text: '0');
   final _customMaterialPriceController = TextEditingController(text: '0');
 
-  // Custom labour fields
   bool _showCustomLabourFields = false;
   final _customLabourNameController = TextEditingController();
   final _customLabourSalaryController = TextEditingController(text: '0');
+
+  Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
   void initState() {
@@ -84,8 +85,6 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
     supervisorId = widget.supervisorId;
     selectedSiteId = widget.supervisorId;
     siteCode = widget.supervisorId;
-    // Optionally fill the siteLocation if you want - can be fetched or fixed
-    // supervisorName is from widget.supervisorName
     _dateController.text = DateFormat('yyyy-MM-dd').format(selectedDate!);
     _fetchMaterialOptions();
     _fetchLabourOptions();
@@ -112,8 +111,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
   Future<void> _fetchSupervisorData() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.siteSupervisorMap
           .where('supervisor', isEqualTo: widget.userName)
           .get();
       if (snapshot.docs.isNotEmpty) {
@@ -130,6 +128,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             })
             .where((site) => site['siteId']!.isNotEmpty)
             .toList();
+        if (!mounted) return;
         setState(() {
           supervisorSites = sites;
           if (sites.isNotEmpty) {
@@ -139,90 +138,99 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             supervisorId = sites.first['supervisorId']!;
             projectName = sites.first['projectName']!;
             projectStage = sites.first['projectStage']!;
-          } else {
-            selectedSiteId = null;
-            siteCode = '';
-            siteLocation = 'Unknown';
-            supervisorId = 'Not found';
-            projectName = 'Not found';
-            projectStage = 'Not found';
           }
-        });
-      } else {
-        setState(() {
-          supervisorSites = [];
-          selectedSiteId = null;
-          supervisorId = 'Not found';
-          siteCode = '';
-          siteLocation = 'Unknown';
-          projectName = 'Not found';
-          projectStage = 'Not found';
         });
       }
     } catch (e) {
-      setState(() {
-        supervisorSites = [];
-        selectedSiteId = null;
-        supervisorId = 'Error loading';
-        siteCode = '';
-        siteLocation = 'Error loading';
-        projectName = 'Not found';
-        projectStage = 'Not found';
-      });
+      debugPrint('Error: $e');
     }
   }
 
   Future<void> _fetchMaterialOptions() async {
+    if (!mounted) return;
     setState(() {
       isLoadingMaterials = true;
       materialError = null;
     });
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('materials').get();
+      // 1. Fetch materialCategories to build a lookup map
+      final categoriesSnapshot = await FirestoreService.getCollection(
+        'materialCategories',
+      ).get();
+      final categoryMap = <String, String>{};
+      for (var doc in categoriesSnapshot.docs) {
+        final data = doc.data();
+        final name = (data['matCategory'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          categoryMap[doc.reference.path] = name;
+          categoryMap[doc.id] = name;
+        }
+      }
+
+      // 2. Fetch specific materials
+      final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data.containsKey('materialName')) {
-          final name = data['materialName']?.toString() ?? '';
-          if (name.isNotEmpty) {
-            options.add(name);
-            final priceRaw = data['materialPrice'];
-            num price = 0;
-            if (priceRaw is num) {
-              price = priceRaw;
-            } else if (priceRaw is String) {
-              price =
-                  num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-            }
-            prices[name] = price;
+
+        // Resolve materialCategory reference
+        String? resolvedCategory;
+        final catRef = data['materialCategory'];
+        if (catRef is DocumentReference) {
+          resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
+        } else if (catRef is String && catRef.isNotEmpty) {
+          resolvedCategory =
+              categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
+        }
+
+        // Fallback if not resolved
+        final name =
+            (resolvedCategory ??
+                    data['materialName'] ??
+                    data['matCategory'] ??
+                    '')
+                .toString()
+                .trim();
+        if (name.isNotEmpty) {
+          options.add(name);
+          final priceRaw = data['materialPrice'];
+          num price = 0;
+          if (priceRaw is num) {
+            price = priceRaw;
+          } else if (priceRaw is String) {
+            price =
+                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
+          prices[name] = price;
         }
       }
+      if (!mounted) return;
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial =
-            materialOptions.isNotEmpty ? materialOptions.first : null;
+        selectedMaterial = materialOptions.isNotEmpty
+            ? materialOptions.first
+            : null;
         isLoadingMaterials = false;
       });
     } catch (e) {
-      setState(() {
-        materialError = 'Failed to load materials';
-        isLoadingMaterials = false;
-      });
+      if (mounted)
+        setState(() {
+          materialError = 'Failed to load materials';
+          isLoadingMaterials = false;
+        });
     }
   }
 
   Future<void> _fetchLabourOptions() async {
+    if (!mounted) return;
     setState(() {
       isLoadingLabours = true;
       labourError = null;
     });
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('labours').get();
+      final snapshot = await FirestoreService.labours.get();
       final options = <String>[];
       final salaries = <String, num>{};
       for (var doc in snapshot.docs) {
@@ -238,12 +246,13 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             } else if (salaryRaw is String) {
               salary =
                   num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                      0;
+                  0;
             }
             salaries[designation] = salary;
           }
         }
       }
+      if (!mounted) return;
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
@@ -251,10 +260,11 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         isLoadingLabours = false;
       });
     } catch (e) {
-      setState(() {
-        labourError = 'Failed to load labours';
-        isLoadingLabours = false;
-      });
+      if (mounted)
+        setState(() {
+          labourError = 'Failed to load labours';
+          isLoadingLabours = false;
+        });
     }
   }
 
@@ -263,7 +273,6 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
     if (selectedMaterial != null && qty > 0) {
       setState(() {
         materials.add({'type': selectedMaterial!, 'quantity': qty});
-        materialQty = 0;
         materialQtyController.text = '0';
       });
     }
@@ -274,7 +283,6 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
     if (selectedLabour != null && qty > 0) {
       setState(() {
         labours.add({'type': selectedLabour!, 'count': qty});
-        labourQty = 0;
         labourQtyController.text = '0';
       });
     }
@@ -352,18 +360,8 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       initialDate: selectedDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: _primaryColor,
-            onPrimary: Colors.white,
-            onSurface: Colors.black,
-          ),
-        ),
-        child: child!,
-      ),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         selectedDate = picked;
         _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
@@ -372,8 +370,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   }
 
   Future<void> _saveToFirestore() async {
-    final siteIdForEntry =
-        ((selectedSiteId ?? siteCode) ?? '').toString().trim();
+    final siteIdForEntry = siteCode;
 
     if (_selectedContractorName == null ||
         _selectedContractorName!.isEmpty ||
@@ -383,8 +380,8 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         siteIdForEntry.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Select contractor, project field, date and site ID')),
+          content: Text('Select contractor, project field, date and site ID'),
+        ),
       );
       return;
     }
@@ -392,41 +389,35 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
     setState(() => isSaving = true);
 
     try {
-      // Build labours array with numeric fields
       final laboursList = labours.map((l) {
         final type = (l['type'] ?? '').toString();
         final count = (l['count'] ?? 0) as int;
         final unitSalary = (labourSalaries[type] ?? 0);
-        final amount = (unitSalary * count).toInt();
         return {
-          'amount': amount,
+          'amount': (unitSalary * count).toInt(),
           'count': count,
           'type': type,
-          'unitSalary':
-              unitSalary is int ? unitSalary : (unitSalary).toInt(),
+          'unitSalary': unitSalary.toInt(),
         };
       }).toList();
 
-      // Build materials array with numeric fields
       final materialsList = materials.map((m) {
         final type = (m['type'] ?? '').toString();
         final qty = (m['quantity'] ?? 0) as int;
         final unitPrice = (materialPrices[type] ?? 0);
-        final amount = (unitPrice * qty).toInt();
         return {
-          'amount': amount,
+          'amount': (unitPrice * qty).toInt(),
           'quantity': qty,
           'type': type,
-          'unitPrice':
-              unitPrice is int ? unitPrice : (unitPrice).toInt(),
+          'unitPrice': unitPrice.toInt(),
         };
       }).toList();
 
-      final totalAmount = _getTotalAmount().toInt();
       final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate!);
-      final contractorNameForId = _selectedContractorName!
-          .trim()
-          .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '-');
+      final contractorNameForId = _selectedContractorName!.trim().replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]'),
+        '-',
+      );
       final docId = '${contractorNameForId}_$dateStr';
 
       final data = {
@@ -437,971 +428,527 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         'fuel': int.tryParse(fuelCost.text) ?? 0,
         'labours': laboursList,
         'materials': materialsList,
-        'totalAmount': totalAmount,
+        'totalAmount': _getTotalAmount(),
         'transport': int.tryParse(transportCost.text) ?? 0,
         'siteId': siteIdForEntry,
       };
 
-      await FirebaseFirestore.instance
-          .collection('contractorEntries')
-          .doc(docId)
-          .set(data);
-
-      // Update totals for this site (writes totalContractorExpense and totalAllExpenses)
-      try {
-        await ExpenseService.recalcTotalsAndSyncProject(siteIdForEntry);
-      } catch (e) {
-        debugPrint('Failed to update totals for siteId $siteIdForEntry: $e');
-        // Do not block success on totals failure
-      }
+      await FirestoreService.contractorEntries.doc(docId).set(data);
+      await ExpenseService.recalcTotalsAndSyncProject(siteIdForEntry);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contractor entry saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Contractor entry saved')));
+      _resetForm();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save entry: $e')),
-      );
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
-  }
-
-  Widget _buildCostInput(
-      String label, TextEditingController controller, IconData icon) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        isDense: true,
-      ),
-      keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
-    );
-  }
-
-  Widget _buildSummaryTable() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints:
-              BoxConstraints(minWidth: MediaQuery.of(context).size.width - 32),
-          child: DataTable(
-            columnSpacing: 16,
-            horizontalMargin: 12,
-            headingRowHeight: 40,
-            dataRowHeight: 40,
-            columns: const [
-              DataColumn(
-                  label: SizedBox(
-                      width: 80,
-                      child: Text('Type',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12)))),
-              DataColumn(
-                  label: SizedBox(
-                      width: 100,
-                      child: Text('Item',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12)))),
-              DataColumn(
-                  label: SizedBox(
-                      width: 60,
-                      child: Text('Qty',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12)))),
-              DataColumn(
-                  label: SizedBox(
-                      width: 100,
-                      child: Text('Amount',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12)))),
-              DataColumn(label: SizedBox(width: 40)),
-            ],
-            rows: [
-              ...materials.asMap().entries.map((entry) {
-                int idx = entry.key;
-                var m = entry.value;
-                return DataRow(cells: [
-                  const DataCell(SizedBox(
-                      width: 80,
-                      child: Text('Material', style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                      width: 100,
-                      child: Text(m['type']?.toString() ?? '',
-                          style: TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis))),
-                  DataCell(SizedBox(
-                      width: 60,
-                      child: Text('${m['quantity'] ?? 0}',
-                          style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                      width: 100,
-                      child: Text(
-                          _calculateMaterialAmount(
-                              m['type']?.toString() ?? '', m['quantity'] ?? 0),
-                          style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                    width: 40,
-                    child: IconButton(
-                      icon:
-                          Icon(Icons.delete, color: Colors.red[300], size: 16),
-                      onPressed: () => _removeMaterial(idx),
-                      padding: EdgeInsets.zero,
-                    ),
-                  )),
-                ]);
-              }),
-              ...labours.asMap().entries.map((entry) {
-                int idx = entry.key;
-                var l = entry.value;
-                return DataRow(cells: [
-                  const DataCell(SizedBox(
-                      width: 80,
-                      child: Text('Labour', style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                      width: 100,
-                      child: Text(l['type']?.toString() ?? '',
-                          style: TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis))),
-                  DataCell(SizedBox(
-                      width: 60,
-                      child: Text('${l['count'] ?? 0}',
-                          style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                      width: 100,
-                      child: Text(
-                          _calculateLabourAmount(
-                              l['type']?.toString() ?? '', l['count'] ?? 0),
-                          style: TextStyle(fontSize: 12)))),
-                  DataCell(SizedBox(
-                    width: 40,
-                    child: IconButton(
-                      icon:
-                          Icon(Icons.delete, color: Colors.red[300], size: 16),
-                      onPressed: () => _removeLabour(idx),
-                      padding: EdgeInsets.zero,
-                    ),
-                  )),
-                ]);
-              }),
-              DataRow(cells: [
-                const DataCell(SizedBox(
-                    width: 80,
-                    child: Text('Food', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 100,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 60,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                DataCell(SizedBox(
-                    width: 100,
-                    child: Text('₹${foodCost.text}',
-                        style: const TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(width: 40)),
-              ]),
-              DataRow(cells: [
-                const DataCell(SizedBox(
-                    width: 80,
-                    child: Text('Transport', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 100,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 60,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                DataCell(SizedBox(
-                    width: 100,
-                    child: Text('₹${transportCost.text}',
-                        style: const TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(width: 40)),
-              ]),
-              DataRow(cells: [
-                const DataCell(SizedBox(
-                    width: 80,
-                    child: Text('Fuel', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 100,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(
-                    width: 60,
-                    child: Text('-', style: TextStyle(fontSize: 12)))),
-                DataCell(SizedBox(
-                    width: 100,
-                    child: Text('₹${fuelCost.text}',
-                        style: const TextStyle(fontSize: 12)))),
-                const DataCell(SizedBox(width: 40)),
-              ]),
-              DataRow(cells: [
-                const DataCell(SizedBox(width: 80, child: Text(''))),
-                const DataCell(SizedBox(width: 100, child: Text(''))),
-                const DataCell(SizedBox(
-                    width: 60,
-                    child: Text('Total',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 12)))),
-                DataCell(SizedBox(
-                    width: 100,
-                    child: Text('₹${_getTotalAmount()}',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: _primaryColor)))),
-                const DataCell(SizedBox(width: 40, child: Text(''))),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _resetForm() {
+    setState(() {
+      materials.clear();
+      labours.clear();
+      _selectedContractorName = null;
+      _selectedProjectField = null;
+      _projectFieldController.clear();
+      _contractorNameController.clear();
+      foodCost.text = '0';
+      transportCost.text = '0';
+      fuelCost.text = '0';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: _primaryColor,
-        title: const Text('Contractor Entry',
-            style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Section 1: Inputs (Site ID + Supervisor Name + Contractor Name + Project Field + Date)
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+    return GlassScaffold(
+      title: 'Contractor Entry',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SupervisorDashboard(
+                  username: widget.userName,
+                  supervisorId: '',
+                  supervisorName: '',
+                ),
+              ),
+              (route) => false,
+            );
+          },
+        ),
+      ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 600,
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Contractor Details',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold, color: _primaryColor)),
-                    const SizedBox(height: 12),
-
-                    // Display Site ID
-                    Text('Site ID: $siteCode',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 6),
-
-                    // Display Supervisor Name
-                    Text('Supervisor Name: ${widget.supervisorName}',
-                        style: TextStyle(fontSize: 15)),
-                    const SizedBox(height: 12),
-
-                    // Contractor Name Dropdown
-                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('contractors')
-                          .orderBy('contractorName')
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        final docs = snapshot.data?.docs ?? [];
-                        final names = <String>[];
-                        final fieldByName = <String, String>{};
-                        for (final d in docs) {
-                          final data = d.data();
-                          final name =
-                              (data['contractorName'] ?? '').toString();
-                          final field =
-                              (data['contractorField'] ?? '').toString();
-                          if (name.isNotEmpty) {
-                            names.add(name);
-                            fieldByName[name] = field;
-                          }
-                        }
-                        final value = names.contains(_selectedContractorName)
-                            ? _selectedContractorName
-                            : null;
-                        return DropdownButtonFormField<String>(
-                          value: value,
-                          items: names
-                              .map((n) => DropdownMenuItem<String>(
-                                  value: n, child: Text(n)))
-                              .toList(),
-                          onChanged: (val) => setState(() {
-                            _selectedContractorName = val;
-                            _selectedProjectField =
-                                val != null ? (fieldByName[val] ?? '') : null;
-                            _projectFieldController.text =
-                                _selectedProjectField ?? '';
-                            _contractorNameController.text = val ?? '';
-                          }),
-                          decoration: InputDecoration(
-                            labelText: 'Contractor Name',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 12, horizontal: 12),
+                    GlassCard(
+                      title: 'Contractor Selection',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoRow(
+                            'Site ID',
+                            siteCode,
+                            Icons.construction,
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      readOnly: true,
-                      controller: _projectFieldController,
-                      decoration: InputDecoration(
-                        labelText: 'Project Field',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 12),
+                          _buildInfoRow(
+                            'Supervisor',
+                            widget.supervisorName,
+                            Icons.person,
+                          ),
+                          const SizedBox(height: 16),
+                          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            stream: FirestoreService.contractors
+                                .orderBy('contractorName')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              final docs = snapshot.data?.docs ?? [];
+                              final names = <String>[];
+                              final fieldByName = <String, String>{};
+                              for (final d in docs) {
+                                final data = d.data();
+                                final name = (data['contractorName'] ?? '')
+                                    .toString();
+                                if (name.isNotEmpty) {
+                                  names.add(name);
+                                  fieldByName[name] =
+                                      (data['contractorField'] ?? '')
+                                          .toString();
+                                }
+                              }
+                              return DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                value: names.contains(_selectedContractorName)
+                                    ? _selectedContractorName
+                                    : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Select Contractor',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: names
+                                    .map(
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text(
+                                          n,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) => setState(() {
+                                  _selectedContractorName = val;
+                                  _selectedProjectField = val != null
+                                      ? fieldByName[val]
+                                      : null;
+                                  _projectFieldController.text =
+                                      _selectedProjectField ?? '';
+                                }),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            'Project Field',
+                            _projectFieldController,
+                            readOnly: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            'Date',
+                            _dateController,
+                            readOnly: true,
+                            onTap: _pickDate,
+                            icon: Icons.calendar_today,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      readOnly: true,
-                      controller: _dateController,
-                      onTap: _pickDate,
-                      decoration: InputDecoration(
-                        labelText: 'Date',
-                        suffixIcon: const Icon(Icons.calendar_today),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 12),
+                    const SizedBox(height: 24),
+
+                    GlassCard(
+                      title: 'Material Details',
+                      child: Column(
+                        children: [
+                          isLoadingMaterials
+                              ? const CircularProgressIndicator()
+                              : DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  value: selectedMaterial,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Select Material',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: materialOptions
+                                      .map(
+                                        (m) => DropdownMenuItem(
+                                          value: m,
+                                          child: Text(
+                                            m,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => selectedMaterial = v),
+                                ),
+                          const SizedBox(height: 12),
+                          _buildQtyField('Quantity', materialQtyController),
+                          const SizedBox(height: 12),
+                          GlassButton(
+                            label: 'ADD MATERIAL',
+                            icon: Icons.add,
+                            onPressed: _addMaterial,
+                            isSecondary: true,
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _showCustomMaterialFields =
+                                  !_showCustomMaterialFields,
+                            ),
+                            child: Text(
+                              _showCustomMaterialFields
+                                  ? 'Hide Custom'
+                                  : 'Add Custom Material',
+                            ),
+                          ),
+                          if (_showCustomMaterialFields) ...[
+                            _buildTextField(
+                              'Material Name',
+                              _customMaterialNameController,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildQtyField('Qty', _customMaterialQtyController),
+                            const SizedBox(height: 8),
+                            _buildQtyField(
+                              'Price',
+                              _customMaterialPriceController,
+                            ),
+                            const SizedBox(height: 8),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomMaterial,
+                              isSecondary: true,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    GlassCard(
+                      title: 'Labour Details',
+                      child: Column(
+                        children: [
+                          isLoadingLabours
+                              ? const CircularProgressIndicator()
+                              : DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  value: selectedLabour,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Select Labour',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: labourOptions
+                                      .map(
+                                        (l) => DropdownMenuItem(
+                                          value: l,
+                                          child: Text(
+                                            l,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => selectedLabour = v),
+                                ),
+                          const SizedBox(height: 12),
+                          _buildQtyField('Count', labourQtyController),
+                          const SizedBox(height: 12),
+                          GlassButton(
+                            label: 'ADD LABOUR',
+                            icon: Icons.person_add,
+                            onPressed: _addLabour,
+                            isSecondary: true,
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _showCustomLabourFields =
+                                  !_showCustomLabourFields,
+                            ),
+                            child: Text(
+                              _showCustomLabourFields
+                                  ? 'Hide Custom'
+                                  : 'Add Custom Labour',
+                            ),
+                          ),
+                          if (_showCustomLabourFields) ...[
+                            _buildTextField(
+                              'Labour Type',
+                              _customLabourNameController,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildQtyField(
+                              'Salary',
+                              _customLabourSalaryController,
+                            ),
+                            const SizedBox(height: 8),
+                            GlassButton(
+                              label: 'ADD CUSTOM',
+                              icon: Icons.check,
+                              onPressed: _addCustomLabour,
+                              isSecondary: true,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    GlassCard(
+                      title: 'Other Expenses',
+                      child: Column(
+                        children: [
+                          _buildQtyField(
+                            'Food (₹)',
+                            foodCost,
+                            icon: Icons.fastfood,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildQtyField(
+                            'Transport (₹)',
+                            transportCost,
+                            icon: Icons.directions_car,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildQtyField(
+                            'Fuel (₹)',
+                            fuelCost,
+                            icon: Icons.local_gas_station,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    if (materials.isNotEmpty || labours.isNotEmpty)
+                      GlassCard(
+                        title:
+                            'Today\'s Summary (Total: ₹${_getTotalAmount()})',
+                        child: _buildSummaryTable(),
+                      ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'SAVE ENTRY',
+                            icon: Icons.save,
+                            onPressed: _saveToFirestore,
+                            isLoading: isSaving,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'RESET',
+                            icon: Icons.refresh,
+                            onPressed: _resetForm,
+                            isSecondary: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: primaryColor),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
           ),
-
-          // Section 2: Only Add Entry details below
           Expanded(
-            child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Form Section Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text('Add Entry',
-                        style: theme.textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl, {
+    bool readOnly = false,
+    VoidCallback? onTap,
+    IconData? icon,
+  }) {
+    return TextField(
+      controller: ctrl,
+      readOnly: readOnly,
+      onTap: onTap,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        suffixIcon: icon != null ? Icon(icon, color: primaryColor) : null,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildQtyField(
+    String label,
+    TextEditingController ctrl, {
+    IconData? icon,
+  }) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        prefixIcon: icon != null ? Icon(icon, color: primaryColor) : null,
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildSummaryTable() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columnSpacing: 20,
+        columns: const [
+          DataColumn(
+            label: Text('Item', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Qty', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('Amt', style: TextStyle(color: Colors.white70)),
+          ),
+          DataColumn(
+            label: Text('', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
+        rows: [
+          ...materials.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
                   ),
-                  const Divider(height: 16),
-
-                  // Material Section
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildSectionHeader('Material Details'),
-                          const SizedBox(height: 8),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: isLoadingMaterials
-                                        ? const Center(
-                                            child: CircularProgressIndicator())
-                                        : materialError != null
-                                            ? Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top: 8.0),
-                                                child: Text(materialError!,
-                                                    style: const TextStyle(
-                                                        color: Colors.red)))
-                                            : Column(
-                                                children: [
-                                                  TextField(
-                                                    decoration:
-                                                        const InputDecoration(
-                                                      hintText:
-                                                          'Search Material...',
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12),
-                                                    ),
-                                                    onChanged: (query) {
-                                                      setState(() {
-                                                        final q =
-                                                            query.toLowerCase();
-                                                        final filtered =
-                                                            materialOptions
-                                                                .where((item) => item
-                                                                    .toLowerCase()
-                                                                    .startsWith(
-                                                                        q))
-                                                                .toList();
-                                                        filtered.sort((a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(b
-                                                                .toLowerCase()));
-                                                        if (filtered
-                                                            .isNotEmpty) {
-                                                          selectedMaterial =
-                                                              filtered.contains(
-                                                                      selectedMaterial)
-                                                                  ? selectedMaterial
-                                                                  : filtered
-                                                                      .first;
-                                                        } else {
-                                                          selectedMaterial =
-                                                              null;
-                                                        }
-                                                        _filteredMaterialOptions =
-                                                            filtered;
-                                                      });
-                                                    },
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  DropdownButtonFormField<
-                                                      String>(
-                                                    value: selectedMaterial,
-                                                    isExpanded: true,
-                                                    decoration: InputDecoration(
-                                                      labelText: 'Material',
-                                                      prefixIcon: const Icon(Icons
-                                                          .category_outlined),
-                                                      border:
-                                                          OutlineInputBorder(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8)),
-                                                      filled: true,
-                                                      fillColor:
-                                                          Colors.grey[50],
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12),
-                                                    ),
-                                                    items: (_filteredMaterialOptions ??
-                                                            materialOptions)
-                                                        .map((item) => DropdownMenuItem(
-                                                            value: item,
-                                                            child: Text(item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis)))
-                                                        .toList(),
-                                                    onChanged: (value) =>
-                                                        setState(() =>
-                                                            selectedMaterial =
-                                                                value),
-                                                  ),
-                                                ],
-                                              ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 2,
-                                    child: TextField(
-                                      controller: materialQtyController,
-                                      decoration: InputDecoration(
-                                        labelText: 'Qty',
-                                        border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8)),
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                vertical: 8, horizontal: 12),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (value) => setState(() =>
-                                          materialQty =
-                                              int.tryParse(value) ?? 0),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.add, size: 18),
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                                backgroundColor: _primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                              onPressed:
-                                  isLoadingMaterials || materialOptions.isEmpty
-                                      ? null
-                                      : _addMaterial,
-                              label: const Text('Add',
-                                  style: TextStyle(fontSize: 14)),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Toggle custom material fields
-                          ElevatedButton(
-                            onPressed: () => setState(() =>
-                                _showCustomMaterialFields =
-                                    !_showCustomMaterialFields),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Add Materials'),
-                          ),
-                          const SizedBox(height: 8),
-
-                          if (_showCustomMaterialFields) ...[
-                            TextField(
-                              controller: _customMaterialNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Material Name',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 12),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _customMaterialQtyController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Qty',
-                                      border: OutlineInputBorder(),
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 12),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _customMaterialPriceController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Unit Price (₹)',
-                                      border: OutlineInputBorder(),
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 12),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _addCustomMaterial,
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: _primaryColor,
-                                        foregroundColor: Colors.white),
-                                    child: const Text('Add Material'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => setState(() =>
-                                        _showCustomMaterialFields = false),
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey[300],
-                                        foregroundColor: Colors.black),
-                                    child: const Text('Cancel'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
-                      ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['quantity']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateMaterialAmount(
+                      e.value['type'],
+                      e.value['quantity'],
                     ),
+                    style: const TextStyle(color: Colors.white),
                   ),
-
-                  // Labour Section
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildSectionHeader('Labour Details'),
-                          const SizedBox(height: 8),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: isLoadingLabours
-                                        ? const Center(
-                                            child: CircularProgressIndicator())
-                                        : labourError != null
-                                            ? Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top: 8.0),
-                                                child: Text(labourError!,
-                                                    style: const TextStyle(
-                                                        color: Colors.red)))
-                                            : Column(
-                                                children: [
-                                                  TextField(
-                                                    decoration:
-                                                        const InputDecoration(
-                                                      hintText:
-                                                          'Search Labour...',
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12),
-                                                    ),
-                                                    onChanged: (query) {
-                                                      setState(() {
-                                                        final q =
-                                                            query.toLowerCase();
-                                                        final filtered = labourOptions
-                                                            .where((item) => item
-                                                                .toLowerCase()
-                                                                .startsWith(q))
-                                                            .toList();
-                                                        filtered.sort((a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(b
-                                                                .toLowerCase()));
-                                                        if (filtered
-                                                            .isNotEmpty) {
-                                                          selectedLabour =
-                                                              filtered.contains(
-                                                                      selectedLabour)
-                                                                  ? selectedLabour
-                                                                  : filtered
-                                                                      .first;
-                                                        } else {
-                                                          selectedLabour = null;
-                                                        }
-                                                        _filteredLabourOptions =
-                                                            filtered;
-                                                      });
-                                                    },
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  DropdownButtonFormField<
-                                                      String>(
-                                                    value: selectedLabour,
-                                                    isExpanded: true,
-                                                    decoration: InputDecoration(
-                                                      labelText: 'Labour',
-                                                      prefixIcon: const Icon(
-                                                          Icons.group),
-                                                      border:
-                                                          OutlineInputBorder(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8)),
-                                                      filled: true,
-                                                      fillColor:
-                                                          Colors.grey[50],
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12),
-                                                    ),
-                                                    items: (_filteredLabourOptions ??
-                                                            labourOptions)
-                                                        .map((item) => DropdownMenuItem(
-                                                            value: item,
-                                                            child: Text(item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis)))
-                                                        .toList(),
-                                                    onChanged: (value) =>
-                                                        setState(() =>
-                                                            selectedLabour =
-                                                                value),
-                                                  ),
-                                                ],
-                                              ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 2,
-                                    child: TextField(
-                                      controller: labourQtyController,
-                                      decoration: InputDecoration(
-                                        labelText: 'Count',
-                                        border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8)),
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                vertical: 8, horizontal: 12),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (value) => setState(() =>
-                                          labourQty = int.tryParse(value) ?? 0),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.add, size: 18),
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                                backgroundColor: _primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                              onPressed:
-                                  isLoadingLabours || labourOptions.isEmpty
-                                      ? null
-                                      : _addLabour,
-                              label: const Text('Add',
-                                  style: TextStyle(fontSize: 14)),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Toggle custom labour fields
-                          ElevatedButton(
-                            onPressed: () => setState(() =>
-                                _showCustomLabourFields =
-                                    !_showCustomLabourFields),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Add Labour'),
-                          ),
-                          const SizedBox(height: 8),
-
-                          if (_showCustomLabourFields) ...[
-                            TextField(
-                              controller: _customLabourNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Labour Type',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 12),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _customLabourSalaryController,
-                              decoration: const InputDecoration(
-                                labelText: 'Salary',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 12),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: labourQtyController,
-                              decoration: const InputDecoration(
-                                labelText: 'Count',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 12),
-                              ),
-                              keyboardType: TextInputType.number,
-                              onChanged: (value) => setState(
-                                  () => labourQty = int.tryParse(value) ?? 0),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _addCustomLabour,
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: _primaryColor,
-                                        foregroundColor: Colors.white),
-                                    child: const Text('Add Labour'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => setState(
-                                        () => _showCustomLabourFields = false),
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey[300],
-                                        foregroundColor: Colors.black),
-                                    child: const Text('Cancel'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
-                      ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
                     ),
+                    onPressed: () => _removeMaterial(e.key),
                   ),
-
-                  // Additional Costs Section
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildSectionHeader('Additional Costs'),
-                          const SizedBox(height: 12),
-                          _buildCostInput(
-                              'Food Cost', foodCost, Icons.fastfood),
-                          const SizedBox(height: 8),
-                          _buildCostInput('Transport Cost', transportCost,
-                              Icons.directions_car),
-                          const SizedBox(height: 8),
-                          _buildCostInput(
-                              'Fuel Cost', fuelCost, Icons.local_gas_station),
-                        ],
-                      ),
+                ),
+              ],
+            ),
+          ),
+          ...labours.asMap().entries.map(
+            (e) => DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    e.value['type'],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '${e.value['count']}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    _calculateLabourAmount(e.value['type'], e.value['count']),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
                     ),
+                    onPressed: () => _removeLabour(e.key),
                   ),
-
-                  // Summary Section
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildSectionHeader('Summary'),
-                              Text('Total: ₹${_getTotalAmount()}',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: _primaryColor)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          _buildSummaryTable(),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Save Button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : _saveToFirestore,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Text('Save Entry',
-                              style: TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

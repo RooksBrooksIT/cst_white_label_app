@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class VehicleDriverConfigPage extends StatefulWidget {
   const VehicleDriverConfigPage({super.key});
@@ -41,8 +44,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
   }
 
   Future<String> _getNextDriverId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('drivers')
+    final snapshot = await FirestoreService
+        .getCollection('drivers')
         .orderBy('driverId', descending: true)
         .limit(1)
         .get();
@@ -51,8 +54,9 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
       return 'DV001';
     }
 
-    final lastDriverId = snapshot.docs.first['driverId'] as String;
-    final number = int.parse(lastDriverId.substring(2));
+    final lastDriverId = snapshot.docs.first['driverId'] as String? ?? 'DV000';
+    final numberStr = lastDriverId.replaceAll(RegExp(r'[^0-9]'), '');
+    final number = int.tryParse(numberStr) ?? 0;
     return 'DV${(number + 1).toString().padLeft(3, '0')}';
   }
 
@@ -76,18 +80,17 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
       data['createdAt'] = FieldValue.serverTimestamp();
     }
 
-    await FirebaseFirestore.instance
-        .collection('drivers')
+    await FirestoreService
+        .getCollection('drivers')
         .doc(driverId)
         .set(data);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
-        ),
-      ),
-    );
+    if (mounted) {
+      await DialogUtils.showSuccessDialog(
+        context,
+        message: 'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
+      );
+    }
 
     if (!_isEditing) {
       _resetForm();
@@ -141,14 +144,17 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     );
 
     if (result == true) {
-      await FirebaseFirestore.instance
-          .collection('drivers')
+      await FirestoreService
+          .getCollection('drivers')
           .doc(driverId)
           .delete();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Driver deleted successfully!')),
-      );
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Driver deleted successfully!',
+        );
+      }
     }
   }
 
@@ -156,17 +162,18 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Driver Configuration'),
-          centerTitle: true,
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(icon: Icon(Icons.person_add), text: 'New Driver'),
-              Tab(icon: Icon(Icons.people), text: 'Existing Drivers'),
-            ],
-          ),
+      child: GlassScaffold(
+        title: 'Driver Configuration',
+        onBack: () => Navigator.pop(context),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(icon: Icon(Icons.person_add), text: 'New Driver'),
+            Tab(icon: Icon(Icons.people), text: 'Existing Drivers'),
+          ],
         ),
         body: TabBarView(
           controller: _tabController,
@@ -188,17 +195,17 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                               children: [
                                 Icon(
                                   _isEditing ? Icons.edit : Icons.person_add,
-                                  color: Colors.blue,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   _isEditing
                                       ? 'Edit Driver - $_currentDriverId'
                                       : 'Add New Driver',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                               ],
@@ -350,8 +357,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
 
             // Existing Drivers Tab
             StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('drivers')
+              stream: FirestoreService
+                  .getCollection('drivers')
                   .orderBy('driverId')
                   .snapshots(),
               builder: (context, snapshot) {
@@ -401,10 +408,10 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                       elevation: 2,
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           child: Text(
                             data['driverId']?.toString().substring(2) ?? '',
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(),
                           ),
                         ),
                         title: Text(
@@ -456,7 +463,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                           children: [
                             IconButton(
                               onPressed: () => _editDriver(driver),
-                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
                               tooltip: 'Edit Driver',
                             ),
                             IconButton(

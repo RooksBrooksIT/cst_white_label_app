@@ -4,7 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../services/firestore_service.dart';
+import '../utils/app_theme.dart';
+import '../utils/pdf_templates.dart';
 import 'dart:async';
+import '../widgets/glass_scaffold.dart';
 
 class DailySitePaymentReportScreen extends StatefulWidget {
   const DailySitePaymentReportScreen({super.key});
@@ -47,66 +51,89 @@ class _DailySitePaymentReportScreenState
 
   Future<void> _fetchSiteIdsAndDetails() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorPayments')
+      // 1. Fetch all site mappings
+      final mappingSnapshot = await FirestoreService.siteSupervisorMap
           .get()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException(
-                'Site details query timeout',
-                const Duration(seconds: 10),
-              );
-            },
-          );
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
       final ids = <String>{};
       final details = <String, Map<String, String>>{};
-      for (var doc in snapshot.docs) {
+
+      for (var doc in mappingSnapshot.docs) {
+        final data = doc.data();
+        final siteId = data['site']?.toString() ?? doc.id;
+        if (siteId.isNotEmpty) {
+          ids.add(siteId);
+
+          // Read projectName directly from the siteSupervisorMap document first
+          final docProjectName = data['projectName']?.toString() ?? '';
+
+          details[siteId] = {
+            'project': docProjectName,
+            'supervisor': data['supervisor']?.toString() ?? '',
+          };
+
+          // Fallback: try to extract project name from siteId pattern (siteName_projectName)
+          // Only use this if projectName wasn't found in the document
+          if (docProjectName.isEmpty && siteId.contains('_')) {
+            final parts = siteId.split('_');
+            if (parts.length > 1) {
+              details[siteId]!['project'] = parts.sublist(1).join('_');
+            }
+          }
+        }
+      }
+
+      // 2. Fetch Projects to enhance/override project names where available
+      final projectsSnapshot = await FirestoreService.projects.get();
+      for (var doc in projectsSnapshot.docs) {
         final data = doc.data();
         final siteId = data['siteId']?.toString();
-        if (siteId != null && siteId.isNotEmpty) {
-          ids.add(siteId);
-          details[siteId] = {
-            'project': data['projectName']?.toString() ?? '',
-            'supervisor': data['supervisorName']?.toString() ?? '',
-          };
+        final fetchedProjectName = data['projectName']?.toString() ?? '';
+        // Only override if we get a non-empty name from projects collection
+        if (siteId != null &&
+            details.containsKey(siteId) &&
+            fetchedProjectName.isNotEmpty) {
+          details[siteId]!['project'] = fetchedProjectName;
         }
       }
 
       if (mounted) {
         setState(() {
-          siteIds = ids.toList();
+          siteIds = ids.toList()..sort();
           siteDetails = details;
         });
       }
-    } on TimeoutException catch (e) {
-      print('Timeout fetching site details: $e');
+    } catch (e) {
+      debugPrint('Error fetching site IDs and details: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to load site data. Please retry.'),
-          ),
+          const SnackBar(content: Text('Failed to load site data')),
         );
       }
-    } catch (e) {
-      print('Error fetching site IDs and details: $e');
     }
   }
 
   void _updateProjectAndSupervisor() {
     if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
-      selectedProject = siteDetails[selectedSiteId]!['project'];
-      selectedSupervisor = siteDetails[selectedSiteId]!['supervisor'];
-      projectController.text = selectedProject ?? '';
-      supervisorController.text = selectedSupervisor ?? '';
+      final project = siteDetails[selectedSiteId]!['project'] ?? '';
+      final supervisor = siteDetails[selectedSiteId]!['supervisor'] ?? '';
+      projectController.text = project;
+      supervisorController.text = supervisor;
+      // Also update state variables and trigger rebuild
+      setState(() {
+        selectedProject = project.isNotEmpty ? project : null;
+        selectedSupervisor = supervisor.isNotEmpty ? supervisor : null;
+      });
     } else {
-      selectedProject = null;
-      selectedSupervisor = null;
       projectController.text = '';
       supervisorController.text = '';
+      setState(() {
+        selectedProject = null;
+        selectedSupervisor = null;
+      });
     }
   }
 
@@ -178,11 +205,11 @@ class _DailySitePaymentReportScreenState
       'MMM',
     ).format(DateTime(selectedYear, selectedMonth));
     String period = '${selectedYear}_${monthStr}_Week${selectedWeekIndex! + 1}';
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorPayments')
+    final snapshot = await FirestoreService.siteSupervisorPayments
         .where('siteId', isEqualTo: selectedSiteId)
         .where('paymentPeriod', isEqualTo: period)
         .get();
+
     List<Map<String, dynamic>> paymentsList = [];
     double sum = 0.0;
     for (var doc in snapshot.docs) {
@@ -220,113 +247,136 @@ class _DailySitePaymentReportScreenState
 
   Future<void> _onPrint() async {
     final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    final now = DateTime.now();
+    final String genAt = DateFormat('dd/MM/yyyy HH:mm').format(now);
+
     pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Site Payment Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (context) => [
+          // Report Metadata
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text(
-                'Site Payment Report',
-                style: pw.TextStyle(
-                  fontSize: 22,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                selectedSiteId ?? 'N/A',
+                pdfPrimaryColor,
               ),
-              pw.SizedBox(height: 10),
-              pw.Text('Site ID: ${selectedSiteId ?? ''}'),
-              pw.Text('Project: ${selectedProject ?? ''}'),
-              pw.Text('Supervisor: ${selectedSupervisor ?? ''}'),
-              pw.Text(
-                'Month: ${DateFormat.MMMM().format(DateTime(0, selectedMonth))}',
+              PdfTemplates.buildMetaBox(
+                'Project',
+                selectedProject ?? 'N/A',
+                pdfPrimaryColor,
               ),
-              pw.Text('Year: $selectedYear'),
-              pw.Text(
-                'Week: ${selectedWeekIndex != null ? selectedWeekIndex! + 1 : ''}',
-              ),
-              pw.SizedBox(height: 16),
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color: PdfColor.fromInt(0xFF772323),
-                    ),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Date',
-                          style: pw.TextStyle(
-                            color: PdfColor.fromInt(0xFFFFFFFF),
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Payment',
-                          style: pw.TextStyle(
-                            color: PdfColor.fromInt(0xFFFFFFFF),
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  ...paymentRecords.map((rec) {
-                    String dateStr = '';
-                    if (rec['paymentDate'] != null) {
-                      try {
-                        DateTime dt = DateFormat(
-                          'yyyy-MM-dd',
-                        ).parse(rec['paymentDate']);
-                        dateStr = DateFormat('EEE, MMM d, yyyy').format(dt);
-                      } catch (e) {
-                        dateStr = rec['paymentDate'].toString();
-                      }
-                    }
-                    return pw.TableRow(
-                      children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(dateStr),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(
-                            rec['paymentAmount']?.toString() ?? '',
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Total',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          totalAmount.toStringAsFixed(2),
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              PdfTemplates.buildMetaBox(
+                'Supervisor',
+                selectedSupervisor ?? 'N/A',
+                pdfPrimaryColor,
               ),
             ],
-          );
-        },
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Month',
+                DateFormat.MMMM().format(DateTime(0, selectedMonth)),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Year',
+                selectedYear.toString(),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Week',
+                selectedWeekIndex != null
+                    ? 'Week ${selectedWeekIndex! + 1}'
+                    : 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox('Generated At', genAt, pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Workforce Table
+          pw.Table.fromTextArray(
+            headers: ['Date', 'Payment Amount (INR)'],
+            data: paymentRecords.map((rec) {
+              String dateStr = '';
+              if (rec['paymentDate'] != null) {
+                try {
+                  DateTime dt = DateFormat(
+                    'yyyy-MM-dd',
+                  ).parse(rec['paymentDate']);
+                  dateStr = DateFormat('EEE, MMM d, yyyy').format(dt);
+                } catch (e) {
+                  dateStr = rec['paymentDate'].toString();
+                }
+              }
+              return [dateStr, rec['paymentAmount']?.toString() ?? '0.00'];
+            }).toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2),
+              1: const pw.FlexColumnWidth(1),
+            },
+          ),
+          pw.SizedBox(height: 24),
+
+          // Grand Totals Section
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: const pw.BoxDecoration(
+              color: PdfColors.blue50,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'Total Payment for Week:',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(width: 24),
+                pw.Text(
+                  'INR ${totalAmount.toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: pdfPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
+
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
@@ -339,506 +389,440 @@ class _DailySitePaymentReportScreenState
 
   @override
   Widget build(BuildContext context) {
-    List<List<DateTime>> weeks = _getWeeksOfMonth(selectedYear, selectedMonth);
-    final Color primaryColor = Color(0xFF003768);
+    return GlassScaffold(
+      title: 'Site Payment Report',
+      onBack: () => Navigator.pop(context),
+      body: _buildBody(context),
+    );
+  }
 
-    return Scaffold(
-      backgroundColor: Color(0xFFF8F6F6),
-      appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: LayoutBuilder(
-          builder: (context, constraints) {
-            double fontSizeBase = constraints.maxWidth / 25;
-            if (fontSizeBase < 16) fontSizeBase = 16;
-            return Text(
-              'Site Payment Report',
-              style: TextStyle(color: Colors.white),
-            );
-          },
-        ),
-        iconTheme: IconThemeData(color: Colors.white),
-        elevation: 2,
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          double screenWidth = constraints.maxWidth;
-          double horizontalPadding = screenWidth * 0.05;
-          if (horizontalPadding < 16) horizontalPadding = 16;
-          if (horizontalPadding > 40) horizontalPadding = 40;
+  Widget _buildBody(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double screenWidth = constraints.maxWidth;
+        double horizontalPadding = screenWidth * 0.05;
+        if (horizontalPadding < 16) horizontalPadding = 16;
+        if (horizontalPadding > 40) horizontalPadding = 40;
 
-          double fontSizeBase = screenWidth / 30;
-          if (fontSizeBase < 14) fontSizeBase = 14;
-          if (fontSizeBase > 22) fontSizeBase = 22;
+        double fontSizeBase = screenWidth / 30;
+        if (fontSizeBase < 14) fontSizeBase = 14;
+        if (fontSizeBase > 22) fontSizeBase = 22;
 
-          return Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: 16,
-            ),
-            child: SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 700),
-                  child: Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(horizontalPadding),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              labelText: 'Site ID',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            value: selectedSiteId,
-                            items: siteIds
-                                .map(
-                                  (id) => DropdownMenuItem(
-                                    value: id,
-                                    child: Text(
-                                      id,
-                                      style: TextStyle(fontSize: fontSizeBase),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedSiteId = value;
-                                _updateProjectAndSupervisor();
-                                selectedWeekIndex = null;
-                                weekDates = [];
-                                paymentRecords = [];
-                                totalAmount = 0.0;
-                              });
-                            },
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Project',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            readOnly: true,
-                            style: TextStyle(fontSize: fontSizeBase),
-                            controller: projectController,
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Supervisor',
-                              labelStyle: TextStyle(fontSize: fontSizeBase),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: primaryColor,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: fontSizeBase * 1.2,
-                                horizontal: fontSizeBase,
-                              ),
-                            ),
-                            readOnly: true,
-                            style: TextStyle(fontSize: fontSizeBase),
-                            controller: supervisorController,
-                          ),
-                          SizedBox(height: fontSizeBase * 1.5),
-
-                          // Fixed Month and Year Row to prevent overflow
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(
-                                    labelText: 'Month',
-                                    labelStyle: TextStyle(
-                                      fontSize: fontSizeBase,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: primaryColor,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: fontSizeBase * 0.9,
-                                      horizontal: fontSizeBase * 0.7,
-                                    ),
-                                  ),
-                                  value: selectedMonth,
-                                  items: List.generate(12, (i) => i + 1)
-                                      .map(
-                                        (m) => DropdownMenuItem(
-                                          value: m,
-                                          child: Text(
-                                            DateFormat.MMMM().format(
-                                              DateTime(0, m),
-                                            ),
-                                            style: TextStyle(
-                                              fontSize: fontSizeBase,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedMonth = value!;
-                                      selectedWeekIndex = null;
-                                      weekDates = [];
-                                      paymentRecords = [];
-                                      totalAmount = 0.0;
-                                    });
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: fontSizeBase * 0.8),
-                              Expanded(
-                                child: DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(
-                                    labelText: 'Year',
-                                    labelStyle: TextStyle(
-                                      fontSize: fontSizeBase,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: primaryColor,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: fontSizeBase * 0.9,
-                                      horizontal: fontSizeBase * 0.7,
-                                    ),
-                                  ),
-                                  value: selectedYear,
-                                  items: years
-                                      .map(
-                                        (y) => DropdownMenuItem(
-                                          value: y,
-                                          child: Text(
-                                            y.toString(),
-                                            style: TextStyle(
-                                              fontSize: fontSizeBase,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedYear = value!;
-                                      selectedWeekIndex = null;
-                                      weekDates = [];
-                                      paymentRecords = [];
-                                      totalAmount = 0.0;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          SizedBox(height: fontSizeBase * 1.8),
-                          Text(
-                            'Weeks:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: primaryColor,
-                              fontSize: fontSizeBase,
-                            ),
-                          ),
-                          SizedBox(height: fontSizeBase),
-                          Wrap(
-                            spacing: fontSizeBase,
-                            children: List.generate(weeks.length, (i) {
-                              return ChoiceChip(
-                                label: Text(
-                                  'Week ${i + 1}',
-                                  style: TextStyle(
-                                    color: selectedWeekIndex == i
-                                        ? Colors.white
-                                        : primaryColor,
-                                    fontSize: fontSizeBase,
-                                  ),
-                                ),
-                                selected: selectedWeekIndex == i,
-                                selectedColor: primaryColor,
-                                backgroundColor: Color(0xFFF2EAEA),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                onSelected: (_) {
-                                  _onWeekSelected(i);
-                                },
-                              );
-                            }),
-                          ),
-                          SizedBox(height: fontSizeBase * 1.8),
-                          if (selectedWeekIndex != null && weekDates.isNotEmpty)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Payments for Week ${selectedWeekIndex! + 1}:',
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: fontSizeBase,
-                                  ),
-                                ),
-                                SizedBox(height: fontSizeBase),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: primaryColor.withOpacity(0.3),
-                                    ),
-                                    color: Color(0xFFF9EDED),
-                                  ),
-                                  child: Table(
-                                    border: TableBorder.symmetric(
-                                      inside: BorderSide(
-                                        color: primaryColor.withOpacity(0.15),
-                                      ),
-                                    ),
-                                    columnWidths: {
-                                      0: FlexColumnWidth(2),
-                                      1: FlexColumnWidth(2),
-                                    },
-                                    children: [
-                                      TableRow(
-                                        decoration: BoxDecoration(
-                                          color: primaryColor.withOpacity(0.9),
-                                        ),
-                                        children: [
-                                          Padding(
-                                            padding: EdgeInsets.all(
-                                              fontSizeBase,
-                                            ),
-                                            child: Text(
-                                              'Date',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                                fontSize: fontSizeBase,
-                                              ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: EdgeInsets.all(
-                                              fontSizeBase,
-                                            ),
-                                            child: Text(
-                                              'Payment',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                                fontSize: fontSizeBase,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      ...paymentRecords.map((rec) {
-                                        String dateStr = '';
-                                        if (rec['paymentDate'] != null) {
-                                          try {
-                                            DateTime dt =
-                                                (rec['paymentDate']
-                                                        as Timestamp)
-                                                    .toDate();
-                                            dateStr = DateFormat(
-                                              'EEE, MMM d, yyyy',
-                                            ).format(dt);
-                                          } catch (e) {
-                                            dateStr = rec['paymentDate']
-                                                .toString();
-                                          }
-                                        }
-                                        return TableRow(
-                                          children: [
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                dateStr,
-                                                style: TextStyle(
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                rec['paymentAmount']
-                                                        ?.toString() ??
-                                                    '',
-                                                style: TextStyle(
-                                                  color: primaryColor,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      }),
-                                      if (paymentRecords.isNotEmpty)
-                                        TableRow(
-                                          children: [
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                'Total',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsets.all(
-                                                fontSizeBase,
-                                              ),
-                                              child: Text(
-                                                totalAmount.toStringAsFixed(2),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: primaryColor,
-                                                  fontSize: fontSizeBase,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          SizedBox(height: fontSizeBase * 3),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF003768),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.cancel_outlined,
-                                  size: fontSizeBase * 1.5,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: _onCancel,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(
-                                    255,
-                                    250,
-                                    185,
-                                    88,
-                                  ),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.restart_alt,
-                                  size: fontSizeBase * 1.5,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed:
-                                    (selectedWeekIndex != null &&
-                                        paymentRecords.isNotEmpty)
-                                    ? _onPrint
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(
-                                    255,
-                                    244,
-                                    53,
-                                    53,
-                                  ),
-                                  shape: CircleBorder(), // Circular button
-                                  padding: EdgeInsets.all(fontSizeBase * 1.5),
-                                ),
-                                child: Icon(
-                                  Icons.print,
-                                  size: fontSizeBase * 1.5,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+        final theme = Theme.of(context);
+        return Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 700),
+                child: Container(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
                       ),
-                    ),
+                    ],
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
+                  child: _buildReportForm(context, fontSizeBase),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReportForm(BuildContext context, double fontSizeBase) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final weeks = _getWeeksOfMonth(selectedYear, selectedMonth);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdownField(
+          label: 'Site ID',
+          value: selectedSiteId,
+          items: siteIds,
+          fontSizeBase: fontSizeBase,
+          onChanged: (value) {
+            setState(() {
+              selectedSiteId = value;
+              selectedWeekIndex = null;
+              weekDates = [];
+              paymentRecords = [];
+              totalAmount = 0.0;
+            });
+            // Call AFTER setState so selectedSiteId is committed before auto-fill reads it
+            _updateProjectAndSupervisor();
+          },
+        ),
+        SizedBox(height: fontSizeBase * 1.5),
+        _buildTextField(
+          label: 'Project',
+          controller: projectController,
+          fontSizeBase: fontSizeBase,
+        ),
+        SizedBox(height: fontSizeBase * 1.5),
+        _buildTextField(
+          label: 'Supervisor',
+          controller: supervisorController,
+          fontSizeBase: fontSizeBase,
+        ),
+        SizedBox(height: fontSizeBase * 2),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 400) {
+              return Column(
+                children: [
+                  _buildMonthDropdown(fontSizeBase),
+                  SizedBox(height: fontSizeBase),
+                  _buildYearDropdown(fontSizeBase),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: _buildMonthDropdown(fontSizeBase)),
+                SizedBox(width: fontSizeBase),
+                Expanded(child: _buildYearDropdown(fontSizeBase)),
+              ],
+            );
+          },
+        ),
+        SizedBox(height: fontSizeBase * 2.5),
+        const Text(
+          'Weeks:',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+            fontSize: 14,
+            letterSpacing: 0.5,
+          ),
+        ),
+        SizedBox(height: fontSizeBase),
+        _buildWeekChips(weeks, fontSizeBase, colorScheme),
+        SizedBox(height: fontSizeBase * 2.5),
+        if (selectedWeekIndex != null && weekDates.isNotEmpty)
+          _buildPaymentTable(fontSizeBase, colorScheme),
+        SizedBox(height: fontSizeBase * 3),
+        _buildActionButtons(fontSizeBase, colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required double fontSizeBase,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<String>(
+      decoration: _inputDecoration(label, fontSizeBase),
+      value: value,
+      dropdownColor: theme.cardColor,
+      items: items
+          .map(
+            (id) => DropdownMenuItem(
+              value: id,
+              child: Text(id, style: TextStyle(fontSize: fontSizeBase)),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required double fontSizeBase,
+  }) {
+    return TextFormField(
+      decoration: _inputDecoration(label, fontSizeBase),
+      readOnly: true,
+      style: TextStyle(fontSize: fontSizeBase, color: const Color(0xFF1E293B)),
+      controller: controller,
+    );
+  }
+
+  Widget _buildMonthDropdown(double fontSizeBase) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<int>(
+      decoration: _inputDecoration('Month', fontSizeBase * 0.9),
+      value: selectedMonth,
+      isExpanded: true,
+      dropdownColor: theme.cardColor,
+      items: List.generate(12, (i) => i + 1)
+          .map(
+            (m) => DropdownMenuItem(
+              value: m,
+              child: Text(
+                DateFormat.MMMM().format(DateTime(0, m)),
+                style: TextStyle(fontSize: fontSizeBase),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedMonth = value!;
+          selectedWeekIndex = null;
+          weekDates = [];
+          paymentRecords = [];
+          totalAmount = 0.0;
+        });
+      },
+    );
+  }
+
+  Widget _buildYearDropdown(double fontSizeBase) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<int>(
+      decoration: _inputDecoration('Year', fontSizeBase * 0.9),
+      value: selectedYear,
+      isExpanded: true,
+      dropdownColor: theme.cardColor,
+      items: years
+          .map(
+            (y) => DropdownMenuItem(
+              value: y,
+              child: Text(
+                y.toString(),
+                style: TextStyle(fontSize: fontSizeBase),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedYear = value!;
+          selectedWeekIndex = null;
+          weekDates = [];
+          paymentRecords = [];
+          totalAmount = 0.0;
+        });
+      },
+    );
+  }
+
+  Widget _buildWeekChips(
+    List<List<DateTime>> weeks,
+    double fontSizeBase,
+    ColorScheme colorScheme,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: List.generate(weeks.length, (i) {
+        final isSelected = selectedWeekIndex == i;
+        return ChoiceChip(
+          label: Text(
+            'Week ${i + 1}',
+            style: TextStyle(
+              color: isSelected
+                  ? colorScheme.onPrimary
+                  : const Color(0xFF64748B),
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: colorScheme.primary,
+          backgroundColor: const Color(0xFFF1F5F9),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          onSelected: (_) => _onWeekSelected(i),
+          showCheckmark: false,
+        );
+      }),
+    );
+  }
+
+  Widget _buildPaymentTable(double fontSizeBase, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Payments for Week ${selectedWeekIndex! + 1}:',
+          style: const TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(1.2),
+              1: FlexColumnWidth(0.8),
+            },
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.05),
+                ),
+                children: [
+                  _buildTableCell('Date', isHeader: true),
+                  _buildTableCell('Payment', isHeader: true),
+                ],
+              ),
+              ...paymentRecords.map((rec) {
+                String dateStr = '';
+                if (rec['paymentDate'] != null) {
+                  try {
+                    DateTime dt = (rec['paymentDate'] as Timestamp).toDate();
+                    dateStr = DateFormat('EEE, MMM d, y').format(dt);
+                  } catch (e) {
+                    dateStr = rec['paymentDate'].toString();
+                  }
+                }
+                return TableRow(
+                  children: [
+                    _buildTableCell(dateStr),
+                    _buildTableCell(rec['paymentAmount']?.toString() ?? '0'),
+                  ],
+                );
+              }),
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.02),
+                ),
+                children: [
+                  _buildTableCell('Total', isTotal: true),
+                  _buildTableCell(
+                    totalAmount.toStringAsFixed(2),
+                    isTotal: true,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableCell(
+    String text, {
+    bool isHeader = false,
+    bool isTotal = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: isHeader || isTotal ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? const Color(0xFF64748B) : const Color(0xFF1E293B),
+          fontSize: isHeader ? 12 : 14,
+        ),
       ),
+    );
+  }
+
+  Widget _buildActionButtons(double fontSizeBase, ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildActionButton(
+          onTap: _onCancel,
+          icon: Icons.refresh_rounded,
+          color: const Color(0xFFF59E0B), // Amber 500
+          label: 'Reset',
+        ),
+        _buildActionButton(
+          onTap: _onPrint,
+          icon: Icons.print_rounded,
+          color: colorScheme.primary,
+          label: 'Print',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback onTap,
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, double fontSize) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 2,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 }

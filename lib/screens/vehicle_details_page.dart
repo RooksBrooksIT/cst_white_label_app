@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 // Custom input formatter for number plate
 class NumberPlateFormatter extends TextInputFormatter {
@@ -92,9 +94,8 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
   final _modelNameController = TextEditingController();
   final _numberPlateController = TextEditingController();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final CollectionReference _vehiclesCollection = FirebaseFirestore.instance
-      .collection('vehicleDetails');
+  final CollectionReference _vehiclesCollection =
+      FirestoreService.getCollection('vehicleDetails');
 
   String _generatedId = '';
   Vehicle? _submittedVehicle;
@@ -204,11 +205,12 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
     }
 
     final lastVehicle = snapshot.docs.first;
-    final lastId = lastVehicle['id'] as String;
+    final lastId = lastVehicle['id'] as String? ?? 'VC000';
 
     // Extract number from last ID and increment
-    final number = int.parse(lastId.replaceAll('VC', ''));
-    return 'VC${(number + 1).toString().padLeft(3, '0')}';
+    final numberStr = lastId.replaceAll(RegExp(r'[^0-9]'), '');
+    final number = (int.tryParse(numberStr) ?? 0) + 1;
+    return 'VC${number.toString().padLeft(3, '0')}';
   }
 
   void _editVehicle() {
@@ -315,20 +317,17 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Details'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        actions: [
-          if (_submittedVehicle != null && !_isEditing)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _deleteVehicle,
-              tooltip: 'Delete Vehicle',
-            ),
-        ],
-      ),
+    return GlassScaffold(
+      title: 'Vehicle Details',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        if (_submittedVehicle != null && !_isEditing)
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _deleteVehicle,
+            tooltip: 'Delete Vehicle',
+          ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -351,10 +350,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                         children: [
                           Text(
                             'Generated Vehicle ID:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
+                            style: TextStyle(fontSize: 14),
                           ),
                           Text(
                             _generatedId,
@@ -412,10 +408,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
                                     'Format: TN-00-XX-0000',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
+                                    style: TextStyle(fontSize: 12),
                                   ),
                                 );
                               },
@@ -497,7 +490,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isEditing
                                         ? Colors.orange
-                                        : Color(0xFF003768),
+                                        : Theme.of(context).colorScheme.primary,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -538,7 +531,6 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
@@ -556,9 +548,9 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.edit,
-                                  color: Color(0xFF003768),
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                                 onPressed: _editVehicle,
                                 tooltip: 'Edit Vehicle',
@@ -586,7 +578,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                               children: [
                                 Icon(
                                   Icons.info,
-                                  color: Color(0xFF003768),
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 16,
                                 ),
                                 const SizedBox(width: 8),
@@ -595,7 +587,7 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                                     'Tap the edit icon to modify vehicle details',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF003768),
+                                      color: Theme.of(context).colorScheme.primary,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),

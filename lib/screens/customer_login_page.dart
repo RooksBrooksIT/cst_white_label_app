@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:demo_cst/screens/customer_dashboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class AppColors {
-  static const primaryColor = Color(0xFF003768);
-  static const primaryGradientStart = Color(0xFF003768);
-  static const primaryGradientEnd = Color(0xFF005A9E);
-}
+import 'customer_dashboard.dart';
+import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
+import '../utils/firestore_error_handler.dart';
+import '../utils/app_theme.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
@@ -17,201 +19,70 @@ class CustomerLoginPage extends StatefulWidget {
   _CustomerLoginPageState createState() => _CustomerLoginPageState();
 }
 
-class _CustomerLoginPageState extends State<CustomerLoginPage>
-    with TickerProviderStateMixin {
+class _CustomerLoginPageState extends State<CustomerLoginPage> {
   final _formKey = GlobalKey<FormState>();
-  late AnimationController _controller;
-  late Animation<double> _opacityAnimation;
-  late Animation<double> _translateAnimation;
-  late Animation<Color?> _gradientAnimation;
-
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _showPassword = false;
+  final TextEditingController _referralController = TextEditingController();
   bool _isLoading = false;
-
-  late AnimationController _errorController;
-  late Animation<Offset> _errorSlideAnimation;
-  late Animation<double> _errorFadeAnimation;
-
-  late AnimationController _successController;
-  late Animation<double> _successScaleAnimation;
-  late Animation<double> _successFadeAnimation;
-
-  // SharedPreferences keys - CUSTOMER specific
-  static const String _isLoggedInKey = 'cust_isLoggedIn';
-  static const String _ownerNameKey = 'cust_ownerName';
-  static const String _siteIdKey = 'cust_siteId';
+  String? _tempOrgName;
+  String? _tempLogoUrl;
+  String? _actualReferralCode;
 
   @override
   void initState() {
     super.initState();
-
     _checkLoginStatus();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    _opacityAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutQuint),
-    );
-
-    _translateAnimation = Tween<double>(
-      begin: 80,
-      end: 0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
-
-    _gradientAnimation = ColorTween(
-      begin: AppColors.primaryColor,
-      end: AppColors.primaryGradientEnd.withOpacity(0.8),
-    ).animate(_controller);
-
-    _errorController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _errorSlideAnimation =
-        Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _errorController,
-            curve: Curves.fastOutSlowIn,
-          ),
-        );
-
-    _errorFadeAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _errorController, curve: Curves.easeIn));
-
-    _successController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _successScaleAnimation = Tween<double>(begin: 0.5, end: 1).animate(
-      CurvedAnimation(parent: _successController, curve: Curves.elasticOut),
-    );
-
-    _successFadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _successController, curve: Curves.easeInCirc),
-    );
   }
 
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
 
-    if (isLoggedIn) {
-      final ownerName = prefs.getString(_ownerNameKey) ?? '';
-      final siteId = prefs.getString(_siteIdKey) ?? '';
+    // Fetch org details if available
+    setState(() {
+      _tempOrgName = prefs.getString('temp_org_name');
+      _tempLogoUrl = prefs.getString('temp_logo_url');
+      _actualReferralCode = prefs.getString('temp_referral_code');
 
-      // Navigate automatically to main page without showing login
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, __, ___) => CustomerDashboardPage(
-            ownerName: ownerName,
-            ownerPhoneNumber: _passwordController.text.trim(),
-            siteId: siteId,
+      if (_tempOrgName != null) {
+        _referralController.text = _tempOrgName!;
+      } else if (_actualReferralCode != null) {
+        _referralController.text = _actualReferralCode!;
+      }
+    });
+
+    final auth = AuthService();
+    if (auth.isLoggedIn && auth.userRole == UserRole.customer) {
+      final data = auth.userData;
+      final orgId = data['orgId'];
+      if (orgId != null && orgId.toString().isNotEmpty) {
+        await AppTheme.syncWithFirestore(orgId.toString());
+      }
+
+      final ownerName = data['ownerName'] ?? '';
+      final siteId = data['siteId'] ?? '';
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CustomerDashboardPage(
+              ownerName: ownerName,
+              ownerPhoneNumber: '',
+              siteId: siteId,
+            ),
           ),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.5),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-        ),
-      );
-    } else {
-      _controller.forward(); // start animations if not logged in
+        );
+      }
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    _errorController.dispose();
-    _successController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _referralController.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _buildScaffold(context);
-  }
-
-  Widget _buildScaffold(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Customer Login',
-          style: TextStyle(color: Colors.white),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: AppColors.primaryColor,
-
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigator.pushReplacement(
-            // context
-            // PageRouteBuilder(
-            //   transitionDuration: const Duration(milliseconds: 600),
-            //   // pageBuilder: (_, __, ___) => const MainDashboard(),
-            //   transitionsBuilder: (_, animation, __, child) {
-            //     return SlideTransition(
-            //       position: Tween<Offset>(
-            //         begin: const Offset(-1, 0),
-            //         end: Offset.zero,
-            //       ).animate(animation),
-            //       child: child,
-            //     );
-            //   },
-            // ),
-            // );
-          },
-        ),
-      ),
-      body: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  _gradientAnimation.value!,
-                  _gradientAnimation.value!.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Transform.translate(
-                offset: Offset(0, _translateAnimation.value),
-                child: Opacity(
-                  opacity: _opacityAnimation.value,
-                  child: _buildLoginCard(),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   Future<void> _login() async {
@@ -219,8 +90,31 @@ class _CustomerLoginPageState extends State<CustomerLoginPage>
       setState(() => _isLoading = true);
 
       try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection('projects')
+        final referralCode =
+            _actualReferralCode ?? _referralController.text.trim();
+
+        // Validate referral code by searching across all admin/referal documents
+        final orgId = await FirestoreService.findOrgIdByReferralCode(
+          referralCode,
+        );
+
+        if (orgId == null) {
+          if (context.mounted) _showError('Invalid Referral Code');
+          return;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cust_org_path', orgId);
+        final String resolvedPath = 'organisation/$orgId/data/admin';
+        await prefs.setString('cust_org_doc_path', resolvedPath);
+
+        await FirestoreService.initialize();
+
+        // Sync branding details
+        await AppTheme.syncWithFirestore(orgId);
+
+        final projectsCollection = await FirestoreService.projects;
+        final querySnapshot = await projectsCollection
             .where('ownerName', isEqualTo: _usernameController.text.trim())
             .where(
               'ownerPhoneNumber',
@@ -229,373 +123,169 @@ class _CustomerLoginPageState extends State<CustomerLoginPage>
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          await prefs.setBool(_isLoggedInKey, true);
-          await prefs.setString(_ownerNameKey, _usernameController.text.trim());
+          final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
+          final siteId = data['siteId'] ?? '';
 
-          // Store siteId (assuming it's the first document's siteId)
-          await prefs.setString(_siteIdKey, querySnapshot.docs.first['siteId']);
+          await AuthService().login(UserRole.customer, {
+            'ownerName': _usernameController.text.trim(),
+            'siteId': siteId,
+            'orgId': orgId,
+            'cust_org_doc_path': resolvedPath,
+          });
 
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              transitionDuration: const Duration(milliseconds: 800),
-              pageBuilder: (_, __, ___) => CustomerDashboardPage(
-                ownerName: _usernameController.text.trim(),
-                ownerPhoneNumber: _passwordController.text.trim(),
-                siteId: querySnapshot.docs.first['siteId'],
-              ),
-              transitionsBuilder: (_, animation, __, child) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.5),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
+          if (mounted) {
+            _showSuccess('Login Successful!');
+            Future.delayed(const Duration(milliseconds: 1500), () {
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CustomerDashboardPage(
+                      ownerName: _usernameController.text.trim(),
+                      ownerPhoneNumber: _passwordController.text.trim(),
+                      siteId: siteId,
+                    ),
                   ),
+                  (route) => false,
                 );
-              },
-            ),
-          );
+              }
+            });
+          }
         } else {
-          _showErrorAnimation('Invalid username or password');
+          if (context.mounted) _showError('Invalid username or phone number');
         }
       } catch (e) {
-        _showErrorAnimation('Login failed. Please try again.');
+        debugPrint('Login error: $e');
+        if (context.mounted) {
+          FirestoreErrorHandler.handleError(context, e, title: 'Login Error');
+        }
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  void _showErrorAnimation(String message) {
-    _errorController.reset();
-    _errorController.forward();
-
+  void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: SlideTransition(
-          position: _errorSlideAnimation,
-          child: FadeTransition(
-            opacity: _errorFadeAnimation,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF003768), // Primary blue start
-                    Color(0xFF005A9E), // Accent lighter blue end
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
     );
   }
 
-  void _showSuccessAnimation(String message) {
-    _successController.reset();
-    _successController.forward();
-
+  void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: ScaleTransition(
-          scale: _successScaleAnimation,
-          child: FadeTransition(
-            opacity: _successFadeAnimation,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green[400],
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
-  Widget _buildLoginCard() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    return Material(
-      elevation: 20,
-      borderRadius: BorderRadius.circular(25),
-      shadowColor: Colors.black.withOpacity(0.2),
-      child: Container(
-        width: screenWidth > 600 ? 350 : 320, // Reduced width
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 28),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.97),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryColor.withOpacity(0.1),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GlassScaffold(
+      onBack: () => Navigator.pop(context),
+      body: Center(
         child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ScaleTransition(
-                  scale: Tween<double>(begin: 0.5, end: 1).animate(
-                    CurvedAnimation(
-                      parent: _controller,
-                      curve: Curves.elasticOut,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Icon Header or Org Logo
+              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                Container(
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: colorScheme.outline, width: 2),
+                  ),
+                  child: Image.network(
+                    _tempLogoUrl!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.person_rounded,
+                      size: 60,
+                      color: colorScheme.primary,
                     ),
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primaryColor.withOpacity(0.4),
-                          blurRadius: 15,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_rounded,
-                      size: 48,
-                      color: Colors.white,
+                )
+              else
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      width: 2,
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                FadeTransition(
-                  opacity: _opacityAnimation,
-                  child: Text(
-                    'Customer Login',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryColor,
-                      letterSpacing: 0.5,
-                    ),
+                  child: Icon(
+                    Icons.person_rounded,
+                    size: 40,
+                    color: colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 8),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0, 0.5),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.fastOutSlowIn,
-                        ),
-                      ),
-                  child: const Text(
-                    'Sign in to continue',
-                    style: TextStyle(fontSize: 14, color: Colors.black54),
-                  ),
+              const SizedBox(height: 24),
+              Text(
+                _tempOrgName ?? 'Customer Login',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
-                const SizedBox(height: 32),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(-0.5, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.easeOutBack,
+              ),
+              const SizedBox(height: 32),
+
+              GlassCard(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      GlassTextField(
+                        controller: _referralController,
+                        label: 'Referral Code / Org Name',
+                        icon: Icons.business_rounded,
+                        enabled:
+                            _actualReferralCode == null && _tempOrgName == null,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 20),
+                      GlassTextField(
+                        controller: _usernameController,
+                        label: 'Owner Name',
+                        icon: Icons.person_outline_rounded,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 20),
+                      GlassTextField(
+                        controller: _passwordController,
+                        label: 'Phone Number',
+                        icon: Icons.phone_android_rounded,
+                        isPassword: true,
+                        keyboardType: TextInputType.phone,
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassButton(
+                          label: 'LOGIN',
+                          isLoading: _isLoading,
+                          onPressed: _login,
                         ),
                       ),
-                  child: TextFormField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: Icon(
-                        Icons.person,
-                        color: AppColors.primaryColor,
-                        size: 24,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primaryColor),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0.5, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: _controller,
-                          curve: Curves.easeOutBack,
-                        ),
-                      ),
-                  child: TextFormField(
-                    controller: _passwordController,
-                    keyboardType: TextInputType.number,
-                    obscureText: !_showPassword,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
                     ],
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(
-                        Icons.lock,
-                        color: AppColors.primaryColor,
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showPassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: AppColors.primaryColor,
-                        ),
-                        onPressed: () =>
-                            setState(() => _showPassword = !_showPassword),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primaryColor),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      } else if (value.length != 10) {
-                        return 'Password must be exactly 10 digits';
-                      } else if (!RegExp(r'^\d{10}$').hasMatch(value)) {
-                        return 'Password must contain only digits';
-                      }
-                      return null;
-                    },
                   ),
                 ),
-                const SizedBox(height: 24),
-                ScaleTransition(
-                  scale: Tween<double>(begin: 0.8, end: 1).animate(
-                    CurvedAnimation(
-                      parent: _controller,
-                      curve: const Interval(0.6, 1, curve: Curves.elasticOut),
-                    ),
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 5,
-                        shadowColor: AppColors.primaryColor.withOpacity(0.3),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'LOGIN',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
         ),
       ),

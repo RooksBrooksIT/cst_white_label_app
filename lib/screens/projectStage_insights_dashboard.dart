@@ -4,7 +4,11 @@ import 'package:demo_cst/screens/projectStage_expenses_reportpage.dart';
 import 'package:demo_cst/screens/projectStage_site_summary_report.dart';
 import 'package:demo_cst/screens/projectstage_daily_site_report.dart';
 import 'package:intl/intl.dart';
-
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
 
 // --- SupervisorEntry Model ---
 class SupervisorEntry {
@@ -34,12 +38,12 @@ class SupervisorEntry {
       siteName: data['siteName'],
       date: data['date'] != null
           ? (data['date'] is Timestamp
-              ? (data['date'] as Timestamp).toDate()
-              : DateTime.tryParse(data['date'].toString()))
+                ? (data['date'] as Timestamp).toDate()
+                : DateTime.tryParse(data['date'].toString()))
           : null,
       amount: data['amount'],
       totalamount: data['totalamount'],
-      projectStage: data['projectStage'],
+      projectStage: data['projectStage'] ?? data['projectField'],
     );
   }
 }
@@ -82,18 +86,15 @@ class SiteSupervisorMapEntry {
 }
 
 Future<List<SiteSupervisorMapEntry>> fetchAllSiteSupervisorMapEntries() async {
-  final snapshot =
-      await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
+  final snapshot = await FirestoreService.getCollection(
+    'siteSupervisorMap',
+  ).get();
   return snapshot.docs
       .map((doc) => SiteSupervisorMapEntry.fromFirestore(doc))
       .toList();
 }
 
-enum ReportType {
-  dailyExpense,
-  expenseRange,
-  siteSummary,
-}
+enum ReportType { dailyExpense, expenseRange, siteSummary }
 
 class ProjectstageInsightsDashboard extends StatefulWidget {
   const ProjectstageInsightsDashboard({super.key});
@@ -105,14 +106,6 @@ class ProjectstageInsightsDashboard extends StatefulWidget {
 
 class _ProjectstageInsightsDashboardState
     extends State<ProjectstageInsightsDashboard> {
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF4a7cda);
-  static const Color backgroundColor = Color(0xFFf8f9fa);
-  static const Color textColor = Color(0xFF2c3e50);
-  static const Color cardColor = Colors.white;
-  static const Color successColor = Color(0xFF2e7d32);
-  static const Color warningColor = Color(0xFFed6c02);
-
   late Future<List<SupervisorEntry>> supervisorEntriesFuture;
   SupervisorEntry? selectedSupervisorEntry;
 
@@ -124,6 +117,9 @@ class _ProjectstageInsightsDashboardState
   List<String> projectStages = [];
   String? selectedProjectStage;
   List<SupervisorEntry> siteSupervisorEntries = [];
+
+  double currentStageCost = 0.0;
+  bool isLoadingCost = false;
 
   ReportType selectedReportType = ReportType.dailyExpense;
 
@@ -171,16 +167,14 @@ class _ProjectstageInsightsDashboardState
       Set<String> stageSet = {};
 
       final futures = collections.map((collection) async {
-        final snapshot = await FirebaseFirestore.instance
-            .collection(collection)
-            .where('siteId', isEqualTo: siteId)
-            .get();
+        final snapshot = await FirestoreService.getCollection(
+          collection,
+        ).where('siteId', isEqualTo: siteId).get();
         for (var doc in snapshot.docs) {
-          if (doc.data().containsKey('projectStage')) {
-            final stage = doc['projectStage'];
-            if (stage != null && stage.toString().trim().isNotEmpty) {
-              stageSet.add(stage.toString());
-            }
+          final data = doc.data();
+          final stage = data['projectStage'] ?? data['projectField'];
+          if (stage != null && stage.toString().trim().isNotEmpty) {
+            stageSet.add(stage.toString().trim());
           }
         }
       }).toList();
@@ -189,25 +183,200 @@ class _ProjectstageInsightsDashboardState
 
       setState(() {
         projectStages = stageSet.toList();
-        selectedProjectStage =
-            projectStages.isNotEmpty ? projectStages.first : null;
+        selectedProjectStage = projectStages.isNotEmpty
+            ? projectStages.first
+            : null;
 
         _updateSelectedSupervisorEntry();
+        if (selectedProjectStage != null) {
+          _calculateStageCost();
+        } else {
+          currentStageCost = 0.0;
+        }
       });
     } catch (e) {
-      print("Error fetching project stages: $e");
+      debugPrint("Error fetching project stages: $e");
       setState(() {
         projectStages = [];
         selectedProjectStage = null;
         selectedSupervisorEntry = null;
+        currentStageCost = 0.0;
       });
     }
   }
 
+  Future<void> _calculateStageCost() async {
+    final siteId = selectedSiteId?.trim();
+    final stage = selectedProjectStage?.trim();
+
+    if (siteId == null || stage == null) return;
+
+    // For Daily/Range reports, only calculate if dates are selected
+    if (selectedReportType == ReportType.dailyExpense && selectedDate == null) {
+      setState(() => currentStageCost = 0.0);
+      return;
+    }
+    if (selectedReportType == ReportType.expenseRange &&
+        (fromDate == null || toDate == null)) {
+      setState(() => currentStageCost = 0.0);
+      return;
+    }
+
+    setState(() => isLoadingCost = true);
+
+    double total = 0.0;
+    try {
+      final collections = [
+        'siteSupervisorEntries',
+        'contractorEntries',
+        'managerEntries',
+        'organizationEntries',
+      ];
+
+      final formattedDateYMD = selectedDate != null
+          ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+          : null;
+      final formattedDateDMY = selectedDate != null
+          ? DateFormat('ddMMyyyy').format(selectedDate!)
+          : null;
+      final start = fromDate;
+      final end = toDate;
+
+      debugPrint(
+        'ProjectstageInsights: Calculating cost for Site: $siteId, Stage: $stage, Type: $selectedReportType',
+      );
+
+      for (var collection in collections) {
+        // Special case for supervisor entries in daily mode: fetch by document ID
+        if (collection == 'siteSupervisorEntries' &&
+            selectedReportType == ReportType.dailyExpense &&
+            formattedDateDMY != null) {
+          final docId = '${siteId}_$formattedDateDMY';
+          final doc = await FirestoreService.getCollection(
+            collection,
+          ).doc(docId).get();
+          if (doc.exists) {
+            final val = _toNum(doc.data()?['totalAmount']);
+            debugPrint(
+              'ProjectstageInsights: Found Supervisor Entry $docId: $val',
+            );
+            total += val;
+          }
+          continue;
+        }
+
+        Query<Map<String, dynamic>> query = FirestoreService.getCollection(
+          collection,
+        ).where('siteId', isEqualTo: siteId);
+
+        // Apply date filter for other collections in daily mode
+        if (selectedReportType == ReportType.dailyExpense &&
+            formattedDateYMD != null) {
+          final dateField =
+              (collection == 'managerEntries' ||
+                  collection == 'organizationEntries')
+              ? 'entryDate'
+              : 'date';
+          query = query.where(dateField, isEqualTo: formattedDateYMD);
+        }
+
+        final snapshot = await query.get();
+        debugPrint(
+          'ProjectstageInsights: Collection $collection returned ${snapshot.docs.length} docs',
+        );
+
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+
+          // Filter by projectStage field (handle both projectStage and projectField)
+          final docStage = (data['projectStage'] ?? data['projectField'])
+              ?.toString()
+              .trim();
+          if (docStage != stage) continue;
+
+          // Apply range filter manually for expenseRange mode
+          if (selectedReportType == ReportType.expenseRange &&
+              start != null &&
+              end != null) {
+            final dateField =
+                (collection == 'managerEntries' ||
+                    collection == 'organizationEntries')
+                ? 'entryDate'
+                : 'date';
+            final rawDate = data[dateField];
+            DateTime? entryDate;
+            if (rawDate is Timestamp) {
+              entryDate = rawDate.toDate();
+            } else if (rawDate is String) {
+              entryDate = DateTime.tryParse(rawDate);
+            }
+
+            if (entryDate == null ||
+                entryDate.isBefore(start.subtract(const Duration(days: 1))) ||
+                entryDate.isAfter(end.add(const Duration(days: 1)))) {
+              continue;
+            }
+          }
+
+          if (collection == 'siteSupervisorEntries' ||
+              collection == 'contractorEntries') {
+            total += _toNum(data['totalAmount'] ?? data['amount']);
+          } else {
+            if (data.containsKey('bills')) {
+              final bills = data['bills'] as List? ?? [];
+              for (var bill in bills) {
+                if (bill is Map) {
+                  // For Daily Expense, we must also check the date of each bill if they are in a list
+                  if (selectedReportType == ReportType.dailyExpense &&
+                      formattedDateYMD != null) {
+                    final billDateRaw = bill['billDate'];
+                    String? billDateStr;
+                    if (billDateRaw is String) {
+                      billDateStr = billDateRaw;
+                    } else if (billDateRaw is Timestamp) {
+                      billDateStr = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(billDateRaw.toDate());
+                    }
+
+                    if (billDateStr != formattedDateYMD) continue;
+                  }
+                  total += _toNum(bill['billAmount']);
+                }
+              }
+            } else {
+              total += _toNum(data['totalAmount'] ?? data['amount']);
+            }
+          }
+        }
+      }
+
+      debugPrint('ProjectstageInsights: Total calculated: $total');
+
+      if (mounted) {
+        setState(() {
+          currentStageCost = total;
+          isLoadingCost = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error calculating stage cost: $e");
+      if (mounted) {
+        setState(() => isLoadingCost = false);
+      }
+    }
+  }
+
+  double _toNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+  }
+
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
-        .get();
+    final querySnapshot = await FirestoreService.getCollection(
+      'siteSupervisorEntries',
+    ).get();
     final entries = querySnapshot.docs
         .map((doc) => SupervisorEntry.fromFirestore(doc))
         .toList();
@@ -225,18 +394,20 @@ class _ProjectstageInsightsDashboardState
     final entriesForSite = siteSupervisorEntries.isNotEmpty
         ? siteSupervisorEntries
         : _allSupervisorEntriesCached!
-            .where((e) => e.siteId == selectedSiteId)
-            .toList();
+              .where((e) => e.siteId == selectedSiteId)
+              .toList();
 
     if (selectedProjectStage == null) {
-      selectedSupervisorEntry =
-          entriesForSite.isNotEmpty ? entriesForSite.first : null;
+      selectedSupervisorEntry = entriesForSite.isNotEmpty
+          ? entriesForSite.first
+          : null;
     } else {
       final filteredEntries = entriesForSite
           .where((entry) => entry.projectStage == selectedProjectStage)
           .toList();
-      selectedSupervisorEntry =
-          filteredEntries.isNotEmpty ? filteredEntries.first : null;
+      selectedSupervisorEntry = filteredEntries.isNotEmpty
+          ? filteredEntries.first
+          : null;
     }
   }
 
@@ -250,10 +421,11 @@ class _ProjectstageInsightsDashboardState
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryColor,
+              primary: Theme.of(context).primaryColor,
               onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+            dialogTheme: const DialogThemeData(),
           ),
           child: child!,
         );
@@ -263,6 +435,7 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         selectedDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
@@ -276,10 +449,11 @@ class _ProjectstageInsightsDashboardState
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryColor,
+              primary: Theme.of(context).primaryColor,
               onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+            dialogTheme: const DialogThemeData(),
           ),
           child: child!,
         );
@@ -289,6 +463,7 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         fromDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
@@ -302,10 +477,11 @@ class _ProjectstageInsightsDashboardState
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryColor,
+              primary: Theme.of(context).primaryColor,
               onPrimary: Colors.white,
-              onSurface: textColor,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+            dialogTheme: const DialogThemeData(),
           ),
           child: child!,
         );
@@ -315,20 +491,29 @@ class _ProjectstageInsightsDashboardState
       setState(() {
         toDate = picked;
       });
+      _calculateStageCost();
     }
   }
 
   void _openReport() {
+    if (selectedSiteId == null) {
+      _showErrorSnackBar(Theme.of(context), 'Please select a Site ID.');
+      return;
+    }
+
+    final currentSupervisorId =
+        selectedSupervisorEntry?.supervisorId ??
+        allSiteEntries
+            .where((e) => e.site == selectedSiteId)
+            .firstOrNull
+            ?.supervisorId ??
+        '';
+
     if (selectedReportType == ReportType.dailyExpense) {
-      if (selectedSupervisorEntry == null ||
-          selectedDate == null ||
-          selectedProjectStage == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Missing report criteria'),
-            backgroundColor: warningColor,
-          ),
+      if (selectedDate == null || selectedProjectStage == null) {
+        _showErrorSnackBar(
+          Theme.of(context),
+          'Missing report criteria (Date/Stage)',
         );
         return;
       }
@@ -336,24 +521,18 @@ class _ProjectstageInsightsDashboardState
         context,
         MaterialPageRoute(
           builder: (_) => ProjectStageDailySiteExpensesReportPage(
-            supervisorId: selectedSupervisorEntry!.supervisorId,
-            siteId: selectedSupervisorEntry!.siteId!,
+            supervisorId: currentSupervisorId,
+            siteId: selectedSiteId!,
             date: selectedDate!,
             projectStage: selectedProjectStage!,
           ),
         ),
       );
     } else if (selectedReportType == ReportType.expenseRange) {
-      if (selectedSupervisorEntry == null ||
-          fromDate == null ||
-          toDate == null ||
-          selectedProjectStage == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Missing report criteria for Expense Range'),
-            backgroundColor: warningColor,
-          ),
+      if (fromDate == null || toDate == null || selectedProjectStage == null) {
+        _showErrorSnackBar(
+          Theme.of(context),
+          'Missing report criteria for Expense Range',
         );
         return;
       }
@@ -361,7 +540,7 @@ class _ProjectstageInsightsDashboardState
         context,
         MaterialPageRoute(
           builder: (_) => ProjectStageExpensesReportPage(
-            siteId: selectedSupervisorEntry!.siteId!,
+            siteId: selectedSiteId!,
             fromDate: fromDate!,
             toDate: toDate!,
             projectStage: selectedProjectStage!,
@@ -369,21 +548,11 @@ class _ProjectstageInsightsDashboardState
         ),
       );
     } else if (selectedReportType == ReportType.siteSummary) {
-      if (selectedSupervisorEntry == null ||
-          selectedSupervisorEntry!.siteId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Missing site selection for summary'),
-            backgroundColor: warningColor,
-          ),
-        );
-        return;
-      }
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ProjectstageSiteSummaryReport(
-            siteId: selectedSupervisorEntry!.siteId!,
+            siteId: selectedSiteId!,
             projectStage: selectedProjectStage ?? '',
           ),
         ),
@@ -393,29 +562,18 @@ class _ProjectstageInsightsDashboardState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Project Stage Insights',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
+
+    return GlassScaffold(
+      title: 'Project Stage Insights',
       body: FutureBuilder<List<SupervisorEntry>>(
         future: supervisorEntriesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
               ),
             );
           }
@@ -423,57 +581,35 @@ class _ProjectstageInsightsDashboardState
             return Center(
               child: Text(
                 'No supervisor entries found.',
-                style: TextStyle(color: textColor),
+                style: theme.textTheme.bodyMedium,
               ),
             );
           }
           _allSupervisorEntriesCached ??= snapshot.data!;
 
-          final supervisorEntries = snapshot.data!;
-          final entriesForSite = siteSupervisorEntries.isNotEmpty
-              ? siteSupervisorEntries
-              : supervisorEntries
-                  .where((e) => e.siteId == selectedSiteId)
-                  .toList();
-
-          final filteredEntries = selectedProjectStage == null
-              ? entriesForSite
-              : entriesForSite
-                  .where((entry) => entry.projectStage == selectedProjectStage)
-                  .toList();
-
-          if (filteredEntries.isEmpty) {
-            selectedSupervisorEntry = null;
-          } else {
-            selectedSupervisorEntry = filteredEntries.first;
-          }
-
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Header
                 Text(
                   'Project Stage Reports',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'Generate detailed reports by project stage',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: textColor.withOpacity(0.7),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Site Selection
-                _buildModernCard(
+                GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -482,19 +618,22 @@ class _ProjectstageInsightsDashboardState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: primaryColor,
+                          color: theme.primaryColor,
                           letterSpacing: 1.2,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedSiteId,
+                        initialValue: selectedSiteId,
                         items: allSiteIds.map((siteId) {
                           return DropdownMenuItem<String>(
                             value: siteId,
                             child: Text(
                               siteId,
-                              style: TextStyle(fontSize: 16, color: textColor),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -508,31 +647,34 @@ class _ProjectstageInsightsDashboardState
                           });
                           await _fetchProjectStagesForSite(newSiteId);
                         },
-                        decoration: _inputDecoration(),
+                        decoration: _inputDecoration(theme),
                         borderRadius: BorderRadius.circular(8),
                         elevation: 2,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-                        dropdownColor: cardColor,
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.primaryColor,
+                        ),
+                        dropdownColor: theme.cardColor,
                       ),
-                      SizedBox(height: 12),
                       if (selectedSupervisorEntry?.siteName != null &&
-                          selectedSupervisorEntry!.siteName!.isNotEmpty)
+                          selectedSupervisorEntry!.siteName!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
                         Text(
                           'Project Name: ${selectedSupervisorEntry!.siteName}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: textColor,
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Project Stage Selection
-                _buildModernCard(
+                GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -541,67 +683,103 @@ class _ProjectstageInsightsDashboardState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: primaryColor,
+                          color: theme.primaryColor,
                           letterSpacing: 1.2,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedProjectStage,
+                        initialValue: selectedProjectStage,
                         items: projectStages.map((stage) {
                           return DropdownMenuItem<String>(
                             value: stage,
                             child: Text(
                               stage,
-                              style: TextStyle(fontSize: 16, color: textColor),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
                           );
                         }).toList(),
                         onChanged: (String? newStage) {
                           setState(() {
                             selectedProjectStage = newStage;
-                            if (_allSupervisorEntriesCached == null) {
-                              selectedSupervisorEntry = null;
-                              return;
-                            }
-                            final entriesForSite = siteSupervisorEntries
-                                    .isNotEmpty
-                                ? siteSupervisorEntries
-                                : _allSupervisorEntriesCached!
-                                    .where((e) => e.siteId == selectedSiteId)
-                                    .toList();
-
-                            if (newStage == null) {
-                              selectedSupervisorEntry =
-                                  entriesForSite.isNotEmpty
-                                      ? entriesForSite.first
-                                      : null;
-                            } else {
-                              final filteredEntries = entriesForSite
-                                  .where(
-                                      (entry) => entry.projectStage == newStage)
-                                  .toList();
-                              selectedSupervisorEntry =
-                                  filteredEntries.isNotEmpty
-                                      ? filteredEntries.first
-                                      : null;
-                            }
+                            _updateSelectedSupervisorEntry();
                           });
+                          _calculateStageCost();
                         },
-                        decoration: _inputDecoration(),
+                        decoration: _inputDecoration(theme),
                         borderRadius: BorderRadius.circular(8),
                         elevation: 2,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-                        dropdownColor: cardColor,
-                      )
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.primaryColor,
+                        ),
+                        dropdownColor: theme.cardColor,
+                      ),
                     ],
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
+
+                // Display Stage Cost
+                if (selectedProjectStage != null)
+                  GlassCard(
+                    color: theme.primaryColor.withValues(alpha: 0.1),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selectedReportType == ReportType.dailyExpense
+                                  ? 'DAILY COST'
+                                  : selectedReportType ==
+                                        ReportType.expenseRange
+                                  ? 'RANGE COST'
+                                  : 'TOTAL STAGE COST',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              selectedProjectStage!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isLoadingCost)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Text(
+                            '₹ ${currentStageCost.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 20),
 
                 // Report Type Selection
-                _buildModernCard(
+                GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -610,35 +788,38 @@ class _ProjectstageInsightsDashboardState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: primaryColor,
+                          color: theme.primaryColor,
                           letterSpacing: 1.2,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       _buildReportOption(
                         type: ReportType.dailyExpense,
-                        icon: Icons.today,
+                        icon: Icons.today_outlined,
                         title: 'Daily Expense',
                         subtitle: 'View expenses for a specific day',
+                        theme: theme,
                       ),
-                      Divider(height: 20, thickness: 0.5, color: Colors.grey[300]),
+                      const Divider(height: 20, thickness: 0.5),
                       _buildReportOption(
                         type: ReportType.expenseRange,
-                        icon: Icons.date_range,
+                        icon: Icons.date_range_outlined,
                         title: 'Expense Range',
                         subtitle: 'View expenses between dates',
+                        theme: theme,
                       ),
-                      Divider(height: 20, thickness: 0.5, color: Colors.grey[300]),
+                      const Divider(height: 20, thickness: 0.5),
                       _buildReportOption(
                         type: ReportType.siteSummary,
-                        icon: Icons.summarize,
+                        icon: Icons.summarize_outlined,
                         title: 'Site Summary',
                         subtitle: 'Overview of site progress',
+                        theme: theme,
                       ),
                     ],
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Date Selection
                 if (selectedReportType == ReportType.dailyExpense)
@@ -646,6 +827,7 @@ class _ProjectstageInsightsDashboardState
                     title: 'SELECT DATE',
                     date: selectedDate,
                     onTap: () => _selectDate(context),
+                    theme: theme,
                   ),
 
                 if (selectedReportType == ReportType.expenseRange)
@@ -655,165 +837,43 @@ class _ProjectstageInsightsDashboardState
                         title: 'FROM DATE',
                         date: fromDate,
                         onTap: () => _selectFromDate(context),
+                        theme: theme,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       _buildDateInputSection(
                         title: 'TO DATE',
                         date: toDate,
                         onTap: () => _selectToDate(context),
+                        theme: theme,
                       ),
                     ],
                   ),
-                SizedBox(height: 24),
+                const SizedBox(height: 32),
 
                 // Generate Report Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (selectedReportType == ReportType.dailyExpense) {
-                        if (selectedSiteId == null ||
-                            selectedSiteId!.isEmpty ||
-                            selectedDate == null ||
-                            selectedProjectStage == null ||
-                            selectedProjectStage!.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'Please select a Site ID, Date, and Project Stage before generating the report.'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        final supervisorEntries = snapshot.data!;
-                        final filteredEntries =
-                            supervisorEntries.where((entry) {
-                          final entryDate = entry.date != null
-                              ? DateTime(entry.date!.year, entry.date!.month,
-                                  entry.date!.day)
-                              : null;
-                          final selectedDateOnly = DateTime(selectedDate!.year,
-                              selectedDate!.month, selectedDate!.day);
-                          return (entry.siteId?.trim().toLowerCase() ?? '') ==
-                                  (selectedSiteId?.trim().toLowerCase() ??
-                                      '') &&
-                              (entry.projectStage == selectedProjectStage) &&
-                              (entryDate == selectedDateOnly);
-                        }).toList();
-                        if (filteredEntries.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('No data found'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        selectedSupervisorEntry = filteredEntries.first;
-                        _openReport();
-                      } else if (selectedReportType ==
-                          ReportType.expenseRange) {
-                        if (selectedSiteId == null ||
-                            selectedSiteId!.isEmpty ||
-                            fromDate == null ||
-                            toDate == null ||
-                            selectedProjectStage == null ||
-                            selectedProjectStage!.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'Please select a Site ID, Project Stage, From Date, and To Date before generating the report.'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        final supervisorEntries = snapshot.data!;
-                        final filteredEntries = selectedProjectStage == null
-                            ? supervisorEntries
-                            : supervisorEntries
-                                .where((entry) =>
-                                    entry.projectStage == selectedProjectStage)
-                                .toList();
-
-                        if (filteredEntries.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'No data found for the selected Site ID and Project Stage.'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        try {
-                          selectedSupervisorEntry = filteredEntries.firstWhere(
-                            (entry) =>
-                                (entry.siteId?.trim().toLowerCase() ?? '') ==
-                                (selectedSiteId?.trim().toLowerCase() ?? ''),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'No data found for the selected Site ID and Project Stage.'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        _openReport();
-                      } else if (selectedReportType == ReportType.siteSummary) {
-                        if (selectedSiteId == null || selectedSiteId!.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'Please select a Site ID before generating the report.'),
-                              backgroundColor: warningColor,
-                            ),
-                          );
-                          return;
-                        }
-                        _openReport();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      'GENERATE REPORT',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                GlassButton(
+                  label: 'GENERATE REPORT',
+                  icon: Icons.analytics_outlined,
+                  onPressed: () => _handleGenerateReport(theme, snapshot.data!),
                 ),
-                SizedBox(height: 20),
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryColor.withOpacity(0.2)),
-                  ),
+                const SizedBox(height: 32),
+                GlassCard(
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: primaryColor, size: 20),
-                      SizedBox(width: 12),
+                      Icon(
+                        Icons.info_outline,
+                        color: theme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Select a site and project stage to generate detailed reports',
                           style: TextStyle(
                             fontSize: 14,
-                            color: textColor.withOpacity(0.8),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                         ),
                       ),
@@ -828,23 +888,67 @@ class _ProjectstageInsightsDashboardState
     );
   }
 
-  Widget _buildModernCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  void _handleGenerateReport(
+    ThemeData theme,
+    List<SupervisorEntry> supervisorEntries,
+  ) {
+    if (selectedSiteId == null || selectedSiteId!.isEmpty) {
+      _showErrorSnackBar(theme, 'Please select a Site ID.');
+      return;
+    }
+
+    if (selectedReportType == ReportType.dailyExpense) {
+      if (selectedDate == null ||
+          selectedProjectStage == null ||
+          selectedProjectStage!.isEmpty) {
+        _showErrorSnackBar(theme, 'Please select a Date and Project Stage.');
+        return;
+      }
+
+      // Try to find an entry to get a specific supervisor if multiple exist
+      final filteredEntries = supervisorEntries.where((entry) {
+        final entryDate = entry.date != null
+            ? DateTime(entry.date!.year, entry.date!.month, entry.date!.day)
+            : null;
+        final selectedDateOnly = DateTime(
+          selectedDate!.year,
+          selectedDate!.month,
+          selectedDate!.day,
+        );
+        return (entry.siteId?.trim().toLowerCase() ?? '') ==
+                (selectedSiteId?.trim().toLowerCase() ?? '') &&
+            (entry.projectStage?.trim() == selectedProjectStage?.trim()) &&
+            (entryDate == selectedDateOnly);
+      }).toList();
+
+      if (filteredEntries.isNotEmpty) {
+        selectedSupervisorEntry = filteredEntries.first;
+      }
+
+      _openReport();
+    } else if (selectedReportType == ReportType.expenseRange) {
+      if (fromDate == null ||
+          toDate == null ||
+          selectedProjectStage == null ||
+          selectedProjectStage!.isEmpty) {
+        _showErrorSnackBar(
+          theme,
+          'Please select a Project Stage and Date Range.',
+        );
+        return;
+      }
+      _openReport();
+    } else if (selectedReportType == ReportType.siteSummary) {
+      _openReport();
+    }
+  }
+
+  void _showErrorSnackBar(ThemeData theme, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: theme.colorScheme.error,
       ),
-      child: child,
     );
   }
 
@@ -853,36 +957,43 @@ class _ProjectstageInsightsDashboardState
     required IconData icon,
     required String title,
     required String subtitle,
+    required ThemeData theme,
   }) {
+    final isSelected = selectedReportType == type;
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
       onTap: () {
         setState(() {
           selectedReportType = type;
           selectedDate = null;
           fromDate = null;
           toDate = null;
+          currentStageCost = 0.0; // Reset cost on type change
         });
-        },
+        if (type == ReportType.siteSummary) {
+          _calculateStageCost(); // Site summary calculates total immediately
+        }
+      },
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: selectedReportType == type
-                    ? primaryColor.withOpacity(0.1)
-                    : Colors.grey[50],
+                color: isSelected
+                    ? theme.primaryColor.withValues(alpha: 0.1)
+                    : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: selectedReportType == type ? primaryColor : Colors.grey[600],
+                color: isSelected
+                    ? theme.primaryColor
+                    : theme.colorScheme.onSurfaceVariant,
                 size: 22,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,37 +1002,29 @@ class _ProjectstageInsightsDashboardState
                     title,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: selectedReportType == type ? primaryColor : textColor,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
+                      color: isSelected
+                          ? theme.primaryColor
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 14,
-                      color: selectedReportType == type
-                          ? primaryColor.withOpacity(0.7)
-                          : Colors.grey[600],
+                      fontSize: 13,
+                      color: isSelected
+                          ? theme.primaryColor.withValues(alpha: 0.8)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            Radio<ReportType>(
-              value: type,
-              groupValue: selectedReportType,
-              onChanged: (ReportType? value) {
-                if (value == null) return;
-                setState(() {
-                  selectedReportType = value;
-                  selectedDate = null;
-                  fromDate = null;
-                  toDate = null;
-                });
-              },
-              activeColor: primaryColor,
-            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: theme.primaryColor, size: 20),
           ],
         ),
       ),
@@ -932,70 +1035,90 @@ class _ProjectstageInsightsDashboardState
     required String title,
     required DateTime? date,
     required VoidCallback onTap,
+    required ThemeData theme,
   }) {
-    return _buildModernCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: primaryColor,
-              letterSpacing: 1.2,
-            ),
-          ),
-          SizedBox(height: 12),
-          InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.primaryColor,
+                letterSpacing: 1.2,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    date != null
-                        ? DateFormat('MMM dd, yyyy').format(date)
-                        : 'Select Date',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: date != null ? textColor : Colors.grey[600],
-                    ),
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
                   ),
-                  Icon(Icons.calendar_month, color: primaryColor),
-                ],
+                  color: theme.colorScheme.surface.withValues(alpha: 0.5),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      date != null
+                          ? DateFormat('dd MMM, yyyy').format(date)
+                          : 'Select Date',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: date != null
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      color: theme.primaryColor,
+                      size: 20,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration() {
+  InputDecoration _inputDecoration(ThemeData theme) {
     return InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: primaryColor, width: 2),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
       ),
       filled: true,
-      fillColor: Colors.grey[50],
+      fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
     );
   }
 }

@@ -19,7 +19,7 @@ Widget buildInfoRow(String label, String value) {
           value,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            
           ),
         ),
       ],

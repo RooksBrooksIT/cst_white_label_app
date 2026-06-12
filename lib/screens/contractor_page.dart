@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class ContractorPage extends StatefulWidget {
   const ContractorPage({super.key});
@@ -12,7 +14,9 @@ class _ContractorPageState extends State<ContractorPage> {
   // For displaying contractors table
   // Show new contractors at the end by ordering by contractorId ascending
   Stream<QuerySnapshot<Map<String, dynamic>>> get _contractorsStream =>
-      FirebaseFirestore.instance.collection('contractors').orderBy('contractorId').snapshots();
+      FirestoreService.getCollection(
+        'contractors',
+      ).orderBy('contractorId').snapshots();
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
@@ -29,21 +33,13 @@ class _ContractorPageState extends State<ContractorPage> {
     super.dispose();
   }
 
-  static const Color primaryColor = Color(0xFF0b3470);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: const Text("New Contractor",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 3,
-        shadowColor: Colors.black38,
-      ),
+    return GlassScaffold(
+      title: 'New Contractor',
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -53,7 +49,6 @@ class _ContractorPageState extends State<ContractorPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -71,7 +66,11 @@ class _ContractorPageState extends State<ContractorPage> {
                     CircleAvatar(
                       radius: 44,
                       backgroundColor: primaryColor.withOpacity(0.15),
-                      child: Icon(Icons.engineering, color: primaryColor, size: 44),
+                      child: Icon(
+                        Icons.engineering,
+                        color: primaryColor,
+                        size: 44,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     _buildProjectFieldDropdown(),
@@ -79,8 +78,9 @@ class _ContractorPageState extends State<ContractorPage> {
                     _textField(
                       controller: _nameController,
                       label: "Contractor Name",
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? "Please enter name" : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? "Please enter name"
+                          : null,
                     ),
                     const SizedBox(height: 20),
                     _textField(
@@ -104,15 +104,18 @@ class _ContractorPageState extends State<ContractorPage> {
                       controller: _addressController,
                       label: "Address",
                       maxLines: 3,
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? "Please enter address" : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? "Please enter address"
+                          : null,
                     ),
                     const SizedBox(height: 28),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: _isSaving ? null : () => Navigator.pop(context),
+                            onPressed: _isSaving
+                                ? null
+                                : () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: primaryColor,
                               side: BorderSide(color: primaryColor),
@@ -121,8 +124,13 @@ class _ContractorPageState extends State<ContractorPage> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
-                            child: const Text("Cancel",
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                            child: const Text(
+                              "Cancel",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -146,11 +154,19 @@ class _ContractorPageState extends State<ContractorPage> {
                                       width: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.5,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ))
-                                  : const Text("Save",
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      "Save",
                                       style: TextStyle(
-                                          fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -174,7 +190,6 @@ class _ContractorPageState extends State<ContractorPage> {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -196,8 +211,13 @@ class _ContractorPageState extends State<ContractorPage> {
                   if (snapshot.hasError) {
                     return Padding(
                       padding: const EdgeInsets.all(30),
-                      child: Text('Error loading contractors',
-                          style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Error loading contractors',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     );
                   }
                   final docs = snapshot.data?.docs ?? [];
@@ -210,9 +230,14 @@ class _ContractorPageState extends State<ContractorPage> {
                   return SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(primaryColor.withOpacity(0.12)),
+                      headingRowColor: WidgetStateProperty.all(
+                        primaryColor.withOpacity(0.12),
+                      ),
                       headingTextStyle: TextStyle(
-                          color: primaryColor, fontWeight: FontWeight.w700, fontSize: 14),
+                        color: primaryColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                       columnSpacing: 36,
                       dataRowHeight: 52,
                       columns: const [
@@ -220,19 +245,16 @@ class _ContractorPageState extends State<ContractorPage> {
                         DataColumn(label: Text('Contractor Name')),
                         DataColumn(label: Text('Project Stage')),
                       ],
-                      rows: List<DataRow>.generate(
-                        docs.length,
-                        (index) {
-                          final data = docs[index].data();
-                          return DataRow(
-                            cells: [
-                              DataCell(Text('${index + 1}')),
-                              DataCell(Text(data['contractorName'] ?? '')),
-                              DataCell(Text(data['contractorField'] ?? '')),
-                            ],
-                          );
-                        },
-                      ),
+                      rows: List<DataRow>.generate(docs.length, (index) {
+                        final data = docs[index].data();
+                        return DataRow(
+                          cells: [
+                            DataCell(Text('${index + 1}')),
+                            DataCell(Text(data['contractorName'] ?? '')),
+                            DataCell(Text(data['contractorField'] ?? '')),
+                          ],
+                        );
+                      }),
                     ),
                   );
                 },
@@ -264,11 +286,14 @@ class _ContractorPageState extends State<ContractorPage> {
       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
+        labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
         filled: true,
-        fillColor: Colors.white,
+
         counterText: '',
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
@@ -279,7 +304,7 @@ class _ContractorPageState extends State<ContractorPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: primaryColor, width: 2.5),
+          borderSide: BorderSide(color: primaryColor, width: 2.5),
         ),
       ),
     );
@@ -287,43 +312,58 @@ class _ContractorPageState extends State<ContractorPage> {
 
   Widget _buildProjectFieldDropdown() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream:
-          FirebaseFirestore.instance.collection('projectStages').orderBy('projectStage').snapshots(),
+      stream: FirestoreService.getCollection(
+        'projectStages',
+      ).orderBy('projectStage').snapshots(),
       builder: (context, snapshot) {
-        final stages = snapshot.data?.docs
+        final stages =
+            snapshot.data?.docs
                 .map((d) => d.data()['projectStage'])
                 .whereType<String>()
                 .toSet()
                 .toList() ??
             [];
-        final currentValue =
-            stages.contains(_selectedProjectField) ? _selectedProjectField : null;
+        final currentValue = stages.contains(_selectedProjectField)
+            ? _selectedProjectField
+            : null;
         return DropdownButtonFormField<String>(
           value: currentValue,
           decoration: InputDecoration(
             labelText: "Project Stage",
-            labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
+            labelStyle: TextStyle(
+              color: primaryColor,
+              fontWeight: FontWeight.w700,
             ),
+            filled: true,
+
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: primaryColor, width: 2.5),
+              borderSide: BorderSide(color: primaryColor, width: 2.5),
             ),
           ),
           items: stages
-              .map((stage) => DropdownMenuItem(value: stage, child: Text(stage)))
+              .map(
+                (stage) => DropdownMenuItem(value: stage, child: Text(stage)),
+              )
               .toList(),
-          onChanged: stages.isNotEmpty ? (v) => setState(() => _selectedProjectField = v) : null,
+          onChanged: stages.isNotEmpty
+              ? (v) => setState(() => _selectedProjectField = v)
+              : null,
           validator: (v) => v == null ? "Please select a project stage" : null,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
           dropdownColor: Colors.white,
         );
       },
@@ -346,14 +386,18 @@ class _ContractorPageState extends State<ContractorPage> {
         'contractorId': contractorId,
         'contractorName': contractorNameCombined,
       };
-      await FirebaseFirestore.instance.collection('contractors').doc(contractorId).set(data);
+      await FirestoreService.getCollection(
+        'contractors',
+      ).doc(contractorId).set(data);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Contractor added successfully"),
           backgroundColor: primaryColor,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       Navigator.pop(context);
@@ -364,7 +408,9 @@ class _ContractorPageState extends State<ContractorPage> {
             content: Text("Failed to save: $e"),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }

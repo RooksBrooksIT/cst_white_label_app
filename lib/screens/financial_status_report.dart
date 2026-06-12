@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../services/firestore_service.dart';
+import '../utils/pdf_templates.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class FinancialStatusReportPage extends StatefulWidget {
   final String siteId;
@@ -25,156 +30,6 @@ class FinancialStatusReportPage extends StatefulWidget {
 }
 
 class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
-  // Color constants
-  final Color primaryColor = const Color(0xFF0b3470);
-  final Color primaryLightColor = const Color(0xFF1e4a8e);
-  final Color accentColor = const Color(0xFF4285F4);
-  final Color successColor = const Color(0xFF34A853);
-  final Color warningColor = const Color(0xFFFBBC05);
-  final Color dangerColor = const Color(0xFFEA4335);
-  final Color backgroundColor = const Color(0xFFF8F9FA);
-  final Color cardColor = Colors.white;
-  final Color textColor = const Color(0xFF2c3e50);
-  final Color secondaryTextColor = const Color(0xFF7f8c8d);
-
-  Future<void> _generateAndPreviewPDF() async {
-    final pdf = pw.Document();
-    final project = projectData ?? {};
-    final budget = _parseNumber(project['projectBudget']);
-    final spent = _parseNumber(project['amountSpent']);
-    final received = _parseNumber(project['amountPaid']);
-    final balance = _parseNumber(project['amountBalance']);
-    final duration = _calculateDurationInDays(project);
-    final startDate = _formatDate(project['actualStartDate']);
-    final endDate = _formatDate(project['plannedEndDate']);
-    final currentDate = _formatDate(DateTime.now());
-
-    pdf.addPage(
-      pw.MultiPage(
-        build: (pw.Context context) => [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(
-                'Financial Status Report',
-                style: pw.TextStyle(
-                  fontSize: 24,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(primaryColor.value),
-                ),
-              ),
-              pw.Container(
-                width: 60,
-                height: 60,
-                decoration: pw.BoxDecoration(
-                  color: PdfColor.fromInt(primaryColor.value),
-                  shape: pw.BoxShape.circle,
-                ),
-                child: pw.Center(
-                  child: pw.Text(
-                    'FSR',
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'Project Information',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColor.fromInt(primaryColor.value),
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          pw.Table.fromTextArray(
-            cellStyle: pw.TextStyle(fontSize: 12),
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-            ),
-            headerDecoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(primaryColor.value),
-            ),
-            data: [
-              ['Site ID', project['siteid'] ?? project['siteId'] ?? '-'],
-              ['Project Name', project['projectName'] ?? '-'],
-              ['Site Location', project['siteLocation'] ?? '-'],
-              ['Owner Name', project['ownerName'] ?? '-'],
-              ['Actual Start Date', startDate],
-              ['Planned End Date', endDate],
-              ['Current Date', currentDate],
-              ['Duration (Days)', duration.toString()],
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'Financial Summary',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColor.fromInt(primaryColor.value),
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          pw.Table.fromTextArray(
-            cellStyle: pw.TextStyle(fontSize: 12),
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-            ),
-            headerDecoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(primaryColor.value),
-            ),
-            data: [
-              ['Project Budget', '₹${budget.toStringAsFixed(2)}'],
-              ['Amount Received', '₹${received.toStringAsFixed(2)}'],
-              ['Amount Spent', '₹${spent.toStringAsFixed(2)}'],
-              ['Balance Amount', '₹${balance.toStringAsFixed(2)}'],
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(primaryColor.value),
-              border: pw.Border.all(
-                color: PdfColor.fromInt(primaryColor.value),
-                width: 1,
-              ),
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            child: pw.Text(
-              'Budget Utilization: ${budget > 0 ? (spent / budget * 100).clamp(0, 100).toStringAsFixed(1) : '0'}%',
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(primaryColor.value),
-              ),
-            ),
-          ),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'Generated on ${DateFormat('dd MMM yyyy - HH:mm').format(DateTime.now())}',
-            style: pw.TextStyle(
-              fontSize: 10,
-              color: PdfColor.fromInt(secondaryTextColor.value),
-            ),
-            textAlign: pw.TextAlign.center,
-          ),
-        ],
-      ),
-    );
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
-
   Map<String, dynamic>? projectData;
   bool isLoading = true;
   String? errorMsg;
@@ -187,7 +42,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final col = FirebaseFirestore.instance.collection('projects');
+      final col = FirestoreService.getCollection('projects');
       QuerySnapshot<Map<String, dynamic>> query = await col
           .where('siteId', isEqualTo: widget.siteId)
           .limit(1)
@@ -198,20 +53,45 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             .limit(1)
             .get();
       }
+
+      Map<String, dynamic> data = {};
       if (query.docs.isNotEmpty) {
+        data = query.docs.first.data();
+      }
+
+      // Also fetch from 'Site' collection to get the location if missing
+      try {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          // Merge location and other site details if they are missing in projectData
+          if (data['siteLocation'] == null && data['location'] == null) {
+            data['siteLocation'] = siteData['location'];
+          }
+          if (data['siteName'] == null) {
+            data['siteName'] = siteData['siteName'];
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching site details: $e');
+      }
+
+      if (data.isNotEmpty) {
         setState(() {
-          projectData = query.docs.first.data();
+          projectData = data;
           isLoading = false;
         });
       } else {
         setState(() {
-          errorMsg = 'Project not found';
+          errorMsg = 'Project data not found for site: ${widget.siteId}';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        errorMsg = 'Error loading project: ${e.toString()}';
+        errorMsg = 'Error loading project: $e';
         isLoading = false;
       });
     }
@@ -219,440 +99,129 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Financial Status Report',
-          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-        ),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return GlassScaffold(
+      title: 'Financial Status Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const Center(child: CircularProgressIndicator())
           : errorMsg != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 48, color: dangerColor),
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMsg!,
-                    style: TextStyle(fontSize: 16, color: textColor),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _fetchProjectData,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Project Header
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: primaryColor.withOpacity(0.2),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: primaryColor.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.business,
-                                size: 20,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.projectName,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.siteName,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: secondaryTextColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Divider(color: Colors.grey[300]),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person_outline,
-                              size: 16,
-                              color: secondaryTextColor,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              widget.ownerName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: secondaryTextColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Project Information Section
-                  _buildSectionHeader(
-                    'Project Information',
-                    Icons.info_outline,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    children: [
-                      _buildInfoItem(
-                        'Site ID',
-                        projectData?['siteid'] ?? projectData?['siteId'] ?? '-',
-                        Icons.tag,
-                      ),
-                      _buildInfoItem(
-                        'Site Location',
-                        projectData?['siteLocation'] ?? '-',
-                        Icons.location_on,
-                      ),
-                      _buildInfoItem(
-                        'Planned Start Date',
-                        _formatDate(projectData?['plannedStartDate']),
-                        Icons.calendar_today,
-                      ),
-                      _buildInfoItem(
-                        'Actual Start Date',
-                        _formatDate(projectData?['actualStateDate']),
-                        Icons.calendar_today,
-                      ),
-                      _buildInfoItem(
-                        'Current Date',
-                        _formatDate(DateTime.now()),
-                        Icons.calendar_today,
-                      ),
-                      _buildInfoItem(
-                        'Duration',
-                        '${_calculateDurationInDays(projectData)} days',
-                        Icons.timelapse,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Financial Summary Section
-                  _buildSectionHeader('Financial Summary', Icons.attach_money),
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    children: [
-                      _buildFinancialItem(
-                        'Project Budget',
-                        projectData?['projectBudget'],
-                        Icons.account_balance_wallet,
-                        primaryColor,
-                      ),
-                      _buildFinancialItem(
-                        'Amount Received',
-                        projectData?['amountPaid'],
-                        Icons.arrow_downward,
-                        successColor,
-                      ),
-                      _buildFinancialItem(
-                        'Amount Spent',
-                        projectData?['amountSpent'],
-                        Icons.arrow_upward,
-                        dangerColor,
-                      ),
-                      _buildFinancialItem(
-                        'Balance Amount',
-                        projectData?['amountBalance'],
-                        Icons.account_balance,
-                        accentColor,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Visual Financial Summary
-                  if (projectData?['projectBudget'] != null &&
-                      projectData?['amountSpent'] != null)
-                    _buildFinancialProgress(),
-                  const SizedBox(height: 32),
-
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.picture_as_pdf, size: 20),
-                          label: const Text('Export as PDF'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: _generateAndPreviewPDF,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.arrow_back, size: 20),
-                          label: const Text('Go Back'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            side: BorderSide(color: primaryColor),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          ? _buildErrorView(theme)
+          : _buildReportView(theme),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: primaryColor),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: primaryColor,
-          ),
+  Widget _buildErrorView(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              errorMsg!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 24),
+            GlassButton(label: 'RETRY', onPressed: _fetchProjectData),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({required List<Widget> children}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildInfoItem(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: secondaryTextColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 14, color: secondaryTextColor),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: textColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildFinancialItem(
-    String label,
-    dynamic value,
-    IconData icon,
-    Color color,
-  ) {
-    final amount = _formatCurrency(value);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 20, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 14, color: secondaryTextColor),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  amount,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFinancialProgress() {
-    final budget = _parseNumber(projectData?['projectBudget']);
-    final spent = _parseNumber(projectData?['amountSpent']);
-    final percentage = budget > 0 ? (spent / budget * 100).clamp(0, 100) : 0;
-
-    Color progressColor;
-    if (percentage > 80) {
-      progressColor = dangerColor;
-    } else if (percentage > 50) {
-      progressColor = warningColor;
-    } else {
-      progressColor = successColor;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
-      ),
+  Widget _buildReportView(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Budget Utilization',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
-            ),
-          ),
+          _buildProjectHeader(theme),
           const SizedBox(height: 16),
-          LinearProgressIndicator(
-            value: percentage / 100,
-            minHeight: 12,
-            borderRadius: BorderRadius.circular(6),
-            backgroundColor: Colors.grey[200],
-            color: progressColor,
-          ),
-          const SizedBox(height: 8),
+          _buildInfoSection(theme),
+          const SizedBox(height: 16),
+          _buildFinancialSummary(theme),
+          const SizedBox(height: 32),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${percentage.toStringAsFixed(1)}% used',
-                style: TextStyle(
-                  color: progressColor,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: GlassButton(
+                  label: 'EXPORT PDF',
+                  onPressed: _generateAndPreviewPDF,
+                  icon: Icons.picture_as_pdf,
                 ),
               ),
-              Text(
-                '${_formatCurrency(spent)} of ${_formatCurrency(budget)}',
-                style: TextStyle(color: secondaryTextColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GlassButton(
+                  label: 'REFRESH',
+                  onPressed: _fetchProjectData,
+                  isSecondary: true,
+                  icon: Icons.refresh,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProjectHeader(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.apartment, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.projectName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      widget.siteName,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          Row(
+            children: [
+              Text('Client Name', style: theme.textTheme.bodySmall),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.ownerName,
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -661,58 +230,346 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     );
   }
 
-  double _parseNumber(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    if (value is String) {
-      return double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
-    }
-    return 0;
+  Widget _buildInfoSection(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Project Information',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            'Site ID',
+            projectData?['siteId'] ?? projectData?['siteid'] ?? '-',
+            Icons.tag,
+          ),
+          _buildInfoRow(
+            'Location',
+            projectData?['siteLocation'] ?? projectData?['location'] ?? '-',
+            Icons.location_on_outlined,
+          ),
+          _buildInfoRow(
+            'Actual Start',
+            _formatDate(
+              projectData?['actualStartDate'] ??
+                  projectData?['actualStateDate'],
+            ),
+            Icons.calendar_today_outlined,
+          ),
+          _buildInfoRow(
+            'Duration',
+            '${_calculateDuration()} days',
+            Icons.history,
+          ),
+        ],
+      ),
+    );
   }
 
-  String _formatDate(dynamic date) {
-    if (date == null) return '-';
-    if (date is String) {
-      try {
-        final dt = DateTime.parse(date);
-        return DateFormat('dd MMM yyyy').format(dt);
-      } catch (_) {
-        return date;
-      }
-    } else if (date is Timestamp) {
-      return DateFormat('dd MMM yyyy').format(date.toDate());
-    } else if (date is DateTime) {
-      return DateFormat('dd MMM yyyy').format(date);
-    }
-    return date.toString();
+  Widget _buildFinancialSummary(ThemeData theme) {
+    final budget = _parseNum(projectData?['projectBudget']);
+    final received = _parseNum(projectData?['amountPaid']);
+    final spent = _parseNum(projectData?['amountSpent']);
+    final balance = _parseNum(projectData?['amountBalance']);
+    final usage = budget > 0 ? (spent / budget * 100).clamp(0, 100) : 0;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Financial Summary',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildFinanceTile(
+            'Total Budget',
+            '₹ $budget',
+            theme.colorScheme.primary,
+            Icons.account_balance_wallet_outlined,
+          ),
+          _buildFinanceTile(
+            'Total Received',
+            '₹ $received',
+            Colors.green,
+            Icons.arrow_downward_rounded,
+          ),
+          _buildFinanceTile(
+            'Total Spent',
+            '₹ $spent',
+            Colors.orange,
+            Icons.arrow_upward_rounded,
+          ),
+          _buildFinanceTile(
+            'Balance',
+            '₹ $balance',
+            Colors.blue,
+            Icons.account_balance_outlined,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Budget Utilization (${usage.toStringAsFixed(1)}%)',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: usage / 100,
+            minHeight: 10,
+            borderRadius: BorderRadius.circular(5),
+            color: usage > 90
+                ? theme.colorScheme.error
+                : theme.colorScheme.primary,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.05),
+          ),
+        ],
+      ),
+    );
   }
 
-  String _formatCurrency(dynamic value) {
-    if (value == null) return '-';
-    final number = _parseNumber(value);
-    return NumberFormat.currency(symbol: '₹', decimalDigits: 2).format(number);
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Text(label, style: theme.textTheme.bodySmall),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  int _calculateDurationInDays(Map<String, dynamic>? data) {
-    if (data == null || data['actualStateDate'] == null) return 0;
+  Widget _buildFinanceTile(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Text(label, style: theme.textTheme.bodyMedium),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    DateTime? startDate;
-    final start = data['actualStateDate'];
+  num _parseNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v;
+    return num.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+  }
 
-    // Parse start date
-    if (start is String) {
-      startDate = DateTime.tryParse(start);
-    } else if (start is Timestamp) {
-      startDate = start.toDate();
-    }
+  String _formatDate(dynamic d) {
+    if (d == null) return '-';
+    if (d is Timestamp) return DateFormat('dd MMM yyyy').format(d.toDate());
+    if (d is String) return d;
+    return '-';
+  }
 
-    if (startDate == null) return 0;
+  int _calculateDuration() {
+    final start =
+        projectData?['actualStartDate'] ?? projectData?['actualStateDate'];
+    if (start is! Timestamp) return 0;
+    return DateTime.now().difference(start.toDate()).inDays;
+  }
 
-    // Use current date as end date
-    final endDate = DateTime.now();
+  Future<void> _generateAndPreviewPDF() async {
+    final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
 
-    // Calculate difference in days
-    final difference = endDate.difference(startDate);
-    return difference.inDays;
+    final budget = _parseNum(projectData?['projectBudget']);
+    final spent = _parseNum(projectData?['amountSpent']);
+    final received = _parseNum(projectData?['amountPaid']);
+    final balance = budget - spent;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Financial Status Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (context) => [
+          // Project Summary Section
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Project Name',
+                widget.projectName,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                widget.siteId,
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Client Name',
+                widget.ownerName,
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Location',
+                projectData?['siteLocation'] ??
+                    projectData?['location'] ??
+                    'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Start Date',
+                _formatDate(projectData?['actualStartDate']),
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Duration',
+                '${_calculateDuration()} Days',
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+
+          // Financial Table
+          pw.Text(
+            'Financial Breakdown',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Table.fromTextArray(
+            headers: ['Financial Metric', 'Amount (INR)'],
+            data: [
+              ['Total Project Budget', budget.toStringAsFixed(2)],
+              ['Total Amount Received', received.toStringAsFixed(2)],
+              ['Total Amount Spent', spent.toStringAsFixed(2)],
+              ['Remaining Balance', balance.toStringAsFixed(2)],
+            ],
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 32),
+
+          // Progress Indicator (Visual represention)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue50,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Summary Analysis',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Budget Utilization: ',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      '${budget > 0 ? (spent / budget * 100).toStringAsFixed(1) : 0}%',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pdfPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Estimated Completion Weight: ',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      '${projectData?['completionPercentage'] ?? 0}%',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pdfPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

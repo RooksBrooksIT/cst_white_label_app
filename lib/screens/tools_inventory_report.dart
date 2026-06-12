@@ -1,6 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'tools_inventory_details.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
 
 class ToolsInventoryPage extends StatefulWidget {
   const ToolsInventoryPage({super.key});
@@ -10,12 +13,6 @@ class ToolsInventoryPage extends StatefulWidget {
 }
 
 class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
-  // Updated Colors
-  static const _primaryColor = Color(0xFF0b3470); // Your main professional blue
-  static const _secondaryColor = Color(0xFFF9FAFB); // Light background for neat UI
-  static const _cardColor = Colors.white;
-  static const _highlightColor = Color(0xFFE8F4F8);
-
   // Data state
   DataState _dataState = DataState.loading;
   List<ToolInventory> _toolsAtCompany = [];
@@ -34,16 +31,17 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     setState(() => _dataState = DataState.loading);
     try {
       final results = await Future.wait([
-        FirebaseFirestore.instance.collection('toolsAtCompany').get(),
-        FirebaseFirestore.instance.collection('toolsAtSite').get(),
-        FirebaseFirestore.instance.collection('tools').get(),
+        FirestoreService.getCollection('toolsAtCompany').get(),
+        FirestoreService.getCollection('toolsAtSite').get(),
+        FirestoreService.getCollection('tools').get(),
       ]);
 
       final companyData = results[0].docs
           .map((doc) => ToolInventory.fromMap(doc.data()))
           .toList();
-      final siteData =
-          results[1].docs.map((doc) => ToolInventory.fromMap(doc.data())).toList();
+      final siteData = results[1].docs
+          .map((doc) => ToolInventory.fromMap(doc.data()))
+          .toList();
       final toolCodes = results[2].docs
           .map((doc) => doc.data()['toolCode']?.toString() ?? '')
           .where((code) => code.isNotEmpty)
@@ -72,10 +70,16 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
 
     return allToolCodes.map((code) {
       final companyCount = _toolsAtCompany
-          .firstWhere((e) => e.toolCode == code, orElse: () => ToolInventory.empty())
+          .firstWhere(
+            (e) => e.toolCode == code,
+            orElse: () => ToolInventory.empty(),
+          )
           .availableCount;
       final siteCount = _toolsAtSite
-          .firstWhere((e) => e.toolCode == code, orElse: () => ToolInventory.empty())
+          .firstWhere(
+            (e) => e.toolCode == code,
+            orElse: () => ToolInventory.empty(),
+          )
           .availableCount;
 
       return ToolInventorySummary(
@@ -90,8 +94,10 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     if (_searchQuery.isEmpty) return _mergedInventory;
 
     return _mergedInventory
-        .where((tool) =>
-            tool.toolCode.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where(
+          (tool) =>
+              tool.toolCode.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
         .toList();
   }
 
@@ -99,37 +105,28 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ToolsInventoryDetailsPage(toolCode: tool.toolCode),
+        builder: (context) =>
+            ToolsInventoryDetailsPage(toolCode: tool.toolCode),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _secondaryColor,
-      appBar: AppBar(
-        title: const Text(
-          'Tools Inventory',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GlassScaffold(
+      title: 'Tools Inventory',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.white),
+          onPressed: _loadInventoryData,
+          tooltip: 'Refresh',
         ),
-        backgroundColor: _primaryColor,
-        elevation: 2,
-        centerTitle: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(16),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInventoryData,
-            tooltip: 'Refresh',
-            color: Colors.white,
-          ),
-        ],
-      ),
+      ],
       body: _buildBody(),
     );
   }
@@ -143,23 +140,18 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(_errorMessage ?? 'Unknown error',
-                  style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadInventoryData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: const Text('Retry'),
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.error,
+                size: 48,
               ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage ?? 'Unknown error',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 16),
+              GlassButton(label: 'RETRY', onPressed: _loadInventoryData),
             ],
           ),
         );
@@ -190,9 +182,9 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                       return _ToolInventoryCard(
                         tool: tool,
                         onTap: () => _navigateToToolDetails(tool),
-                        isHighlighted: tool.toolCode
-                            .toLowerCase()
-                            .contains(_searchQuery.toLowerCase()),
+                        isHighlighted: tool.toolCode.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ),
                       );
                     },
                   ),
@@ -215,15 +207,15 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           ),
           const SizedBox(height: 8),
           TextButton(
+            child: const Text('Clear search'),
             onPressed: () {
               setState(() {
                 _searchQuery = '';
               });
             },
             style: TextButton.styleFrom(
-              foregroundColor: _primaryColor,
+              foregroundColor: Theme.of(context).colorScheme.primary,
             ),
-            child: const Text('Clear search'),
           ),
         ],
       ),
@@ -231,10 +223,14 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
   }
 
   Widget _buildSummaryCards() {
-    final totalAtCompany =
-        _toolsAtCompany.fold(0, (sum, tool) => sum + tool.availableCount);
-    final totalAtSite =
-        _toolsAtSite.fold(0, (sum, tool) => sum + tool.availableCount);
+    final totalAtCompany = _toolsAtCompany.fold(
+      0,
+      (sum, tool) => sum + tool.availableCount,
+    );
+    final totalAtSite = _toolsAtSite.fold(
+      0,
+      (sum, tool) => sum + tool.availableCount,
+    );
     final totalTools = totalAtCompany + totalAtSite;
 
     return LayoutBuilder(
@@ -248,7 +244,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                       title: 'Total Tools',
                       value: totalTools,
                       icon: Icons.construction,
-                      primaryColor: _primaryColor,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -257,7 +252,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                       title: 'At Company',
                       value: totalAtCompany,
                       icon: Icons.business,
-                      primaryColor: _primaryColor,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -266,7 +260,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                       title: 'At Site',
                       value: totalAtSite,
                       icon: Icons.location_city,
-                      primaryColor: _primaryColor,
                     ),
                   ),
                 ],
@@ -280,7 +273,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                           title: 'Total Tools',
                           value: totalTools,
                           icon: Icons.construction,
-                          primaryColor: _primaryColor,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -289,7 +281,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                           title: 'At Company',
                           value: totalAtCompany,
                           icon: Icons.business,
-                          primaryColor: _primaryColor,
                         ),
                       ),
                     ],
@@ -299,7 +290,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                     title: 'At Site',
                     value: totalAtSite,
                     icon: Icons.location_city,
-                    primaryColor: _primaryColor,
                     fullWidth: true,
                   ),
                 ],
@@ -309,29 +299,26 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
   }
 
   Widget _buildSearchBar() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: _cardColor,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.12),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
       ),
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Search tools...',
-          prefixIcon: Icon(Icons.search, color: _primaryColor),
+          prefixIcon: Icon(Icons.search, color: colorScheme.primary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear),
-                  color: _primaryColor,
+                  color: colorScheme.primary,
                   onPressed: () {
                     setState(() {
                       _searchQuery = '';
@@ -340,8 +327,11 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                 )
               : null,
         ),
-        cursorColor: _primaryColor,
-        style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w600),
+        cursorColor: colorScheme.primary,
+        style: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
         onChanged: (value) {
           setState(() {
             _searchQuery = value;
@@ -356,33 +346,26 @@ class _SummaryCard extends StatelessWidget {
   final String title;
   final int value;
   final IconData icon;
-  final Color primaryColor;
   final bool fullWidth;
 
   const _SummaryCard({
     required this.title,
     required this.value,
     required this.icon,
-    required this.primaryColor,
     this.fullWidth = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
       width: fullWidth ? double.infinity : null,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: colorScheme.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,22 +376,22 @@ class _SummaryCard extends StatelessWidget {
               Text(
                 title.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: primaryColor.withOpacity(0.75),
-                  letterSpacing: 1.2,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.primary,
+                  letterSpacing: 1,
                 ),
               ),
-              Icon(icon, color: primaryColor.withOpacity(0.7)),
+              Icon(icon, color: colorScheme.primary, size: 20),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             value.toString(),
             style: TextStyle(
-              fontSize: 26,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: primaryColor,
+              color: colorScheme.primary,
             ),
           ),
         ],
@@ -430,13 +413,9 @@ class _ToolInventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      elevation: 2,
-      color: isHighlighted ? const Color(0xFFE8F4F8) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return GlassCard(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -449,37 +428,45 @@ class _ToolInventoryCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    tool.toolCode,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
+                  Expanded(
+                    child: Text(
+                      tool.toolCode,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Icon(Icons.chevron_right, color: Colors.grey),
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _InventoryBadge(
                     label: 'Company',
                     count: tool.atCompany,
                     color: Colors.blue.shade700,
                   ),
-                  const SizedBox(width: 12),
                   _InventoryBadge(
                     label: 'Site',
                     count: tool.atSite,
                     color: Colors.green.shade700,
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 4),
                   TextButton(
                     onPressed: onTap,
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF0b3470),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                      foregroundColor: colorScheme.primary,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     child: const Text('View Details'),
                   ),
@@ -547,10 +534,7 @@ class ToolInventory {
   final String toolCode;
   final int availableCount;
 
-  const ToolInventory({
-    required this.toolCode,
-    required this.availableCount,
-  });
+  const ToolInventory({required this.toolCode, required this.availableCount});
 
   factory ToolInventory.fromMap(Map<String, dynamic> map) {
     return ToolInventory(

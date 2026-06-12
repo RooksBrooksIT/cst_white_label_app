@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 import 'package:intl/intl.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
@@ -10,7 +13,7 @@ class MaterialInfoScreen extends StatefulWidget {
 }
 
 class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed unused _firestore field
 
   // Form controllers
   final TextEditingController _managerNameController = TextEditingController();
@@ -34,11 +37,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   final TextEditingController _fromSiteNameController = TextEditingController();
   final TextEditingController _fromSupervisorController =
       TextEditingController();
+  final TextEditingController _fromProjectNameController =
+      TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
 
   final TextEditingController _toManagerController = TextEditingController();
   final TextEditingController _toSiteNameController = TextEditingController();
   final TextEditingController _toSupervisorController = TextEditingController();
+  final TextEditingController _toProjectNameController =
+      TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
 
   // Site-to-Company specific state
@@ -91,10 +98,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     _fromManagerController.dispose();
     _fromSiteNameController.dispose();
     _fromSupervisorController.dispose();
+    _fromProjectNameController.dispose();
     _fromDateController.dispose();
     _toManagerController.dispose();
     _toSiteNameController.dispose();
     _toSupervisorController.dispose();
+    _toProjectNameController.dispose();
     _toDateController.dispose();
 
     // Site-to-Company controllers
@@ -106,36 +115,185 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     super.dispose();
   }
 
-  // Load site data from siteSupervisorMap collection
+  // Load site data from site collection with supervisor mapping left-joined
   Future<void> _loadSiteData() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('siteSupervisorMap')
-          .get();
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+      final Map<String, Map<String, dynamic>> siteDetails = {
+        for (var doc in sitesSnapshot.docs)
+          doc.id: doc.data() as Map<String, dynamic>
+      };
+
+      final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
+      // Build lookup by 'site' field AND by plain site name (for older records)
+      final Map<String, Map<String, dynamic>> supervisorMap = {};
+      for (var doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final siteField = data['site']?.toString().trim();
+        if (siteField != null && siteField.isNotEmpty) {
+          supervisorMap[siteField] = data;
+        }
+      }
 
       if (mounted) {
         setState(() {
-          sitesList = querySnapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'siteId': doc.id,
-              'siteName': data['site'] ?? doc.id,
-              'projectName': data['projectName'] ?? '',
-              'supervisorName':
-                  data['supervisor'] ?? data['supervisorName'] ?? '',
+          sitesList = siteDetails.entries.map<Map<String, dynamic>>((entry) {
+            final sId = entry.key;           // e.g. "S001_MySiteName"
+            final sData = entry.value;
+            final siteName = sData['siteName']?.toString() ?? sId;
+            // Try matching by doc ID first, then by plain site name
+            final mapping = supervisorMap[sId] ?? supervisorMap[siteName];
+
+            return <String, dynamic>{
+              'siteId': sId,
+              'siteName': siteName,
+              'projectName': mapping?['projectName'] ?? sData['projectName'] ?? '',
+              'supervisorName': mapping?['supervisor'] ?? 'Not Assigned',
             };
           }).toList();
           _isLoadingSites = false;
+          debugPrint('Loaded ${sitesList.length} sites successfully');
         });
       }
     } catch (e) {
-      print('Error loading site data: $e');
+      debugPrint('Error loading site data: $e');
       if (mounted) {
         setState(() {
           _isLoadingSites = false;
         });
         _showSnackBar('Error loading site data');
       }
+    }
+  }
+
+  // Asynchronously fetch and fill latest project and supervisor details from Firestore
+  Future<void> _fetchAndFillSiteDetails(String siteId, {required int mode, bool isFromSite = true}) async {
+    final trimmedId = siteId.trim();
+    if (trimmedId.isEmpty) return;
+
+    debugPrint('Auto-filling site details for ID: $trimmedId (mode: $mode)');
+
+    String? supervisor;
+    String? projectName;
+    String? siteName;
+
+    // 1. Check preloaded sitesList as a fast initial fill (instant UI update)
+    final siteItem = sitesList.firstWhere(
+      (s) => s['siteId']?.toString().trim() == trimmedId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (siteItem.isNotEmpty) {
+      debugPrint('Found preloaded siteItem: $siteItem');
+      siteName = siteItem['siteName']?.toString();
+      // Only use preloaded supervisor/projectName if they are non-empty/non-default
+      final preloadedProject = siteItem['projectName']?.toString() ?? '';
+      final preloadedSupervisor = siteItem['supervisorName']?.toString() ?? '';
+      if (preloadedProject.isNotEmpty) projectName = preloadedProject;
+      if (preloadedSupervisor.isNotEmpty && preloadedSupervisor != 'Not Assigned') supervisor = preloadedSupervisor;
+    } else {
+      debugPrint('No preloaded siteItem found for $trimmedId');
+    }
+
+    // Fill immediately with whatever we have so far
+    if (mounted) {
+      setState(() {
+        _applyFill(mode: mode, isFromSite: isFromSite,
+          siteName: siteName ?? trimmedId,
+          projectName: projectName ?? '',
+          supervisor: supervisor ?? '');
+      });
+    }
+
+    try {
+      // 2. Always query siteSupervisorMap by 'site' field (doc IDs don't match siteId)
+      // Also try plain siteName in case older records stored the name rather than doc ID
+      QuerySnapshot<Map<String, dynamic>>? mapSnapshot;
+      mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap')
+          .where('site', isEqualTo: trimmedId)
+          .limit(1)
+          .get();
+
+      if (mapSnapshot.docs.isEmpty && siteName != null && siteName != trimmedId) {
+        // Fallback: try querying by the human-readable site name
+        mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap')
+            .where('site', isEqualTo: siteName)
+            .limit(1)
+            .get();
+      }
+
+      if (mapSnapshot.docs.isNotEmpty) {
+        final data = mapSnapshot.docs.first.data();
+        final fetchedSupervisor = data['supervisor']?.toString();
+        final fetchedProject = (data['projectName'] ?? data['project_name'])?.toString();
+        if (fetchedSupervisor != null && fetchedSupervisor.isNotEmpty) supervisor = fetchedSupervisor;
+        if (fetchedProject != null && fetchedProject.isNotEmpty) projectName = fetchedProject;
+      }
+
+      // 3. Fetch from projects collection by siteId for the project name
+      if (projectName == null || projectName.isEmpty) {
+        // Try with doc ID format first
+        var projectSnapshot = await FirestoreService.getCollection('projects')
+            .where('siteId', isEqualTo: trimmedId)
+            .limit(1)
+            .get();
+        // Also try with siteName if still not found
+        if (projectSnapshot.docs.isEmpty && siteName != null) {
+          projectSnapshot = await FirestoreService.getCollection('projects')
+              .where('siteName', isEqualTo: siteName)
+              .limit(1)
+              .get();
+        }
+        if (projectSnapshot.docs.isNotEmpty) {
+          final pData = projectSnapshot.docs.first.data();
+          // projects docs have 'siteName' not 'projectName'
+          final pName = (pData['projectName'] ?? pData['siteName'])?.toString();
+          if (pName != null && pName.trim().isNotEmpty) projectName = pName;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error auto-filling site details for $trimmedId: $e');
+    }
+
+    // Final fallbacks
+    supervisor = (supervisor?.isNotEmpty == true) ? supervisor : 'Not Assigned';
+    projectName = (projectName?.isNotEmpty == true) ? projectName : (siteName ?? trimmedId);
+    siteName ??= trimmedId;
+
+    if (mounted) {
+      setState(() {
+        _applyFill(mode: mode, isFromSite: isFromSite,
+          siteName: siteName!,
+          projectName: projectName!,
+          supervisor: supervisor!);
+      });
+    }
+  }
+
+  // Helper to apply filled values to the correct controllers based on mode
+  void _applyFill({
+    required int mode,
+    required bool isFromSite,
+    required String siteName,
+    required String projectName,
+    required String supervisor,
+  }) {
+    if (mode == 0) {
+      _projectNameController.text = projectName;
+      _supervisorNameController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+    } else if (mode == 1) {
+      if (isFromSite) {
+        _fromSiteNameController.text = siteName;
+        _fromProjectNameController.text = projectName;
+        _fromSupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      } else {
+        _toSiteNameController.text = siteName;
+        _toProjectNameController.text = projectName;
+        _toSupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      }
+    } else if (mode == 2) {
+      _siteToCompanySiteNameController.text = siteName;
+      _siteToCompanySupervisorController.text = supervisor.isNotEmpty ? supervisor : 'Not Assigned';
+      _projectNameController.text = projectName;
     }
   }
 
@@ -171,23 +329,30 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // Load material data from materialsavailablity collection
   Future<void> _loadMaterialData() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('materialsavailablity')
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materialsavailablity',
+      ).get();
 
       // Group by materialname and pick the latest entry (by lastupdated) for each
       final Map<String, Map<String, dynamic>> latestByName = {};
       for (final doc in querySnapshot.docs) {
         final data = doc.data();
-        final name = (data['materialname'] ?? '').toString().trim();
+        // Check for both materialName and materialname
+        final name = (data['materialName'] ?? data['materialname'] ?? '')
+            .toString()
+            .trim();
         if (name.isEmpty) continue;
+
         final count = _parseCount(data['count']);
-        final lastUpdatedMs = _tsMillis(data['lastupdated']);
+        // Check for both lastupdated and lastUpdated
+        final lastUpdatedMs = _tsMillis(
+          data['lastupdated'] ?? data['lastUpdated'],
+        );
 
         if (!latestByName.containsKey(name)) {
           latestByName[name] = {
             'docId': doc.id,
-            'materialName': name, // use field value as the logical key
+            'materialName': name,
             'displayName': name,
             'count': count,
             'lastupdatedMillis': lastUpdatedMs,
@@ -195,7 +360,6 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         } else {
           final existing = latestByName[name]!;
           final existingTs = existing['lastupdatedMillis'];
-          // Replace if this doc has a newer timestamp in millis
           final isNewer = lastUpdatedMs > (existingTs as int? ?? -1);
           if (isNewer) {
             latestByName[name] = {
@@ -246,16 +410,19 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
 
     try {
-      final querySnapshot = await _firestore
-          .collection('materialatsite')
-          .where('siteid', isEqualTo: siteId)
-          .get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'materialatsite',
+      ).where('siteid', isEqualTo: siteId).get();
 
       final list =
           querySnapshot.docs
               .map((doc) {
                 final data = doc.data();
-                final name = (data['materialname'] ?? '').toString().trim();
+                // Check for both materialName and materialname
+                final name =
+                    (data['materialName'] ?? data['materialname'] ?? '')
+                        .toString()
+                        .trim();
                 if (name.isEmpty) return null;
                 final count = _parseCount(data['count']);
                 return {
@@ -300,7 +467,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // Find the selected site data and auto-fill site name and supervisor name
       final selectedSite = sitesList.firstWhere(
         (site) => site['siteId'] == siteId,
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
 
       if (selectedSite.isNotEmpty) {
@@ -328,7 +495,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final source = _transferMode == 0 ? materialsList : siteMaterialsList;
         final selectedMaterial = source.firstWhere(
           (material) => material['materialName'] == materialName,
-          orElse: () => {},
+          orElse: () => <String, dynamic>{},
         );
         if (selectedMaterial.isNotEmpty) {
           availableCount = selectedMaterial['count'] ?? 0;
@@ -369,7 +536,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     final source = _transferMode == 0 ? materialsList : siteMaterialsList;
     final selectedMaterial = source.firstWhere(
       (material) => material['materialName'] == _selectedMaterialName,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
     final displayName =
         selectedMaterial['displayName'] ?? _selectedMaterialName!;
@@ -417,6 +584,26 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _selectedSiteId = null;
       _projectNameController.clear();
       _supervisorNameController.clear();
+
+      _fromManagerController.clear();
+      _fromSiteId = null;
+      _fromSiteNameController.clear();
+      _fromProjectNameController.clear();
+      _fromSupervisorController.clear();
+
+      _toManagerController.clear();
+      _toSiteId = null;
+      _toSiteNameController.clear();
+      _toProjectNameController.clear();
+      _toSupervisorController.clear();
+
+      _siteToCompanyManagerController.clear();
+      _siteToCompanySiteNameController.clear();
+      _siteToCompanySupervisorController.clear();
+      _siteToCompanyDateController.text = DateFormat(
+        'yyyy-MM-dd',
+      ).format(DateTime.now());
+
       _selectedMaterialName = null;
       _neededCountController.clear();
       availableCount = 0;
@@ -440,6 +627,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _selectedSiteId = null;
       _siteToCompanySiteNameController.clear();
       _siteToCompanySupervisorController.clear();
+      _projectNameController.clear();
       _siteToCompanyDateController.clear();
       _selectedMaterialName = null;
       _neededCountController.clear();
@@ -597,7 +785,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 _saveTransferData();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF772323),
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm Transfer'),
@@ -612,7 +800,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     if (_selectedSiteId == null) return '';
     final selectedSite = sitesList.firstWhere(
       (site) => site['siteId'] == _selectedSiteId,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
     return selectedSite['siteName'] ?? _selectedSiteId!;
   }
@@ -640,13 +828,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Save to materialmovementhistory collection
       final movementHistoryDocId = '${_selectedSiteId}_$date';
-      final movementHistoryRef = _firestore
-          .collection('materialmovementhistory')
-          .doc(movementHistoryDocId);
+      final movementHistoryRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementHistoryDocId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -671,7 +859,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         // Update materialsavailablity collection (decrease count) on the latest document for this material
         final latestEntry = materialsList.firstWhere(
           (mat) => mat['materialName'] == material['materialName'],
-          orElse: () => {'count': 0, 'docId': material['materialName']},
+          orElse: () => <String, dynamic>{'count': 0, 'docId': material['materialName']},
         );
         final String docId = (latestEntry['docId'] ?? material['materialName'])
             .toString();
@@ -679,17 +867,17 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final newAvailableCount =
             currentAvailableCount - material['neededCount'];
 
-        final materialAvailabilityRef = _firestore
-            .collection('materialsavailablity')
-            .doc(docId);
+        final materialAvailabilityRef = FirestoreService.getCollection(
+          'materialsavailablity',
+        ).doc(docId);
         batch.update(materialAvailabilityRef, {"count": newAvailableCount});
 
         // Update materialatsite collection
         final materialAtSiteDocId =
             '${_selectedSiteId}_${material['materialName']}';
-        final materialAtSiteRef = _firestore
-            .collection('materialatsite')
-            .doc(materialAtSiteDocId);
+        final materialAtSiteRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc(materialAtSiteDocId);
 
         // Check if we need to create or update
         final existingDoc = await materialAtSiteRef.get();
@@ -735,7 +923,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // Close loading dialog and show success
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialog();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been transferred successfully.',
+        );
+        _clearAll();
       }
     } catch (e) {
       print('Error saving transfer data: $e');
@@ -780,7 +972,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Process each material for materialatsite collection
       for (final material in materialsToTransfer) {
@@ -788,12 +980,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         final int moveCount = material['neededCount'];
 
         // Document references
-        final fromDocRef = _firestore
-            .collection('materialatsite')
-            .doc('${_fromSiteId}_$matName');
-        final toDocRef = _firestore
-            .collection('materialatsite')
-            .doc('${_toSiteId}_$matName');
+        final fromDocRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc('${_fromSiteId}_$matName');
+        final toDocRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc('${_toSiteId}_$matName');
 
         // Get current counts
         final fromSnap = await fromDocRef.get();
@@ -830,9 +1022,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       // 2. Save to materialmovementhistory collection
       final movementId =
           '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = _firestore
-          .collection('materialmovementhistory')
-          .doc(movementId);
+      final movementRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -845,6 +1037,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           "Tositeid": _toSiteId,
           "managername": _fromManagerController.text,
           "materialname": material['materialName'],
+          "materialdisplayname": material['displayName'],
+          "fromsitename": _fromSiteNameController.text,
+          "fromprojectname": _fromProjectNameController.text,
+          "fromsupervisorname": _fromSupervisorController.text,
+          "tositename": _toSiteNameController.text,
+          "toprojectname": _toProjectNameController.text,
+          "tosupervisorname": _toSupervisorController.text,
           "timestamp": FieldValue.serverTimestamp(),
         };
       }
@@ -856,7 +1055,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialogSiteToSite();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been transferred successfully between sites.',
+        );
 
         // Clear form and reload data
         setState(() {
@@ -865,6 +1067,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           availableCount = 0;
           _neededCountController.clear();
         });
+
+        _fromManagerController.clear();
+        _toManagerController.clear();
+        _fromDateController.clear();
+        _toDateController.clear();
 
         // Reload site materials for updated counts
         await _loadSiteMaterialData(_fromSiteId);
@@ -912,14 +1119,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       );
 
       // Use batch for atomic operations
-      final batch = _firestore.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
       // 1. Save to materialmovementhistory collection
       final movementId =
           '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = _firestore
-          .collection('materialmovementhistory')
-          .doc(movementId);
+      final movementRef = FirestoreService.getCollection(
+        'materialmovementhistory',
+      ).doc(movementId);
 
       Map<String, dynamic> movementHistoryData = {};
       for (int i = 0; i < materialsToTransfer.length; i++) {
@@ -949,15 +1156,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         // Update materialsavailablity collection (increase count)
         final latestEntry = materialsList.firstWhere(
           (mat) => mat['materialName'] == matName,
-          orElse: () => {'count': 0, 'docId': matName},
+          orElse: () => <String, dynamic>{'count': 0, 'docId': matName},
         );
         final String docId = (latestEntry['docId'] ?? matName).toString();
         final currentAvailableCount = (latestEntry['count'] ?? 0).toInt();
         final newAvailableCount = currentAvailableCount + moveCount;
 
-        final materialAvailabilityRef = _firestore
-            .collection('materialsavailablity')
-            .doc(docId);
+        final materialAvailabilityRef = FirestoreService.getCollection(
+          'materialsavailablity',
+        ).doc(docId);
         batch.set(materialAvailabilityRef, {
           "count": newAvailableCount,
           "materialname": matName,
@@ -966,9 +1173,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
         // Update materialatsite collection (decrease count at site)
         final materialAtSiteDocId = '${_selectedSiteId}_$matName';
-        final materialAtSiteRef = _firestore
-            .collection('materialatsite')
-            .doc(materialAtSiteDocId);
+        final materialAtSiteRef = FirestoreService.getCollection(
+          'materialatsite',
+        ).doc(materialAtSiteDocId);
 
         final existingDoc = await materialAtSiteRef.get();
         if (existingDoc.exists) {
@@ -1017,7 +1224,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        _showSuccessDialogSiteToCompany();
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Materials have been returned to company successfully.',
+        );
 
         // Clear form
         _clearSiteToCompanyFields();
@@ -1031,184 +1241,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Materials have been transferred successfully.'),
-              const SizedBox(height: 12),
-              Text('Site: ${_getSelectedSiteName()}'),
-              Text('Date: ${_dateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Transferred Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ Available counts updated in system\n✓ Materials added to site inventory\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _clearAll();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  void _showSuccessDialogSiteToSite() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Materials have been transferred successfully between sites.',
-              ),
-              const SizedBox(height: 12),
-              Text('From Site: ${_fromSiteNameController.text}'),
-              Text('To Site: ${_toSiteNameController.text}'),
-              Text('Date: ${_fromDateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Transferred Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ From site inventory decreased\n✓ To site inventory increased\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Optionally clear more fields if needed
-                _fromManagerController.clear();
-                _toManagerController.clear();
-                _fromDateController.clear();
-                _toDateController.clear();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialogSiteToCompany() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Transfer Successful!',
-            style: TextStyle(color: Colors.green),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Materials have been returned to company successfully.',
-              ),
-              const SizedBox(height: 12),
-              Text('From Site: ${_siteToCompanySiteNameController.text}'),
-              Text('Date: ${_siteToCompanyDateController.text}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Returned Materials:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...materialsToTransfer
-                  .map(
-                    (material) => Text(
-                      '- ${material['displayName']}: ${material['neededCount']} units',
-                    ),
-                  )
-                  .toList(),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '✓ Company inventory increased\n✓ Site inventory decreased\n✓ Transfer history saved',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1240,23 +1273,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _transferMode == 0
-              ? 'Company To Site Transfer'
-              : _transferMode == 1
-              ? 'Site To Site Transfer'
-              : 'Site To Company Transfer',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF772323),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
+    return GlassScaffold(
+      title: _transferMode == 0
+          ? 'Company To Site Transfer'
+          : _transferMode == 1
+          ? 'Site To Site Transfer'
+          : 'Site To Company Transfer',
+      onBack: () => Navigator.pop(context),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1275,24 +1299,25 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         _neededCountController.clear();
                       });
                     },
+
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 0
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 0
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 0 ? 0 : 2,
                         ),
                       ),
                     ),
                     child: const Text(
-                      'CompanyToSite',
+                      'CTS',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1310,22 +1335,22 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 1
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 1
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 1 ? 0 : 2,
                         ),
                       ),
                     ),
                     child: const Text(
-                      'SiteToSite',
+                      'STS',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1343,22 +1368,22 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _transferMode == 2
-                          ? const Color(0xFF772323)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       foregroundColor: _transferMode == 2
                           ? Colors.white
-                          : const Color(0xFF772323),
+                          : Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: const Color(0xFF772323),
+                          color: Theme.of(context).colorScheme.primary,
                           width: _transferMode == 2 ? 0 : 2,
                         ),
                       ),
                     ),
                     child: const Text(
-                      'SiteToCompany',
+                      'STC',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1455,7 +1480,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1501,13 +1526,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -1517,7 +1542,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton(
                       onPressed: _transferMaterials,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -1583,26 +1608,21 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _fromSiteId,
                 onChanged: (v) async {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _fromSiteId = v;
-                    _fromSiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _fromSupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                    // Reset material selection for SiteToSite
-                    _selectedMaterialName = null;
-                    availableCount = 0;
-                    _neededCountController.clear();
-                    _isLoadingMaterials = true;
-                  });
-                  await _loadSiteMaterialData(v);
+                  if (v != null) {
+                    setState(() {
+                      _fromSiteId = v;
+                      _selectedMaterialName = null;
+                      availableCount = 0;
+                      _neededCountController.clear();
+                      _isLoadingMaterials = true;
+                    });
+                    await _fetchAndFillSiteDetails(v, mode: 1, isFromSite: true);
+                    await _loadSiteMaterialData(v);
+                  }
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
+              
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _fromSiteNameController,
@@ -1610,6 +1630,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _fromProjectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1641,19 +1669,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _toSiteId,
                 onChanged: (v) {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _toSiteId = v;
-                    _toSiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _toSupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                  });
+                  if (v != null) {
+                    setState(() {
+                      _toSiteId = v;
+                    });
+                    _fetchAndFillSiteDetails(v, mode: 1, isFromSite: false);
+                  }
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1662,6 +1685,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _toProjectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -1714,7 +1745,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1753,13 +1784,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel Transfer',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -1773,7 +1804,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -1806,27 +1837,19 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               _buildSiteDropdownGeneric(
                 selectedId: _selectedSiteId,
                 onChanged: (v) async {
-                  final site = sitesList.firstWhere(
-                    (s) => s['siteId'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _selectedSiteId = v;
-                    _siteToCompanySiteNameController.text =
-                        site['siteName']?.toString() ?? '';
-                    _siteToCompanySupervisorController.text =
-                        site['supervisorName']?.toString() ?? '';
-                    _projectNameController.text =
-                        site['projectName']?.toString() ?? '';
-                    // Reset material selection
-                    _selectedMaterialName = null;
-                    availableCount = 0;
-                    _neededCountController.clear();
-                    _isLoadingMaterials = true;
-                  });
-                  await _loadSiteMaterialData(v);
+                  if (v != null) {
+                    setState(() {
+                      _selectedSiteId = v;
+                      _selectedMaterialName = null;
+                      availableCount = 0;
+                      _neededCountController.clear();
+                      _isLoadingMaterials = true;
+                    });
+                    await _fetchAndFillSiteDetails(v, mode: 2);
+                    await _loadSiteMaterialData(v);
+                  }
                 },
-                label: 'Site ID *',
+                label: 'Site *',
               ),
               const SizedBox(height: 16),
 
@@ -1837,6 +1860,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 hint: 'Auto-filled from selection',
                 enabled: false,
                 icon: Icons.location_on,
+              ),
+              const SizedBox(height: 16),
+
+              // Project Name
+              _buildTextField(
+                controller: _projectNameController,
+                label: 'Project Name',
+                hint: 'Auto-filled from selection',
+                enabled: false,
+                icon: Icons.business,
               ),
               const SizedBox(height: 16),
 
@@ -1900,7 +1933,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addMaterial,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -1946,13 +1979,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _clearAll,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: Colors.grey.shade400),
                       ),
                       child: const Text(
-                        'Cancel Transfer',
+                        'Clear',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
@@ -1966,7 +1999,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF772323),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -2035,10 +2068,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       ),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF772323),
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );
@@ -2058,11 +2091,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -2106,11 +2135,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2172,11 +2197,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           'Site *',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2225,17 +2246,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       );
                     }).toList(),
                     onChanged: (v) {
-                      final site = sitesList.firstWhere(
-                        (s) => s['siteId'] == v,
-                        orElse: () => {},
-                      );
-                      setState(() {
-                        _selectedSiteId = v;
-                        _projectNameController.text =
-                            site['projectName']?.toString() ?? '';
-                        _supervisorNameController.text =
-                            site['supervisorName']?.toString() ?? '';
-                      });
+                      if (v != null) {
+                        setState(() {
+                          _selectedSiteId = v;
+                        });
+                        _fetchAndFillSiteDetails(v, mode: 0);
+                      }
                     },
                   ),
                 ),
@@ -2250,11 +2266,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           'Material Name *',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2343,11 +2355,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2383,11 +2391,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       children: [
         const Text(
           'Materials to Transfer:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black87,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2409,9 +2413,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         : null,
                   ),
                   child: ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.inventory,
-                      color: Color(0xFF772323),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     title: Text(
                       material['displayName'],

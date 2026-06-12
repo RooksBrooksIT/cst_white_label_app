@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class MaterialRequestForm extends StatefulWidget {
   final String supervisorId;
@@ -37,10 +40,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   bool isLoadingSupervisorData = true;
 
   // Color scheme
-  final Color primaryColor = const Color(0xFF0B3470);
-  final Color accentColor = Color(0xFF4CAF50);
-  final Color errorColor = Color(0xFFE53935);
-  final Color backgroundColor = Color(0xFFF5F7FA);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get accentColor => Theme.of(context).colorScheme.secondary;
+  Color get errorColor => Theme.of(context).colorScheme.error;
+  Color get backgroundColor => Theme.of(context).colorScheme.surface;
 
   // Material dropdown data
   List<Map<String, dynamic>> materialDocs = [];
@@ -49,8 +52,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   @override
   void initState() {
     super.initState();
-    supervisorNameController =
-        TextEditingController(text: widget.supervisorName);
+    supervisorNameController = TextEditingController(
+      text: widget.supervisorName,
+    );
     _fetchSupervisorSites(); // fetch all sites assigned to supervisor
     _fetchMaterialsFromFirestore();
     _fetchUnitsFromFirestore();
@@ -58,8 +62,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   Future<void> _fetchUnitsFromFirestore() async {
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('materialUnits').get();
+      final snapshot = await FirestoreService.getCollection(
+        'materialUnits',
+      ).get();
       final units = snapshot.docs
           .map((doc) => doc.data()['matUnit']?.toString() ?? '')
           .where((unit) => unit.isNotEmpty)
@@ -78,10 +83,24 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       supervisorError = null;
     });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
-          .where('supervisor', isEqualTo: widget.supervisorName)
-          .get();
+      final collection = FirestoreService.getCollection('siteSupervisorMap');
+
+      // Try querying by Supervisor ID first
+      var query = collection.where(
+        'Supervisor ID',
+        isEqualTo: widget.supervisorId,
+      );
+      var snapshot = await query.get();
+
+      // Fallback to name if not found by ID
+      if (snapshot.docs.isEmpty) {
+        query = collection.where(
+          'supervisor',
+          isEqualTo: widget.supervisorName,
+        );
+        snapshot = await query.get();
+      }
+
       if (snapshot.docs.isNotEmpty) {
         siteDropdownItems = snapshot.docs
             .map((doc) => doc.data()['site']?.toString() ?? '')
@@ -116,11 +135,15 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   Future<void> _fetchMaterialsFromFirestore() async {
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('materials').get();
+      final snapshot = await FirestoreService.getCollection(
+        'materialCategories',
+      ).get();
       materialDocs = snapshot.docs.map((doc) => doc.data()).toList();
       materialDescriptions = materialDocs
-          .map((m) => m['materialName']?.toString() ?? '')
+          .map(
+            (m) =>
+                (m['matCategory'] ?? m['materialName'] ?? '').toString().trim(),
+          )
           .where((desc) => desc.isNotEmpty)
           .toList();
       setState(() {});
@@ -158,15 +181,18 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     });
     if (value != null) {
       final mat = materialDocs.firstWhere(
-        (m) => m['materialName'] == value,
+        (m) =>
+            (m['matCategory'] ?? m['materialName'] ?? '').toString().trim() ==
+            value,
         orElse: () => {},
       );
       final unitRef = mat['materialUnit'];
       if (unitRef != null && unitRef.toString().isNotEmpty) {
         if (unitRef is String && unitRef.startsWith('materialUnits/')) {
           try {
-            final unitSnap =
-                await FirebaseFirestore.instance.doc(unitRef).get();
+            final unitSnap = await FirebaseFirestore.instance
+                .doc(unitRef)
+                .get();
             if (unitSnap.exists && unitSnap.data() != null) {
               final unitData = unitSnap.data() as Map<String, dynamic>;
               final unitName = unitData['name']?.toString() ?? '';
@@ -211,13 +237,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       lastDate: DateTime(2100),
       builder: (BuildContext context, Widget? child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
               primary: primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+              onPrimary: Theme.of(context).colorScheme.onPrimary,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           child: child!,
         );
@@ -285,11 +311,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       final projectName = projectController.text.trim();
       final supervisorName = supervisorNameController.text.trim();
       final now = DateTime.now();
-      final formattedDate = '${DateFormat('MMMM d, yyyy at h:mm:ss a')
-              .format(now)} UTC${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs()}:${(now.timeZoneOffset.inMinutes % 60).toString().padLeft(2, '0')}';
+      final formattedDate =
+          '${DateFormat('MMMM d, yyyy at h:mm:ss a').format(now)} UTC${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs()}:${(now.timeZoneOffset.inMinutes % 60).toString().padLeft(2, '0')}';
 
-      final reqCollection =
-          FirebaseFirestore.instance.collection('siteMaterialsRequest');
+      final reqCollection = FirestoreService.getCollection(
+        'siteMaterialsRequest',
+      );
       final querySnapshot = await reqCollection
           .orderBy('matReqId', descending: true)
           .limit(1)
@@ -304,13 +331,15 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       }
 
       final List<Map<String, dynamic>> materials = addedMaterials
-          .map((mat) => {
-                "materialName": mat['material'],
-                "materialQty":
-                    int.tryParse(mat['quantity'].toString()) ?? mat['quantity'],
-                "materialUnit": mat['unit'],
-                "priority": mat['priority'],
-              })
+          .map(
+            (mat) => {
+              "materialName": mat['material'],
+              "materialQty":
+                  int.tryParse(mat['quantity'].toString()) ?? mat['quantity'],
+              "materialUnit": mat['unit'],
+              "priority": mat['priority'],
+            },
+          )
           .toList();
 
       final data = {
@@ -333,6 +362,24 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       final docId = "${siteId}_$datePart";
       await reqCollection.doc(docId).set(data);
 
+      // Build a string of requested materials
+      final materialNames = addedMaterials
+          .map((mat) => mat['material'])
+          .join(', ');
+
+      // Notify the organisation about the new material request
+      await NotificationService.notifyOrganisation(
+        title: '📦 New Material Request',
+        body:
+            '$supervisorName (Site: $siteId) requested $matReqId. Items: $materialNames',
+        data: {
+          'type': 'material_request',
+          'matReqId': matReqId,
+          'siteId': siteId,
+          'supervisorName': supervisorName,
+        },
+      );
+
       if (!mounted) return;
 
       // Show alert dialog with matReqId and keep form open
@@ -340,8 +387,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text('Request Submitted'),
-          content:
-              Text('Material Request ID $matReqId has been sent for approval.'),
+          content: Text(
+            'Material Request ID $matReqId has been sent for approval.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -361,8 +409,11 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     }
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {bool enabled = true}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+  }) {
     return TextFormField(
       controller: controller,
       enabled: enabled,
@@ -376,7 +427,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
@@ -389,28 +440,30 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     required ValueChanged<T?> onChanged,
   }) {
     return DropdownButtonFormField<T>(
+      isExpanded: true,
       value: value,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: primaryColor),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+          borderSide: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      dropdownColor: Colors.white,
+      dropdownColor: Theme.of(context).colorScheme.surface,
       icon: Icon(Icons.arrow_drop_down, color: primaryColor),
       items: items.map((T item) {
         return DropdownMenuItem<T>(
           value: item,
           child: Text(
             item.toString(),
-            style: TextStyle(color: Colors.black87),
+            style: TextStyle(),
+            overflow: TextOverflow.ellipsis,
           ),
         );
       }).toList(),
@@ -423,20 +476,23 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       margin: EdgeInsets.only(top: 20, bottom: 8),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.1),
+        color: primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: primaryColor.withOpacity(0.3)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Icon(Icons.info_outline, color: primaryColor, size: 20),
-          SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -460,13 +516,15 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             labelStyle: TextStyle(color: primaryColor),
             hintText: 'Select Date',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+              borderSide: BorderSide(
+                color: primaryColor.withValues(alpha: 0.5),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderSide: BorderSide(color: primaryColor, width: 2),
             ),
             filled: true,
-            fillColor: Colors.white,
+
             suffixIcon: Icon(Icons.calendar_today, color: primaryColor),
             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -477,380 +535,387 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: ThemeData(
-        primaryColor: primaryColor,
-        colorScheme: ColorScheme.light(primary: primaryColor),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: EdgeInsets.symmetric(vertical: 14),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: primaryColor,
-          ),
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        appBar: AppBar(
-          title: Text('Material Request Form',style: TextStyle(color: Colors.white),),
-          centerTitle: true,
-          elevation: 0,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [primaryColor.withOpacity(0.8), primaryColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return GlassScaffold(
+      title: 'Material Request Form',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      body: isLoadingSupervisorData
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(primaryColor),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading site information...',
+                    style: TextStyle(color: primaryColor),
+                  ),
+                ],
               ),
-            ),
-          ),
-        ),
-        body: isLoadingSupervisorData
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(primaryColor)),
-                    SizedBox(height: 16),
-                    Text(
-                      'Loading site information...',
-                      style: TextStyle(color: primaryColor),
-                    ),
-                  ],
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// SECTION 1: Basic Details
-                    _buildSectionHeader('Site Information'),
-                    if (supervisorError != null)
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        margin: EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: errorColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: errorColor.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline,
-                                color: errorColor, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                supervisorError!,
-                                style: TextStyle(color: errorColor),
-                              ),
-                            ),
-                          ],
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  /// SECTION 1: Basic Details
+                  _buildSectionHeader('Site Information'),
+                  if (supervisorError != null)
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      margin: EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: errorColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: errorColor.withValues(alpha: 0.3),
                         ),
                       ),
-                    SizedBox(height: 8),
-                    _buildDropdown<String>(
-                      label: "Site ID",
-                      value: selectedSite,
-                      items: siteDropdownItems,
-                      onChanged: (value) {
-                        setState(() {
-                          selectedSite = value;
-                          siteIdController.text = value ?? '';
-                          final map = siteMappings.firstWhere(
-                            (m) => m['site'] == value,
-                            orElse: () => {},
-                          );
-                          projectController.text =
-                              map['projectName']?.toString() ?? '';
-                          projectStageController.text =
-                              map['projectStage']?.toString() ?? '';
-                          supervisorNameController.text =
-                              map['supervisor']?.toString() ??
-                                  widget.supervisorName;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 12),
-                    _buildTextField("Supervisor Name", supervisorNameController,
-                        enabled: false),
-                    SizedBox(height: 12),
-                    _buildTextField("Project", projectController,
-                        enabled: false),
-                    SizedBox(height: 12),
-                    _buildTextField("Project Stage", projectStageController,
-                        enabled: false),
-                    SizedBox(height: 12),
-                    _buildDateField(),
-                    SizedBox(height: 8),
-
-                    /// SECTION 2: Material Entry
-                    _buildSectionHeader('Add Materials'),
-                    SizedBox(height: 8),
-                    _buildDropdown<String>(
-                      label: "Material",
-                      value: selectedMaterial,
-                      items: materialDescriptions,
-                      onChanged: _onMaterialChanged,
-                    ),
-                    SizedBox(height: 12),
-                    _buildDropdown<String>(
-                      label: "Unit",
-                      value: selectedUnit,
-                      items: unitDropdownItems,
-                      onChanged: (value) =>
-                          setState(() => selectedUnit = value),
-                    ),
-                    SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child:
-                              _buildTextField("Quantity", quantityController),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    _buildDropdown<String>(
-                      label: "Priority",
-                      value: selectedPriority,
-                      items: ['Immediate', 'In 2 days'],
-                      onChanged: (value) =>
-                          setState(() => selectedPriority = value!),
-                    ),
-                    SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _addMaterial,
-                        icon: Icon(Icons.add, size: 20),
-                        label: Text("Add Material"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor,
-                        ),
-                      ),
-                    ),
-
-                    /// SECTION 3: Data Table
-                    if (addedMaterials.isNotEmpty) ...[
-                      _buildSectionHeader('Requested Materials'),
-                      SizedBox(height: 8),
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columnSpacing: 24,
-                              dataRowHeight: 48,
-                              headingRowHeight: 40,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              columns: [
-                                DataColumn(
-                                  label: Text(
-                                    "Material",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "Unit",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "Qty",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "Priority",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "Action",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: addedMaterials
-                                  .asMap()
-                                  .entries
-                                  .map((entry) => DataRow(
-                                        cells: [
-                                          DataCell(
-                                              Text(entry.value['material'])),
-                                          DataCell(
-                                              Text(entry.value['unit'] ?? '')),
-                                          DataCell(
-                                              Text(entry.value['quantity'])),
-                                          DataCell(
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    entry.value['priority'] ==
-                                                            'Immediate'
-                                                        ? Colors.red.shade50
-                                                        : Colors.orange.shade50,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color:
-                                                      entry.value['priority'] ==
-                                                              'Immediate'
-                                                          ? Colors.red.shade100
-                                                          : Colors
-                                                              .orange.shade100,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                entry.value['priority'],
-                                                style: TextStyle(
-                                                  color:
-                                                      entry.value['priority'] ==
-                                                              'Immediate'
-                                                          ? Colors.red.shade800
-                                                          : Colors
-                                                              .orange.shade800,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            IconButton(
-                                              icon: Icon(Icons.delete_outline,
-                                                  color: errorColor),
-                                              onPressed: () =>
-                                                  _removeMaterial(entry.key),
-                                            ),
-                                          ),
-                                        ],
-                                      ))
-                                  .toList(),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: errorColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              supervisorError!,
+                              style: TextStyle(color: errorColor),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Total Items: ${addedMaterials.length}',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ] else ...[
-                      SizedBox(height: 20),
-                      Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.inventory_2_outlined,
-                                size: 60, color: Colors.grey.shade400),
-                            SizedBox(height: 8),
-                            Text(
-                              'No materials added yet',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Add materials using the form above',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
+                    ),
+                  SizedBox(height: 8),
+                  _buildDropdown<String>(
+                    label: "Site ID",
+                    value: selectedSite,
+                    items: siteDropdownItems,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedSite = value;
+                        siteIdController.text = value ?? '';
+                        final map = siteMappings.firstWhere(
+                          (m) => m['site'] == value,
+                          orElse: () => {},
+                        );
+                        projectController.text =
+                            map['projectName']?.toString() ?? '';
+                        projectStageController.text =
+                            map['projectStage']?.toString() ?? '';
+                        supervisorNameController.text =
+                            map['supervisor']?.toString() ??
+                            widget.supervisorName;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildTextField(
+                    "Supervisor Name",
+                    supervisorNameController,
+                    enabled: false,
+                  ),
+                  SizedBox(height: 12),
+                  _buildTextField("Project", projectController, enabled: false),
+                  SizedBox(height: 12),
+                  _buildTextField(
+                    "Project Stage",
+                    projectStageController,
+                    enabled: false,
+                  ),
+                  SizedBox(height: 12),
+                  _buildDateField(),
+                  SizedBox(height: 8),
+
+                  /// SECTION 2: Material Entry
+                  _buildSectionHeader('Add Materials'),
+                  SizedBox(height: 8),
+                  _buildDropdown<String>(
+                    label: "Material",
+                    value: selectedMaterial,
+                    items: materialDescriptions,
+                    onChanged: _onMaterialChanged,
+                  ),
+                  SizedBox(height: 12),
+                  _buildDropdown<String>(
+                    label: "Unit",
+                    value: selectedUnit,
+                    items: unitDropdownItems,
+                    onChanged: (value) => setState(() => selectedUnit = value),
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField("Quantity", quantityController),
                       ),
                     ],
+                  ),
+                  SizedBox(height: 12),
+                  _buildDropdown<String>(
+                    label: "Priority",
+                    value: selectedPriority,
+                    items: ['Immediate', 'In 2 days'],
+                    onChanged: (value) =>
+                        setState(() => selectedPriority = value!),
+                  ),
+                  SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _addMaterial,
+                      icon: Icon(Icons.add, size: 20),
+                      label: Text("Add Material"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                      ),
+                    ),
+                  ),
 
-                    /// FINAL BUTTONS
-                    SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _cancelForm,
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: primaryColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                  /// SECTION 3: Data Table
+                  if (addedMaterials.isNotEmpty) ...[
+                    _buildSectionHeader('Requested Materials'),
+                    SizedBox(height: 8),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columnSpacing: 24,
+                            dataRowHeight: 48,
+                            headingRowHeight: 40,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            columns: [
+                              DataColumn(
+                                label: Text(
+                                  "Material",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              "Cancel",
-                              style: TextStyle(color: primaryColor),
-                            ),
+                              DataColumn(
+                                label: Text(
+                                  "Unit",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  "Qty",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  "Priority",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  "Action",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            rows: addedMaterials
+                                .asMap()
+                                .entries
+                                .map(
+                                  (entry) => DataRow(
+                                    cells: [
+                                      DataCell(Text(entry.value['material'])),
+                                      DataCell(Text(entry.value['unit'] ?? '')),
+                                      DataCell(Text(entry.value['quantity'])),
+                                      DataCell(
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                entry.value['priority'] ==
+                                                    'Immediate'
+                                                ? Theme.of(context)
+                                                      .colorScheme
+                                                      .error
+                                                      .withOpacity(0.1)
+                                                : Theme.of(context)
+                                                      .colorScheme
+                                                      .secondary
+                                                      .withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color:
+                                                  entry.value['priority'] ==
+                                                      'Immediate'
+                                                  ? Theme.of(context)
+                                                        .colorScheme
+                                                        .error
+                                                        .withOpacity(0.3)
+                                                  : Theme.of(context)
+                                                        .colorScheme
+                                                        .secondary
+                                                        .withOpacity(0.3),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            entry.value['priority'],
+                                            style: TextStyle(
+                                              color:
+                                                  entry.value['priority'] ==
+                                                      'Immediate'
+                                                  ? Theme.of(
+                                                      context,
+                                                    ).colorScheme.error
+                                                  : Theme.of(
+                                                      context,
+                                                    ).colorScheme.secondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: errorColor,
+                                          ),
+                                          onPressed: () =>
+                                              _removeMaterial(entry.key),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _sendForApproval,
-                            style: ElevatedButton.styleFrom(
-                              elevation: 2,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Total Items: ${addedMaterials.length}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ] else ...[
+                    SizedBox(height: 20),
+                    Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 60,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'No materials added yet',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 16,
                             ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Add materials using the form above',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  /// FINAL BUTTONS
+                  SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _cancelForm,
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(color: primaryColor),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: TextStyle(color: primaryColor),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _sendForApproval,
+                          style: ElevatedButton.styleFrom(
+                            elevation: 2,
+                            backgroundColor: primaryColor,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.send, size: 20),
                                 SizedBox(width: 8),
-                                Text(
-                                  "Submit Request",
-                                  style: TextStyle(color: Colors.white),
-                                ),
+                                Text("Submit Request", style: TextStyle()),
                               ],
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 16),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                ],
               ),
-      ),
+            ),
     );
   }
 }

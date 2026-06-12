@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/screens/WebViewScreen.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
 
 
 class ConstructionDocuments extends StatefulWidget {
@@ -13,10 +15,6 @@ class ConstructionDocuments extends StatefulWidget {
 class _ConstructionDocumentsState extends State<ConstructionDocuments> {
   String? selectedSiteId;
   Map<String, dynamic>? selectedSiteData;
-
-  final Color primaryColor = Color(0xFF772323);
-  final Color accentColor = Color(0xFFD9B6A3);
-  final Color backgroundColor = Color(0xFFF5F5F5);
 
   Future<void> fetchSiteData(String siteId) async {
     try {
@@ -45,31 +43,16 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Construction Documents',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: Container(
-        color: backgroundColor,
+    final cs = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Construction Documents',
+      body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Site Selection Card
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+            GlassCard(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -80,7 +63,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: cs.primary,
                       ),
                     ),
                     SizedBox(height: 12),
@@ -104,11 +87,25 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                             .toList(); // Ensure unique IDs
                         return DropdownButtonFormField<String>(
                           value: selectedSiteId,
+                          dropdownColor: cs.surfaceContainerHighest,
+                          style: TextStyle(color: cs.onSurface),
                           decoration: InputDecoration(
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: cs.primary),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 14),
                             labelText: 'Select Site ID',
+                            labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
                           ),
                           isExpanded: true,
                           items: siteIds.map((String id) {
@@ -140,11 +137,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
             SizedBox(height: 24),
             // Project Details and Documents Card
             Expanded(
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              child: GlassCard(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: selectedSiteData == null
@@ -165,23 +158,26 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: cs.primary,
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
-                                  'Project Name: ${selectedSiteData!['projectName'] ?? 'N/A'}'),
+                                  'Project Name: ${selectedSiteData!['projectName'] ?? 'N/A'}',
+                                  style: TextStyle(color: cs.onSurface)),
                               Text(
-                                  'Project Phase: ${selectedSiteData!['projectPhase'] ?? 'N/A'}'),
+                                  'Project Phase: ${selectedSiteData!['projectPhase'] ?? 'N/A'}',
+                                  style: TextStyle(color: cs.onSurface)),
                               Text(
-                                  'Supervisor: ${selectedSiteData!['supervisorName'] ?? 'N/A'}'),
-                              SizedBox(height: 24),
+                                  'Supervisor: ${selectedSiteData!['supervisorName'] ?? 'N/A'}',
+                                  style: TextStyle(color: cs.onSurface)),
+                              const SizedBox(height: 24),
                               Text(
                                 'Associated Documents',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: cs.primary,
                                 ),
                               ),
                               SizedBox(height: 16),
@@ -189,15 +185,15 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                   selectedSiteData!['siteDocs'] is List)
                                 Table(
                                   border: TableBorder.all(
-                                      color: Colors.grey.shade300),
-                                  columnWidths: {
+                                      color: cs.outlineVariant),
+                                  columnWidths: const {
                                     0: FlexColumnWidth(3),
                                     1: FlexColumnWidth(1),
                                   },
                                   children: [
                                     TableRow(
                                       decoration: BoxDecoration(
-                                          color: accentColor.withOpacity(0.2)),
+                                          color: cs.primary.withOpacity(0.1)),
                                       children: [
                                         Padding(
                                           padding: const EdgeInsets.all(8.0),
@@ -206,7 +202,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: Colors.black87,
+                                              color: cs.primary,
                                             ),
                                           ),
                                         ),
@@ -217,7 +213,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: Colors.black87,
+                                              color: cs.primary,
                                             ),
                                             textAlign: TextAlign.center,
                                           ),
@@ -237,13 +233,13 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                             Padding(
                                               padding:
                                                   const EdgeInsets.all(8.0),
-                                              child: Text(
-                                                docName,
-                                                style: TextStyle(
-                                                  fontSize: 15,
-                                                  color: Colors.black87,
-                                                ),
-                                              ),
+                                                  child: Text(
+                                                    docName,
+                                                    style: TextStyle(
+                                                      fontSize: 15,
+                                                      color: cs.onSurface,
+                                                    ),
+                                                  ),
                                             ),
                                             Padding(
                                               padding:
@@ -267,15 +263,16 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                                                   style:
                                                       ElevatedButton.styleFrom(
                                                     backgroundColor:
-                                                        primaryColor,
+                                                        cs.primary,
+                                                    foregroundColor: cs.onPrimary,
                                                     shape:
                                                         RoundedRectangleBorder(
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                              6),
+                                                              12),
                                                     ),
                                                     padding:
-                                                        EdgeInsets.symmetric(
+                                                        const EdgeInsets.symmetric(
                                                             horizontal: 16,
                                                             vertical: 8),
                                                   ),
@@ -317,13 +314,14 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                       });
                     },
                     style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: primaryColor),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: cs.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(
                       'Clear',
                       style: TextStyle(
-                        color: primaryColor,
+                        color: cs.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -334,10 +332,12 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Cancel',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,

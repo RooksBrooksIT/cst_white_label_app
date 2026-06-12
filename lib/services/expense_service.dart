@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firestore_service.dart';
 
 class ExpenseService {
   // Recalculate all expense category totals and sync with project document
@@ -24,7 +25,7 @@ class ExpenseService {
       await firestore.runTransaction((txn) async {
         // Document reference for total site expenses
         final totalsRef =
-            firestore.collection('totalSiteExpensesPerDay').doc(siteId);
+            FirestoreService.getCollection('totalSiteExpensesPerDay').doc(siteId);
 
         // Read project document snapshot (if exists) first
         DocumentSnapshot<Map<String, dynamic>>? projectSnap;
@@ -108,8 +109,7 @@ class ExpenseService {
   static Future<DocumentReference<Map<String, dynamic>>?>
       _findExistingProjectDocBySiteId(String siteId) async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('projects')
+      final query = await FirestoreService.projects
           .where('siteId', isEqualTo: siteId)
           .limit(1)
           .get();
@@ -127,13 +127,19 @@ class ExpenseService {
   static Future<double> _sumSupervisorExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final snapshot = await FirestoreService.siteSupervisorEntries
           .where('siteId', isEqualTo: siteId)
           .get();
 
       for (final doc in snapshot.docs) {
         final data = doc.data();
+        // Skip manager entries entered through manager site entry page
+        if (data['isManagerEntry'] == true ||
+            data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true ||
+            data['createdBy'] == 'manager_org') {
+          continue;
+        }
         final amount = data['totalAmount'];
         if (amount is num) {
           total += amount.toDouble();
@@ -149,8 +155,7 @@ class ExpenseService {
   static Future<double> _sumManagerExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('managerExpenseSummary')
+      final snapshot = await FirestoreService.managerExpenseSummary
           // Document IDs assumed like: {siteId}_{something}
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
           .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
@@ -163,6 +168,32 @@ class ExpenseService {
           total += amount.toDouble();
         }
       }
+
+      // Also sum manager site entry expenses saved in managerEntries
+      final managerEntriesSnapshot = await FirestoreService.managerEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in managerEntriesSnapshot.docs) {
+        final data = doc.data();
+        final amount = data['totalAmount'];
+        if (amount is num) {
+          total += amount.toDouble();
+        }
+      }
+
+      // Maintain backward compatibility with historical manager entries in siteSupervisorEntries
+      final supervisorEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in supervisorEntriesSnapshot.docs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
+          final amount = data['totalAmount'];
+          if (amount is num) {
+            total += amount.toDouble();
+          }
+        }
+      }
     } catch (e) {
       print("❌ Error summing manager expenses for siteId=$siteId: $e");
     }
@@ -173,8 +204,7 @@ class ExpenseService {
   static Future<double> _sumOrganizationExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('organizationExpenseSummary')
+      final snapshot = await FirestoreService.organizationExpenseSummary
           // Document IDs assumed like: {siteId}_{something}
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
           .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
@@ -187,6 +217,20 @@ class ExpenseService {
           total += amount.toDouble();
         }
       }
+
+      // Also sum manager site entry organization expenses saved in siteSupervisorEntries
+      final orgEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+          .where('siteId', isEqualTo: siteId)
+          .get();
+      for (final doc in orgEntriesSnapshot.docs) {
+        final data = doc.data();
+        if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          final amount = data['totalAmount'];
+          if (amount is num) {
+            total += amount.toDouble();
+          }
+        }
+      }
     } catch (e) {
       print("❌ Error summing organization expenses for siteId=$siteId: $e");
     }
@@ -197,8 +241,7 @@ class ExpenseService {
   static Future<double> _sumContractorExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('contractorEntries')
+      final snapshot = await FirestoreService.contractorEntries
           .where('siteId', isEqualTo: siteId)
           .get();
 
@@ -219,8 +262,7 @@ class ExpenseService {
   static Future<double> _sumIncentiveExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorIncentives')
+      final snapshot = await FirestoreService.siteSupervisorIncentives
           .where('siteId', isEqualTo: siteId)
           .get();
 

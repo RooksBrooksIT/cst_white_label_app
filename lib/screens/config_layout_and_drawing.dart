@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class LayoutAndDrawingsPage extends StatefulWidget {
   const LayoutAndDrawingsPage({super.key});
@@ -19,28 +21,54 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
   final TextEditingController purposeController = TextEditingController();
 
   List<Map<String, String>> uploadedDocuments = [];
+  List<QueryDocumentSnapshot> existingConfigDocs = [];
+  String? selectedConfigId;
 
-  final Color primaryColor = const Color(0xFF0b3470);
-  final Color accentColor = const Color(0xFF073060);
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get accentColor => Theme.of(context).colorScheme.primary;
   final Color backgroundColor = const Color(0xFFF5F7FA);
 
   List<Map<String, String>> allSites = [];
 
   Future<List<Map<String, String>>> fetchAllSites() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
-        .get();
-    return snapshot.docs
-        .map((doc) {
-          final data = doc.data();
-          return {
-            'site': data['site']?.toString() ?? '',
-            'supervisor': data['supervisor']?.toString() ?? '',
-            'projectName': data['projectName']?.toString() ?? '',
-          };
-        })
-        .where((site) => site['site']!.isNotEmpty)
-        .toList();
+    try {
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
+
+      final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
+      final Map<String, Map<String, dynamic>> supervisorMap = {};
+      for (var doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final sId = data['site']?.toString() ?? doc.id;
+        if (sId.isNotEmpty) {
+          supervisorMap[sId] = data;
+        }
+      }
+
+      final projectsSnapshot = await FirestoreService.getCollection('projects').get();
+      final Map<String, String> projectNames = {};
+      for (var doc in projectsSnapshot.docs) {
+        final data = doc.data();
+        final sId = data['siteId']?.toString();
+        final pName = data['projectName']?.toString();
+        if (sId != null && sId.isNotEmpty && pName != null && pName.isNotEmpty) {
+          projectNames[sId] = pName;
+        }
+      }
+
+      return sitesSnapshot.docs.map<Map<String, String>>((doc) {
+        final sId = doc.id;
+        final mapping = supervisorMap[sId];
+
+        return {
+          'site': sId,
+          'supervisor': mapping?['supervisor']?.toString() ?? 'Not Assigned',
+          'projectName': mapping?['projectName'] ?? projectNames[sId] ?? 'Not Assigned',
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching all sites: $e');
+      return [];
+    }
   }
 
   void setSupervisorAndProject(String? siteId) async {
@@ -52,11 +80,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
     projectNameController.text = siteData['projectName'] ?? '';
 
     if (siteId != null && siteId.isNotEmpty) {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
+      final query = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('site', isEqualTo: siteId).limit(1).get();
       if (query.docs.isNotEmpty) {
         final data = query.docs.first.data();
         projectPhaseController.text = data['projectStage']?.toString() ?? '';
@@ -67,6 +93,43 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
       projectPhaseController.text = '';
     }
     setState(() {});
+  }
+
+  Future<void> _fetchExistingConfigs(String siteId) async {
+    try {
+      final snapshot = await FirestoreService.getCollection(
+        'siteDrawings',
+      ).where('siteId', isEqualTo: siteId).get();
+      setState(() {
+        existingConfigDocs = snapshot.docs;
+        selectedConfigId = null;
+      });
+    } catch (e) {
+      debugPrint('Error fetching existing configs: $e');
+    }
+  }
+
+  void _loadConfiguration(String docId) {
+    final doc = existingConfigDocs.firstWhere((d) => d.id == docId);
+    final data = doc.data() as Map<String, dynamic>;
+
+    setState(() {
+      supervisorNameController.text = data['supervisorName']?.toString() ?? '';
+      projectNameController.text = data['projectName']?.toString() ?? '';
+      projectPhaseController.text = data['projectPhase']?.toString() ?? '';
+
+      final siteDocs = data['siteDocs'] as List<dynamic>? ?? [];
+      uploadedDocuments = siteDocs.map((item) {
+        final docMap = Map<String, dynamic>.from(item);
+        return {
+          'Doc Name': docMap['docName']?.toString() ?? '',
+          'Purpose': docMap['purpose']?.toString() ?? 'Previously Saved',
+          'Upload Flag': 'Uploaded',
+          'File Name': docMap['docUrl']?.toString() ?? '',
+        };
+      }).toList();
+      selectedConfigId = docId;
+    });
   }
 
   Future<void> _uploadDocument() async {
@@ -160,21 +223,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Layout and Drawings',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 5,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
-        ),
-        shadowColor: primaryColor.withOpacity(0.6),
-      ),
+    return GlassScaffold(
+      title: 'Layout and Drawings',
+      onBack: () => Navigator.pop(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
         child: Column(
@@ -203,14 +254,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                             'Error: ${snapshot.error}',
                             style: const TextStyle(color: Colors.red),
                           );
-                        } else if (!snapshot.hasData ||
-                            snapshot.data!.isEmpty) {
-                          return const Text(
-                            'No sites found',
-                            style: TextStyle(color: Colors.black54),
-                          );
                         }
-                        allSites = snapshot.data!;
+
+                        allSites = snapshot.data ?? [];
                         final sites = allSites
                             .map((site) => site['site']!)
                             .toList();
@@ -234,7 +280,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                               ),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 16,
@@ -246,14 +292,30 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                                   value: site,
                                   child: Text(
                                     site,
-                                    style: const TextStyle(fontSize: 16),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               )
                               .toList(),
                           onChanged: (value) {
-                            setState(() => selectedSiteId = value);
+                            setState(() {
+                              selectedSiteId = value;
+                              uploadedDocuments.clear();
+                              docNameController.clear();
+                              purposeController.clear();
+                              supervisorNameController.clear();
+                              projectNameController.clear();
+                              projectPhaseController.clear();
+                              existingConfigDocs = [];
+                              selectedConfigId = null;
+                            });
                             setSupervisorAndProject(value);
+                            if (value != null) {
+                              _fetchExistingConfigs(value);
+                            }
                           },
                           hint: const Text('Select Site ID'),
                           borderRadius: BorderRadius.circular(14),
@@ -261,32 +323,78 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                             Icons.arrow_drop_down,
                             color: primaryColor,
                           ),
-                          style: TextStyle(
-                            color: Colors.grey[900],
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.w500),
                         );
                       },
                     ),
+                    if (existingConfigDocs.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      DropdownButtonFormField<String>(
+                        value: selectedConfigId,
+                        decoration: InputDecoration(
+                          labelText: 'Load Previous Configuration',
+                          labelStyle: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: primaryColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 16,
+                          ),
+                        ),
+                        items: existingConfigDocs.map((doc) {
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text(
+                              doc.id.split('_').last, // Display the date part
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.black,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            _loadConfiguration(value);
+                          }
+                        },
+                        hint: const Text('Select a saved drawing set'),
+                        borderRadius: BorderRadius.circular(14),
+                        icon: Icon(Icons.history, color: primaryColor),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     _readonlyTextField(
                       controller: supervisorNameController,
                       label: 'Supervisor Name',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 24),
                     _readonlyTextField(
                       controller: projectNameController,
                       label: 'Project Name',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 24),
                     _readonlyTextField(
                       controller: projectPhaseController,
                       label: 'Project Phase',
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.grey.shade200,
                       primaryColor: primaryColor,
                     ),
                   ],
@@ -310,7 +418,6 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -666,7 +773,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
         labelText: label,
         labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
         filled: true,
-        fillColor: Colors.white,
+
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
@@ -693,9 +800,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
     final formattedDate =
         '${now.day.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.year}';
     final docId = '${selectedSiteId}_$formattedDate';
-    final docRef = FirebaseFirestore.instance
-        .collection('siteDrawings')
-        .doc(docId);
+    final docRef = FirestoreService.getCollection('siteDrawings').doc(docId);
 
     List<dynamic> existingSiteDocs = [];
     final docSnapshot = await docRef.get();

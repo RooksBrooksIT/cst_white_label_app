@@ -1,6 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../utils/responsive.dart';
+import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_text_field.dart';
+import '../widgets/glass_button.dart';
 
 class SiteToCompanyReturn extends StatefulWidget {
   final String supervisorId;
@@ -17,15 +23,13 @@ class SiteToCompanyReturn extends StatefulWidget {
 }
 
 class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
-  final Color _primaryColor = const Color(0xFF0B3470);
-  final Color _accentColor = const Color(0xFFE0AFAF);
-  final Color _backgroundColor = const Color(0xFFF5F5F5);
 
   // Form controllers
   final TextEditingController _managerNameController = TextEditingController();
   final TextEditingController _projectNameController = TextEditingController();
-  final TextEditingController _supervisorNameController =
-      TextEditingController();
+  final TextEditingController _supervisorNameController = TextEditingController();
+  final TextEditingController _toolCountController = TextEditingController();
+  
   DateTime? _selectedDate;
   String? _selectedSiteId;
   String? _selectedTool;
@@ -44,9 +48,18 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     _fetchTools();
   }
 
+  @override
+  void dispose() {
+    _managerNameController.dispose();
+    _projectNameController.dispose();
+    _supervisorNameController.dispose();
+    _toolCountController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchSiteIds() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .get();
     final siteSet = <String>{};
     for (var doc in snapshot.docs) {
@@ -62,7 +75,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }
 
   Future<void> _fetchTools() async {
-    final snapshot = await FirebaseFirestore.instance.collection('tools').get();
+    final snapshot = await FirestoreService.getCollection('tools').get();
     setState(() {
       _tools = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -70,10 +83,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
           'toolId': data['toolId'] ?? '',
           'toolName': data['toolName'] ?? '',
           'toolCode': data['toolCode'] ?? '',
-          'toolOwner': data['toolOwner'] ?? '',
+          'name': data['toolName'] ?? data['toolCode'] ?? '',
           'availableCount': data['availableCount'] ?? 0,
-          'toolCount': data['toolCount'] ?? 0,
-          'description': data['description'] ?? '',
         };
       }).toList();
     });
@@ -86,15 +97,14 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       builder: (context, child) {
+        final cs = Theme.of(context).colorScheme;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: _primaryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(foregroundColor: _primaryColor),
+            colorScheme: cs.copyWith(
+              primary: cs.primary,
+              onPrimary: cs.onPrimary,
+              surface: cs.surface,
+              onSurface: cs.onSurface,
             ),
           ),
           child: child!,
@@ -111,8 +121,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   Future<void> _fetchAndSetProjectName(String? siteId) async {
     if (siteId == null || siteId.trim().isEmpty) return;
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('siteSupervisorMap')
+    final snapshot = await FirestoreService
+        .getCollection('siteSupervisorMap')
         .where('site', isEqualTo: siteId)
         .limit(1)
         .get();
@@ -126,8 +136,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     }
   }
 
-  Future<void> _fetchAvailableCountForSelectedTool(String? toolId) async {
-    if (toolId == null) {
+  Future<void> _fetchAvailableCountForSelectedTool(String? toolName) async {
+    if (toolName == null) {
       setState(() {
         _selectedToolAvailableCount = null;
       });
@@ -135,7 +145,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     }
 
     final toolObj = _tools.firstWhere(
-      (t) => t['toolId'] == toolId,
+      (t) => t['name'] == toolName,
       orElse: () => {'toolCode': null},
     );
     final toolCode = toolObj['toolCode'] as String?;
@@ -147,8 +157,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       return;
     }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('toolsAtSite')
+    final snapshot = await FirestoreService
+        .getCollection('toolsMovement')
         .where('toolCode', isEqualTo: toolCode)
         .limit(1)
         .get();
@@ -162,9 +172,9 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
   void _addTool() {
     if (_selectedTool == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a tool')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a tool')),
+      );
       return;
     }
 
@@ -183,17 +193,18 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       return;
     }
 
+    final toolObj = _tools.firstWhere((t) => t['name'] == _selectedTool);
+    
     setState(() {
-      _addedTools.add({'tool': _selectedTool!, 'count': _toolCount!});
+      _addedTools.add({
+        'name': _selectedTool!,
+        'toolCode': toolObj['toolCode'],
+        'count': _toolCount!,
+      });
       _selectedTool = null;
       _toolCount = null;
+      _toolCountController.clear();
       _selectedToolAvailableCount = null;
-    });
-  }
-
-  void _removeTool(int index) {
-    setState(() {
-      _addedTools.removeAt(index);
     });
   }
 
@@ -202,43 +213,13 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       _managerNameController.clear();
       _projectNameController.clear();
       _supervisorNameController.clear();
+      _toolCountController.clear();
       _selectedDate = null;
       _selectedSiteId = null;
       _selectedTool = null;
       _toolCount = null;
       _addedTools.clear();
       _selectedToolAvailableCount = null;
-    });
-  }
-
-  Future<void> _updateToolsInventory({
-    required String toolCode,
-    required String siteId,
-    required int count,
-  }) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('toolsInventory')
-        .doc(toolCode);
-
-    final now = DateTime.now();
-    final isoString = now.toIso8601String();
-
-    final docSnap = await docRef.get();
-    List<dynamic> sites = [];
-    if (docSnap.exists) {
-      final data = docSnap.data() as Map<String, dynamic>;
-      sites = data['sites'] ?? [];
-      sites.removeWhere(
-        (site) => site['siteId'] == siteId && site['toolCode'] == toolCode,
-      );
-    }
-
-    sites.add({'count': count, 'siteId': siteId});
-
-    await docRef.set({
-      'lastUpdatedOn': isoString,
-      'sites': sites,
-      'toolCode': toolCode,
     });
   }
 
@@ -257,15 +238,13 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       return;
     }
 
-    // Generate document ID
     final dateStr = DateFormat('ddMMyyyy').format(_selectedDate!);
     final docId = '${_selectedSiteId}_$dateStr';
 
-    // Generate trId (TR001, TR002, etc.)
     String trId = 'TR001';
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      final snapshot = await FirestoreService
+        .getCollection('toolsReturn')
           .orderBy('trId', descending: true)
           .limit(1)
           .get();
@@ -277,283 +256,189 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         }
       }
     } catch (e) {
-      // Fallback to TR001
+      debugPrint('Error fetching last trId: $e');
     }
 
-    // Prepare tools list
-    final toolsList = _addedTools.map((tool) {
-      final toolObj = _tools.firstWhere(
-        (t) => t['toolId'] == tool['tool'],
-        orElse: () => {'toolCode': tool['tool']},
-      );
-      return {
-        'toolCode': toolObj['toolCode'] ?? tool['tool'],
-        'toolCount': tool['count'],
-      };
-    }).toList();
-
-    // Prepare return data
     final data = {
       'trId': trId,
-      'date':
-          '${DateFormat('MMMM d, yyyy at hh:mm:ss a').format(DateTime.now())} UTC+5:30',
+      'date': '${DateFormat('MMMM d, yyyy at hh:mm:ss a').format(DateTime.now())} UTC+5:30',
       'mgrName': _managerNameController.text,
       'supervisorName': _supervisorNameController.text,
       'rfSiteId': _selectedSiteId,
       'projectName': _projectNameController.text,
-      'tools': toolsList,
+      'tools': _addedTools,
     };
 
     try {
-      // Update inventory for each tool
       for (final tool in _addedTools) {
-        final toolObj = _tools.firstWhere(
-          (t) => t['toolId'] == tool['tool'],
-          orElse: () => {'toolCode': tool['tool']},
-        );
-        final toolCode = toolObj['toolCode'] ?? tool['tool'];
+        final toolCode = tool['toolCode'];
         final count = tool['count'] as int;
 
-        // Update toolsAtSite (decrease count)
-        final siteQuery = await FirebaseFirestore.instance
-            .collection('toolsAtSite')
+        // Update toolsAtSite
+        final siteQuery = await FirestoreService
+            .getCollection('toolsAtSite')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
 
-        int newSiteCount = 0;
         if (siteQuery.docs.isNotEmpty) {
           final docRef = siteQuery.docs.first.reference;
           final current = siteQuery.docs.first['availableCount'] as int? ?? 0;
-          newSiteCount = current - count;
-          await docRef.update({'availableCount': newSiteCount});
+          await docRef.update({'availableCount': current - count});
         }
 
-        // Update toolsAtCompany (increase count)
-        final companyQuery = await FirebaseFirestore.instance
-            .collection('toolsAtCompany')
+        // Update toolsAtCompany
+        final companyQuery = await FirestoreService
+            .getCollection('toolsAtCompany')
             .where('toolCode', isEqualTo: toolCode)
             .limit(1)
             .get();
 
         if (companyQuery.docs.isNotEmpty) {
           final docRef = companyQuery.docs.first.reference;
-          final current =
-              companyQuery.docs.first['availableCount'] as int? ?? 0;
+          final current = companyQuery.docs.first['availableCount'] as int? ?? 0;
           await docRef.update({'availableCount': current + count});
         }
-
-        // Update toolsInventory
-        await _updateToolsInventory(
-          toolCode: toolCode,
-          siteId: _selectedSiteId!,
-          count: newSiteCount,
-        );
       }
 
-      // Save return record
-      await FirebaseFirestore.instance
-          .collection('toolsReturn')
+      await FirestoreService
+          .getCollection('toolsMovement')
           .doc(docId)
           .set(data);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tools returned successfully')),
       );
+
+      // Notify the organisation about tools return
+      await NotificationService.notifyOrganisation(
+        title: '🛠️ Tools Return Request',
+        body: '${_supervisorNameController.text} initiated a tools return (ID: $trId) from $_selectedSiteId.',
+        data: {
+          'type': 'tools_return',
+          'trId': trId,
+          'siteId': _selectedSiteId,
+          'supervisorName': _supervisorNameController.text,
+        },
+      );
+
       _resetForm();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error saving return: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving return: $e')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Site to Company Return',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: true,
-        backgroundColor: _primaryColor,
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
-      ),
+    return GlassScaffold(
+      title: 'Site to Company Return',
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Return Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      controller: _managerNameController,
-                      label: ' Name',
-                      icon: Icons.person,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDatePicker(),
-                    const SizedBox(height: 16),
-                    _buildDropdownField(
-                      value: _selectedSiteId,
-                      label: 'Site ID',
-                      items: _siteIds,
-                      onChanged: (newValue) {
-                        setState(() {
-                          _selectedSiteId = newValue;
-                        });
-                        _fetchAndSetProjectName(newValue);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      controller: _projectNameController,
-                      label: 'Project Name',
-                      icon: Icons.work,
-                      readOnly: true,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      controller: _supervisorNameController,
-                      label: 'Supervisor Name',
-                      icon: Icons.supervisor_account,
-                    ),
-                  ],
-                ),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader('Return Details'),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _managerNameController,
+                    label: 'Manager Name',
+                    icon: Icons.person,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildDatePicker(),
+                  const SizedBox(height: 16),
+                  _buildDropdownField(
+                    value: _selectedSiteId,
+                    label: 'Site ID',
+                    items: _siteIds,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedSiteId = newValue;
+                      });
+                      _fetchAndSetProjectName(newValue);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _projectNameController,
+                    label: 'Project Name',
+                    icon: Icons.business,
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInputField(
+                    controller: _supervisorNameController,
+                    label: 'Supervisor Name',
+                    icon: Icons.badge,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tools Selection',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader('Tools Selection'),
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildDropdownField(
+                        value: _selectedTool,
+                        label: 'Select Tool',
+                        items: _tools.map((t) => t['name'] as String).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            _selectedTool = newValue;
+                            _toolCountController.clear();
+                            _toolCount = null;
+                          });
+                          _fetchAvailableCountForSelectedTool(newValue);
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildDropdownField(
-                          value: _selectedTool,
-                          label: 'Select Tool',
-                          items: _tools
-                              .map((t) => t['toolId'] as String)
-                              .toList(),
-                          displayItems: _tools
-                              .map((t) => t['toolCode'] as String)
-                              .toList(),
-                          onChanged: (newValue) {
-                            setState(() {
-                              _selectedTool = newValue;
-                              _toolCount = null;
-                            });
-                            _fetchAvailableCountForSelectedTool(newValue);
-                          },
-                        ),
-                        const SizedBox(height: 4),
-                        _AvailableCountWithWarning(
-                          availableCount: _selectedToolAvailableCount,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildInputField(
-                          label: 'Count',
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) {
-                            setState(() {
-                              _toolCount = int.tryParse(value);
-                            });
-                          },
-                          enabled:
-                              _selectedToolAvailableCount != null &&
-                              _selectedToolAvailableCount! > 0,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(
-                          Icons.add,
-                          size: 20,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Add Tool',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        onPressed: _addTool,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
+                      const SizedBox(height: 4),
+                      _AvailableCountWithWarning(
+                        availableCount: _selectedToolAvailableCount,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 12),
+                      _buildInputField(
+                        controller: _toolCountController,
+                        label: 'Count',
+                        icon: Icons.onetwothree,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            _toolCount = int.tryParse(value);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  GlassButton(
+                    label: 'Add Tool',
+                    onPressed: _addTool,
+                  ),
+                ],
               ),
             ),
             if (_addedTools.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Selected Tools',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildToolsTable(),
-                    ],
-                  ),
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('Selected Tools'),
+                    const SizedBox(height: 16),
+                    _buildToolsTable(),
+                  ],
                 ),
               ),
             ],
@@ -561,68 +446,53 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
             Row(
               children: [
                 Expanded(
-                  child: _buildActionButton(
-                    text: 'Return Tools',
-                    icon: Icons.keyboard_return,
-                    isPrimary: true,
-                    onPressed: _saveReturn,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionButton(
-                    text: 'Reset',
-                    icon: Icons.refresh,
-                    isPrimary: false,
-                    onPressed: _resetForm,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionButton(
-                    text: 'Cancel',
-                    icon: Icons.close,
-                    isPrimary: false,
+                  child: GlassButton(
+                    label: 'Cancel',
+                    isSecondary: true,
                     onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: GlassButton(
+                    label: 'Save Return',
+                    onPressed: _saveReturn,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInputField({
-    TextEditingController? controller,
-    String label = '',
-    IconData? icon,
-    TextInputType? keyboardType,
-    bool readOnly = false,
-    bool enabled = true,
-    void Function(String)? onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: icon != null ? Icon(icon, size: 20) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
-        filled: true,
-        fillColor: readOnly || !enabled ? Colors.grey.shade100 : Colors.white,
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    Function(String)? onChanged,
+  }) {
+    return GlassTextField(
+      controller: controller,
+      label: label,
+      icon: icon,
       keyboardType: keyboardType,
       readOnly: readOnly,
-      enabled: enabled,
       onChanged: onChanged,
     );
   }
@@ -630,68 +500,57 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   Widget _buildDropdownField({
     required String? value,
     required String label,
-    required List<String?> items,
-    List<String>? displayItems,
-    required void Function(String?) onChanged,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
       value: value,
+      onChanged: onChanged,
+      isExpanded: true,
+      dropdownColor: cs.surfaceContainerHighest,
+      style: TextStyle(color: cs.onSurface),
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
+        labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, color: cs.primary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: cs.surface.withOpacity(0.05),
       ),
-      items: items.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
+      items: items.map((String item) {
         return DropdownMenuItem<String>(
           value: item,
           child: Text(
-            displayItems != null && displayItems.length > index
-                ? displayItems[index]
-                : item ?? '',
+            item,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: cs.onSurface),
           ),
         );
       }).toList(),
-      onChanged: onChanged,
-      borderRadius: BorderRadius.circular(8),
     );
   }
 
   Widget _buildDatePicker() {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: () => _selectDate(context),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Date',
-          prefixIcon: const Icon(Icons.calendar_today, size: 20),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade400),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade400),
-          ),
-          filled: true,
-          fillColor: Colors.white,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: cs.surface.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.onSurface.withOpacity(0.1)),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Icon(Icons.calendar_today, color: cs.primary, size: 20),
+            const SizedBox(width: 12),
             Text(
               _selectedDate == null
-                  ? 'Select date'
+                  ? 'Select Date'
                   : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(color: cs.onSurface, fontSize: 16),
             ),
           ],
         ),
@@ -699,168 +558,113 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     );
   }
 
-  Widget _buildActionButton({
-    required String text,
-    required IconData icon,
-    required bool isPrimary,
-    required void Function() onPressed,
-  }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 20),
-      label: Text(text),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? _primaryColor : Colors.white,
-        foregroundColor: isPrimary ? Colors.white : _primaryColor,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: isPrimary ? BorderSide.none : BorderSide(color: _primaryColor),
-        ),
-        elevation: isPrimary ? 2 : 0,
-      ),
-    );
-  }
-
   Widget _buildToolsTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
-        ),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
         child: Column(
           children: [
             Container(
-              decoration: BoxDecoration(
-                color: _accentColor.withOpacity(0.3),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(8),
-                ),
+              color: cs.primary.withOpacity(0.1),
+              padding: EdgeInsets.symmetric(
+                vertical: Responsive.scaleV(context, 12),
+                horizontal: Responsive.scaleH(context, 8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  SizedBox(
-                    width: 120,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(
-                        'Tool Id',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'Tool Name',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 120,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(
-                        'Tool Code',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Tool Code',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 80,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
+                  Expanded(
+                    flex: 1,
+                    child: Text(
+                      'Qty',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 14),
+                        color: cs.onSurface,
                       ),
-                      child: Text(
-                        'Count',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                  SizedBox(
-                    width: 50,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(''),
-                    ),
-                  ),
+                  SizedBox(width: Responsive.scaleH(context, 40)),
                 ],
               ),
             ),
-            ..._addedTools.asMap().entries.map((entry) {
-              final i = entry.key;
-              final tool = entry.value;
-              final toolObj = _tools.firstWhere(
-                (t) => t['toolId'] == tool['tool'],
-                orElse: () => {'toolCode': ''},
-              );
-              final toolCode = toolObj['toolCode'] ?? '';
+            ...List.generate(_addedTools.length, (index) {
+              final tool = _addedTools[index];
               return Container(
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  border: Border(top: BorderSide(color: cs.outlineVariant)),
+                ),
+                padding: EdgeInsets.symmetric(
+                  vertical: Responsive.scaleV(context, 8),
+                  horizontal: Responsive.scaleH(context, 8),
                 ),
                 child: Row(
                   children: [
-                    SizedBox(
-                      width: 120,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
-                        ),
-                        child: Text(
-                          tool['tool'] ?? '',
-                          style: const TextStyle(color: Colors.black87),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        tool['name'] ?? '',
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
                         ),
                       ),
                     ),
-                    SizedBox(
-                      width: 120,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
-                        ),
-                        child: Text(
-                          toolCode,
-                          style: const TextStyle(color: Colors.black87),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        tool['toolCode'] ?? '',
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
                         ),
                       ),
                     ),
-                    SizedBox(
-                      width: 80,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        tool['count'].toString(),
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 14),
+                          color: cs.onSurface,
                         ),
-                        child: Text(
-                          tool['count'].toString(),
-                          style: const TextStyle(color: Colors.black87),
-                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    SizedBox(
-                      width: 50,
-                      child: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _removeTool(i),
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: cs.error,
+                        size: Responsive.scaleH(context, 20),
                       ),
+                      onPressed: () => setState(() => _addedTools.removeAt(index)),
                     ),
                   ],
                 ),
@@ -875,51 +679,38 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
 class _AvailableCountWithWarning extends StatelessWidget {
   final int? availableCount;
-  const _AvailableCountWithWarning({super.key, this.availableCount});
+
+  const _AvailableCountWithWarning({required this.availableCount});
 
   @override
   Widget build(BuildContext context) {
-    if (availableCount == null) {
-      return const Text(
-        'Available: N/A',
-        style: TextStyle(fontSize: 12, color: Colors.grey),
-      );
-    }
-    if (availableCount == 0) {
-      return Row(
+    if (availableCount == null) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final bool isLow = availableCount! < 5;
+    final Color color = isLow ? cs.error : Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: EdgeInsets.only(top: Responsive.scaleV(context, 4)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning, color: Colors.red, size: 16),
-          const SizedBox(width: 4),
+          Icon(
+            isLow ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+            size: Responsive.scaleH(context, 16),
+            color: color,
+          ),
+          SizedBox(width: Responsive.scaleH(context, 4)),
           Text(
-            'Available: 0 (Not available)',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.red,
-              fontWeight: FontWeight.bold,
+            'Available: $availableCount',
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 13),
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
-      );
-    }
-    if (availableCount! < 5) {
-      return Row(
-        children: [
-          const Icon(Icons.warning, color: Colors.orange, size: 16),
-          const SizedBox(width: 4),
-          Text(
-            'Available: $availableCount (Low stock!)',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.orange,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      );
-    }
-    return Text(
-      'Available: $availableCount',
-      style: const TextStyle(fontSize: 12, color: Colors.green),
+      ),
     );
   }
 }

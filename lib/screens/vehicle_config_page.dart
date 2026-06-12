@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class AddVehicleLogPage extends StatefulWidget {
   const AddVehicleLogPage({super.key});
@@ -11,15 +14,13 @@ class AddVehicleLogPage extends StatefulWidget {
 
 class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   final _formKey = GlobalKey<FormState>();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed _firestore field
 
-  final TextEditingController _vehicleIdController = TextEditingController();
-  final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _fromLocationController = TextEditingController();
   final TextEditingController _toLocationController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
-  final TextEditingController _materialTypeController = TextEditingController();
+
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
@@ -48,7 +49,46 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   void _setCurrentTime() {
     final now = DateTime.now();
-    _startTimeController.text = DateFormat('HH:mm').format(now);
+    _startTimeController.text = DateFormat('hh:mm a').format(now);
+  }
+
+  Future<void> _selectTime(BuildContext context, TextEditingController controller) async {
+    TimeOfDay initialTime = TimeOfDay.now();
+    if (controller.text.isNotEmpty) {
+      try {
+        // Try parsing existing time to set initial picker time
+        final parsedTime = DateFormat('hh:mm a').parse(controller.text);
+        initialTime = TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
+      } catch (e) {
+        try {
+          // Fallback if it was saved in HH:mm format
+          final parsedTime = DateFormat('HH:mm').parse(controller.text);
+          initialTime = TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
+        } catch (e) {
+          // Keep current time
+        }
+      }
+    }
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+      setState(() {
+        controller.text = DateFormat('hh:mm a').format(dt);
+      });
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -67,6 +107,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       print('Error loading initial data: $e');
       _showErrorSnackBar('Failed to load data. Please try again.');
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -75,16 +116,23 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadDrivers() async {
     try {
-      final snapshot = await _firestore
-          .collection('drivers')
-          .where('status', isEqualTo: 'Active')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'drivers',
+      ).where('status', isEqualTo: 'Active').get();
 
+      final names = snapshot.docs
+          .map((doc) => doc['driverName'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toSet() // Ensure uniqueness
+          .toList();
+
+      if (!mounted) return;
       setState(() {
-        _driverNames = snapshot.docs
-            .map((doc) => doc['driverName'] as String? ?? '')
-            .where((name) => name.isNotEmpty)
-            .toList();
+        _driverNames = names;
+        // Validate current selection
+        if (_selectedDriver != null && !_driverNames.contains(_selectedDriver)) {
+          _selectedDriver = null;
+        }
       });
     } catch (e) {
       print('Error loading drivers: $e');
@@ -94,8 +142,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadSites() async {
     try {
-      final snapshot = await _firestore.collection('projects').get();
+      final snapshot = await FirestoreService.getCollection('projects').get();
 
+      if (!mounted) return;
       setState(() {
         _siteNames = snapshot.docs
             .map((doc) {
@@ -109,7 +158,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               return siteName.toString();
             })
             .where((name) => name.isNotEmpty)
+            .toSet() // Ensure uniqueness
             .toList();
+            
+        // Validate current selections
+        if (_selectedFromSite != null && !_siteNames.contains(_selectedFromSite)) {
+          _selectedFromSite = null;
+        }
+        if (_selectedToSite != null && !_siteNames.contains(_selectedToSite)) {
+          _selectedToSite = null;
+        }
       });
     } catch (e) {
       print('Error loading sites: $e');
@@ -119,7 +177,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadVehicles() async {
     try {
-      final snapshot = await _firestore.collection('vehicleDetails').get();
+      final snapshot = await FirestoreService.getCollection(
+        'vehicleDetails',
+      ).get();
 
       List<Map<String, dynamic>> vehicles = [];
 
@@ -139,8 +199,13 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
       vehicles.sort((a, b) => a['id'].compareTo(b['id']));
 
+      if (!mounted) return;
       setState(() {
         _vehicles = vehicles;
+        // Validate current selection
+        if (_selectedVehicle != null && !_vehicles.any((v) => v['id'] == _selectedVehicle)) {
+          _selectedVehicle = null;
+        }
       });
     } catch (e) {
       print('Error loading vehicles: $e');
@@ -150,13 +215,14 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadMaterials() async {
     try {
-      final snapshot = await _firestore.collection('materials').get();
+      final snapshot = await FirestoreService.getCollection('materialCategories').get();
 
       List<Map<String, dynamic>> materialsWithUnits = [];
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final materialName = data['materialName'] as String? ?? '';
+        final materialName = (data['matCategory'] ?? data['materialName'] ?? '').toString().trim();
+        if (materialName.isEmpty) continue;
         final materialUnitRef = data['materialUnit'] as DocumentReference?;
 
         String unit = '';
@@ -165,7 +231,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           try {
             final unitDoc = await materialUnitRef.get();
             if (unitDoc.exists) {
-              unit = unitDoc['unitName'] as String? ?? '';
+              final unitData = unitDoc.data() as Map<String, dynamic>?;
+              unit = (unitData?['unitName'] ?? unitData?['name'] ?? unitData?['matUnit'] ?? '').toString();
             }
           } catch (e) {
             print('Error fetching unit for material $materialName: $e');
@@ -179,8 +246,23 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         });
       }
 
+      if (!mounted) return;
       setState(() {
-        _materials = materialsWithUnits;
+        // Ensure material names are unique for the dropdown
+        final uniqueMaterials = <String, Map<String, dynamic>>{};
+        for (var material in materialsWithUnits) {
+          final name = material['materialName'] as String;
+          if (!uniqueMaterials.containsKey(name)) {
+            uniqueMaterials[name] = material;
+          }
+        }
+        _materials = uniqueMaterials.values.toList();
+        
+        // Validate current selection
+        if (_selectedMaterial != null && !_materials.any((m) => m['materialName'] == _selectedMaterial)) {
+          _selectedMaterial = null;
+          _selectedUnit = '';
+        }
       });
     } catch (e) {
       print('Error loading materials: $e');
@@ -190,19 +272,19 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<String> _getNextMovementId() async {
     try {
-      final snapshot = await _firestore
-          .collection('vehicleMovements')
-          .orderBy('movementId', descending: true)
-          .limit(1)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'vehicleMovements',
+      ).orderBy('movementId', descending: true).limit(1).get();
 
       if (snapshot.docs.isEmpty) {
         return 'VM001';
       }
 
-      final lastMovementId = snapshot.docs.first['movementId'] as String;
-      final number = int.parse(lastMovementId.substring(2));
-      return 'VM${(number + 1).toString().padLeft(3, '0')}';
+      final lastMovementId =
+          snapshot.docs.first['movementId'] as String? ?? 'VM000';
+      final numberStr = lastMovementId.replaceAll(RegExp(r'[^0-9]'), '');
+      final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
+      return 'VM${nextNumber.toString().padLeft(3, '0')}';
     } catch (e) {
       print('Error generating movement ID: $e');
       return 'VM001';
@@ -334,10 +416,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       };
 
       // Save to Firestore
-      await _firestore
-          .collection('vehicleMovements')
-          .doc(docId)
-          .set(movementData);
+      await FirestoreService.getCollection(
+        'vehicleMovements',
+      ).doc(docId).set(movementData);
 
       _showSuccessSnackBar('Vehicle movement logged successfully!');
       _resetForm();
@@ -345,9 +426,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       print('Error saving movement: $e');
       _showErrorSnackBar('Failed to save movement: ${e.toString()}');
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -386,16 +469,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    if (!mounted) return;
+    DialogUtils.showSuccessDialog(context, message: message);
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -408,13 +487,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Vehicle Movement Log'),
-          centerTitle: true,
-          backgroundColor: Colors.blue[700],
-          foregroundColor: Colors.white,
-        ),
+      return GlassScaffold(
+        title: 'Vehicle Movement Log',
+        onBack: () => Navigator.pop(context),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -428,20 +503,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Movement Log'),
-        centerTitle: true,
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInitialData,
-            tooltip: 'Reload Data',
-          ),
-        ],
-      ),
+    return GlassScaffold(
+      title: 'Vehicle Movement Log',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: _loadInitialData,
+          tooltip: 'Reload Data',
+        ),
+      ],
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -458,12 +529,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Basic Information',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -497,7 +568,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                     //   vehicle['modelName'],
                                     //   style: TextStyle(
                                     //     fontSize: 14,
-                                    //     color: Colors.grey[600],
+                                    //
                                     //   ),
                                     // ),
                                     // if (vehicle['numberPlate'] != null &&
@@ -508,7 +579,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                     //     'Plate: ${vehicle['numberPlate']}',
                                     //     style: TextStyle(
                                     //       fontSize: 12,
-                                    //       color: Colors.grey[500],
+                                    //
                                     //     ),
                                     //   ),
                                   ],
@@ -539,9 +610,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.info,
-                                color: Color(0xFF003768),
+                                color: Theme.of(context).colorScheme.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -549,11 +620,13 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Selected Vehicle:',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFF003768),
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -581,20 +654,23 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                       // Date Selection
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.calendar_today,
-                            color: Color(0xFF003768),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
-                            style: const TextStyle(fontSize: 16),
+                          Expanded(
+                            child: Text(
+                              'Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ),
-                          const Spacer(),
                           ElevatedButton(
                             onPressed: () => _selectDate(context),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF003768),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                             ),
                             child: const Text('Change Date'),
@@ -615,12 +691,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Movement Type',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF003768),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -661,12 +737,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Locations',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -761,12 +837,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Driver & Material',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -849,8 +925,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 suffixText: _selectedUnit.isNotEmpty
                                     ? _selectedUnit
                                     : null,
-                                suffixStyle: const TextStyle(
-                                  color: Color(0xFF003768),
+                                suffixStyle: TextStyle(
+                                  color: Theme.of(context).primaryColor,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -887,12 +963,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Time & Distance',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -905,12 +981,14 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 labelText: 'Start Time',
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.access_time),
-                                hintText: 'HH:mm',
+                                hintText: 'hh:mm a',
                               ),
                               readOnly: true,
-                              onTap: () {
-                                _setCurrentTime();
-                              },
+                              onTap: () => _selectTime(context, _startTimeController),
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Enter start time'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -921,8 +999,10 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 labelText: 'End Time',
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.access_time),
-                                hintText: 'HH:mm (e.g., 16:15)',
+                                hintText: 'hh:mm a',
                               ),
+                              readOnly: true,
+                              onTap: () => _selectTime(context, _endTimeController),
                               validator: (value) =>
                                   value == null || value.isEmpty
                                   ? 'Enter end time'
@@ -958,12 +1038,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Additional Information',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF003768),
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                       const SizedBox(height: 12),

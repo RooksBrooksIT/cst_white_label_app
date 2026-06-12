@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
+import '../services/firestore_service.dart';
 import 'project_screen.dart';
 
 class SiteScreen extends StatefulWidget {
@@ -22,16 +24,14 @@ class _SiteScreenState extends State<SiteScreen>
 
   DateTime? _startDate;
   DateTime? _endDate;
-  String? _projectType;
+  String? _projectCategory;
   String _status = 'In-Progress';
   bool _isGettingLocation = false;
   bool _isSaving = false; // disables Save button for 3 seconds when true
 
   TabController? _tabController;
 
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF084a99);
-  static const Color backgroundColor = Color(0xFFF5F7FA);
+  // Theme colors will be derived from context
 
   @override
   void initState() {
@@ -51,13 +51,14 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectCategories() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectCategories')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectCategories',
+      ).get();
       final categories = snapshot.docs
           .map((doc) => doc['projectCategory']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
       return categories;
     } catch (e) {
@@ -67,14 +68,31 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<List<String>> fetchProjectStatus() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectStatus')
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectStatus',
+      ).get();
       final statusList = snapshot.docs
           .map((doc) => doc['projectState']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
+
+      // Add default status options if they are not already present
+      final defaultStatuses = [
+        'Planning',
+        'Started',
+        'In Progress',
+        'On Hold',
+        'Completed',
+        'Cancelled',
+      ];
+      for (var status in defaultStatuses) {
+        if (!statusList.contains(status)) {
+          statusList.add(status);
+        }
+      }
+
       return statusList;
     } catch (e) {
       throw 'Failed to load status options: $e';
@@ -82,6 +100,8 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: isStartDate
@@ -91,8 +111,8 @@ class _SiteScreenState extends State<SiteScreen>
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
               primary: primaryColor,
               onPrimary: Colors.white,
               onSurface: Colors.black87,
@@ -121,7 +141,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<String> _getNextSiteId(String siteName) async {
-    final snapshot = await FirebaseFirestore.instance.collection('Site').get();
+    final snapshot = await FirestoreService.getCollection('Site').get();
     int maxSiteNum = 0;
     for (final doc in snapshot.docs) {
       if (doc.data().containsKey('siteId')) {
@@ -158,9 +178,31 @@ class _SiteScreenState extends State<SiteScreen>
       if (permission == LocationPermission.deniedForever) {
         throw 'Location permissions are permanently denied';
       }
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final Position position;
+      Position? tempPosition;
+      try {
+        tempPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('High accuracy getCurrentPosition failed/timed out: $e');
+        // Fallback 1: Try retrieving the last known position
+        tempPosition = await Geolocator.getLastKnownPosition();
+        if (tempPosition == null) {
+          debugPrint('Last known position is null, attempting low accuracy...');
+          // Fallback 2: Try low accuracy with a short timeout as a final attempt
+          tempPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 5),
+          );
+        }
+      }
+
+      if (tempPosition == null) {
+        throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
+      }
+      position = tempPosition;
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -201,9 +243,14 @@ class _SiteScreenState extends State<SiteScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final backgroundColor = theme.scaffoldBackgroundColor;
+
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Site Details',
           style: TextStyle(color: Colors.white),
@@ -211,9 +258,9 @@ class _SiteScreenState extends State<SiteScreen>
         centerTitle: true,
         elevation: 0,
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primaryColor, Color.fromARGB(255, 13, 64, 140)],
+              colors: [primaryColor, primaryColor.withOpacity(0.8)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -222,7 +269,8 @@ class _SiteScreenState extends State<SiteScreen>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
-          unselectedLabelColor: Color(0xFFd1d5db),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -242,6 +290,9 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Widget _buildNewSiteTab() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -329,18 +380,23 @@ class _SiteScreenState extends State<SiteScreen>
                   return _buildErrorWidget('No project categories available');
                 }
                 final categories = snapshot.data!;
-                if (_projectType == null && categories.isNotEmpty) {
+                // Ensure _projectCategory is valid for the current categories list
+                String currentValue = _projectCategory ?? categories.first;
+                if (!categories.contains(currentValue)) {
+                  currentValue = categories.first;
+                  // Use addPostFrameCallback to update state safely after build
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() => _projectType = categories.first);
-                    }
+                    if (mounted)
+                      setState(() => _projectCategory = categories.first);
                   });
                 }
+
                 return _buildDropdown(
-                  value: _projectType ?? categories.first,
+                  value: currentValue,
                   items: categories,
                   label: 'Project Category',
-                  onChanged: (value) => setState(() => _projectType = value),
+                  onChanged: (value) =>
+                      setState(() => _projectCategory = value),
                 );
               },
             ),
@@ -375,8 +431,18 @@ class _SiteScreenState extends State<SiteScreen>
                   return _buildErrorWidget('No status options available');
                 }
                 final statusList = snapshot.data!;
+                // Ensure _status is valid for the current statusList
+                String currentStatus = _status;
+                if (!statusList.contains(currentStatus)) {
+                  currentStatus = statusList.first;
+                  // Use addPostFrameCallback to update state safely after build
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _status = statusList.first);
+                  });
+                }
+
                 return _buildDropdown(
-                  value: _status,
+                  value: currentStatus,
                   items: statusList,
                   label: 'Project Status',
                   onChanged: (value) => setState(() => _status = value!),
@@ -393,8 +459,11 @@ class _SiteScreenState extends State<SiteScreen>
 
   // Replace the existing _buildAllSiteTab() with this implementation
   Widget _buildAllSiteTab() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('Site').snapshots(),
+      stream: FirestoreService.getCollection('Site').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -412,10 +481,10 @@ class _SiteScreenState extends State<SiteScreen>
           scrollDirection: Axis.horizontal,
           child: DataTable(
             columnSpacing: 26,
-            headingRowColor: WidgetStateProperty.all(
+            headingRowColor: MaterialStateProperty.all(
               primaryColor.withOpacity(0.1),
             ),
-            headingTextStyle: const TextStyle(
+            headingTextStyle: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 15,
               color: primaryColor,
@@ -424,6 +493,8 @@ class _SiteScreenState extends State<SiteScreen>
               DataColumn(label: Text('Site ID')),
               DataColumn(label: Text('Site Name')),
               DataColumn(label: Text('Location')),
+              DataColumn(label: Text('Category')),
+              DataColumn(label: Text('Status')),
             ],
             rows: List<DataRow>.generate(sites.length, (index) {
               final site = sites[index];
@@ -431,15 +502,20 @@ class _SiteScreenState extends State<SiteScreen>
               final siteId = (data['siteId'] as String?) ?? site.id;
               final siteName = (data['siteName'] as String?) ?? '';
               final location = (data['location'] as String?) ?? '';
+              final projectCategory =
+                  (data['projectCategory'] as String?) ?? '';
+              final status = (data['status'] as String?) ?? '';
 
               return DataRow(
-                color: WidgetStateProperty.resolveWith<Color?>(
+                color: MaterialStateProperty.resolveWith<Color?>(
                   (states) => index % 2 == 0 ? Colors.white : Colors.grey[50],
                 ),
                 cells: [
                   DataCell(Text(siteId)),
                   DataCell(Text(siteName)),
                   DataCell(Text(location)),
+                  DataCell(Text(projectCategory)),
+                  DataCell(Text(status)),
                 ],
               );
             }),
@@ -450,11 +526,14 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: primaryColor,
@@ -471,6 +550,9 @@ class _SiteScreenState extends State<SiteScreen>
     TextInputType? keyboardType,
     bool readOnly = false,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -499,7 +581,7 @@ class _SiteScreenState extends State<SiteScreen>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: primaryColor, width: 2.5),
+              borderSide: BorderSide(color: primaryColor, width: 2.5),
             ),
           ),
           validator: validator,
@@ -521,6 +603,9 @@ class _SiteScreenState extends State<SiteScreen>
     required String label,
     required Function(String?) onChanged,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -560,7 +645,7 @@ class _SiteScreenState extends State<SiteScreen>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: primaryColor, width: 2.5),
+              borderSide: BorderSide(color: primaryColor, width: 2.5),
             ),
           ),
           style: const TextStyle(
@@ -580,6 +665,9 @@ class _SiteScreenState extends State<SiteScreen>
     required DateTime? date,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -609,22 +697,26 @@ class _SiteScreenState extends State<SiteScreen>
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: primaryColor, width: 2.5),
+                borderSide: BorderSide(color: primaryColor, width: 2.5),
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  date == null
-                      ? 'Select $label'
-                      : DateFormat('MMM d, yyyy').format(date),
-                  style: TextStyle(
-                    color: date == null ? Colors.grey.shade600 : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                Expanded(
+                  child: Text(
+                    date == null
+                        ? 'Select $label'
+                        : DateFormat('MMM d, yyyy').format(date),
+                    style: TextStyle(
+                      color: date == null
+                          ? Colors.grey.shade600
+                          : Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Icon(Icons.calendar_today, color: primaryColor, size: 22),
               ],
             ),
@@ -658,6 +750,9 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -674,13 +769,6 @@ class _SiteScreenState extends State<SiteScreen>
           label: 'Reset',
           color: Colors.orange.shade700,
           onPressed: _resetForm,
-        ),
-        _buildActionButton(
-          context,
-          icon: Icons.cancel,
-          label: 'Cancel',
-          color: Colors.red.shade700,
-          onPressed: () => Navigator.pop(context),
         ),
       ],
     );
@@ -737,13 +825,12 @@ class _SiteScreenState extends State<SiteScreen>
     final endDate = _endDate != null
         ? DateFormat('yyyy-MM-dd').format(_endDate!)
         : '';
-    final projectType = _projectType ?? '';
+    final projectCategory = _projectCategory ?? '';
     final status = _status.isNotEmpty ? _status : 'In-Progress';
 
     try {
       // Deduplication: check if a Site with same siteName and location already exists
-      final dupQuery = await FirebaseFirestore.instance
-          .collection('Site')
+      final dupQuery = await FirestoreService.getCollection('Site')
           .where('siteName', isEqualTo: siteName)
           .where('location', isEqualTo: location)
           .limit(1)
@@ -771,23 +858,20 @@ class _SiteScreenState extends State<SiteScreen>
         'location': location,
         'latitude': latitude.isNotEmpty ? double.tryParse(latitude) : null,
         'longitude': longitude.isNotEmpty ? double.tryParse(longitude) : null,
-        'projectType': projectType,
+        'projectCategory': projectCategory,
         'startDate': startDate,
         'endDate': endDate,
         'status': status,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      final siteDocId = '${nextId}_${siteName.replaceAll(' ', '')}';
-      await FirebaseFirestore.instance
-          .collection('Site')
-          .doc(siteDocId)
-          .set(siteData);
+      final siteDocId = nextId + '_' + siteName.replaceAll(' ', '');
+      await FirestoreService.getCollection('Site').doc(siteDocId).set(siteData);
 
       // Create project with dedupe on name+siteId combination as well
-      final projectsSnapshot = await FirebaseFirestore.instance
-          .collection('projects')
-          .get();
+      final projectsSnapshot = await FirestoreService.getCollection(
+        'projects',
+      ).get();
       int maxPRNum = 0;
       for (final doc in projectsSnapshot.docs) {
         final docId = doc.id;
@@ -809,37 +893,21 @@ class _SiteScreenState extends State<SiteScreen>
 
       final projectData = {
         'createdAt': FieldValue.serverTimestamp(),
-        'siteId': '${nextId}_${siteName.replaceAll(' ', '')}',
+        'siteId': nextId + '_' + siteName.replaceAll(' ', ''),
         'siteName': siteName,
         'plannedStartDate': plannedStartDateTs,
         'plannedEndDate': plannedEndDateTs,
-        'projectType': projectType,
+        'projectCategory': projectCategory,
         'status': status,
         'siteLocation': location,
       };
 
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(nextPrDocId)
-          .set(projectData);
+      await FirestoreService.getCollection(
+        'projects',
+      ).doc(nextPrDocId).set(projectData);
 
       // Success message then navigate to ProjectScreen
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Your new value has been saved successfully'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // Navigate to project page
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProjectScreen(projectId: nextPrDocId),
-          ),
-        );
-      }
+      _showSuccessDialog(nextId, nextPrDocId);
 
       _resetForm();
     } catch (e, stack) {
@@ -864,65 +932,113 @@ class _SiteScreenState extends State<SiteScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
+      builder: (BuildContext dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final primaryColor = theme.primaryColor;
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          elevation: 6,
-          child: Padding(
-            padding: const EdgeInsets.all(26.0),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Lottie.asset(
-                  'assets/animation/success.json',
-                  width: 110,
-                  height: 110,
-                  repeat: false,
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Lottie.asset(
+                      'assets/animation/success.json',
+                      width: 120,
+                      height: 120,
+                      repeat: false,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 Text(
                   'Success!',
-                  style: TextStyle(
-                    fontSize: 24,
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Project created with ID $siteId.\nPlease update the project details.',
+                RichText(
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 17, color: Colors.black87),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.5,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
-                    ),
-                    elevation: 5,
-                  ),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProjectScreen(projectId: projectId),
+                    children: [
+                      const TextSpan(text: 'New site registered as '),
+                      TextSpan(
+                        text: siteId,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
                       ),
-                    );
-                  },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                      const TextSpan(
+                        text:
+                            '.\n\nPlease proceed to update the project configuration.',
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ProjectScreen(projectId: projectId),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -940,7 +1056,7 @@ class _SiteScreenState extends State<SiteScreen>
       _longitudeController.clear();
       _startDate = null;
       _endDate = null;
-      _projectType = null;
+      _projectCategory = null;
       _status = 'In-Progress';
     });
   }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 // import 'package:ideal_cst/screens/vehichle_inventory_pdf.dart';
 import 'package:demo_cst/screens/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 /// Vehicle Inventory Report
 /// - Filter modes: by Date (string equality on 'date'), by Month (createdAt range), by Site (toLocation equality)
@@ -56,8 +58,8 @@ class _VehicleInventoryReportPageState
   Future<void> _loadSites() async {
     setState(() => _isLoadingSites = true);
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('projects')
+      final snap = await FirestoreService
+          .getCollection('projects')
           .get();
       final names = <String>{};
       for (final d in snap.docs) {
@@ -148,7 +150,7 @@ class _VehicleInventoryReportPageState
   Future<void> _fetchData() async {
     setState(() => _isLoadingData = true);
     try {
-      final col = FirebaseFirestore.instance.collection('vehicleMovements');
+      final col = FirestoreService.getCollection('vehicleMovements');
 
       Query<Map<String, dynamic>> q = col;
 
@@ -411,8 +413,9 @@ class _VehicleInventoryReportPageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Vehicle Inventory Report')),
+    return GlassScaffold(
+      title: 'Vehicle Inventory Report',
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

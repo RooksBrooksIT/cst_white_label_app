@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../utils/pdf_templates.dart';
 
 class MaterialReportPage extends StatefulWidget {
   const MaterialReportPage({super.key});
@@ -9,15 +18,8 @@ class MaterialReportPage extends StatefulWidget {
 }
 
 class _MaterialReportPageState extends State<MaterialReportPage> {
-  final Color primaryColor = const Color(0xFF0b3470); // Dark Blue
-  final Color accentColor = const Color(0xFFc4b800); // Muted Gold Accent
-  final Color backgroundColor = const Color(
-    0xFFF9FAFB,
-  ); // Soft Light Background
-
   List<String> materialNames = [];
   String? selectedMaterial;
-
   bool isLoadingNames = true;
   bool isReportLoading = false;
   List<_SiteMaterialRow> reportRows = [];
@@ -25,42 +27,29 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   @override
   void initState() {
     super.initState();
-    _fetchMaterialNames();
+    _initAndFetch();
+  }
+
+  Future<void> _initAndFetch() async {
+    await FirestoreService.initialize();
+    await _fetchMaterialNames();
   }
 
   Future<void> _fetchMaterialNames() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('materialsInventory')
-          .get();
-
+      final snapshot = await FirestoreService.materialCategories.get();
       final names = snapshot.docs
-          .map((doc) => (doc.data()['materialName'] ?? '').toString().trim())
+          .map((doc) => (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '').toString().trim())
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();
-
       names.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
       setState(() {
         materialNames = names;
         isLoadingNames = false;
       });
     } catch (e) {
       setState(() => isLoadingNames = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load materials: $e'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.red[400],
-          ),
-        );
-      });
     }
   }
 
@@ -71,11 +60,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     });
 
     try {
-      final q = await FirebaseFirestore.instance
-          .collection('materialsInventory')
-          .where('materialName', isEqualTo: materialName)
-          .get();
-
+      final q = await FirestoreService.getCollection('materialsInventory').where('materialName', isEqualTo: materialName).get();
       final Map<String, double> qtyBySite = {};
       for (final doc in q.docs) {
         final data = doc.data();
@@ -83,30 +68,17 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         if (sites is List) {
           for (final s in sites) {
             if (s is Map<String, dynamic>) {
-              final siteId = (s['siteId'] ?? s['siteid'] ?? '')
-                  .toString()
-                  .trim();
+              final siteId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
               if (siteId.isEmpty) continue;
-              final qtyRaw = s['materialQty'];
-              final qty = _parseNumber(qtyRaw);
-              qtyBySite.update(
-                siteId,
-                (prev) => prev + qty,
-                ifAbsent: () => qty,
-              );
+              final qty = _parseNumber(s['materialQty']);
+              qtyBySite.update(siteId, (prev) => prev + qty, ifAbsent: () => qty);
             }
           }
         }
       }
 
-      final rows =
-          qtyBySite.entries
-              .map((e) => _SiteMaterialRow(siteId: e.key, qty: e.value))
-              .toList()
-            ..sort(
-              (a, b) =>
-                  a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()),
-            );
+      final rows = qtyBySite.entries.map((e) => _SiteMaterialRow(siteId: e.key, qty: e.value)).toList();
+      rows.sort((a, b) => a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()));
 
       setState(() {
         reportRows = rows;
@@ -114,303 +86,195 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       });
     } catch (e) {
       setState(() => isReportLoading = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load report: $e'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.red[400],
-          ),
-        );
-      });
     }
   }
 
   double _parseNumber(dynamic v) {
     if (v == null) return 0.0;
     if (v is num) return v.toDouble();
-    if (v is String) {
-      final cleaned = v.replaceAll(RegExp(r'[^0-9.+-]'), '');
-      final parsed = double.tryParse(cleaned);
-      return parsed ?? 0.0;
-    }
+    if (v is String) return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
     return 0.0;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Material Report',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 22,
-          ),
-        ),
-        backgroundColor: primaryColor,
-        centerTitle: true,
-        elevation: 6,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              if (selectedMaterial != null) {
-                _fetchMaterialReport(selectedMaterial!);
-              }
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              shadowColor: Colors.black12,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SELECT MATERIAL',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[700],
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (isLoadingNames)
-                      Center(
-                        child: CircularProgressIndicator(color: primaryColor),
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        value: selectedMaterial,
-                        iconEnabledColor: primaryColor,
-                        decoration: InputDecoration(
-                          labelText: 'Choose Material',
-                          labelStyle: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          prefixIcon: Icon(Icons.search, color: primaryColor),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: primaryColor),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                        dropdownColor: Colors.white,
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                        isExpanded: true,
-                        items: materialNames
-                            .map(
-                              (name) => DropdownMenuItem<String>(
-                                value: name,
-                                child: Text(name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          setState(() => selectedMaterial = val);
-                          if (val != null) {
-                            _fetchMaterialReport(val);
-                          }
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            if (selectedMaterial != null) ...[
-              Row(
-                children: [
-                  Icon(Icons.assignment, color: primaryColor, size: 26),
-                  const SizedBox(width: 10),
-                  Text(
-                    'MATERIAL REPORT',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Showing results for: $selectedMaterial',
-                style: TextStyle(fontSize: 15, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 18),
-              if (isReportLoading)
-                Center(child: CircularProgressIndicator(color: primaryColor))
-              else
-                _buildReportTable(context),
-            ],
-            if (selectedMaterial != null &&
-                !isReportLoading &&
-                reportRows.isEmpty)
-              Center(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 50),
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
 
-                    Text(
-                      'No data available',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No sites found for the selected material',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-              ),
+    return GlassScaffold(
+      title: 'Material Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+          onPressed: reportRows.isNotEmpty ? _generatePdf : null,
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.white),
+          onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
+        ),
+      ],
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSelectionCard(theme),
+            const SizedBox(height: 24),
+            if (selectedMaterial != null) ...[
+              _buildReportHeader(theme),
+              const SizedBox(height: 16),
+              if (isReportLoading)
+                const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+              else if (reportRows.isEmpty)
+                _buildEmptyState(theme)
+              else
+                _buildReportTable(theme),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildReportTable(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      shadowColor: Colors.black12,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryColor.withOpacity(0.3)),
+  Widget _buildSelectionCard(ThemeData theme) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Inventory Insights', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 4),
+          Text('Select a material to view its distribution across sites.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 20),
+          if (isLoadingNames)
+            const LinearProgressIndicator()
+          else
+            DropdownButtonFormField<String>(
+              value: selectedMaterial,
+              decoration: InputDecoration(
+                labelText: 'Material Name',
+                prefixIcon: const Icon(Icons.inventory_2_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Sites:',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  Text(
-                    reportRows.length.toString(),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: primaryColor,
-                    ),
-                  ),
-                ],
-              ),
+              items: materialNames.map((name) => DropdownMenuItem(
+                value: name,
+                child: Text(name, style: TextStyle(color: theme.colorScheme.onSurface)),
+              )).toList(),
+              dropdownColor: theme.colorScheme.surfaceContainerHighest,
+              onChanged: (val) {
+                setState(() => selectedMaterial = val);
+                if (val != null) _fetchMaterialReport(val);
+              },
             ),
-            const SizedBox(height: 20),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300, width: 1),
-                ),
-                child: DataTable(
-                  columnSpacing: 30,
-                  horizontalMargin: 20,
-                  headingRowColor: WidgetStateProperty.resolveWith(
-                    (states) => primaryColor.withOpacity(0.1),
-                  ),
-                  columns: [
-                    DataColumn(
-                      label: Text(
-                        'SITE ID',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                    DataColumn(
-                      numeric: true,
-                      label: Text(
-                        'QUANTITY',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                  rows: reportRows
-                      .map(
-                        (r) => DataRow(
-                          cells: [
-                            DataCell(
-                              Text(
-                                r.siteId,
-                                style: TextStyle(
-                                  color: Colors.grey[800],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Text(
-                                r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2),
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportHeader(ThemeData theme) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 12),
+        Text('DISTRIBUTION REPORT', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: theme.colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return GlassCard(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40.0),
+          child: Column(
+            children: [
+              Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.outlineVariant),
+              const SizedBox(height: 16),
+              const Text('No site data found for this material.', style: TextStyle(fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildReportTable(ThemeData theme) {
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.05), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Across active sites', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text('${reportRows.length} sites', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: reportRows.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (ctx, i) {
+              final row = reportRows[i];
+              return ListTile(
+                title: Text(row.siteId, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                trailing: Text(row.qty.toStringAsFixed(row.qty % 1 == 0 ? 0 : 2), style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor, fontSize: 16)),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  Future<void> _generatePdf() async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Material Distribution Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Material Name', selectedMaterial ?? 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Total Sites', '${reportRows.length}', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Table.fromTextArray(
+            headers: ['Site ID', 'Quantity'],
+            data: reportRows.map((r) => [r.siteId, r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2)]).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }
 

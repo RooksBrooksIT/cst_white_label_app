@@ -1,22 +1,28 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../utils/responsive.dart';
+import '../utils/pdf_templates.dart';
 
 class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
   final String? siteId;
   final DateTime date;
+  final String? projectStage;
 
   const DailySiteExpensesReportPage({
     super.key,
     required this.supervisorId,
     required this.siteId,
     required this.date,
+    this.projectStage,
   });
 
   @override
@@ -26,1153 +32,207 @@ class DailySiteExpensesReportPage extends StatefulWidget {
 
 class _DailySiteExpensesReportPageState
     extends State<DailySiteExpensesReportPage> {
-  static const Color primaryColor = Color(0xFF0b3470);
-  static const Color accentColor = Color(0xFF4a7cda);
-  static const Color backgroundColor = Color(0xFFf8f9fa);
-  static const Color textColor = Color(0xFF2c3e50);
-  static const Color cardColor = Colors.white;
-  static const Color successColor = Color(0xFF2e7d32);
-  static const Color warningColor = Color(0xFFed6c02);
-
   String get _documentId {
     final formattedDate = DateFormat('ddMMyyyy').format(widget.date);
     return '${widget.siteId}_$formattedDate';
   }
 
   Future<Map<String, dynamic>> _fetchAllReports() async {
-    final supervisorDoc = await FirebaseFirestore.instance
-        .collection('siteSupervisorEntries')
-        .doc(_documentId)
-        .get();
-    final managerQuery = await FirebaseFirestore.instance
-        .collection('managerEntries')
-        .where('siteId', isEqualTo: widget.siteId)
-        .get();
-    final allManagerDocs = managerQuery.docs;
-    final orgQuery = await FirebaseFirestore.instance
-        .collection('organizationEntries')
-        .where('siteId', isEqualTo: widget.siteId)
-        .get();
-    final allOrgDocs = orgQuery.docs;
+    final supervisorDoc = await FirestoreService.getCollection(
+      'siteSupervisorEntries',
+    ).doc(_documentId).get();
 
-    // Contractor Expenses
-    final contractorQuery = await FirebaseFirestore.instance
-        .collection('contractorEntries')
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date))
-        .get();
-    final allContractorDocs = contractorQuery.docs;
+    // Check if supervisor entry matches projectStage if provided
+    DocumentSnapshot? filteredSupervisorDoc;
+    if (supervisorDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredSupervisorDoc = supervisorDoc;
+        }
+      } else {
+        filteredSupervisorDoc = supervisorDoc;
+      }
+    }
 
-    // Incentive Expenses
-    final incentiveQuery = await FirebaseFirestore.instance
-        .collection('totalSiteExpensesPerDay')
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date))
-        .get();
-    final incentiveDoc = (incentiveQuery.docs.isNotEmpty)
-        ? incentiveQuery.docs.first
-        : null;
+    final managerDoc = await FirestoreService.getCollection(
+      'managerExpenses',
+    ).doc(_documentId).get();
+
+    // Check if manager entry matches projectStage if provided
+    DocumentSnapshot? filteredManagerDoc;
+    if (managerDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = managerDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredManagerDoc = managerDoc;
+        }
+      } else {
+        filteredManagerDoc = managerDoc;
+      }
+    }
+
+    Query<Map<String, dynamic>> orgQuery = FirestoreService.getCollection(
+      'organizationExpenses',
+    ).where('siteId', isEqualTo: widget.siteId);
+
+    if (widget.projectStage != null) {
+      // organizationEntries often use projectField or projectStage
+      // We'll fetch and filter in memory to be safe, or use multiple where if possible
+    }
+
+    final orgSnapshot = await orgQuery.limit(50).get();
+    List<DocumentSnapshot> filteredOrgEntries = orgSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredOrgEntries = orgSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
+    Query<Map<String, dynamic>> contractorQuery =
+        FirestoreService.getCollection('contractorEntries')
+            .where('siteId', isEqualTo: widget.siteId)
+            .where(
+              'date',
+              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
+            );
+
+    final contractorSnapshot = await contractorQuery.limit(50).get();
+    List<DocumentSnapshot> filteredContractorEntries = contractorSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredContractorEntries = contractorSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
+    final incentiveQuery =
+        await FirestoreService.getCollection('totalSiteExpensesPerDay')
+            .where('siteId', isEqualTo: widget.siteId)
+            .where(
+              'date',
+              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
+            )
+            .limit(1)
+            .get();
+
+    DocumentSnapshot? filteredIncentiveDoc;
+    if (incentiveQuery.docs.isNotEmpty) {
+      final doc = incentiveQuery.docs.first;
+      if (widget.projectStage != null) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredIncentiveDoc = doc;
+        }
+      } else {
+        filteredIncentiveDoc = doc;
+      }
+    }
 
     return {
-      'supervisor': supervisorDoc.exists ? supervisorDoc : null,
-      'managerEntries': allManagerDocs,
-      'organizationEntries': allOrgDocs,
-      'contractorEntries': allContractorDocs,
-      'incentiveDoc': incentiveDoc,
+      'supervisor': filteredSupervisorDoc,
+      'managerEntries': filteredManagerDoc != null
+          ? <DocumentSnapshot>[filteredManagerDoc]
+          : <DocumentSnapshot>[],
+      'organizationEntries': filteredOrgEntries,
+      'contractorEntries': filteredContractorEntries,
+      'incentiveDoc': filteredIncentiveDoc,
     };
-  }
-
-  List<DataRow> _buildLabourRows(List<dynamic> labours) {
-    return labours.map<DataRow>((labour) {
-      return DataRow(
-        cells: [
-          DataCell(Text('Labour', style: TextStyle(color: textColor))),
-          DataCell(
-            Text(labour['type'] ?? '', style: TextStyle(color: textColor)),
-          ),
-          DataCell(
-            Text(
-              '${labour['count'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-          DataCell(
-            Text(
-              '${labour['unitSalary'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-          DataCell(
-            Text(
-              '${labour['amount'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-        ],
-      );
-    }).toList();
-  }
-
-  List<DataRow> _buildMaterialRows(List<dynamic> materials) {
-    return materials.map<DataRow>((material) {
-      return DataRow(
-        cells: [
-          DataCell(Text('Material', style: TextStyle(color: textColor))),
-          DataCell(
-            Text(material['type'] ?? '', style: TextStyle(color: textColor)),
-          ),
-          DataCell(
-            Text(
-              '${material['quantity'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-          DataCell(
-            Text(
-              '${material['unitPrice'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-          DataCell(
-            Text(
-              '${material['amount'] ?? ''}',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-        ],
-      );
-    }).toList();
-  }
-
-  List<DataRow> _buildExpenseRows(Map<String, dynamic> data) {
-    final List<DataRow> rows = [];
-    final expenseFields = [
-      {'type': 'Food', 'key': 'food'},
-      {'type': 'Fuel', 'key': 'fuel'},
-      {'type': 'Transport', 'key': 'transport'},
-    ];
-    for (var field in expenseFields) {
-      if (data.containsKey(field['key'])) {
-        rows.add(
-          DataRow(
-            cells: [
-              DataCell(Text('Expense', style: TextStyle(color: textColor))),
-              DataCell(
-                Text(field['type']!, style: TextStyle(color: textColor)),
-              ),
-              DataCell(Text('-', style: TextStyle(color: textColor))),
-              DataCell(Text('-', style: TextStyle(color: textColor))),
-              DataCell(
-                Text(
-                  '${data[field['key']]}',
-                  style: TextStyle(color: textColor),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-    return rows;
-  }
-
-  // PDF generation function for all details
-  Future<Uint8List> _generatePdf({
-    required Map<String, dynamic>? supervisorData,
-    required List<Map<String, dynamic>> managerBills,
-    required List<Map<String, dynamic>> orgBills,
-    required List<Map<String, dynamic>> contractorBills,
-    required num supervisorTotal,
-    required num managerTotal,
-    required num orgTotal,
-    required num contractorTotal,
-    required num grandTotal,
-  }) async {
-    final pdf = pw.Document();
-    final formattedDate = DateFormat('yyyy-MM-dd').format(widget.date);
-
-    pdf.addPage(
-      pw.MultiPage(
-        build: (pw.Context context) => [
-          pw.Text(
-            'Daily Site Expenses Report',
-            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 12),
-          pw.Text('Supervisor ID: ${widget.supervisorId}'),
-          pw.Text('Site ID: ${widget.siteId ?? "N/A"}'),
-          pw.Text('Date: $formattedDate'),
-          pw.SizedBox(height: 16),
-
-          // Supervisor Section
-          if (supervisorData != null) ...[
-            pw.Text(
-              'Site Supervisor Expenses',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            _pdfSupervisorTable(supervisorData),
-            pw.SizedBox(height: 8),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Supervisor Total: ₹$supervisorTotal',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // Manager Section
-          if (managerBills.isNotEmpty) ...[
-            pw.Text(
-              'Manager Expenses',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            _pdfBillsTable(managerBills),
-            pw.SizedBox(height: 8),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Manager Total: ₹$managerTotal',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // Organization Section
-          if (orgBills.isNotEmpty) ...[
-            pw.Text(
-              'Organization Expenses',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            _pdfBillsTable(orgBills),
-            pw.SizedBox(height: 8),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Organization Total: ₹$orgTotal',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // Contractor Section
-          if (contractorBills.isNotEmpty) ...[
-            pw.Text(
-              'Contractor Expenses',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            _pdfContractorTable(contractorBills),
-            pw.SizedBox(height: 8),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Contractor Total: ₹$contractorTotal',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // Grand Total
-          pw.Divider(),
-          pw.SizedBox(height: 8),
-          pw.Center(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(16),
-              decoration: pw.BoxDecoration(
-                color: PdfColor.fromInt(primaryColor.value),
-                borderRadius: pw.BorderRadius.circular(12),
-              ),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    'Grand Total',
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  pw.SizedBox(height: 6),
-                  pw.Text(
-                    '₹$grandTotal',
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 28,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    return pdf.save();
-  }
-
-  pw.Widget _pdfSupervisorTable(Map<String, dynamic> data) {
-    final labours = (data['labours'] ?? []) as List<dynamic>;
-    final materials = (data['materials'] ?? []) as List<dynamic>;
-    final expenseFields = [
-      {'type': 'Food', 'key': 'food'},
-      {'type': 'Fuel', 'key': 'fuel'},
-      {'type': 'Transport', 'key': 'transport'},
-    ];
-    final tableRows = <List<String>>[];
-    for (var field in expenseFields) {
-      if (data.containsKey(field['key'])) {
-        tableRows.add([
-          'Expense',
-          field['type']!,
-          '-',
-          '-',
-          '${data[field['key']]}',
-        ]);
-      }
-    }
-    for (var labour in labours) {
-      tableRows.add([
-        'Labour',
-        labour['type'] ?? '',
-        '${labour['count'] ?? ''}',
-        '${labour['unitSalary'] ?? ''}',
-        '${labour['amount'] ?? ''}',
-      ]);
-    }
-    for (var material in materials) {
-      tableRows.add([
-        'Material',
-        material['type'] ?? '',
-        '${material['quantity'] ?? ''}',
-        '${material['unitPrice'] ?? ''}',
-        '${material['amount'] ?? ''}',
-      ]);
-    }
-    return pw.Table.fromTextArray(
-      headers: ['Type', 'Item', 'Quantity', 'Unit', 'Amount'],
-      data: tableRows,
-      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFE3F2FD)),
-    );
-  }
-
-  pw.Widget _pdfBillsTable(List<Map<String, dynamic>> bills) {
-    final tableRows = bills.map((bill) {
-      String billDate = '-';
-      if (bill['billDate'] != null) {
-        if (bill['billDate'] is String) {
-          billDate = DateFormat(
-            'yyyy-MM-dd',
-          ).format(DateTime.parse(bill['billDate']));
-        } else if (bill['billDate'] is Timestamp) {
-          billDate = DateFormat(
-            'yyyy-MM-dd',
-          ).format((bill['billDate'] as Timestamp).toDate());
-        }
-      }
-      return [
-        bill['billNo']?.toString() ?? '-',
-        bill['billVendor']?.toString() ?? '-',
-        bill['billAmount']?.toString() ?? '-',
-        billDate,
-      ];
-    }).toList();
-    return pw.Table.fromTextArray(
-      headers: ['Bill No', 'Vendor', 'Amount', 'Date'],
-      data: tableRows,
-      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFE3F2FD)),
-    );
-  }
-
-  pw.Widget _pdfContractorTable(List<Map<String, dynamic>> contractorBills) {
-    final tableRows = <List<String>>[];
-
-    for (var bill in contractorBills) {
-      // Construct rows for expenses, labours and materials similar to supervisor
-      if (bill.isEmpty) continue;
-
-      // Expenses
-      final expenseFields = [
-        {'type': 'Food', 'key': 'food'},
-        {'type': 'Fuel', 'key': 'fuel'},
-        {'type': 'Transport', 'key': 'transport'},
-      ];
-      for (var field in expenseFields) {
-        if (bill.containsKey(field['key'])) {
-          tableRows.add([
-            'Expense',
-            field['type']!,
-            '-',
-            '-',
-            '${bill[field['key']]}',
-          ]);
-        }
-      }
-
-      // Labours
-      final labours = bill['labours'] ?? [];
-      for (var labour in labours) {
-        tableRows.add([
-          'Labour',
-          labour['type']?.toString() ?? '',
-          labour['count']?.toString() ?? '',
-          '', // unit - skipping for contractor table for simplicity
-          labour['amount']?.toString() ?? '',
-        ]);
-      }
-
-      // Materials
-      final materials = bill['materials'] ?? [];
-      for (var material in materials) {
-        tableRows.add([
-          'Material',
-          material['type']?.toString() ?? '',
-          material['quantity']?.toString() ?? '',
-          '', // unitPrice skipped for PDF preview simplicity
-          material['amount']?.toString() ?? '',
-        ]);
-      }
-    }
-    return pw.Table.fromTextArray(
-      headers: ['Type', 'Item', 'Quantity', 'Unit', 'Amount'],
-      data: tableRows,
-      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-      cellAlignment: pw.Alignment.centerLeft,
-      headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFD1C4E9)),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final formattedDate = DateFormat('yyyy-MM-dd').format(widget.date);
+    final theme = Theme.of(context);
+    final isMobile = Responsive.isMobile(context);
+    final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Daily Site Expenses Report',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+    return GlassScaffold(
+      title: 'Daily Site Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+          onPressed: () => _handlePdfExport(context),
         ),
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
-        elevation: 2,
-      ),
+      ],
       body: FutureBuilder<Map<String, dynamic>>(
         future: _fetchAllReports(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-              ),
-            );
-          }
-          final supervisorDoc = snapshot.data?['supervisor'];
-          final managerEntries =
-              snapshot.data?['managerEntries'] as List<DocumentSnapshot>;
-          final orgEntries =
-              snapshot.data?['organizationEntries'] as List<DocumentSnapshot>;
-          final contractorEntries =
-              snapshot.data?['contractorEntries'] as List<DocumentSnapshot>;
-          final incentiveDoc = snapshot.data?['incentiveDoc'];
+          if (snapshot.connectionState == ConnectionState.waiting)
+            return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError)
+            return Center(child: Text('Error: ${snapshot.error}'));
+
+          final data = snapshot.data!;
+          final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
+          final managerEntries = (data['managerEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
+          final orgEntries = (data['organizationEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
+          final contractorEntries = (data['contractorEntries'] as List? ?? [])
+              .cast<DocumentSnapshot>();
+          final incentiveDoc = data['incentiveDoc'] as DocumentSnapshot?;
 
           if (supervisorDoc == null &&
-              (managerEntries.isEmpty) &&
-              (orgEntries.isEmpty) &&
-              (contractorEntries.isEmpty) &&
+              managerEntries.isEmpty &&
+              orgEntries.isEmpty &&
+              contractorEntries.isEmpty &&
               incentiveDoc == null) {
-            return Center(
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.receipt_long, size: 48, color: primaryColor),
-                      SizedBox(height: 16),
-                      Text(
-                        'No report found for this date.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: textColor.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+            return _buildNoDataView(theme, dateStr);
           }
 
-          // Extract data
           final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
-
-          final orgData = (orgEntries.isNotEmpty)
-              ? orgEntries.first.data() as Map<String, dynamic>?
-              : null;
-
-          // Top section info
-          final managerData =
-              (managerEntries.isNotEmpty)
-              ? managerEntries.first.data() as Map<String, dynamic>?
-              : null;
-          final siteId =
-              widget.siteId ??
-              supervisorData?['siteId'] ??
-              managerData?['siteId'] ??
-              orgData?['siteId'] ??
-              'N/A';
-          final supervisorName =
-              supervisorData?['supervisorName'] ??
-              managerData?['supervisorName'] ??
-              orgData?['supervisorName'] ??
-              widget.supervisorId;
-          final projectName =
-              supervisorData?['projectName'] ??
-              managerData?['projectName'] ??
-              orgData?['projectName'] ??
-              '-';
-
-          // Supervisor Expenses Table
-          List<DataRow> supervisorRows = [];
-          if (supervisorData != null) {
-            final labours = (supervisorData['labours'] ?? []) as List<dynamic>;
-            final materials =
-                (supervisorData['materials'] ?? []) as List<dynamic>;
-            supervisorRows = [
-              ..._buildExpenseRows(supervisorData),
-              ..._buildLabourRows(labours),
-              ..._buildMaterialRows(materials),
-            ];
-          }
-          final supervisorTotal = supervisorData?['totalAmount'] ?? 0;
-
-          // Manager Expenses Table
-          List<DataRow> managerRows = [];
-          num managerTotal = 0;
-          if (managerEntries.isNotEmpty) {
-            final selectedDateStr = DateFormat(
-              'yyyy-MM-dd',
-            ).format(widget.date);
-            for (var doc in managerEntries) {
-              final managerData = doc.data() as Map<String, dynamic>?;
-              if (managerData != null && managerData['bills'] != null) {
-                final bills = (managerData['bills'] as List<dynamic>).where((
-                  bill,
-                ) {
-                  final billDate = bill['billDate'];
-                  if (billDate == null) return false;
-                  DateTime? billDateObj;
-                  if (billDate is String) {
-                    billDateObj = DateTime.tryParse(billDate);
-                  } else if (billDate is Timestamp) {
-                    billDateObj = billDate.toDate();
-                  }
-                  return billDateObj != null &&
-                      DateFormat('yyyy-MM-dd').format(billDateObj) ==
-                          selectedDateStr;
-                }).toList();
-                managerRows.addAll(
-                  bills.map<DataRow>((bill) {
-                    String billDateStr = '-';
-                    final billDate = bill['billDate'];
-                    if (billDate != null) {
-                      DateTime? billDateObj;
-                      if (billDate is String) {
-                        billDateObj = DateTime.tryParse(billDate);
-                      } else if (billDate is Timestamp) {
-                        billDateObj = billDate.toDate();
-                      }
-                      if (billDateObj != null) {
-                        billDateStr = DateFormat(
-                          'yyyy-MM-dd',
-                        ).format(billDateObj);
-                      }
-                    }
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Text(
-                            bill['billNo']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            bill['billVendor']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            bill['billAmount']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(billDateStr, style: TextStyle(color: textColor)),
-                        ),
-                      ],
-                    );
-                  }),
-                );
-                // Sum up only the displayed bills
-                for (final bill in bills) {
-                  if (bill['billAmount'] is num) {
-                    managerTotal += bill['billAmount'] as num;
-                  } else if (bill['billAmount'] is String) {
-                    final parsed = double.tryParse(
-                      bill['billAmount'].toString().replaceAll(
-                        RegExp(r'[^0-9.]'),
-                        '',
-                      ),
-                    );
-                    if (parsed != null) managerTotal += parsed;
-                  }
-                }
-              }
-            }
-          }
-
-          // Organization Expenses Table
-          List<DataRow> orgRows = [];
-          num orgTotal = 0;
-          if (orgEntries.isNotEmpty) {
-            final selectedDateStr = DateFormat(
-              'yyyy-MM-dd',
-            ).format(widget.date);
-            for (final doc in orgEntries) {
-              final orgData = doc.data() as Map<String, dynamic>?;
-              if (orgData != null && orgData['bills'] != null) {
-                final bills = orgData['bills'] as List<dynamic>;
-                final filteredBills = bills.where((bill) {
-                  final billDate = bill['billDate'];
-                  DateTime? billDateObj;
-                  if (billDate is String) {
-                    billDateObj = DateTime.tryParse(billDate);
-                  } else if (billDate is Timestamp) {
-                    billDateObj = billDate.toDate();
-                  }
-                  return billDateObj != null &&
-                      DateFormat('yyyy-MM-dd').format(billDateObj) ==
-                          selectedDateStr;
-                }).toList();
-                orgRows.addAll(
-                  filteredBills.map<DataRow>((bill) {
-                    String billDate = '-';
-                    if (bill['billDate'] != null) {
-                      if (bill['billDate'] is String) {
-                        billDate = DateFormat(
-                          'yyyy-MM-dd',
-                        ).format(DateTime.parse(bill['billDate']));
-                      } else if (bill['billDate'] is Timestamp) {
-                        billDate = DateFormat(
-                          'yyyy-MM-dd',
-                        ).format((bill['billDate'] as Timestamp).toDate());
-                      }
-                    }
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Text(
-                            bill['billNo']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            bill['billVendor']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            bill['billAmount']?.toString() ?? '-',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ),
-                        DataCell(
-                          Text(billDate, style: TextStyle(color: textColor)),
-                        ),
-                      ],
-                    );
-                  }),
-                );
-                // Sum up totals for filtered bills only
-                for (final bill in filteredBills) {
-                  if (bill['billAmount'] is num) {
-                    orgTotal += bill['billAmount'] as num;
-                  } else if (bill['billAmount'] is String) {
-                    final parsed = double.tryParse(
-                      bill['billAmount'].toString().replaceAll(
-                        RegExp(r'[^0-9.]'),
-                        '',
-                      ),
-                    );
-                    if (parsed != null) orgTotal += parsed;
-                  }
-                }
-              }
-            }
-          }
-
-          // Contractor Expenses Table
-          List<DataRow> contractorRows = [];
-          num contractorTotal = 0;
-          if (contractorEntries.isNotEmpty) {
-            for (final doc in contractorEntries) {
-              final contractorData = doc.data() as Map<String, dynamic>?;
-              if (contractorData != null) {
-                contractorRows.addAll([
-                  ..._buildExpenseRows(contractorData),
-                  ..._buildLabourRows(contractorData['labours'] ?? []),
-                  ..._buildMaterialRows(contractorData['materials'] ?? []),
-                ]);
-                contractorTotal += contractorData['totalAmount'] ?? 0;
-              }
-            }
-          }
-
-          // Incentive Expenses Data
-          num incentiveTotal = 0;
-          if (incentiveDoc != null) {
-            final incentiveData = incentiveDoc.data() as Map<String, dynamic>?;
-            incentiveTotal = incentiveData?['totalIncentiveExpenses'] ?? 0;
-          }
-
-          final totalAmount =
-              (supervisorTotal is num ? supervisorTotal : 0) +
-              (managerTotal is num ? managerTotal : 0) +
-              (orgTotal is num ? orgTotal : 0) +
-              (contractorTotal is num ? contractorTotal : 0) +
-              (incentiveTotal is num ? incentiveTotal : 0);
+          final totalAmount = _calculateTotal(data);
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header Card
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                _buildSummaryHeader(theme, dateStr, totalAmount),
+                const SizedBox(height: 24),
+                if (supervisorData != null)
+                  _buildSupervisorSection(theme, supervisorData),
+                if (managerEntries.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildBillsSection(theme, 'Manager Expenses', managerEntries),
+                ],
+                if (orgEntries.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildBillsSection(
+                    theme,
+                    'Organization Expenses',
+                    orgEntries,
                   ),
-                  color: cardColor,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.assignment,
-                              color: primaryColor,
-                              size: 24,
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Report Summary',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-                        _buildInfoRow('Site ID', siteId),
-                        _buildInfoRow('Supervisor', supervisorName),
-                        _buildInfoRow('Project', projectName),
-                        _buildInfoRow('Date', formattedDate),
-                      ],
-                    ),
-                  ),
+                ],
+                if (contractorEntries.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildContractorSection(theme, contractorEntries),
+                ],
+                const SizedBox(height: 40),
+                GlassButton(
+                  label: 'EXPORT FULL REPORT',
+                  onPressed: () => _handlePdfExport(context),
+                  icon: Icons.picture_as_pdf,
                 ),
-                SizedBox(height: 24),
-
-                if (supervisorRows.isNotEmpty) ...[
-                  _buildSectionHeader('Site Supervisor Expenses'),
-                  SizedBox(height: 12),
-                  _buildDataTable(
-                    columns: const [
-                      DataColumn(
-                        label: Text(
-                          'Type',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Item',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Quantity',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Unit',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Amount',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    rows: supervisorRows,
-                  ),
-                  SizedBox(height: 16),
-                  _buildSubtotalCard('Supervisor Total', supervisorTotal),
-                  SizedBox(height: 24),
-                ],
-
-                if (managerRows.isNotEmpty) ...[
-                  _buildSectionHeader('Manager Expenses'),
-                  SizedBox(height: 12),
-                  _buildDataTable(
-                    columns: const [
-                      DataColumn(
-                        label: Text(
-                          'Bill No',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Vendor',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Amount',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Date',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    rows: managerRows,
-                  ),
-                  SizedBox(height: 16),
-                  _buildSubtotalCard('Manager Total', managerTotal),
-                  SizedBox(height: 24),
-                ],
-
-                if (orgRows.isNotEmpty) ...[
-                  _buildSectionHeader('Organization Expenses'),
-                  SizedBox(height: 12),
-                  _buildDataTable(
-                    columns: const [
-                      DataColumn(
-                        label: Text(
-                          'Bill No',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Vendor',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Amount',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Date',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    rows: orgRows,
-                  ),
-                  SizedBox(height: 16),
-                  _buildSubtotalCard('Organization Total', orgTotal),
-                  SizedBox(height: 24),
-                ],
-
-                if (contractorRows.isNotEmpty) ...[
-                  _buildSectionHeader('Contractor Expenses'),
-                  SizedBox(height: 12),
-                  _buildDataTable(
-                    columns: const [
-                      DataColumn(
-                        label: Text(
-                          'Type',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Item',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Quantity',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Unit',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Amount',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    rows: contractorRows,
-                  ),
-                  SizedBox(height: 16),
-                  _buildSubtotalCard('Contractor Total', contractorTotal),
-                  SizedBox(height: 24),
-                ],
-
-                // Grand Total Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  color: primaryColor,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        Icon(Icons.summarize, color: Colors.white, size: 32),
-                        SizedBox(height: 12),
-                        Text(
-                          'Grand Total',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          '₹$totalAmount',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 24),
-
-                // PDF Button
-                Center(
-                  child: ElevatedButton.icon(
-                    icon: Icon(
-                      Icons.picture_as_pdf,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    label: Text(
-                      'Generate PDF Report',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 3,
-                    ),
-                    onPressed: () async {
-                      // Gather all data for PDF
-                      final selectedDateStr = DateFormat(
-                        'yyyy-MM-dd',
-                      ).format(widget.date);
-                      // Supervisor
-                      final supervisor = supervisorData;
-                      num supervisorTotal = 0;
-                      if (supervisor != null) {
-                        final expenseFields = [
-                          {'type': 'Food', 'key': 'food'},
-                          {'type': 'Fuel', 'key': 'fuel'},
-                          {'type': 'Transport', 'key': 'transport'},
-                        ];
-                        for (var field in expenseFields) {
-                          if (supervisor.containsKey(field['key'])) {
-                            supervisorTotal +=
-                                num.tryParse(
-                                  supervisor[field['key']].toString(),
-                                ) ??
-                                0;
-                          }
-                        }
-                        final labours =
-                            (supervisor['labours'] ?? []) as List<dynamic>;
-                        for (var labour in labours) {
-                          supervisorTotal +=
-                              num.tryParse(
-                                labour['amount']?.toString() ?? '0',
-                              ) ??
-                              0;
-                        }
-                        final materials =
-                            (supervisor['materials'] ?? []) as List<dynamic>;
-                        for (var material in materials) {
-                          supervisorTotal +=
-                              num.tryParse(
-                                material['amount']?.toString() ?? '0',
-                              ) ??
-                              0;
-                        }
-                      }
-                      // Manager
-                      List<Map<String, dynamic>> managerBills = [];
-                      num managerTotal = 0;
-                      for (var doc in managerEntries) {
-                        final managerData = doc.data() as Map<String, dynamic>?;
-                        if (managerData != null &&
-                            managerData['bills'] != null) {
-                          final bills = (managerData['bills'] as List<dynamic>)
-                              .where((bill) {
-                                final billDate = bill['billDate'];
-                                if (billDate == null) return false;
-                                DateTime? billDateObj;
-                                if (billDate is String) {
-                                  billDateObj = DateTime.tryParse(billDate);
-                                } else if (billDate is Timestamp) {
-                                  billDateObj = billDate.toDate();
-                                }
-                                return billDateObj != null &&
-                                    DateFormat(
-                                          'yyyy-MM-dd',
-                                        ).format(billDateObj) ==
-                                        selectedDateStr;
-                              })
-                              .toList();
-                          for (var bill in bills) {
-                            managerBills.add(Map<String, dynamic>.from(bill));
-                            managerTotal +=
-                                num.tryParse(
-                                  bill['billAmount']?.toString() ?? '0',
-                                ) ??
-                                0;
-                          }
-                        }
-                      }
-                      // Organization
-                      List<Map<String, dynamic>> orgBills = [];
-                      num orgTotal = 0;
-                      for (final doc in orgEntries) {
-                        final orgData = doc.data() as Map<String, dynamic>?;
-                        if (orgData != null && orgData['bills'] != null) {
-                          final bills = orgData['bills'] as List<dynamic>;
-                          final filteredBills = bills.where((bill) {
-                            final billDate = bill['billDate'];
-                            DateTime? billDateObj;
-                            if (billDate is String) {
-                              billDateObj = DateTime.tryParse(billDate);
-                            } else if (billDate is Timestamp) {
-                              billDateObj = billDate.toDate();
-                            }
-                            return billDateObj != null &&
-                                DateFormat('yyyy-MM-dd').format(billDateObj) ==
-                                    selectedDateStr;
-                          }).toList();
-                          for (var bill in filteredBills) {
-                            orgBills.add(Map<String, dynamic>.from(bill));
-                            orgTotal +=
-                                num.tryParse(
-                                  bill['billAmount']?.toString() ?? '0',
-                                ) ??
-                                0;
-                          }
-                        }
-                      }
-
-                      // Contractor
-                      List<Map<String, dynamic>> contractorBills = [];
-                      num contractorTotal = 0;
-                      for (final doc in contractorEntries) {
-                        final contractorData =
-                            doc.data() as Map<String, dynamic>?;
-                        if (contractorData != null) {
-                          contractorBills.add(contractorData);
-                          contractorTotal += contractorData['totalAmount'] ?? 0;
-                        }
-                      }
-
-                      final grandTotal =
-                          supervisorTotal +
-                          managerTotal +
-                          orgTotal +
-                          contractorTotal;
-
-                      final pdfBytes = await _generatePdf(
-                        supervisorData: supervisor,
-                        managerBills: managerBills,
-                        orgBills: orgBills,
-                        contractorBills: contractorBills,
-                        supervisorTotal: supervisorTotal,
-                        managerTotal: managerTotal,
-                        orgTotal: orgTotal,
-                        contractorTotal: contractorTotal,
-                        grandTotal: grandTotal,
-                      );
-                      await Printing.layoutPdf(onLayout: (format) => pdfBytes);
-                    },
-                  ),
-                ),
-                SizedBox(height: 24),
+                const SizedBox(height: 40),
               ],
             ),
           );
@@ -1181,50 +241,80 @@ class _DailySiteExpensesReportPageState
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildNoDataView(ThemeData theme, String dateStr) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: textColor.withOpacity(0.7),
-                fontSize: 14,
-              ),
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 64,
+            color: theme.colorScheme.outlineVariant,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No entries found for $dateStr',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(color: textColor, fontSize: 14),
-            ),
+          const SizedBox(height: 24),
+          GlassButton(
+            label: 'REFRESH',
+            onPressed: () => setState(() {}),
+            isSecondary: true,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: primaryColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
+  Widget _buildSummaryHeader(ThemeData theme, String date, num total) {
+    final cs = theme.colorScheme;
+    return GlassCard(
+      color: cs.primary,
+      child: Column(
         children: [
           Text(
-            title,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+            'TOTAL DAILY EXPENDITURE',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: cs.onPrimary.withOpacity(0.7),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₹ ${total.toStringAsFixed(2)}',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: cs.onPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.onPrimary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: cs.onPrimary.withOpacity(0.7),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  date,
+                  style: TextStyle(
+                    color: cs.onPrimary.withOpacity(0.7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1232,52 +322,471 @@ class _DailySiteExpensesReportPageState
     );
   }
 
-  Widget _buildDataTable({
-    required List<DataColumn> columns,
-    required List<DataRow> rows,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowHeight: 40,
-          dataRowHeight: 40,
-          horizontalMargin: 16,
-          columnSpacing: 24,
-          headingRowColor: WidgetStateProperty.all(
-            primaryColor.withOpacity(0.1),
+  Widget _buildSupervisorSection(ThemeData theme, Map<String, dynamic> data) {
+    final labours = List<Map<String, dynamic>>.from(data['labours'] ?? []);
+    final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SITE SUPERVISOR ENTRIES',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
           ),
-          columns: columns,
-          rows: rows,
+          const SizedBox(height: 16),
+          if (labours.isNotEmpty) ...[
+            _buildSectionTitle(theme, 'Labour'),
+            ...labours.map(
+              (l) => _buildDetailRow(
+                l['type'],
+                '${l['count']} workers',
+                '₹${l['amount']}',
+              ),
+            ),
+            const Divider(height: 24),
+          ],
+          if (materials.isNotEmpty) ...[
+            _buildSectionTitle(theme, 'Materials'),
+            ...materials.map(
+              (m) => _buildDetailRow(
+                m['type'],
+                '${m['quantity']} units',
+                '₹${m['amount']}',
+              ),
+            ),
+            const Divider(height: 24),
+          ],
+          _buildSectionTitle(theme, 'Other Expenses'),
+          _buildDetailRow('Food', '', '₹${data['food'] ?? 0}'),
+          _buildDetailRow('Fuel', '', '₹${data['fuel'] ?? 0}'),
+          _buildDetailRow('Transport', '', '₹${data['transport'] ?? 0}'),
+          const Divider(height: 24),
+          _buildTotalRow(theme, 'Supervisor Total', data['totalAmount'] ?? 0),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillsSection(
+    ThemeData theme,
+    String title,
+    List<DocumentSnapshot> entries,
+  ) {
+    num total = 0;
+    final List<Map<String, dynamic>> allBills = [];
+    for (var doc in entries) {
+      final data = doc.data() as Map<String, dynamic>;
+      final bills = List<Map<String, dynamic>>.from(data['bills'] ?? []);
+      for (var bill in bills) {
+        allBills.add(bill);
+        total += _parseAmount(bill['billAmount']);
+      }
+    }
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...allBills.map(
+            (b) => _buildDetailRow(
+              b['billVendor'],
+              'Bill: ${b['billNo']}',
+              '₹${b['billAmount']}',
+            ),
+          ),
+          const Divider(height: 24),
+          _buildTotalRow(theme, '$title Total', total),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContractorSection(
+    ThemeData theme,
+    List<DocumentSnapshot> entries,
+  ) {
+    num total = 0;
+    for (var doc in entries)
+      total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'CONTRACTOR EXPENSES',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${entries.length} contractor entries recorded for this site.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          _buildTotalRow(theme, 'Contractor Total', total),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(ThemeData theme, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 
-  Widget _buildSubtotalCard(String label, num amount) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        color: primaryColor.withOpacity(0.1),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Text(
-            '$label: ₹$amount',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              color: primaryColor,
+  Widget _buildDetailRow(String label, String subtitle, String amount) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
-        ),
+          Text(
+            amount,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildTotalRow(ThemeData theme, String label, num total) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          '₹ ${total.toStringAsFixed(2)}',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.primaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  num _calculateTotal(Map<String, dynamic> data) {
+    num total = 0;
+    final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
+    if (supervisorDoc != null)
+      total +=
+          (supervisorDoc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+
+    for (var doc
+        in (data['managerEntries'] as List? ?? []).cast<DocumentSnapshot>()) {
+      final bills =
+          (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
+      for (var b in bills) total += _parseAmount(b['billAmount']);
+    }
+
+    for (var doc
+        in (data['organizationEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
+      final bills =
+          (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
+      for (var b in bills) total += _parseAmount(b['billAmount']);
+    }
+
+    for (var doc
+        in (data['contractorEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
+      total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+    }
+
+    if (data['incentiveDoc'] != null) {
+      total +=
+          (data['incentiveDoc'] as DocumentSnapshot).data()
+              as Map<String, dynamic>? ??
+          {}['totalIncentiveExpenses'] ??
+          0;
+    }
+
+    return total;
+  }
+
+  num _parseAmount(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v;
+    return num.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+  }
+
+  Future<void> _handlePdfExport(BuildContext context) async {
+    final pdf = pw.Document();
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.value,
+    );
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+    final reportData = await _fetchAllReports();
+    final totalAmount = _calculateTotal(reportData);
+    final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
+
+    final supervisorDoc = reportData['supervisor'] as DocumentSnapshot?;
+    final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
+    final managerEntries = (reportData['managerEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final orgEntries = (reportData['organizationEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final contractorEntries = (reportData['contractorEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Daily site Summary Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Site ID',
+                widget.siteId ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox('Date', dateStr, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Total Spent',
+                '₹ ${totalAmount.toStringAsFixed(2)}',
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Supervisor Section
+          if (supervisorData != null) ...[
+            pw.Text(
+              'Site Supervisor Entries',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                color: pdfPrimaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            if ((supervisorData['labours'] as List?)?.isNotEmpty ?? false) ...[
+              pw.Text(
+                'Labour',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+              pw.Table.fromTextArray(
+                headers: ['Type', 'Count', 'Amount'],
+                data: (supervisorData['labours'] as List)
+                    .map((l) => [l['type'], l['count'], '₹${l['amount']}'])
+                    .toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+            if ((supervisorData['materials'] as List?)?.isNotEmpty ??
+                false) ...[
+              pw.Text(
+                'Materials',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+              pw.Table.fromTextArray(
+                headers: ['Type', 'Quantity', 'Amount'],
+                data: (supervisorData['materials'] as List)
+                    .map((m) => [m['type'], m['quantity'], '₹${m['amount']}'])
+                    .toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+            pw.Text(
+              'Other Supervisor Expenses',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+            ),
+            pw.Table.fromTextArray(
+              headers: ['Expense', 'Amount'],
+              data: [
+                ['Food', '₹${supervisorData['food'] ?? 0}'],
+                ['Fuel', '₹${supervisorData['fuel'] ?? 0}'],
+                ['Transport', '₹${supervisorData['transport'] ?? 0}'],
+              ],
+              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+              headerStyle: pw.TextStyle(
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Manager Section
+          if (managerEntries.isNotEmpty) ...[
+            pw.Text(
+              'Manager Expenses',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                color: pdfPrimaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            ...managerEntries.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final bills = List<Map<String, dynamic>>.from(
+                data['bills'] ?? [],
+              );
+              return pw.Table.fromTextArray(
+                headers: ['Vendor', 'Bill No', 'Amount'],
+                data: bills
+                    .map(
+                      (b) => [
+                        b['billVendor'],
+                        b['billNo'],
+                        '₹${b['billAmount']}',
+                      ],
+                    )
+                    .toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              );
+            }),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Org Section
+          if (orgEntries.isNotEmpty) ...[
+            pw.Text(
+              'Organization Expenses',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                color: pdfPrimaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            ...orgEntries.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final bills = List<Map<String, dynamic>>.from(
+                data['bills'] ?? [],
+              );
+              return pw.Table.fromTextArray(
+                headers: ['Vendor', 'Bill No', 'Amount'],
+                data: bills
+                    .map(
+                      (b) => [
+                        b['billVendor'],
+                        b['billNo'],
+                        '₹${b['billAmount']}',
+                      ],
+                    )
+                    .toList(),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerStyle: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              );
+            }),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Contractor Section
+          if (contractorEntries.isNotEmpty) ...[
+            pw.Text(
+              'Contractor Expenses',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                color: pdfPrimaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Table.fromTextArray(
+              headers: ['Entry ID', 'Site', 'Amount'],
+              data: contractorEntries.map((doc) {
+                final d = doc.data() as Map<String, dynamic>;
+                return [
+                  doc.id,
+                  d['site'] ?? 'N/A',
+                  '₹${d['totalAmount'] ?? 0}',
+                ];
+              }).toList(),
+              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+              headerStyle: pw.TextStyle(
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ],
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

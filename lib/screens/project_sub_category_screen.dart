@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-extension StringExtension on String? {
-  bool get isNullOrEmpty => this == null || this!.isEmpty;
-}
+import '../services/firestore_service.dart';
+import '../widgets/glass_button.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_text_field.dart';
+import 'package:flutter/material.dart';
+import '../utils/dialog_utils.dart';
 
 class ProjectSubCategoryScreen extends StatefulWidget {
   const ProjectSubCategoryScreen({super.key});
@@ -15,511 +17,336 @@ class ProjectSubCategoryScreen extends StatefulWidget {
 
 class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
   String? _selectedSubCategory;
-  final TextEditingController _customizationController =
-      TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _newSubCategoryController =
-      TextEditingController();
-  bool _isSubCategorySelected = false;
-
-  final Color primaryColor = const Color(0xFF0B3470); // ✅ new professional color
+  final _newSubCategoryController = TextEditingController();
 
   Future<String> _getNextSubCategoryId() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
-          .orderBy('subCategoryId', descending: true)
-          .limit(1)
-          .get();
+      final snapshot = await FirestoreService.getCollection(
+        'projectSubCategories',
+      ).orderBy('subCategoryId', descending: true).limit(1).get();
 
-      if (snapshot.docs.isEmpty) {
-        return 'PSC001';
-      } else {
-        final lastId = snapshot.docs.first['subCategoryId'] as String;
-        final numericPart = int.parse(lastId.replaceAll(RegExp(r'[^0-9]'), ''));
-        final nextId = numericPart + 1;
-        return 'PSC${nextId.toString().padLeft(3, '0')}';
-      }
+      if (snapshot.docs.isEmpty) return 'PSC001';
+      final lastId = snapshot.docs.first['subCategoryId']?.toString() ?? '';
+      if (lastId.isEmpty) return 'PSC001';
+      final numericPart = int.parse(lastId.replaceAll(RegExp(r'[^0-9]'), ''));
+      return 'PSC${(numericPart + 1).toString().padLeft(3, '0')}';
     } catch (e) {
-      throw Exception('Failed to generate next sub-category ID: $e');
+      return 'PSC${DateTime.now().millisecondsSinceEpoch.toString().substring(10)}';
     }
+  }
+
+  Future<bool> _isDuplicateSubCategory(String name) async {
+    final snapshot = await FirestoreService.getCollection(
+      'projectSubCategories',
+    ).where('projectSubCategory', isEqualTo: name).limit(1).get();
+    return snapshot.docs.isNotEmpty;
   }
 
   Future<void> _showAddSubCategoryDialog() async {
     _newSubCategoryController.clear();
     bool isDuplicate = false;
-    bool saved = false;
-    String savedName = "";
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          builder: (context, setDialogState) {
+            final theme = Theme.of(context);
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
-              child: Container(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Add New Sub Category',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: primaryColor,
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Add New Sub Category',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  GlassTextField(
+                    controller: _newSubCategoryController,
+                    label: 'Sub Category Name',
+                    icon: Icons.subdirectory_arrow_right_rounded,
+                    onChanged: (value) async {
+                      final duplicate = await _isDuplicateSubCategory(
+                        value.trim(),
+                      );
+                      setDialogState(() => isDuplicate = duplicate);
+                    },
+                  ),
+                  if (isDuplicate)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'This sub-category already exists',
+                        style: TextStyle(
+                          color: theme.colorScheme.error,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _newSubCategoryController,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: 'Sub Category Name',
-                        labelStyle: TextStyle(color: primaryColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GlassButton(
+                          label: 'CANCEL',
+                          onPressed: () => Navigator.pop(context),
+                          isSecondary: true,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: primaryColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: primaryColor,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.blue.shade50,
                       ),
-                      onChanged: (value) async {
-                        final duplicate =
-                            await _isDuplicateSubCategory(value.trim());
-                        setState(() {
-                          isDuplicate = duplicate;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            foregroundColor: primaryColor,
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.save, color: Colors.white),
-                          label: const Text(
-                            'Save',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                isDuplicate ? Colors.grey : primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: GlassButton(
+                          label: 'SAVE',
                           onPressed: isDuplicate
                               ? null
                               : () async {
-                                  final newSubCategory =
-                                      _newSubCategoryController.text.trim();
-                                  if (newSubCategory.isEmpty) return;
-
-                                  final newId = await _getNextSubCategoryId();
-                                  await FirebaseFirestore.instance
-                                      .collection('projectSubCategories')
-                                      .doc(newId)
-                                      .set({
-                                    'subCategoryId': newId,
-                                    'projectSubCategory': newSubCategory,
+                                  final name = _newSubCategoryController.text
+                                      .trim();
+                                  if (name.isEmpty) return;
+                                  final id = await _getNextSubCategoryId();
+                                  await FirestoreService.getCollection(
+                                    'projectSubCategories',
+                                  ).doc(id).set({
+                                    'subCategoryId': id,
+                                    'projectSubCategory': name,
                                   });
-
-                                  saved = true;
-                                  savedName = newSubCategory;
-
-                                  Navigator.of(context).pop();
-                                  setState(() {
-                                    _selectedSubCategory = newSubCategory;
-                                    _isSubCategorySelected = true;
-                                  });
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    setState(() => _selectedSubCategory = name);
+                                    await DialogUtils.showSuccessDialog(
+                                      context,
+                                      message:
+                                          'Sub Category added successfully!',
+                                    );
+                                  }
                                 },
                         ),
-                      ],
-                    ),
-                    if (isDuplicate)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          'This sub-category already exists.',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
-                        ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             );
           },
         );
       },
     );
-
-    if (saved && savedName.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sub-category "$savedName" added successfully.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      });
-    }
-  }
-
-  Future<bool> _isDuplicateSubCategory(String subCategoryName) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
-          .where('projectSubCategory', isEqualTo: subCategoryName)
-          .limit(1)
-          .get();
-
-      return snapshot.docs.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
   }
 
   Future<void> _deleteSelectedSubCategory() async {
-    if (_selectedSubCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a sub-category to delete.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Sub Category'),
-        content: Text(
-            'Are you sure you want to delete the sub-category "${_selectedSubCategory!}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('projectSubCategories')
-          .where('projectSubCategory', isEqualTo: _selectedSubCategory)
-          .get();
-
-      if (snapshot.docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sub-category not found in database.'),
-            backgroundColor: Colors.red,
-          ),
+    if (_selectedSubCategory == null) return;
+    final snapshot = await FirestoreService.getCollection(
+      'projectSubCategories',
+    ).where('projectSubCategory', isEqualTo: _selectedSubCategory).get();
+    if (snapshot.docs.isNotEmpty) {
+      await snapshot.docs.first.reference.delete();
+      if (mounted) {
+        setState(() => _selectedSubCategory = null);
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Sub Category deleted successfully!',
         );
-        return;
       }
-
-      for (final doc in snapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      setState(() {
-        _selectedSubCategory = null;
-        _isSubCategorySelected = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sub-category deleted successfully.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete sub-category: $e'),
-          backgroundColor: Colors.red.shade900,
-        ),
-      );
     }
   }
 
   @override
+  void dispose() {
+    _newSubCategoryController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.blue.shade50,
-      appBar: AppBar(
-        title: const Text(
-          'Sub Category Setup',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Subcategory detail box
-          Container(
-            constraints: const BoxConstraints(maxWidth: 500),
-            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(24),
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.assignment, size: 32, color: primaryColor),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Sub Category Details',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Configure your sub-category settings',
-                                  style: TextStyle(
-                                      color: primaryColor, fontSize: 14),
-                                ),
-                              ],
-                            ),
+    final theme = Theme.of(context);
+    return GlassScaffold(
+      title: 'Sub Categories',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            GlassCard(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: theme.primaryColor,
+                          child: const Icon(
+                            Icons.assignment,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Sub Category',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                          fontSize: 16,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('projectSubCategories')
-                                  .orderBy('subCategoryId')
-                                  .snapshots(),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) {
-                                  return const LinearProgressIndicator();
-                                }
-
-                                final subCategories = snapshot.data!.docs
-                                    .map((doc) =>
-                                        doc['projectSubCategory'] as String)
-                                    .toSet()
-                                    .toList();
-
-                                final validSelected =
-                                    subCategories.contains(_selectedSubCategory)
-                                        ? _selectedSubCategory
-                                        : null;
-
-                                return DropdownButtonFormField<String>(
-                                  value: validSelected,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.blue.shade50,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    hintText: 'Select sub-category',
-                                  ),
-                                  icon: Icon(Icons.arrow_drop_down,
-                                      color: primaryColor),
-                                  items: subCategories.map((subCategory) {
-                                    return DropdownMenuItem<String>(
-                                      value: subCategory,
-                                      child: Text(subCategory),
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      _selectedSubCategory = newValue;
-                                      _isSubCategorySelected = newValue != null;
-                                    });
-                                  },
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please select a sub-category';
-                                    }
-                                    return null;
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: "Add New Sub Category",
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(24),
-                                onTap: _showAddSubCategoryDialog,
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: primaryColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.add,
-                                      color: Colors.white, size: 24),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Project Configuration',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
+                              Text(
+                                'Define sub-categories for detailed tracking',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirestoreService.getCollection(
+                              'projectSubCategories',
+                            ).orderBy('subCategoryId').snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData || snapshot.data == null)
+                                return const LinearProgressIndicator();
+                              final items = snapshot.data!.docs
+                                  .map(
+                                    (d) =>
+                                        d['projectSubCategory']?.toString() ??
+                                        '',
+                                  )
+                                  .where((val) => val.isNotEmpty)
+                                  .toList();
+                              return DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                value:
+                                    (_selectedSubCategory != null &&
+                                        items.contains(_selectedSubCategory))
+                                    ? _selectedSubCategory
+                                    : null,
+                                decoration: InputDecoration(
+                                  labelText: 'Select Sub Category',
+                                  prefixIcon: const Icon(Icons.search_rounded),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: theme.cardColor,
+                                ),
+                                items: items
+                                    .toSet()
+                                    .map(
+                                      (item) => DropdownMenuItem(
+                                        value: item,
+                                        child: Text(
+                                          item,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setState(() => _selectedSubCategory = v),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton.filledTonal(
+                          onPressed: _showAddSubCategoryDialog,
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.only(top: 24.0, bottom: 32.0),
-            child: Row(
+            const SizedBox(height: 32),
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildCircularActionButton(
-                  icon: Icons.arrow_back,
-                  label: 'Back',
-                  backgroundColor: const Color.fromARGB(255, 181, 220, 255),
-                  iconColor: primaryColor,
-                  labelColor: primaryColor,
-                  onPressed: () => Navigator.of(context).pop(),
+                Expanded(
+                  child: GlassButton(
+                    label: 'BACK',
+                    onPressed: () => Navigator.pop(context),
+                    isSecondary: true,
+                  ),
                 ),
-                const SizedBox(width: 40),
-                _buildCircularActionButton(
-                  icon: Icons.delete,
-                  label: 'Delete',
-                  backgroundColor: _isSubCategorySelected
-                      ? Colors.red.shade100
-                      : Colors.grey.shade300,
-                  iconColor: _isSubCategorySelected
-                      ? Colors.red.shade900
-                      : Colors.grey.shade600,
-                  labelColor: Colors.red.shade900,
-                  onPressed:
-                      _isSubCategorySelected ? _deleteSelectedSubCategory : null,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: GlassButton(
+                    label: 'DELETE',
+                    onPressed: _selectedSubCategory == null
+                        ? null
+                        : () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Sub Category'),
+                                content: Text(
+                                  'Are you sure you want to delete "$_selectedSubCategory"?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('CANCEL'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: Text(
+                                      'DELETE',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.error,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true)
+                              await _deleteSelectedSubCategory();
+                          },
+                    isSecondary: true,
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-
-  // Reusable Button
-  Widget _buildCircularActionButton({
-    required IconData icon,
-    required String label,
-    required Color backgroundColor,
-    required Color iconColor,
-    required Color labelColor,
-    required VoidCallback? onPressed,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 55,
-          height: 55,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: iconColor),
-            onPressed: onPressed,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-      ],
     );
   }
 }

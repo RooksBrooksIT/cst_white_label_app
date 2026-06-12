@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_button.dart';
+import '../utils/pdf_templates.dart';
+import '../utils/app_theme.dart';
 
 class ToolsInventoryDetailsPage extends StatefulWidget {
   final String toolCode;
@@ -19,9 +24,9 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
   String? errorMessage;
   String toolName = "";
   String toolCategory = "";
-
-  /// ✅ Professional Primary Color
-  final Color primaryColor = const Color(0xFF0B3470);
+  String toolDescription = "";
+  String toolOwner = "";
+  Map<String, String> siteNameMap = {};
 
   @override
   void initState() {
@@ -35,139 +40,205 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
       errorMessage = null;
     });
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('toolsInventory')
+      // 1. Fetch tool master data
+      final toolMasterDoc = await FirestoreService.getCollection('tools')
           .where('toolCode', isEqualTo: widget.toolCode)
+          .limit(1)
           .get();
 
-      if (query.docs.isNotEmpty) {
-        final doc = query.docs.first;
-        final sites = doc.data()['sites'] as List<dynamic>? ?? [];
+      String name = "";
+      String category = "";
+      String description = "";
+      String owner = "";
 
-        // Aggregate counts by siteId to avoid duplicates
-        Map<String, int> siteCounts = {};
+      if (toolMasterDoc.docs.isNotEmpty) {
+        final data = toolMasterDoc.docs.first.data();
+        name = data['toolName']?.toString() ?? "";
+        category = data['toolCategory']?.toString() ?? "";
+        description = data['description']?.toString() ?? "";
+        owner = data['toolOwner']?.toString() ?? "";
+      }
 
-        for (var site in sites) {
-          final siteId = site['siteId'] ?? '';
-          final count = (site['count'] ?? 0) as int;
-          if (siteCounts.containsKey(siteId)) {
-            siteCounts[siteId] = siteCounts[siteId]! + count;
-          } else {
-            siteCounts[siteId] = count;
-          }
+      // 2. Fetch tool distribution data from toolsInventory collection
+      // Document ID should be the toolCode
+      final query = await FirestoreService.getCollection('toolsInventory')
+          .doc(widget.toolCode)
+          .get();
+
+      List<dynamic> sites = [];
+      if (query.exists) {
+        sites = query.data()?['sites'] as List<dynamic>? ?? [];
+      } else {
+        // Fallback: search by toolCode field if doc ID is different
+        final searchByField = await FirestoreService.getCollection('toolsInventory')
+            .where('toolCode', isEqualTo: widget.toolCode)
+            .limit(1)
+            .get();
+        if (searchByField.docs.isNotEmpty) {
+          sites = searchByField.docs.first.data()['sites'] as List<dynamic>? ?? [];
+        }
+      }
+
+      // 3. Fetch all site names for lookup
+      final sitesSnapshot = await FirestoreService.sites.get();
+      final names = {
+        for (var s in sitesSnapshot.docs)
+          s.id: s.data()['siteName']?.toString() ?? 'Unnamed Site'
+      };
+
+      // 4. Aggregate counts by siteId to avoid duplicates and handle zero counts
+      Map<String, int> siteCounts = {};
+
+      for (var site in sites) {
+        final siteId = site['siteId'] ?? '';
+        final count = (site['count'] ?? 0) as int;
+        if (siteCounts.containsKey(siteId)) {
+          siteCounts[siteId] = siteCounts[siteId]! + count;
+        } else {
+          siteCounts[siteId] = count;
+        }
+      }
+
+        // 3. Fetch tool metadata (name/category)
+        final toolQuery = await FirestoreService.getCollection('tools')
+            .where('toolCode', isEqualTo: widget.toolCode)
+            .limit(1)
+            .get();
+
+        String fetchedName = "";
+        String fetchedCategory = "";
+
+        if (toolQuery.docs.isNotEmpty) {
+          final toolData = toolQuery.docs.first.data();
+          fetchedName = toolData['toolName']?.toString() ?? "";
+          fetchedCategory = toolData['toolOwner']?.toString() ?? ""; // Using owner as category if category not found
         }
 
-        // ✅ Filter out entries where count == 0
+      setState(() {
+        toolName = name;
+        toolCategory = category;
+        toolDescription = description;
+        toolOwner = owner;
+        siteNameMap = names;
+          toolName = fetchedName;
+          toolCategory = fetchedCategory;
+        // Only keep active site distributions (count > 0)
         inventoryData = siteCounts.entries
-            .where((entry) => entry.value > 0) // only keep non-zero counts
+            .where((entry) => entry.value > 0)
             .map((entry) {
               return {'siteId': entry.key, 'toolsCount': entry.value};
             })
             .toList();
-
-        // toolName = doc.data()['name'] ?? 'Unknown Tool';
-        // toolCategory = doc.data()['category'] ?? 'Uncategorized';
-      } else {
-        inventoryData = [];
-      }
+      });
     } catch (e) {
-      errorMessage = 'Failed to load data: ${e.toString()}';
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Failed to load data: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-    setState(() {
-      isLoading = false;
-    });
   }
 
   Future<void> _generatePdf(BuildContext context) async {
     final pdf = pw.Document();
+    final primaryColor = Theme.of(context).primaryColor;
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final orgDetails = await PdfTemplates.fetchOrgDetails();
+
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+        header: (context) => PdfTemplates.buildHeader(
+          reportTitle: 'Tools Distribution Report',
+          orgDetails: orgDetails,
+          primaryColor: pdfPrimaryColor,
+        ),
+        build: (pw.Context context) => [
+          // Tool Details Section
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox('Tool Name', toolName.isNotEmpty ? toolName : 'N/A', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Tool Code', widget.toolCode, pdfPrimaryColor),
+              PdfTemplates.buildMetaBox('Category', toolCategory.isNotEmpty ? toolCategory : 'N/A', pdfPrimaryColor),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          if (toolOwner.isNotEmpty || toolDescription.isNotEmpty)
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                if (toolOwner.isNotEmpty)
+                  PdfTemplates.buildMetaBox('Owner', toolOwner, pdfPrimaryColor),
+                if (toolDescription.isNotEmpty)
+                  pw.Expanded(
+                    child: pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 32),
+                      child: PdfTemplates.buildMetaBox('Description', toolDescription, pdfPrimaryColor),
+                    ),
+                  ),
+              ],
+            ),
+          pw.SizedBox(height: 32),
+
+          pw.Text(
+            'Distribution by Site',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: ['Site ID', 'Site Name', 'Tools Count'],
+            data: inventoryData
+                .map(
+                  (item) => [
+                    item['siteId'].toString(),
+                    siteNameMap[item['siteId']] ?? "Unnamed Site",
+                    item['toolsCount'].toString()
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              color: PdfColors.white,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            headerDecoration: pw.BoxDecoration(
+              color: pdfPrimaryColor,
+            ),
+            cellAlignment: pw.Alignment.centerLeft,
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 24),
+          pw.Divider(thickness: 1, color: pdfPrimaryColor),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
             children: [
               pw.Text(
-                "Tools Distribution Report",
-                style: pw.TextStyle(
-                  fontSize: 28,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
-                ),
+                'Total Distribution: ',
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
               ),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 2, color: PdfColor.fromInt(0xFF0B3470)),
-              pw.SizedBox(height: 8),
               pw.Text(
-                "Tool Details",
+                '${inventoryData.fold<int>(0, (sum, item) => sum + (item['toolsCount'] as int))}',
                 style: pw.TextStyle(
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              // pw.Bullet(
-              //   text: "Name: $toolName",
-              //   style: pw.TextStyle(fontSize: 14),
-              // ),
-              // pw.Bullet(
-              //   text: "Category: $toolCategory",
-              //   style: pw.TextStyle(fontSize: 14),
-              // ),
-              pw.Bullet(
-                text: "Tool Code: ${widget.toolCode}",
-                style: pw.TextStyle(fontSize: 14),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Text(
-                "Distribution by Site",
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF0B3470),
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Table.fromTextArray(
-                headers: ['Site ID', 'Tools Count'],
-                data: inventoryData
-                    .map(
-                      (item) => [item['siteId'], item['toolsCount'].toString()],
-                    )
-                    .toList(),
-                headerStyle: pw.TextStyle(
-                  // backgroundColor: PdfColor.fromInt(0xFF0B3470),
-                  color: PdfColors.white,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-                cellAlignment: pw.Alignment.centerLeft,
-                cellPadding: const pw.EdgeInsets.all(8),
-                border: pw.TableBorder.all(
-                  color: PdfColor.fromInt(0xFF0B3470),
-                  width: 1,
-                ),
-                headerDecoration: pw.BoxDecoration(
-                  color: PdfColor.fromInt(0xFF0B3470),
-                ),
-              ),
-              pw.Spacer(),
-              pw.Divider(thickness: 2, color: PdfColor.fromInt(0xFF0B3470)),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text(
-                  "Total Tools: ${inventoryData.fold<int>(0, (sum, item) => sum + (item['toolsCount'] as int))}",
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF0B3470),
-                  ),
+                  color: pdfPrimaryColor,
                 ),
               ),
             ],
-          );
-        },
+          ),
+        ],
+        footer: (context) => PdfTemplates.buildFooter(context),
       ),
     );
     await Printing.layoutPdf(
@@ -177,257 +248,229 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          "Tool Distribution Details",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 3,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return GlassScaffold(
+      title: "Tool Distribution Details",
+      appBarBackgroundColor: colorScheme.primary,
+      appBarForegroundColor: colorScheme.onPrimary,
+      onBack: () => Navigator.pop(context),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Text(
-                  errorMessage!,
-                  style: TextStyle(
-                    color: Colors.red[700],
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+              ? _buildErrorView(errorMessage!)
+              : SizedBox.expand(
+                  child: Column(
+                    children: [
+                      _buildToolHeaderCard(colorScheme),
+                      const SizedBox(height: 16),
+                      // Expanded table container with proper constraints
+                      Expanded(
+                        child: _buildDistributionTableCard(colorScheme),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildActionButtons(context),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
+                ),
+    );
+  }
+
+  Widget _buildErrorView(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            GlassButton(
+              onPressed: _fetchInventoryData,
+              label: "RETRY",
+              isSecondary: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolHeaderCard(ColorScheme colorScheme) {
+    return GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              toolName.isNotEmpty ? toolName : "Master ${widget.toolCode}",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildInfoChip(Icons.code, widget.toolCode, colorScheme),
+                _buildInfoChip(Icons.category, toolCategory.isNotEmpty ? toolCategory : "Uncategorized", colorScheme),
+                if (toolOwner.isNotEmpty)
+                  _buildInfoChip(Icons.person_pin, toolOwner, colorScheme),
+              ],
+            ),
+            if (toolDescription.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                toolDescription,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
                 ),
               ),
-            )
-          : Column(
-              children: [
-                // Header Card
-                Card(
-                  margin: const EdgeInsets.all(16),
-                  elevation: 6,
-                  shadowColor: primaryColor.withOpacity(0.3),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          toolName.isNotEmpty ? toolName : "Tool Details",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              "Distributed across ${inventoryData.length} sites",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.primary.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                        /// ✅ Show chips one below the other
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildInfoChip(
-                              icon: Icons.code,
-                              label: widget.toolCode,
-                            ),
-                            const SizedBox(height: 10),
-                            _buildInfoChip(
-                              icon: Icons.category,
-                              label: toolCategory.isNotEmpty
-                                  ? toolCategory
-                                  : "Uncategorized",
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-                        Text(
-                          "Distributed across ${inventoryData.length} sites",
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.grey[700],
+  Widget _buildDistributionTableCard(ColorScheme colorScheme) {
+    return GlassCard(
+                      mainAxisSize: MainAxisSize.max,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min, // Ensure it doesn't try to take infinite space
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Text(
+              "Site Distribution Details",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+          if (inventoryData.isEmpty)
+             const Padding(
+               padding: EdgeInsets.all(32.0),
+               child: Center(
+                 child: Text("No active distributions found for this tool."),
+               ),
+             )
+          else
+            // Removed Expanded here to avoid conflict with GlassCard's internal structure
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(8),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                headingRowColor: WidgetStateProperty.all(colorScheme.primary.withOpacity(0.05)),
+                columnSpacing: 24,
+                horizontalMargin: 12,
+                columns: const [
+                  DataColumn(label: Text('Site ID', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Site Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Count', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                ],
+                rows: inventoryData.map((data) {
+                  final siteId = data['siteId'];
+                  final siteName = siteNameMap[siteId] ?? "Unnamed Site";
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(siteId, style: const TextStyle(fontSize: 13))),
+                      DataCell(Text(siteName, style: const TextStyle(fontWeight: FontWeight.w500))),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Data Table Section
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Card(
-                      elevation: 3,
-                      shadowColor: primaryColor.withOpacity(0.25),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.1),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12),
-                              ),
+                          child: Text(
+                            data['toolsCount'].toString(),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
                             ),
-                            child: Text(
-                              "Distribution by Site",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.vertical,
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(
-                                  primaryColor,
-                                ),
-                                headingTextStyle: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                columnSpacing: 30,
-                                horizontalMargin: 20,
-                                columns: const [
-                                  DataColumn(label: Text('SITE')),
-                                  DataColumn(
-                                    label: Text('COUNT'),
-                                    numeric: true,
-                                  ),
-                                ],
-                                rows: inventoryData
-                                    .map(
-                                      (data) => DataRow(
-                                        cells: [
-                                          DataCell(
-                                            Text(
-                                              data['siteId'],
-                                              style: TextStyle(
-                                                color: primaryColor,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 6,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: primaryColor.withOpacity(
-                                                  0.08,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                data['toolsCount'].toString(),
-                                                style: TextStyle(
-                                                  color: primaryColor,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Action Buttons
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _generatePdf(context),
-                          icon: const Icon(Icons.picture_as_pdf),
-                          label: const Text("Generate Report"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            side: BorderSide(color: primaryColor, width: 1.5),
-                          ),
-                          child: const Text(
-                            "Back",
-                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
+                  );
+                }).toList(),
+                                ),
+              ),
             ),
+        ],
+      ),
     );
   }
 
-  Widget _buildInfoChip({required IconData icon, required String label}) {
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: GlassButton(
+            onPressed: () => _generatePdf(context),
+            label: "GENERATE REPORT",
+            icon: Icons.picture_as_pdf,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: GlassButton(
+            onPressed: () => Navigator.pop(context),
+            label: "CLOSE",
+            isSecondary: true,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label, ColorScheme colorScheme) {
     return Chip(
-      avatar: Icon(icon, size: 20, color: primaryColor),
+      avatar: Icon(icon, size: 16, color: colorScheme.primary),
       label: Text(
         label,
-        style: TextStyle(
-          color: primaryColor,
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.w600),
       ),
-      backgroundColor: primaryColor.withOpacity(0.08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: colorScheme.primary.withOpacity(0.08),
       side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

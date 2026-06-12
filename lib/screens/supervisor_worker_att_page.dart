@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
+import '../widgets/glass_card.dart';
+import '../utils/list_extensions.dart';
+import 'supervisor_dashboard.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
-  const AttendanceManagementPage({super.key});
+  final String supervisorId;
+  final String supervisorName;
+
+  const AttendanceManagementPage({
+    super.key,
+    required this.supervisorId,
+    required this.supervisorName,
+  });
 
   @override
   _AttendanceManagementPageState createState() =>
@@ -11,12 +23,12 @@ class AttendanceManagementPage extends StatefulWidget {
 }
 
 class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   // Selected values
-  String? _selectedSite;
+  String? _selectedSiteId;
+  String? _selectedSiteName;
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
+  List<String> _assignedSiteNames = [];
 
   // Loading states
   bool _isLoadingSites = false;
@@ -31,41 +43,137 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   @override
   void initState() {
     super.initState();
-    _loadSites();
+    _fetchAssignedSitesAndLoad();
   }
 
-  Future<void> _loadSites() async {
+  Future<void> _fetchAssignedSitesAndLoad() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingSites = true;
+      _sites = [];
     });
 
     try {
-      final querySnapshot = await _firestore.collection('workerSiteMap').get();
-      setState(() {
-        _sites = querySnapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'site': data['site'] ?? '',
-            'supervisor': data['supervisor'] ?? '',
-            'projectName': data['projectName'] ?? '',
-            'totalWorkers': data['totalWorkers'] ?? 0,
-          };
-        }).toList();
-        _isLoadingSites = false;
-      });
+      if (!FirestoreService.isReady) {
+        debugPrint('FirestoreService is not ready.');
+        setState(() => _isLoadingSites = false);
+        return;
+      }
+
+      // 1. Get assigned site IDs from siteSupervisorMap
+      final mapCollection = FirestoreService.getCollection('siteSupervisorMap');
+
+      // Query by ID
+      final idSnapshot = await mapCollection
+          .where('Supervisor ID', isEqualTo: widget.supervisorId)
+          .get();
+
+      // Query by Name as fallback
+      final nameSnapshot = await mapCollection
+          .where('supervisor', isEqualTo: widget.supervisorName)
+          .get();
+
+      final Set<String> assignedSiteIds = {};
+      for (var doc in idSnapshot.docs) {
+        final siteId = doc.data()['site']?.toString();
+        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+      }
+      for (var doc in nameSnapshot.docs) {
+        final siteId = doc.data()['site']?.toString();
+        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+      }
+
+      debugPrint('Assigned Site IDs for supervisor: $assignedSiteIds');
+
+      // 2. Load worker sites
+      final workerSiteMapColl = FirestoreService.getCollection('workerSiteMap');
+      List<Map<String, dynamic>> finalSites = [];
+
+      if (assignedSiteIds.isNotEmpty) {
+        // Fetch only specific sites assigned to this supervisor
+        // Using chunks of 30 due to Firestore 'whereIn' limits
+        final idList = assignedSiteIds.toList();
+        for (var i = 0; i < idList.length; i += 30) {
+          final end = (i + 30 < idList.length) ? i + 30 : idList.length;
+          final chunk = idList.sublist(i, end);
+
+          final workerSnapshot = await workerSiteMapColl
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+
+          for (var doc in workerSnapshot.docs) {
+            final data = doc.data();
+            finalSites.add({
+              'id': doc.id,
+              'site': data['site'] ?? doc.id,
+              'supervisor': data['supervisor'] ?? '',
+              'projectName': data['projectName'] ?? '',
+              'totalWorkers': data['totalWorkers'] ?? 0,
+            });
+          }
+        }
+      }
+
+      // 3. Fallback: If no sites found by mapping, try a general query
+      // but only if finalSites is still empty (maybe mapping doc is missing but workerSiteMap has supervisor field)
+      if (finalSites.isEmpty) {
+        final searchName = widget.supervisorName.trim().toLowerCase();
+        final searchId = widget.supervisorId.trim().toLowerCase();
+
+        final allWorkerSites = await workerSiteMapColl.get();
+        finalSites = allWorkerSites.docs
+            .where((doc) {
+              final data = doc.data();
+              final docSupName =
+                  (data['supervisor'] ?? data['supervisorName'] ?? '')
+                      .toString()
+                      .toLowerCase();
+              final docSupId = (data['supervisorId'] ?? '')
+                  .toString()
+                  .toLowerCase();
+
+              return (docSupId.isNotEmpty && docSupId == searchId) ||
+                  (docSupName.isNotEmpty &&
+                      (docSupName == searchName ||
+                          docSupName.contains(searchName)));
+            })
+            .map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'site': data['site'] ?? doc.id,
+                'supervisor': data['supervisor'] ?? '',
+                'projectName': data['projectName'] ?? '',
+                'totalWorkers': data['totalWorkers'] ?? 0,
+              };
+            })
+            .toList();
+      }
+
+      if (mounted) {
+        setState(() {
+          _sites = finalSites;
+          _isLoadingSites = false;
+        });
+      }
     } catch (e) {
-      print('Error loading sites: $e');
-      setState(() {
-        _isLoadingSites = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      debugPrint('Error in _fetchAssignedSitesAndLoad: $e');
+      if (mounted) {
+        setState(() => _isLoadingSites = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading sites. Please check connection.'),
+          ),
+        );
+      }
     }
   }
 
-  Future<void> _loadWorkersForSite(String site) async {
+  Future<void> _loadSites() async {
+    // This method is now handled by _fetchAssignedSitesAndLoad
+  }
+
+  Future<void> _loadWorkersForSite(String siteId, String siteName) async {
     setState(() {
       _isLoadingWorkers = true;
       _workers = [];
@@ -73,7 +181,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final doc = await _firestore.collection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(siteId).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -82,22 +192,25 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         );
 
         // Load existing attendance for today if any
-        await _loadExistingAttendance(site);
+        await _loadExistingAttendance(siteName);
 
+        if (!mounted) return;
         setState(() {
           _workers = workersList;
           _isLoadingWorkers = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingWorkers = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No workers found for this site')),
+          const SnackBar(content: Text('No workers found for this site')),
         );
       }
     } catch (e) {
       print('Error loading workers: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingWorkers = false;
       });
@@ -111,34 +224,49 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     try {
       final docId =
           '${site}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
-      final doc = await _firestore.collection('WorkerSummary').doc(docId).get();
+      final doc = await FirestoreService.getCollection(
+        'workersAttendance',
+      ).doc(docId).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         final workersData = data['workers'] as Map<String, dynamic>?;
 
         if (workersData != null) {
+          if (!mounted) return;
           setState(() {
             workersData.forEach((workerName, workerData) {
-              _attendanceStatus[workerName] = workerData['attendance'] ?? '';
+              // Ensure we check for 'attendance' field in the worker data map
+              _attendanceStatus[workerName] =
+                  workerData['attendance']?.toString() ?? '';
             });
           });
         }
       }
     } catch (e) {
-      print('Error loading existing attendance: $e');
+      debugPrint('Error loading existing attendance: $e');
     }
   }
 
-  void _onSiteSelected(String? site) {
+  void _onSiteSelected(String? siteId) {
+    String? siteName;
+    if (siteId != null) {
+      final site = _sites.firstWhere(
+        (s) => s['id'] == siteId,
+        orElse: () => {},
+      );
+      siteName = site['site'];
+    }
+
     setState(() {
-      _selectedSite = site;
+      _selectedSiteId = siteId;
+      _selectedSiteName = siteName;
       _workers.clear();
       _attendanceStatus.clear();
     });
 
-    if (site != null) {
-      _loadWorkersForSite(site);
+    if (siteId != null && siteName != null) {
+      _loadWorkersForSite(siteId, siteName);
     }
   }
 
@@ -149,9 +277,11 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Future<void> _submitAttendance() async {
-    if (_selectedSite == null || _workers.isEmpty) {
+    if (_selectedSiteId == null ||
+        _selectedSiteName == null ||
+        _workers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a site with workers')),
+        const SnackBar(content: Text('Please select a site with workers')),
       );
       return;
     }
@@ -164,47 +294,91 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
     if (workersWithoutAttendance.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please mark attendance for all workers')),
+        const SnackBar(content: Text('Please mark attendance for all workers')),
       );
       return;
     }
 
+    if (!mounted) return;
     setState(() {
       _isSubmitting = true;
     });
 
     try {
-      final docId =
-          '${_selectedSite!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
-      final summaryDocId = '${_selectedSite!}_$_currentMonth';
-
-      // Prepare workers data for daily attendance
-      final Map<String, dynamic> workersData = {};
+      final String month = _currentMonth;
+      final String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final batch = FirebaseFirestore.instance.batch();
 
       for (final worker in _workers) {
         final workerName = worker['workerName']?.toString() ?? '';
         final attendanceStatus = _attendanceStatus[workerName] ?? '';
+        if (attendanceStatus.isEmpty) continue;
 
-        workersData[workerName] = {
+        // Ensure we utilize workerId if available, fallback to a name-site combination
+        final String workerId =
+            worker['workerId']?.toString() ??
+            '${workerName}_${_selectedSiteName}';
+        final String workerDocId = '${workerId}_$month';
+        final docRef = FirestoreService.getCollection(
+          'WorkerMonthlyAttendance',
+        ).doc(workerDocId);
+
+        // Daily attendance data as per requirements
+        final Map<String, dynamic> todayAttendance = {
+          'status': attendanceStatus.toLowerCase(),
+          'markedAt': FieldValue.serverTimestamp(),
+          'salaryPerDay':
+              double.tryParse(worker['workerSalary']?.toString() ?? '0') ?? 0,
+        };
+
+        // Update the monthly document with a nested map key update
+        batch.set(docRef, {
+          'workerId': workerId,
+          'workerName': workerName,
+          'designation': worker['workerDesignation'] ?? '',
+          'site': _selectedSiteName,
+          'month': month,
+          'baseSalary': worker['workerSalary'] ?? '0',
+          'status': 'draft',
+          'attendanceData': {todayDate: todayAttendance},
+        }, SetOptions(merge: true));
+      }
+
+      // Legacy daily log (optional, kept for audit trail)
+      final dailyDocId =
+          '${_selectedSiteName!}_${DateFormat('dd_MM_yyyy').format(DateTime.now())}';
+      final Map<String, dynamic> workersDataLog = {};
+      for (final worker in _workers) {
+        final name = worker['workerName']?.toString() ?? '';
+        workersDataLog[name] = {
           'designation': worker['workerDesignation'] ?? '',
           'salary': worker['workerSalary'] ?? '',
-          'attendance': attendanceStatus,
+          'attendance': _attendanceStatus[name] ?? '',
         };
       }
 
-      // Submit to workersAttendance collection
-      await _firestore.collection('workersAttendance').doc(docId).set({
-        'Day': _currentDate,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'month': _currentMonth,
-        'site': _selectedSite,
-        'workers': workersData,
-      }, SetOptions(merge: true));
+      batch.set(
+        FirestoreService.getCollection('workersAttendance').doc(dailyDocId),
+        {
+          'day': DateFormat('dd').format(DateTime.now()), // dd
+          'month': DateFormat(
+            'MM-yyyy',
+          ).format(DateTime.now()), // MM-yyyy as per user spec
+          'site': _selectedSiteName,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'workers': workersDataLog,
+          'Day':
+              _currentDate, // Keep for backward compatibility if needed, but 'day' is primary now
+        },
+        SetOptions(merge: true),
+      );
 
-      // Update workersSummary collection
-      await _updateWorkersSummary(summaryDocId, workersData);
+      await batch.commit();
 
+      // Recalculate monthly totals for summaries
+      await _recalculateMonthlySalaries();
+
+      if (!mounted) return;
       setState(() {
         _isSubmitting = false;
       });
@@ -217,6 +391,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isSubmitting = false;
       });
@@ -226,282 +401,66 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     }
   }
 
-  Future<void> _updateWorkersSummary(
-    String docId,
-    Map<String, dynamic> dailyAttendance,
-  ) async {
+  Future<void> _recalculateMonthlySalaries() async {
     try {
-      final doc = await _firestore
-          .collection('workersSummary')
-          .doc(docId)
-          .get();
+      final String month = _currentMonth;
+      final querySnapshot =
+          await FirestoreService.getCollection('WorkerMonthlyAttendance')
+              .where('month', isEqualTo: month)
+              .where('site', isEqualTo: _selectedSiteName)
+              .get();
 
-      if (doc.exists) {
-        // Document exists - update existing data
-        final existingData = doc.data() as Map<String, dynamic>;
-        final existingWorkers =
-            existingData['workers'] as Map<String, dynamic>? ?? {};
+      final batch = FirebaseFirestore.instance.batch();
 
-        // Create a copy of existing workers data to modify
-        final updatedWorkers = Map<String, dynamic>.from(existingWorkers);
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final Map<String, dynamic> attendanceMap =
+            data['attendanceData'] as Map<String, dynamic>? ?? {};
 
-        // Update attendance for each worker
-        dailyAttendance.forEach((workerName, dailyData) {
-          final attendanceStatus = dailyData['attendance'] as String;
-          final designation = dailyData['designation'] as String;
-          final salary = dailyData['salary'] as String;
+        double totalSalary = 0.0;
+        int presentDays = 0;
 
-          if (updatedWorkers.containsKey(workerName)) {
-            // Worker exists - update attendance counts
-            final existingWorker =
-                updatedWorkers[workerName] as Map<String, dynamic>;
-            final existingAttendance =
-                existingWorker['attendance'] as Map<String, dynamic>? ?? {};
+        attendanceMap.forEach((date, details) {
+          if (details is Map) {
+            final String status =
+                details['status']?.toString().toLowerCase() ?? '';
+            final double salaryPerDay =
+                double.tryParse(details['salaryPerDay']?.toString() ?? '0') ??
+                0.0;
 
-            final presentDays =
-                int.tryParse(
-                  existingAttendance['presentDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final absentDays =
-                int.tryParse(
-                  existingAttendance['absentDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final overtimeDays =
-                int.tryParse(
-                  existingAttendance['overtimeDays']
-                          ?.toString()
-                          .split(' ')
-                          .first ??
-                      '0',
-                ) ??
-                0;
-            final halfDays =
-                int.tryParse(
-                  existingAttendance['halfDays']?.toString().split(' ').first ??
-                      '0',
-                ) ??
-                0;
-
-            // Increment the appropriate counter
-            switch (attendanceStatus.toLowerCase()) {
-              case 'present':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '${presentDays + 1} days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + 1 + overtimeDays + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'absent':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '${absentDays + 1} days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + overtimeDays + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'overtime':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '${overtimeDays + 1} days',
-                    'halfDays': '$halfDays days',
-                    'totalWorkingDays':
-                        '${presentDays + (overtimeDays + 1) + (halfDays * 0.5).round()} days',
-                  },
-                };
-                break;
-              case 'half day':
-                updatedWorkers[workerName] = {
-                  ...existingWorker,
-                  'attendance': {
-                    'presentDays': '$presentDays days',
-                    'absentDays': '$absentDays days',
-                    'overtimeDays': '$overtimeDays days',
-                    'halfDays': '${halfDays + 1} days',
-                    'totalWorkingDays':
-                        '${presentDays + overtimeDays + ((halfDays + 1) * 0.5).round()} days',
-                  },
-                };
-                break;
-            }
-          } else {
-            // New worker - initialize with first attendance
-            switch (attendanceStatus.toLowerCase()) {
-              case 'present':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '1 day',
-                    'absentDays': '0 days',
-                    'overtimeDays': '0 days',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '1 day',
-                  },
-                };
-                break;
-              case 'absent':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '1 day',
-                    'overtimeDays': '0 days',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '0 days',
-                  },
-                };
-                break;
-              case 'overtime':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '0 days',
-                    'overtimeDays': '1 day',
-                    'halfDays': '0 days',
-                    'totalWorkingDays': '1 day',
-                  },
-                };
-                break;
-              case 'half day':
-                updatedWorkers[workerName] = {
-                  'designation': designation,
-                  'salary': salary,
-                  'attendance': {
-                    'presentDays': '0 days',
-                    'absentDays': '0 days',
-                    'overtimeDays': '0 days',
-                    'halfDays': '1 day',
-                    'totalWorkingDays': '0.5 day',
-                  },
-                };
-                break;
+            if (status == 'present' || status == 'overtime') {
+              totalSalary += salaryPerDay;
+              presentDays += 1;
+            } else if (status == 'half day') {
+              totalSalary += (salaryPerDay / 2.0);
+              presentDays += 1; // Or increment by 0.5 depending on policy
             }
           }
         });
 
-        // Update the document with modified data
-        await _firestore.collection('workersSummary').doc(docId).set({
+        batch.update(doc.reference, {
+          'calculatedSalary': totalSalary,
+          'totalPresentDays': presentDays,
           'updatedAt': FieldValue.serverTimestamp(),
-          'month': _currentMonth,
-          'site': _selectedSite,
-          'workers': updatedWorkers,
-        }, SetOptions(merge: true));
-      } else {
-        // Document doesn't exist - create new with initial data
-        final Map<String, dynamic> summaryWorkersData = {};
-
-        dailyAttendance.forEach((workerName, dailyData) {
-          final attendanceStatus = dailyData['attendance'] as String;
-          final designation = dailyData['designation'] as String;
-          final salary = dailyData['salary'] as String;
-
-          switch (attendanceStatus.toLowerCase()) {
-            case 'present':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '1 day',
-                  'absentDays': '0 days',
-                  'overtimeDays': '0 days',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '1 day',
-                },
-              };
-              break;
-            case 'absent':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '1 day',
-                  'overtimeDays': '0 days',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '0 days',
-                },
-              };
-              break;
-            case 'overtime':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '0 days',
-                  'overtimeDays': '1 day',
-                  'halfDays': '0 days',
-                  'totalWorkingDays': '1 day',
-                },
-              };
-              break;
-            case 'half day':
-              summaryWorkersData[workerName] = {
-                'designation': designation,
-                'salary': salary,
-                'attendance': {
-                  'presentDays': '0 days',
-                  'absentDays': '0 days',
-                  'overtimeDays': '0 days',
-                  'halfDays': '1 day',
-                  'totalWorkingDays': '0.5 day',
-                },
-              };
-              break;
-          }
-        });
-
-        await _firestore.collection('workersSummary').doc(docId).set({
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'month': _currentMonth,
-          'site': _selectedSite,
-          'workers': summaryWorkersData,
         });
       }
+
+      await batch.commit();
     } catch (e) {
-      print('Error updating workers summary: $e');
-      rethrow; // Re-throw to handle in the main submit method
+      debugPrint('Error in salary recalculation: $e');
     }
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'present':
-        return Colors.green;
+        return Colors.green; // Semantic success
       case 'absent':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'overtime':
-        return Colors.orange;
+        return Colors.orange; // Semantic warning
       case 'half day':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.secondary;
       default:
         return Colors.grey;
     }
@@ -524,12 +483,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Attendance Management'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
+    return GlassScaffold(
+      title: 'Attendance Management',
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -539,12 +495,12 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             _buildSectionHeader('Select Site'),
             _buildSiteSelectionSection(),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Workers Attendance Table
-            if (_selectedSite != null) _buildAttendanceSection(),
+            if (_selectedSiteId != null) _buildAttendanceSection(),
 
-            if (_workers.isNotEmpty) SizedBox(height: 24),
+            if (_workers.isNotEmpty) const SizedBox(height: 24),
 
             // Submit Button
             if (_workers.isNotEmpty) _buildSubmitButton(),
@@ -555,6 +511,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Widget _buildSectionHeader(String title) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Text(
@@ -562,64 +519,79 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.blue[800],
+          color: cs.primary,
         ),
       ),
     );
   }
 
   Widget _buildSiteSelectionSection() {
-    return Card(
-      elevation: 2,
+    final cs = Theme.of(context).colorScheme;
+    return GlassCard(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedSite,
+              value: _selectedSiteId,
+              dropdownColor: cs.surfaceContainerHighest,
+              style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
                 labelText: 'Site *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.construction),
+                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.primary),
+                ),
+                prefixIcon: Icon(Icons.construction, color: cs.primary),
+                filled: true,
+                fillColor: cs.surface.withOpacity(0.1),
               ),
               items: _isLoadingSites
                   ? [
                       DropdownMenuItem(
                         value: null,
-                        child: Text('Loading sites...'),
+                        child: Text(
+                          'Loading sites...',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ),
                       ),
                     ]
                   : _sites.map<DropdownMenuItem<String>>((site) {
                       return DropdownMenuItem<String>(
-                        value: site['site'] as String?,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(site['site'] ?? ''),
-                            // Text(
-                            //   '${site['totalWorkers']} workers • ${site['supervisor']}',
-                            //   style: TextStyle(
-                            //     fontSize: 12,
-                            //     color: Colors.grey,
-                            //   ),
-                            // ),
-                          ],
+                        value: site['id'] as String?,
+                        child: Text(
+                          site['site'] ?? 'Unnamed Site',
+                          style: TextStyle(color: cs.onSurface),
                         ),
                       );
                     }).toList(),
               onChanged: _onSiteSelected,
             ),
 
-            if (_selectedSite != null) SizedBox(height: 12),
+            if (_selectedSiteId != null) const SizedBox(height: 12),
 
-            if (_selectedSite != null)
+            if (_selectedSiteId != null)
               Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 16, color: Colors.blue),
-                  SizedBox(width: 8),
+                  Icon(Icons.calendar_today, size: 16, color: cs.primary),
+                  const SizedBox(width: 8),
                   Text(
                     'Date: $_currentDate',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ],
               ),
@@ -630,9 +602,10 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Widget _buildAttendanceSection() {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
-      child: Card(
-        elevation: 2,
+      child: GlassCard(
+        mainAxisSize: MainAxisSize.max,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -646,126 +619,186 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue[800],
+                      color: cs.primary,
                     ),
                   ),
                   if (_workers.isNotEmpty)
-                    Chip(
-                      label: Text(
-                        '${_attendanceStatus.values.where((status) => status.isNotEmpty).length}/${_workers.length} marked',
-                        style: TextStyle(color: Colors.white),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
                       ),
-                      backgroundColor: Colors.blue,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_attendanceStatus.values.where((status) => status.isNotEmpty).length}/${_workers.length} marked',
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               if (_isLoadingWorkers)
-                Center(child: CircularProgressIndicator())
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
               else if (_workers.isEmpty)
                 Center(
-                  child: Text(
-                    'No workers found for this site',
-                    style: TextStyle(color: Colors.grey),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.person_off,
+                          size: 48,
+                          color: cs.onSurface.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No workers found for this site',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else
                 Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.grey[100],
-                        ),
-                        columns: [
-                          DataColumn(label: Text('No.')),
-                          DataColumn(label: Text('Worker Name')),
-                          DataColumn(label: Text('Designation')),
-                          // DataColumn(label: Text('Salary/Day')),
-                          DataColumn(label: Text('Attendance Status')),
-                          DataColumn(label: Text('Actions')),
-                        ],
-                        rows: _workers.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final worker = entry.value;
-                          final workerName =
-                              worker['workerName']?.toString() ?? '';
-                          final currentStatus =
-                              _attendanceStatus[workerName] ?? '';
+                  child: ListView.builder(
+                    itemCount: _workers.length,
+                    padding: const EdgeInsets.only(top: 8),
+                    itemBuilder: (context, index) {
+                      final worker = _workers[index];
+                      final workerName = worker['workerName']?.toString() ?? '';
+                      final designation =
+                          worker['workerDesignation']?.toString() ?? '';
+                      final currentStatus = _attendanceStatus[workerName] ?? '';
 
-                          return DataRow(
-                            cells: [
-                              DataCell(Text('${index + 1}')),
-                              DataCell(
-                                Text(
-                                  workerName,
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              DataCell(Text(worker['workerDesignation'] ?? '')),
-                              // DataCell(
-                              //   Text('₹${worker['workerSalary'] ?? '0'}'),
-                              // ),
-                              DataCell(
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(
-                                      currentStatus,
-                                    ).withOpacity(0.1),
-                                    border: Border.all(
-                                      color: _getStatusColor(currentStatus),
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _getStatusText(currentStatus),
-                                    style: TextStyle(
-                                      color: _getStatusColor(currentStatus),
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: cs.surface.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: cs.primary.withOpacity(0.1),
+                                child: Text(
+                                  (index + 1).toString(),
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    _buildAttendanceButton(
+                              title: Text(
+                                workerName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text(
+                                designation,
+                                style: TextStyle(
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              trailing: currentStatus.isNotEmpty
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(
+                                          currentStatus,
+                                        ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _getStatusColor(
+                                            currentStatus,
+                                          ).withOpacity(0.5),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _getStatusText(currentStatus),
+                                        style: TextStyle(
+                                          color: _getStatusColor(currentStatus),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const Divider(height: 1),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Present',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Absent',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Overtime',
                                       workerName,
                                       currentStatus,
                                     ),
-                                    SizedBox(width: 4),
-                                    _buildAttendanceButton(
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: _buildAttendanceButton(
                                       'Half Day',
                                       workerName,
                                       currentStatus,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -783,23 +816,38 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     final isSelected = currentStatus.toLowerCase() == status.toLowerCase();
     final color = _getStatusColor(status);
 
-    return Tooltip(
-      message: status,
-      child: GestureDetector(
-        onTap: () => _setAttendance(workerName, status),
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: isSelected ? color : color.withOpacity(0.1),
-            border: Border.all(color: color),
-            borderRadius: BorderRadius.circular(6),
+    return InkWell(
+      onTap: () => _setAttendance(workerName, status),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withOpacity(0.05),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
           ),
-          child: Center(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              status[0].toUpperCase(),
+              status,
               style: TextStyle(
-                color: isSelected ? Colors.white : color,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : color,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -811,6 +859,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Widget _buildSubmitButton() {
+    final cs = Theme.of(context).colorScheme;
     final markedCount = _attendanceStatus.values
         .where((status) => status.isNotEmpty)
         .length;
@@ -822,15 +871,19 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       child: ElevatedButton(
         onPressed: allMarked && !_isSubmitting ? _submitAttendance : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: allMarked ? Colors.green : Colors.grey,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: allMarked
+              ? Theme.of(context).colorScheme.primary
+              : cs.onSurface.withOpacity(0.3),
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         child: _isSubmitting
             ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
@@ -838,15 +891,18 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   ),
-                  SizedBox(width: 12),
-                  Text('Submitting...'),
+                  const SizedBox(width: 12),
+                  const Text('Submitting...'),
                 ],
               )
             : Text(
                 allMarked
                     ? 'Submit Attendance for $_currentDate'
                     : 'Mark All Attendance to Submit ($markedCount/${_workers.length})',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
       ),
     );

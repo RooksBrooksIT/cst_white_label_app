@@ -1,5 +1,8 @@
+import 'package:demo_cst/utils/responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import '../widgets/glass_scaffold.dart';
 
 class WorkerMappingPage extends StatefulWidget {
   const WorkerMappingPage({super.key});
@@ -9,15 +12,15 @@ class WorkerMappingPage extends StatefulWidget {
 }
 
 class _WorkerMappingPageState extends State<WorkerMappingPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  // Removed _firestore field
   // Selected values
   String? _selectedSite;
   String? _selectedSupervisor;
   String? _selectedProjectName;
 
   // Selected worker for current selection
-  String? _selectedWorker;
+  String? _selectedWorkerId;
+  String? _selectedWorkerName;
   String? _selectedWorkerDesignation;
   String? _selectedWorkerSalary;
   String? _selectedWorkerPhone;
@@ -32,6 +35,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   // Loading states
   bool _isLoadingSites = false;
   bool _isLoadingWorkers = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -46,29 +50,31 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await _firestore
-          .collection('siteSupervisorMap')
-          .get();
+      // Fetch sites from the 'Site' collection (doc.id = site identifier)
+      final siteSnapshot = await FirestoreService.getCollection('Site').get();
+      if (!mounted) return;
+
       setState(() {
-        _sites = querySnapshot.docs.map((doc) {
+        _sites = siteSnapshot.docs.map((doc) {
           final data = doc.data();
           return {
             'id': doc.id,
-            'site': data['site'] ?? '',
-            'supervisor': data['supervisor'] ?? '',
-            'projectName': data['projectName'] ?? '',
+            'site': doc.id,
+            'siteName': data['siteName'] ?? doc.id,
           };
         }).toList();
         _isLoadingSites = false;
       });
     } catch (e) {
-      print('Error loading sites: $e');
-      setState(() {
-        _isLoadingSites = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      debugPrint('Error loading sites: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSites = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading sites: $e')));
+      }
     }
   }
 
@@ -78,7 +84,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     try {
-      final querySnapshot = await _firestore.collection('workersConfig').get();
+      final querySnapshot = await FirestoreService.getCollection(
+        'workersConfig',
+      ).limit(200).get();
+      if (!mounted) return;
       setState(() {
         _workers = querySnapshot.docs.map((doc) {
           final data = doc.data();
@@ -93,13 +102,15 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         _isLoadingWorkers = false;
       });
     } catch (e) {
-      print('Error loading workers: $e');
-      setState(() {
-        _isLoadingWorkers = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading workers: $e')));
+      debugPrint('Error loading workers: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingWorkers = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading workers: $e')));
+      }
     }
   }
 
@@ -112,27 +123,63 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     });
 
     if (site != null) {
-      // Find the selected site details
-      final selectedSiteData = _sites.firstWhere(
-        (siteData) => siteData['site'] == site,
-        orElse: () => {},
-      );
+      // Look up supervisor and project info from siteSupervisorMap
+      _loadSiteDetails(site);
+      // Load existing workers for this site if any
+      _loadExistingWorkersForSite(site);
+    }
+  }
 
-      if (selectedSiteData.isNotEmpty) {
+  Future<void> _loadSiteDetails(String siteId) async {
+    try {
+      // Query siteSupervisorMap for this site's supervisor and project name
+      final mapSnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).where('site', isEqualTo: siteId).limit(1).get();
+
+      if (!mounted) return;
+
+      if (mapSnapshot.docs.isNotEmpty) {
+        final data = mapSnapshot.docs.first.data();
         setState(() {
-          _selectedSupervisor = selectedSiteData['supervisor'];
-          _selectedProjectName = selectedSiteData['projectName'];
+          _selectedSupervisor = data['supervisor'] ?? 'Not available';
+          _selectedProjectName = data['projectName'] ?? 'Not available';
         });
-
-        // Load existing workers for this site if any
-        _loadExistingWorkersForSite(site);
+      } else {
+        // Fallback: try to get project name from Site collection
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(siteId).get();
+        if (!mounted) return;
+        setState(() {
+          _selectedSupervisor = 'Not available';
+          if (siteDoc.exists) {
+            final data = siteDoc.data()!;
+            _selectedProjectName = data['siteName'] ?? 'Not available';
+          } else {
+            _selectedProjectName = 'Not available';
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading site details: $e');
+      if (mounted) {
+        setState(() {
+          _selectedSupervisor = 'Error loading';
+          _selectedProjectName = 'Error loading';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading site details: $e')),
+        );
       }
     }
   }
 
   Future<void> _loadExistingWorkersForSite(String site) async {
     try {
-      final doc = await _firestore.collection('workerSiteMap').doc(site).get();
+      final doc = await FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(site).get();
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -140,40 +187,49 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           data['workers'] ?? [],
         );
 
-        setState(() {
-          _selectedWorkersList = existingWorkers;
-        });
+        if (mounted) {
+          setState(() {
+            _selectedWorkersList = existingWorkers;
+          });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Loaded ${existingWorkers.length} existing workers for this site',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Loaded ${existingWorkers.length} existing workers for this site',
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
-      print('Error loading existing workers: $e');
+      debugPrint('Error loading existing workers: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading existing workers: $e')),
+        );
+      }
     }
   }
 
-  void _onWorkerSelected(String? workerName) {
+  void _onWorkerSelected(String? workerId) {
     setState(() {
-      _selectedWorker = workerName;
+      _selectedWorkerId = workerId;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
     });
 
-    if (workerName != null) {
+    if (workerId != null) {
       // Find the selected worker details
       final selectedWorkerData = _workers.firstWhere(
-        (worker) => worker['name'] == workerName,
+        (worker) => worker['id'] == workerId,
         orElse: () => {},
       );
 
       if (selectedWorkerData.isNotEmpty) {
         setState(() {
+          _selectedWorkerName = selectedWorkerData['name'];
           _selectedWorkerDesignation = selectedWorkerData['designation'];
           _selectedWorkerSalary = selectedWorkerData['salary'];
           _selectedWorkerPhone = selectedWorkerData['phoneNumber'];
@@ -183,7 +239,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   }
 
   void _addWorkerToList() {
-    if (_selectedWorker == null || _selectedWorkerDesignation == null) {
+    if (_selectedWorkerId == null || _selectedWorkerName == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Please select a worker first')));
@@ -192,7 +248,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Check if worker is already added in current session
     bool alreadyExists = _selectedWorkersList.any(
-      (worker) => worker['workerName'] == _selectedWorker,
+      (worker) => worker['workerName'] == _selectedWorkerName,
     );
 
     if (alreadyExists) {
@@ -204,7 +260,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     setState(() {
       _selectedWorkersList.add({
-        'workerName': _selectedWorker,
+        'workerId': _selectedWorkerId,
+        'workerName': _selectedWorkerName,
         'workerDesignation': _selectedWorkerDesignation,
         'workerSalary': _selectedWorkerSalary,
         'workerPhone': _selectedWorkerPhone,
@@ -214,7 +271,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Reset current selection
     setState(() {
-      _selectedWorker = null;
+      _selectedWorkerId = null;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
@@ -236,25 +294,50 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Future<void> _submitMapping() async {
     // Validation
-    if (_selectedSite == null ||
-        _selectedSupervisor == null ||
-        _selectedProjectName == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please select a site first')));
+    if (!_isFormComplete) {
+      String missing = '';
+      if (_selectedSite == null)
+        missing = 'site selection';
+      else if (_selectedSupervisor == null || _selectedProjectName == null)
+        missing = 'site details (waiting for fetch)';
+      else if (_selectedWorkersList.isEmpty)
+        missing = 'at least one worker';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please complete the form: missing $missing')),
+      );
       return;
     }
 
-    if (_selectedWorkersList.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please add at least one worker')));
-      return;
-    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Mapping'),
+        content: Text(
+          'Are you sure you want to save the worker mapping for $_selectedSite? This will update the existing records if any.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSubmitting = true);
 
     try {
       // Use site name as document ID
-      final docRef = _firestore.collection('workerSiteMap').doc(_selectedSite!);
+      final docRef = FirestoreService.getCollection(
+        'workerSiteMap',
+      ).doc(_selectedSite!);
 
       final docSnapshot = await docRef.get();
 
@@ -309,17 +392,23 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       }
 
       // Reset form
-      setState(() {
-        _selectedSite = null;
-        _selectedSupervisor = null;
-        _selectedProjectName = null;
-        _selectedWorkersList.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _selectedSite = null;
+          _selectedSupervisor = null;
+          _selectedProjectName = null;
+          _selectedWorkersList.clear();
+        });
+      }
     } catch (e) {
-      print('Error mapping workers: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error mapping workers: $e')));
+      debugPrint('Error mapping workers: $e');
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error mapping workers: $e')));
+      }
     }
   }
 
@@ -357,12 +446,12 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Worker Site Mapping'),
-        backgroundColor: Color(0xFF003768),
-        foregroundColor: Colors.white,
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GlassScaffold(
+      title: 'Worker Site Mapping',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -397,14 +486,28 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF003768),
-        ),
+      padding: const EdgeInsets.only(top: 16, bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.fontSize(context, 12),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 2.0,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -418,6 +521,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           children: [
             // Site Dropdown
             DropdownButtonFormField<String>(
+              isExpanded: true,
               value: _selectedSite,
               decoration: InputDecoration(
                 labelText: 'Site *',
@@ -432,9 +536,15 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                       ),
                     ]
                   : _sites.map<DropdownMenuItem<String>>((site) {
+                      final displayName = site['siteName'] != site['site']
+                          ? '${site['site']} (${site['siteName']})'
+                          : site['site'] ?? '';
                       return DropdownMenuItem<String>(
                         value: site['site'] as String?,
-                        child: Text(site['site'] ?? ''),
+                        child: Text(
+                          displayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
               onChanged: _onSiteSelected,
@@ -476,89 +586,107 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
     }).toList();
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Worker Dropdown and Add Button Row
-            Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedWorker,
-                    decoration: InputDecoration(
-                      labelText: 'Select Worker',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
+                // Worker Dropdown and Add Button Section
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: _selectedWorkerId,
+                        decoration: InputDecoration(
+                          labelText: 'Select Worker',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        items: _isLoadingWorkers
+                            ? [
+                                DropdownMenuItem(
+                                  value: null,
+                                  child: Text('Loading workers...'),
+                                ),
+                              ]
+                            : availableWorkers.map<DropdownMenuItem<String>>((
+                                worker,
+                              ) {
+                                final String name =
+                                    worker['name']?.toString().trim() ?? '';
+                                final String displayName = name.isNotEmpty
+                                    ? name
+                                    : 'Unnamed (${worker['id']})';
+                                return DropdownMenuItem<String>(
+                                  value: worker['id'] as String?,
+                                  child: Text(
+                                    displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                        onChanged: _onWorkerSelected,
+                      ),
                     ),
-                    items: _isLoadingWorkers
-                        ? [
-                            DropdownMenuItem(
-                              value: null,
-                              child: Text('Loading workers...'),
-                            ),
-                          ]
-                        : availableWorkers.map<DropdownMenuItem<String>>((
-                            worker,
-                          ) {
-                            return DropdownMenuItem<String>(
-                              value: worker['name'] as String?,
-                              child: Text(worker['name'] ?? ''),
-                            );
-                          }).toList(),
-                    onChanged: _onWorkerSelected,
-                  ),
-                ),
-                SizedBox(width: 12),
-                SizedBox(
-                  height: 56, // Match the dropdown height
-                  child: ElevatedButton.icon(
-                    onPressed: _addWorkerToList,
-                    icon: Icon(Icons.add),
-                    label: Text('Add'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 56, // Match the dropdown height
+                      width: 70,
+                      child: FilledButton(
+                        onPressed: _addWorkerToList,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Icon(Icons.add_rounded),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
+
+                SizedBox(height: 16),
+
+                // Auto-filled Worker Details
+                if (_selectedWorkerDesignation != null ||
+                    _selectedWorkerSalary != null)
+                  Column(
+                    children: [
+                      _buildReadOnlyField(
+                        'Designation',
+                        _selectedWorkerDesignation ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      _buildReadOnlyField(
+                        'Salary',
+                        _selectedWorkerSalary ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      if (_selectedWorkerPhone != null)
+                        _buildReadOnlyField(
+                          'Phone',
+                          _selectedWorkerPhone ?? 'Not available',
+                        ),
+                    ],
+                  )
+                else if (_selectedWorkerId != null)
+                  Text(
+                    'No details found for this worker',
+                    style: TextStyle(color: Colors.orange),
+                  ),
               ],
             ),
-
-            SizedBox(height: 16),
-
-            // Auto-filled Worker Details
-            if (_selectedWorkerDesignation != null ||
-                _selectedWorkerSalary != null)
-              Column(
-                children: [
-                  _buildReadOnlyField(
-                    'Designation',
-                    _selectedWorkerDesignation ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  _buildReadOnlyField(
-                    'Salary',
-                    _selectedWorkerSalary ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  if (_selectedWorkerPhone != null)
-                    _buildReadOnlyField(
-                      'Phone',
-                      _selectedWorkerPhone ?? 'Not available',
-                    ),
-                ],
-              )
-            else if (_selectedWorker != null)
-              Text(
-                'No details found for this worker',
-                style: TextStyle(color: Colors.orange),
-              ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -570,15 +698,17 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 Text(
                   'Selected Workers (${_selectedWorkersList.length})',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF003768),
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
                 if (_selectedWorkersList.isNotEmpty)
@@ -597,7 +727,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: SingleChildScrollView(
@@ -649,44 +779,83 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       width: double.infinity,
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(4),
-        color: Colors.grey[50],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+          Text(value, style: TextStyle(fontSize: 16)),
         ],
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _isFormComplete ? _submitMapping : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isFormComplete ? Color(0xFF003768) : Colors.grey,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return Column(
+      children: [
+        if (!_isFormComplete && _selectedSite != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.orange[800]),
+                  SizedBox(width: 8),
+                  Text(
+                    _selectedWorkersList.isEmpty
+                        ? 'Add at least one worker to save mapping'
+                        : 'Waiting for site details...',
+                    style: TextStyle(
+                      color: Colors.orange[900],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: (_isFormComplete && !_isSubmitting)
+                ? _submitMapping
+                : null,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              disabledBackgroundColor: Colors.grey[200],
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  )
+                : const Text(
+                    'SAVE SITE MAPPING',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+          ),
         ),
-        child: Text(
-          'Save Site Mapping',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
+      ],
     );
   }
 }

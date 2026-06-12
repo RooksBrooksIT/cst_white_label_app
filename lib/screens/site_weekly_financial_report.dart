@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'dart:async';
 import 'site_weekly_financial_report2.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SiteWeeklyFinancialReports extends StatefulWidget {
   const SiteWeeklyFinancialReports({super.key});
@@ -13,15 +14,6 @@ class SiteWeeklyFinancialReports extends StatefulWidget {
 
 class _SiteWeeklyFinancialReportState
     extends State<SiteWeeklyFinancialReports> {
-  // Color constants
-  final Color primaryColor = const Color(0xFF0b3470);
-  final Color primaryLightColor = const Color(0xFF1e4a8e);
-  final Color accentColor = const Color(0xFF4285F4);
-  final Color backgroundColor = const Color(0xFFF8F9FA);
-  final Color cardColor = Colors.white;
-  final Color textColor = const Color(0xFF2c3e50);
-  final Color secondaryTextColor = const Color(0xFF7f8c8d);
-
   // List to hold all documents
   List<Map<String, dynamic>> supervisorMaps = [];
   int selectedIndex = 0;
@@ -54,8 +46,7 @@ class _SiteWeeklyFinancialReportState
 
   Future<void> fetchSupervisorData() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('siteSupervisorMap')
+      final snapshot = await FirestoreService.getCollection('siteSupervisorMap')
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -72,9 +63,7 @@ class _SiteWeeklyFinancialReportState
 
       supervisorMaps = snapshot.docs.isEmpty
           ? []
-          : snapshot.docs
-                .map((doc) => doc.data() as Map<String, dynamic>)
-                .toList();
+          : snapshot.docs.map((doc) => doc.data()).toList();
 
       if (mounted) {
         setState(() {
@@ -104,496 +93,362 @@ class _SiteWeeklyFinancialReportState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Weekly Financial Report',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: primaryColor,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      backgroundColor: backgroundColor,
+    final colorScheme = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Weekly Financial Report',
+      onBack: () => Navigator.pop(context),
       body: isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : supervisorMaps.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.receipt_long,
-                    size: 64,
-                    color: primaryColor.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Sites Found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No site supervisor data available',
-                    style: TextStyle(fontSize: 14, color: secondaryTextColor),
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          : _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (supervisorMaps.isEmpty) {
+      return _buildEmptyState(context);
+    }
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
                   ),
                 ],
+                border: Border.all(color: theme.dividerColor),
               ),
-            )
-          : Center(
-              child: SingleChildScrollView(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  padding: const EdgeInsets.all(24),
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 24,
-                    horizontal: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: primaryColor.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.bar_chart,
-                                size: 30,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Site Weekly Financial Report',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
+              child: _buildForm(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                      // SECTION 1: Select Site
-                      Text(
-                        'Select Site',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: DropdownButtonFormField<int>(
-                          value: selectedIndex < supervisorMaps.length
-                              ? selectedIndex
-                              : null,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: InputBorder.none,
-                            labelText: 'Choose Site',
-                            labelStyle: TextStyle(color: secondaryTextColor),
-                          ),
-                          isExpanded: true,
-                          icon: Icon(
-                            Icons.arrow_drop_down,
-                            color: primaryColor,
-                          ),
-                          items: List.generate(
-                            supervisorMaps.length,
-                            (index) => DropdownMenuItem(
-                              value: index,
-                              child: Text(
-                                supervisorMaps[index]['site'] ?? 'Site',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                          onChanged: (int? newIndex) {
-                            if (newIndex != null &&
-                                newIndex < supervisorMaps.length) {
-                              setState(() {
-                                selectedIndex = newIndex;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long_rounded,
+            size: 80,
+            color: colorScheme.onSurfaceVariant.withOpacity(0.2),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Sites Found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No site supervisor data available',
+            style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
 
-                      // SECTION 2: Financial Details
-                      Text(
-                        'Select Period',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Year selection
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedYear,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: InputBorder.none,
-                            labelText: 'Select Year',
-                            labelStyle: TextStyle(color: secondaryTextColor),
-                          ),
-                          items: List.generate(
-                            5,
-                            (i) => DropdownMenuItem(
-                              value: DateTime.now().year - 2 + i,
-                              child: Text(
-                                (DateTime.now().year - 2 + i).toString(),
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _selectedYear = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Month selection
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: primaryColor.withOpacity(0.2),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedMonth,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: InputBorder.none,
-                            labelText: 'Select Month',
-                            labelStyle: TextStyle(color: secondaryTextColor),
-                          ),
-                          items: List.generate(
-                            12,
-                            (i) => DropdownMenuItem(
-                              value: i + 1,
-                              child: Text(
-                                _monthNames[i],
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _selectedMonth = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Week selection
-                      Text(
-                        'Select Week',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: secondaryTextColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: List.generate(
-                          5,
-                          (i) => ChoiceChip(
-                            label: Text(
-                              'Week ${i + 1}',
-                              style: TextStyle(
-                                color: _selectedWeek == i + 1
-                                    ? Colors.white
-                                    : primaryColor,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            selected: _selectedWeek == i + 1,
-                            selectedColor: primaryColor,
-                            backgroundColor: primaryColor.withOpacity(0.1),
-                            onSelected: (selected) {
-                              setState(() {
-                                _selectedWeek = selected ? i + 1 : null;
-                              });
-                            },
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              side: BorderSide(
-                                color: primaryColor.withOpacity(0.3),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Selected period summary
-                      if (_selectedWeek != null)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: primaryColor.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Selected Period:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryColor,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Year: $_selectedYear',
-                                style: TextStyle(color: textColor),
-                              ),
-                              Text(
-                                'Month: ${_selectedMonth != null ? _monthNames[_selectedMonth! - 1] : ''}',
-                                style: TextStyle(color: textColor),
-                              ),
-                              Text(
-                                'Week: Week $_selectedWeek',
-                                style: TextStyle(color: textColor),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 32),
-
-                      // Action Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (supervisorMaps.isEmpty ||
-                                    selectedIndex >= supervisorMaps.length) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text(
-                                        'No site available to select.',
-                                      ),
-                                      backgroundColor: Colors.red[400],
-                                    ),
-                                  );
-                                  return;
-                                }
-                                if (_selectedYear == null ||
-                                    _selectedMonth == null ||
-                                    _selectedWeek == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text(
-                                        'Please select year, month, and week.',
-                                      ),
-                                      backgroundColor: Colors.orange[400],
-                                    ),
-                                  );
-                                  return;
-                                }
-                                final selectedSite =
-                                    supervisorMaps[selectedIndex];
-                                final monthName =
-                                    _monthNames[_selectedMonth! - 1].substring(
-                                      0,
-                                      3,
-                                    );
-                                final paymentPeriod =
-                                    "${_selectedYear}_${monthName}_Week$_selectedWeek";
-
-                                final query = await FirebaseFirestore.instance
-                                    .collection('siteSupervisorPayments')
-                                    .where(
-                                      'paymentPeriod',
-                                      isEqualTo: paymentPeriod,
-                                    )
-                                    .limit(1)
-                                    .get()
-                                    .timeout(
-                                      const Duration(seconds: 10),
-                                      onTimeout: () {
-                                        throw TimeoutException(
-                                          'Query timeout',
-                                          const Duration(seconds: 10),
-                                        );
-                                      },
-                                    );
-
-                                try {
-                                  if (query.docs.isNotEmpty) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            SiteWeeklyFinancialReport2(
-                                              siteDetails: selectedSite,
-                                              paymentPeriod: paymentPeriod,
-                                            ),
-                                      ),
-                                    );
-                                  } else {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: Text(
-                                          'No Data Found',
-                                          style: TextStyle(color: primaryColor),
-                                        ),
-                                        content: const Text(
-                                          'No report is available for the selected period.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(),
-                                            child: Text(
-                                              'OK',
-                                              style: TextStyle(
-                                                color: primaryColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  print('Error loading report: $e');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text(
-                                        'Failed to load report. Please try again.',
-                                      ),
-                                      backgroundColor: Colors.red[400],
-                                    ),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                'Generate Report',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: primaryColor,
-                                side: BorderSide(color: primaryColor),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                'Cancel',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+  Widget _buildForm(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.bar_chart_rounded,
+              size: 32,
+              color: colorScheme.primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Select Site',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurfaceVariant,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          value: selectedIndex < supervisorMaps.length ? selectedIndex : null,
+          decoration: _inputDecoration(context, 'Choose Site'),
+          dropdownColor: theme.cardColor,
+          isExpanded: true,
+          items: List.generate(
+            supervisorMaps.length,
+            (index) => DropdownMenuItem(
+              value: index,
+              child: Text(
+                supervisorMaps[index]['site'] ?? 'Site',
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
+          ),
+          onChanged: (int? newIndex) {
+            if (newIndex != null) {
+              setState(() => selectedIndex = newIndex);
+            }
+          },
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Select Period',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurfaceVariant,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<int>(
+          value: _selectedYear,
+          isExpanded: true,
+          decoration: _inputDecoration(context, 'Select Year'),
+          dropdownColor: theme.cardColor,
+          style: TextStyle(color: colorScheme.onSurface),
+          items: List.generate(
+            5,
+            (i) => DropdownMenuItem(
+              value: DateTime.now().year - 2 + i,
+              child: Text((DateTime.now().year - 2 + i).toString()),
+            ),
+          ),
+          onChanged: (val) => setState(() {
+            _selectedYear = val;
+            _selectedWeek = null;
+          }),
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<int>(
+          value: _selectedMonth,
+          isExpanded: true,
+          decoration: _inputDecoration(context, 'Select Month'),
+          dropdownColor: theme.cardColor,
+          style: TextStyle(color: colorScheme.onSurface),
+          items: List.generate(
+            12,
+            (i) => DropdownMenuItem(value: i + 1, child: Text(_monthNames[i])),
+          ),
+          onChanged: (val) => setState(() {
+            _selectedMonth = val;
+            _selectedWeek = null;
+          }),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Select Week',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(
+            5,
+            (i) => ChoiceChip(
+              label: Text('Week ${i + 1}'),
+              selected: _selectedWeek == i + 1,
+              onSelected: (selected) {
+                setState(() => _selectedWeek = selected ? i + 1 : null);
+              },
+              selectedColor: colorScheme.primary,
+              backgroundColor: colorScheme.surfaceVariant,
+              labelStyle: TextStyle(
+                color: _selectedWeek == i + 1
+                    ? colorScheme.onPrimary
+                    : colorScheme.onSurfaceVariant,
+                fontWeight: _selectedWeek == i + 1
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              showCheckmark: false,
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+        _buildActionButtons(context),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _onGenerateReport,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text(
+              'Generate Report',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.onSurfaceVariant,
+              side: BorderSide(color: theme.dividerColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _onGenerateReport() async {
+    if (supervisorMaps.isEmpty || selectedIndex >= supervisorMaps.length) {
+      _showSnackBar('No sites available to select.', Colors.red);
+      return;
+    }
+    if (_selectedYear == null ||
+        _selectedMonth == null ||
+        _selectedWeek == null) {
+      _showSnackBar('Please select year, month, and week.', Colors.orange);
+      return;
+    }
+
+    final selectedSite = supervisorMaps[selectedIndex];
+    final monthName = _monthNames[_selectedMonth! - 1].substring(0, 3);
+    final paymentPeriod = "${_selectedYear}_${monthName}_Week$_selectedWeek";
+
+    try {
+      final query =
+          await FirestoreService.getCollection('siteSupervisorPayments')
+              .where('paymentPeriod', isEqualTo: paymentPeriod)
+              .limit(1)
+              .get()
+              .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (query.docs.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SiteWeeklyFinancialReport2(
+              siteDetails: selectedSite,
+              paymentPeriod: paymentPeriod,
+            ),
+          ),
+        );
+      } else {
+        _showNoDataDialog();
+      }
+    } catch (e) {
+      _showSnackBar('Failed to load report. Please try again.', Colors.red);
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+  }
+
+  void _showNoDataDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('No Data Found'),
+        content: const Text('No report is available for the selected period.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(BuildContext context, String label) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+      filled: true,
+      fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.dividerColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.dividerColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 }

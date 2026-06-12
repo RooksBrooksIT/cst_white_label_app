@@ -1,0 +1,18 @@
+﻿Analyzing tools_movement_page.dart...                           
+
+warning - The value of the field '_accentColor' isn't used - lib\screens\tools_movement_page.dart:21:15 - unused_field
+warning - The value of the field '_cardColor' isn't used - lib\screens\tools_movement_page.dart:22:15 - unused_field
+   info - Empty catch block - lib\screens\tools_movement_page.dart:830:17 - empty_catches
+   info - Don't use 'BuildContext's across async gaps - lib\screens\tools_movement_page.dart:889:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\tools_movement_page.dart:897:28 - use_build_context_synchronously
+   info - Empty catch block - lib\screens\tools_movement_page.dart:930:17 - empty_catches
+   info - Don't use 'BuildContext's across async gaps - lib\screens\tools_movement_page.dart:991:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\tools_movement_page.dart:999:28 - use_build_context_synchronously
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\tools_movement_page.dart:1034:11 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\tools_movement_page.dart:1112:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\tools_movement_page.dart:1119:38 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\tools_movement_page.dart:1202:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\tools_movement_page.dart:1205:39 - deprecated_member_use
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\tools_movement_page.dart:1284:11 - unused_element_parameter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\tools_movement_page.dart:1297:60 - deprecated_member_use
+
