@@ -18,6 +18,8 @@ class CustomerWorkProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -76,7 +78,10 @@ class CustomerWorkProgress extends StatelessWidget {
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       padding: EdgeInsets.zero,
-      body: CustomScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           // Section Header
@@ -146,6 +151,8 @@ class CustomerWorkProgress extends StatelessWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
+      ),
+        ),
       ),
     );
   }

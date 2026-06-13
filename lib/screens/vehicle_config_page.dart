@@ -486,11 +486,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     if (_isLoading) {
       return GlassScaffold(
         title: 'Vehicle Movement Log',
         onBack: () => Navigator.pop(context),
-        body: const Center(
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -500,6 +505,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
             ],
           ),
         ),
+        ),
+      ),
       );
     }
 
@@ -513,7 +520,10 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           tooltip: 'Reload Data',
         ),
       ],
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
@@ -1089,6 +1099,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               const SizedBox(height: 20),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

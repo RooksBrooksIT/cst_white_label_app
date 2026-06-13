@@ -128,35 +128,42 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
       title: 'Site Status Report',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView(theme)
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeaderCard(theme),
-                  const SizedBox(height: 24),
-                  _buildSelectorSection(theme),
-                  const SizedBox(height: 40),
-                  GlassButton(
-                    label: 'GENERATE REPORT',
-                    onPressed:
-                        (_selectedStatus == null || _statusOptions.isEmpty)
-                        ? null
-                        : _handleReport,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+              ? _buildErrorView(theme)
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeaderCard(theme),
+                      const SizedBox(height: 24),
+                      _buildSelectorSection(theme),
+                      const SizedBox(height: 40),
+                      GlassButton(
+                        label: 'GENERATE REPORT',
+                        onPressed:
+                            (_selectedStatus == null || _statusOptions.isEmpty)
+                            ? null
+                            : _handleReport,
+                      ),
+                      const SizedBox(height: 12),
+                      GlassButton(
+                        label: 'CANCEL',
+                        onPressed: () => Navigator.pop(context),
+                        isSecondary: true,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  GlassButton(
-                    label: 'CANCEL',
-                    onPressed: () => Navigator.pop(context),
-                    isSecondary: true,
-                  ),
-                ],
-              ),
-            ),
+                ),
+        ),
+      ),
     );
   }
 

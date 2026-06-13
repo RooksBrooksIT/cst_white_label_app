@@ -386,6 +386,8 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Supervisor Verification',
       onBack: () => Navigator.pop(context),
@@ -402,7 +404,10 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
       //     ),
       //   ),
       // ],
-      body: FadeTransition(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: FadeTransition(
         opacity: _fadeAnimation,
         child: TabBarView(
           controller: _tabController,
@@ -569,6 +574,8 @@ class _SupervisorVerificationPageState extends State<SupervisorVerificationPage>
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

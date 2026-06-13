@@ -321,13 +321,18 @@ class _MaterialScreenState extends State<MaterialScreen>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Config',
       onBack: () => Navigator.pop(context),
       appBarBackgroundColor: theme.colorScheme.primary,
       appBarForegroundColor: Colors.white,
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           Container(
             color: theme.cardColor,
@@ -352,6 +357,8 @@ class _MaterialScreenState extends State<MaterialScreen>
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

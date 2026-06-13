@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
@@ -203,24 +204,39 @@ class _SiteScreenState extends State<SiteScreen>
         throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
       }
       position = tempPosition;
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        String address = [
-          place.street,
-          place.locality,
-          place.administrativeArea,
-          place.country,
-        ].where((part) => part?.isNotEmpty ?? false).join(', ');
-        setState(() {
-          _latitudeController.text = position.latitude.toStringAsFixed(6);
-          _longitudeController.text = position.longitude.toStringAsFixed(6);
-          _locationController.text = address;
-        });
+
+      String address = '';
+
+      if (kIsWeb) {
+        address = 'Web Location';
+      } else {
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks.first;
+            address = [
+              place.street,
+              place.locality,
+              place.administrativeArea,
+              place.country,
+            ].where((part) => part?.isNotEmpty ?? false).join(', ');
+          }
+        } catch (geocodingError) {
+          debugPrint('Geocoding error (falling back to coordinates only): $geocodingError');
+          address = 'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        }
       }
+
+      setState(() {
+        _latitudeController.text = position.latitude.toStringAsFixed(6);
+        _longitudeController.text = position.longitude.toStringAsFixed(6);
+        if (_locationController.text.isEmpty || _locationController.text == 'Web Location') {
+          _locationController.text = address;
+        }
+      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -239,6 +255,8 @@ class _SiteScreenState extends State<SiteScreen>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     if (_tabController == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -282,9 +300,14 @@ class _SiteScreenState extends State<SiteScreen>
           ],
         ),
       ),
-      body: TabBarView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: TabBarView(
         controller: _tabController,
         children: [_buildNewSiteTab(), _buildAllSiteTab()],
+      ),
+        ),
       ),
     );
   }

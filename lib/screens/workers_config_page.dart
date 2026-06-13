@@ -271,6 +271,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Workers Configuration',
       onBack: () => Navigator.pop(context),
@@ -290,9 +292,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           Tab(text: 'WORKERS LIST'),
         ],
       ),
-      body: TabBarView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: TabBarView(
         controller: _tabController,
         children: [_buildCreateWorkerTab(), _buildWorkersListTab()],
+      ),
+        ),
       ),
     );
   }

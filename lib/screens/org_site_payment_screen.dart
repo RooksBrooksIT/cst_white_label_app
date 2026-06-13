@@ -319,34 +319,63 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
     return GlassScaffold(
       title: 'Site Payment',
       onBack: () => Navigator.pop(context),
-      body: _buildBody(context),
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(context),
-          const SizedBox(height: 32),
-          _buildForm(context),
-        ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _buildBody(context, isDesktop, isTablet, isMobile),
+        ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildBody(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0)),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isDesktop ? 900.0 : double.infinity,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context, isDesktop, isTablet, isMobile),
+              SizedBox(height: isDesktop ? 40.0 : 32.0),
+              _buildForm(context, isDesktop, isTablet, isMobile),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(isDesktop ? 16.0 : 12.0),
           decoration: BoxDecoration(
             color: colorScheme.primary.withOpacity(0.1),
             shape: BoxShape.circle,
@@ -354,10 +383,10 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: Icon(
             Icons.payments_rounded,
             color: colorScheme.primary,
-            size: 32,
+            size: isDesktop ? 40.0 : 32.0,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: isDesktop ? 20.0 : 16.0),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,12 +396,14 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.onSurface,
+                  fontSize: isDesktop ? 26.0 : null,
                 ),
               ),
               Text(
                 'Record site supervisor payments',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
+                  fontSize: isDesktop ? 15.0 : null,
                 ),
               ),
             ],
@@ -382,56 +413,86 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GlassCard(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle(context, 'Site Details'),
-              const SizedBox(height: 20),
-              _buildSiteDropdown(context),
-              const SizedBox(height: 20),
+              _buildSectionTitle(
+                context,
+                'Site Details',
+                isDesktop,
+                isTablet,
+                isMobile,
+              ),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildSiteDropdown(context, isDesktop, isTablet, isMobile),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
               _buildSupervisorField(context),
-              const SizedBox(height: 20),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
               _buildAmountField(context),
-              const SizedBox(height: 20),
-              _buildProjectStageDropdown(context),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildProjectStageDropdown(
+                context,
+                isDesktop,
+                isTablet,
+                isMobile,
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: isDesktop ? 32.0 : 24.0),
         GlassCard(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle(context, 'Payment Period'),
-              const SizedBox(height: 20),
-              _buildPeriodSelection(context),
-              const SizedBox(height: 24),
-              _buildWeeksSelection(context),
+              _buildSectionTitle(
+                context,
+                'Payment Period',
+                isDesktop,
+                isTablet,
+                isMobile,
+              ),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildPeriodSelection(context, isDesktop, isTablet, isMobile),
+              SizedBox(height: isDesktop ? 32.0 : 24.0),
+              _buildWeeksSelection(context, isDesktop, isTablet, isMobile),
               if (selectedPaymentWeekIndex != null) ...[
-                const SizedBox(height: 24),
-                _buildDatePickerSection(context),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
+                _buildDatePickerSection(context, isDesktop, isTablet, isMobile),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 40),
-        _buildActionButtons(context),
+        SizedBox(height: isDesktop ? 48.0 : 40.0),
+        _buildActionButtons(context, isDesktop, isTablet, isMobile),
       ],
     );
   }
 
-  Widget _buildSiteDropdown(BuildContext context) {
+  Widget _buildSiteDropdown(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
     return _buildDropdownContainer(
       context,
       label: 'Site ID',
+      isDesktop: isDesktop,
+      isTablet: isTablet,
+      isMobile: isMobile,
       child: DropdownButtonFormField<String>(
         value: selectedSiteId,
         isExpanded: true,
@@ -441,18 +502,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           prefixIcon: Icon(
             Icons.place_rounded,
             color: theme.primaryColor,
-            size: 20,
+            size: isDesktop ? 24.0 : 20.0,
           ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16.0 : 12.0,
+            vertical: isDesktop ? 12.0 : 8.0,
           ),
         ),
         items: siteList.map((site) {
           return DropdownMenuItem<String>(
             value: site['id'],
-            child: Text(site['display'] ?? ''),
+            child: Text(
+              site['display'] ?? '',
+              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+            ),
           );
         }).toList(),
         onChanged: (value) async {
@@ -494,11 +558,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildProjectStageDropdown(BuildContext context) {
+  Widget _buildProjectStageDropdown(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
     return _buildDropdownContainer(
       context,
       label: 'Project Stage',
+      isDesktop: isDesktop,
+      isTablet: isTablet,
+      isMobile: isMobile,
       child: DropdownButtonFormField<String>(
         value: selectedProjectStage,
         isExpanded: true,
@@ -508,16 +580,22 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           prefixIcon: Icon(
             Icons.flag_rounded,
             color: theme.primaryColor,
-            size: 20,
+            size: isDesktop ? 24.0 : 20.0,
           ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16.0 : 12.0,
+            vertical: isDesktop ? 12.0 : 8.0,
           ),
         ),
         items: projectStages.map((stage) {
-          return DropdownMenuItem<String>(value: stage, child: Text(stage));
+          return DropdownMenuItem<String>(
+            value: stage,
+            child: Text(
+              stage,
+              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+            ),
+          );
         }).toList(),
         onChanged: (value) {
           setState(() {
@@ -528,9 +606,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildPeriodSelection(BuildContext context) {
+  Widget _buildPeriodSelection(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
-    final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (isMobile) {
       return Column(
@@ -538,6 +620,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           _buildDropdownContainer(
             context,
             label: 'Year',
+            isDesktop: isDesktop,
+            isTablet: isTablet,
+            isMobile: isMobile,
             child: DropdownButtonFormField<int>(
               value: selectedPaymentYear,
               isExpanded: true,
@@ -546,18 +631,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 prefixIcon: Icon(
                   Icons.calendar_today_rounded,
                   color: theme.primaryColor,
-                  size: 20,
+                  size: isDesktop ? 24.0 : 20.0,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 16.0 : 12.0,
+                  vertical: isDesktop ? 12.0 : 8.0,
                 ),
               ),
               items: paymentYears.map((y) {
                 return DropdownMenuItem<int>(
                   value: y,
-                  child: Text(y.toString()),
+                  child: Text(
+                    y.toString(),
+                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -568,10 +656,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               },
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isDesktop ? 20.0 : 16.0),
           _buildDropdownContainer(
             context,
             label: 'Month',
+            isDesktop: isDesktop,
+            isTablet: isTablet,
+            isMobile: isMobile,
             child: DropdownButtonFormField<int>(
               value: selectedPaymentMonth,
               isExpanded: true,
@@ -580,18 +671,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 prefixIcon: Icon(
                   Icons.calendar_month_rounded,
                   color: theme.primaryColor,
-                  size: 20,
+                  size: isDesktop ? 24.0 : 20.0,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 16.0 : 12.0,
+                  vertical: isDesktop ? 12.0 : 8.0,
                 ),
               ),
               items: List.generate(12, (i) => i + 1).map((m) {
                 return DropdownMenuItem<int>(
                   value: m,
-                  child: Text(DateFormat.MMMM().format(DateTime(0, m))),
+                  child: Text(
+                    DateFormat.MMMM().format(DateTime(0, m)),
+                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -612,6 +706,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: _buildDropdownContainer(
             context,
             label: 'Year',
+            isDesktop: isDesktop,
+            isTablet: isTablet,
+            isMobile: isMobile,
             child: DropdownButtonFormField<int>(
               value: selectedPaymentYear,
               isExpanded: true,
@@ -620,18 +717,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 prefixIcon: Icon(
                   Icons.calendar_today_rounded,
                   color: theme.primaryColor,
-                  size: 20,
+                  size: isDesktop ? 24.0 : 20.0,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 16.0 : 12.0,
+                  vertical: isDesktop ? 12.0 : 8.0,
                 ),
               ),
               items: paymentYears.map((y) {
                 return DropdownMenuItem<int>(
                   value: y,
-                  child: Text(y.toString()),
+                  child: Text(
+                    y.toString(),
+                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -643,11 +743,14 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: isDesktop ? 20.0 : 16.0),
         Expanded(
           child: _buildDropdownContainer(
             context,
             label: 'Month',
+            isDesktop: isDesktop,
+            isTablet: isTablet,
+            isMobile: isMobile,
             child: DropdownButtonFormField<int>(
               value: selectedPaymentMonth,
               isExpanded: true,
@@ -656,18 +759,21 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 prefixIcon: Icon(
                   Icons.calendar_month_rounded,
                   color: theme.primaryColor,
-                  size: 20,
+                  size: isDesktop ? 24.0 : 20.0,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 16.0 : 12.0,
+                  vertical: isDesktop ? 12.0 : 8.0,
                 ),
               ),
               items: List.generate(12, (i) => i + 1).map((m) {
                 return DropdownMenuItem<int>(
                   value: m,
-                  child: Text(DateFormat.MMMM().format(DateTime(0, m))),
+                  child: Text(
+                    DateFormat.MMMM().format(DateTime(0, m)),
+                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -687,24 +793,28 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     BuildContext context, {
     required String label,
     required Widget child,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: EdgeInsets.only(left: 4.0, bottom: isDesktop ? 12.0 : 8.0),
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              fontSize: isDesktop ? 15.0 : null,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
             color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: theme.dividerColor),
           ),
           child: child,
@@ -713,7 +823,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Row(
@@ -724,15 +839,18 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             style: OutlinedButton.styleFrom(
               foregroundColor: colorScheme.onSurfaceVariant,
               side: BorderSide(color: theme.dividerColor),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
               ),
             ),
-            child: const Text('Reset'),
+            child: Text(
+              'Reset',
+              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+            ),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: isDesktop ? 20.0 : 16.0),
         Expanded(
           flex: 2,
           child: ElevatedButton(
@@ -740,9 +858,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
               ),
               elevation: 0,
             ),
@@ -751,6 +869,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onPrimary,
+                fontSize: isDesktop ? 15.0 : 13.0,
               ),
             ),
           ),
@@ -759,22 +878,34 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
+  Widget _buildSectionTitle(
+    BuildContext context,
+    String title,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: EdgeInsets.only(left: 4.0),
       child: Text(
         title.toUpperCase(),
         style: theme.textTheme.labelMedium?.copyWith(
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.primary,
           letterSpacing: 1.2,
+          fontSize: isDesktop ? 14.0 : null,
         ),
       ),
     );
   }
 
-  Widget _buildWeeksSelection(BuildContext context) {
+  Widget _buildWeeksSelection(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -782,30 +913,38 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle(context, 'Select Week *'),
-        const SizedBox(height: 12),
+        _buildSectionTitle(
+          context,
+          'Select Week *',
+          isDesktop,
+          isTablet,
+          isMobile,
+        ),
+        SizedBox(height: isDesktop ? 16.0 : 12.0),
         weeks.isEmpty
             ? Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(isDesktop ? 20.0 : 16.0),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(12.0),
                   border: Border.all(color: theme.dividerColor),
                 ),
                 child: Text(
                   'No weeks available for selected month',
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    fontSize: isDesktop ? 14.0 : 12.0,
                   ),
                 ),
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  final double width = (constraints.maxWidth - 12) / 2;
+                  final double spacing = isDesktop ? 16.0 : 12.0;
+                  final double width = (constraints.maxWidth - spacing) / 2;
                   return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: spacing,
+                    runSpacing: spacing,
                     children: List.generate(weeks.length, (i) {
                       final week = weeks[i];
                       final startDate = DateFormat('MMM dd').format(week.first);
@@ -819,12 +958,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             selectedDate = week.first;
                           });
                         },
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12.0),
                         child: Container(
                           width: width,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 8,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isDesktop ? 16.0 : 12.0,
+                            horizontal: isDesktop ? 12.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
@@ -832,7 +971,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                                 : theme.scaffoldBackgroundColor.withValues(
                                     alpha: 0.5,
                                   ),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(12.0),
                             border: Border.all(
                               color: isSelected
                                   ? colorScheme.primary
@@ -844,7 +983,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                                       color: colorScheme.primary.withValues(
                                         alpha: 0.3,
                                       ),
-                                      blurRadius: 8,
+                                      blurRadius: 8.0,
                                       offset: const Offset(0, 4),
                                     ),
                                   ]
@@ -855,18 +994,18 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                               Text(
                                 'Week ${i + 1}',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: isDesktop ? 16.0 : 14.0,
                                   fontWeight: FontWeight.bold,
                                   color: isSelected
                                       ? colorScheme.onPrimary
                                       : colorScheme.onSurface,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: isDesktop ? 6.0 : 4.0),
                               Text(
                                 '$startDate - $endDate',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: isDesktop ? 13.0 : 11.0,
                                   color: isSelected
                                       ? colorScheme.onPrimary.withValues(
                                           alpha: 0.9,
@@ -886,7 +1025,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     );
   }
 
-  Widget _buildDatePickerSection(BuildContext context) {
+  Widget _buildDatePickerSection(
+    BuildContext context,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
     final weekDays = weeks[selectedPaymentWeekIndex!];
     final theme = Theme.of(context);
@@ -895,8 +1039,14 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle(context, 'Select Date within Week'),
-        const SizedBox(height: 12),
+        _buildSectionTitle(
+          context,
+          'Select Date within Week',
+          isDesktop,
+          isTablet,
+          isMobile,
+        ),
+        SizedBox(height: isDesktop ? 16.0 : 12.0),
         GestureDetector(
           onTap: () async {
             final weekStart = weekDays.first;
@@ -934,11 +1084,14 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             }
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            padding: EdgeInsets.symmetric(
+              vertical: isDesktop ? 20.0 : 16.0,
+              horizontal: isDesktop ? 20.0 : 16.0,
+            ),
             decoration: BoxDecoration(
               color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
               border: Border.all(color: theme.dividerColor),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.0),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -948,9 +1101,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                     Icon(
                       Icons.calendar_today_rounded,
                       color: colorScheme.primary,
-                      size: 20,
+                      size: isDesktop ? 24.0 : 20.0,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isDesktop ? 16.0 : 12.0),
                     Text(
                       selectedDate != null
                           ? DateFormat(
@@ -958,7 +1111,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             ).format(selectedDate!)
                           : 'Select Date',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: isDesktop ? 17.0 : 16.0,
                         color: colorScheme.onSurface,
                         fontWeight: FontWeight.w500,
                       ),
@@ -968,19 +1121,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  size: 16,
+                  size: isDesktop ? 20.0 : 16.0,
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isDesktop ? 12.0 : 8.0),
         Padding(
-          padding: const EdgeInsets.only(left: 4),
+          padding: EdgeInsets.only(left: 4.0),
           child: Text(
             'Available: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: isDesktop ? 13.0 : 12.0,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),

@@ -370,8 +370,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       // Notify the organisation about the new material request
       await NotificationService.notifyOrganisation(
         title: '📦 New Material Request',
-        body:
-            '$supervisorName (Site: $siteId) requested $matReqId. Items: $materialNames',
+        body: '$supervisorName (Site: $siteId) requested $matReqId. Items: $materialNames',
         data: {
           'type': 'material_request',
           'matReqId': matReqId,
@@ -535,11 +534,16 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Material Request Form',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: isLoadingSupervisorData
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoadingSupervisorData
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -916,6 +920,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 }

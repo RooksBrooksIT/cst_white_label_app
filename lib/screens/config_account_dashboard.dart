@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/screens/org_sub_menu_screen.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/responsive.dart';
 import 'package:demo_cst/screens/config_material_information.dart';
 import 'package:demo_cst/screens/Site_Supervisor_Config.dart';
 import 'package:demo_cst/screens/config_mat_sub_cat.dart';
@@ -318,8 +319,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
 
     return GlassScaffold(
       title: _currentIndex == 0
@@ -374,65 +373,86 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         notchMargin: 8,
         color: theme.cardColor,
         elevation: 8,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildNavItem(
-              context,
-              Icons.dashboard_rounded,
-              'Dashboard',
-              _currentIndex == 0,
-              () => setState(() => _currentIndex = 0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: Responsive.maxContentWidth,
             ),
-            _buildNavItem(
-              context,
-              Icons.work_rounded,
-              'Projects',
-              _currentIndex == 1,
-              () => setState(() => _currentIndex = 1),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildNavItem(
+                  context,
+                  Icons.dashboard_rounded,
+                  'Dashboard',
+                  _currentIndex == 0,
+                  () => setState(() => _currentIndex = 0),
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.work_rounded,
+                  'Projects',
+                  _currentIndex == 1,
+                  () => setState(() => _currentIndex = 1),
+                ),
+                const SizedBox(width: 40), // Space for FAB
+                _buildNavItem(
+                  context,
+                  Icons.edit_note_rounded,
+                  'Daily Entry',
+                  _currentIndex == 2,
+                  () => setState(() => _currentIndex = 2),
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.account_balance_wallet_rounded,
+                  'Expenses',
+                  _currentIndex == 3,
+                  () => setState(() => _currentIndex = 3),
+                ),
+              ],
             ),
-            const SizedBox(width: 40), // Space for FAB
-            _buildNavItem(
-              context,
-              Icons.edit_note_rounded,
-              'Daily Entry',
-              _currentIndex == 2,
-              () => setState(() => _currentIndex = 2),
-            ),
-            _buildNavItem(
-              context,
-              Icons.account_balance_wallet_rounded,
-              'Expenses',
-              _currentIndex == 3,
-              () => setState(() => _currentIndex = 3),
-            ),
-          ],
+          ),
         ),
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          CustomScrollView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              ..._buildGridSections(crossAxisCount),
-              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: Responsive.maxContentWidth,
+          ),
+          child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return CustomScrollView(
+                    controller: _scrollController,
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      ..._buildGridSections(context, constraints.maxWidth),
+                      const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+                    ],
+                  );
+                },
+              ),
+              const ProjectScreen(hideAppBar: true),
+              ManagerSiteEntryPage(
+                userName: _managerName,
+                userDetails: AuthService().userData,
+                hideAppBar: true,
+              ),
+              const ManagerExpenses(hideAppBar: true),
             ],
           ),
-          const ProjectScreen(hideAppBar: true),
-          ManagerSiteEntryPage(
-            userName: _managerName,
-            userDetails: AuthService().userData,
-            hideAppBar: true,
-          ),
-          const ManagerExpenses(hideAppBar: true),
-        ],
+        ),
       ),
     );
   }
 
-  List<Widget> _buildGridSections(int crossAxisCount) {
+  List<Widget> _buildGridSections(BuildContext context, double availableWidth) {
+    final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
+    final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
+    final hPad = Responsive.horizontalPadding(context);
     List<Widget> slivers = [];
 
     for (var entry in groupedItems.entries) {
@@ -444,7 +464,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 12),
             child: Row(
               children: [
                 Container(
@@ -465,8 +485,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 const SizedBox(width: 12),
                 Text(
                   sectionTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: TextStyle(
+                    fontSize: Responsive.fontSize(context, 16),
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.3,
                   ),
@@ -498,7 +518,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(horizontal: hPad),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate(
               (context, index) => _buildGridItem(items[index]),
@@ -508,7 +528,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.8,
+              childAspectRatio: childAspectRatio,
             ),
           ),
         ),

@@ -227,25 +227,32 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
           onPressed: expenses.isNotEmpty ? _generatePdf : null,
         ),
       ],
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildFilterCard(theme),
-            const SizedBox(height: 24),
-            if (isLoadingExpenses)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (expenses.isNotEmpty)
-              _buildReportSection(theme)
-            else if (selectedContractor != null && selectedSiteId != null)
-              _buildEmptyState(theme),
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildFilterCard(theme),
+                const SizedBox(height: 24),
+                if (isLoadingExpenses)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (expenses.isNotEmpty)
+                  _buildReportSection(theme)
+                else if (selectedContractor != null && selectedSiteId != null)
+                  _buildEmptyState(theme),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -75,12 +75,17 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Project Performance',
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMsg != null
               ? _buildErrorView(theme)
@@ -100,6 +105,8 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
                     ),
                   ),
                 ),
+        ),
+      ),
     );
   }
 

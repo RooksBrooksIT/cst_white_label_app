@@ -215,46 +215,67 @@ class _OrganisationRegistrationPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0);
+    final maxContentWidth = 800.0;
 
     return GlassScaffold(
       title: 'Register Organization',
       onBack: _goBack,
-      body: CustomScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                _buildStepIndicator(theme),
-                const SizedBox(height: 24),
-                FadeTransition(
-                  opacity: _opacityAnimation,
-                  child: AnimatedBuilder(
-                    animation: _translateAnimation,
-                    builder: (context, child) => Transform.translate(
-                      offset: Offset(0, _translateAnimation.value),
-                      child: child,
-                    ),
-                    child: _buildStep1(theme),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: isDesktop ? 32.0 : 20.0),
+                  child: Column(
+                    children: [
+                      _buildStepIndicator(theme, isMobile, isTablet, isDesktop),
+                      SizedBox(height: isDesktop ? 32.0 : 24.0),
+                      FadeTransition(
+                        opacity: _opacityAnimation,
+                        child: AnimatedBuilder(
+                          animation: _translateAnimation,
+                          builder: (context, child) => Transform.translate(
+                            offset: Offset(0, _translateAnimation.value),
+                            child: child,
+                          ),
+                          child: _buildStep1(theme, isMobile, isTablet, isDesktop),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
       ),
+        ),
+      ),
     );
   }
 
-  Widget _buildStepIndicator(ThemeData theme) {
+  Widget _buildStepIndicator(ThemeData theme, bool isMobile, bool isTablet, bool isDesktop) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0;
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
@@ -274,22 +295,22 @@ class _OrganisationRegistrationPageState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: isDesktop ? 44.0 : 36.0,
+                    height: isDesktop ? 44.0 : 36.0,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDone
                           ? colorScheme.primary
                           : (isActive
-                                ? colorScheme.primary
-                                : colorScheme.surfaceVariant),
+                              ? colorScheme.primary
+                              : colorScheme.surfaceVariant),
                     ),
                     child: Center(
                       child: isDone
-                          ? const Icon(
+                          ? Icon(
                               Icons.check,
                               color: Colors.white,
-                              size: 20,
+                              size: isDesktop ? 24.0 : 20.0,
                             )
                           : Text(
                               '${index + 1}',
@@ -297,20 +318,20 @@ class _OrganisationRegistrationPageState
                                 color: isActive
                                     ? Colors.white
                                     : colorScheme.onSurfaceVariant,
-                                fontSize: 14,
+                                fontSize: isDesktop ? 16.0 : 14.0,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isDesktop ? 10.0 : 8.0),
                   Text(
                     steps[index],
                     style: TextStyle(
                       color: isActive
                           ? colorScheme.primary
                           : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
+                      fontSize: isDesktop ? 14.0 : 12.0,
                       fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                     ),
                   ),
@@ -319,12 +340,12 @@ class _OrganisationRegistrationPageState
               // Connector line
               if (index < steps.length - 1)
                 Container(
-                  width: 40,
-                  height: 2,
-                  margin: const EdgeInsets.only(
-                    bottom: 24,
-                    left: 12,
-                    right: 12,
+                  width: isDesktop ? 50.0 : 40.0,
+                  height: 2.0,
+                  margin: EdgeInsets.only(
+                    bottom: isDesktop ? 28.0 : 24.0,
+                    left: isDesktop ? 16.0 : 12.0,
+                    right: isDesktop ? 16.0 : 12.0,
                   ),
                   decoration: BoxDecoration(
                     color: activeStep > index
@@ -340,7 +361,7 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildStep1(ThemeData theme) {
+  Widget _buildStep1(ThemeData theme, bool isMobile, bool isTablet, bool isDesktop) {
     final colorScheme = theme.colorScheme;
 
     return Column(
@@ -353,16 +374,18 @@ class _OrganisationRegistrationPageState
             fontWeight: FontWeight.w800,
             color: colorScheme.onSurface,
             letterSpacing: -0.5,
+            fontSize: isDesktop ? 28.0 : 24.0,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isDesktop ? 12.0 : 8.0),
         Text(
           'Please provide your organization details below.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
+            fontSize: isDesktop ? 17.0 : 15.0,
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isDesktop ? 40.0 : 32.0),
 
         // Professional Form Container
         Form(
@@ -370,8 +393,8 @@ class _OrganisationRegistrationPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFieldLabel('Organization Name'),
-              const SizedBox(height: 8),
+              _buildFieldLabel('Organization Name', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _orgNameController,
                 hint: 'Enter organization name',
@@ -382,10 +405,11 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
-              const SizedBox(height: 20),
-              _buildFieldLabel('Corporate Email'),
-              const SizedBox(height: 8),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildFieldLabel('Corporate Email', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _emailController,
                 hint: 'e.g. contact@org.com',
@@ -402,10 +426,11 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
-              const SizedBox(height: 20),
-              _buildFieldLabel('Contact Number'),
-              const SizedBox(height: 8),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildFieldLabel('Contact Number', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _phoneController,
                 hint: 'Enter mobile number',
@@ -424,10 +449,11 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
-              const SizedBox(height: 20),
-              _buildFieldLabel('Admin Username'),
-              const SizedBox(height: 8),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildFieldLabel('Admin Username', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _usernameController,
                 hint: 'Choose a unique username',
@@ -438,10 +464,11 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
-              const SizedBox(height: 20),
-              _buildFieldLabel('Password'),
-              const SizedBox(height: 8),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildFieldLabel('Password', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _passwordController,
                 hint: 'Min. 8 characters',
@@ -460,16 +487,17 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
               // Strength Indicator
               if (_passwordStrength.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8, left: 4),
+                  padding: EdgeInsets.only(top: isDesktop ? 12.0 : 8.0, left: 4.0),
                   child: Row(
                     children: [
                       Container(
-                        width: 80,
-                        height: 4,
+                        width: isDesktop ? 100.0 : 80.0,
+                        height: 4.0,
                         decoration: BoxDecoration(
                           color: _strengthColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(2),
@@ -487,21 +515,21 @@ class _OrganisationRegistrationPageState
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: isDesktop ? 12.0 : 8.0),
                       Text(
                         _passwordStrength,
                         style: TextStyle(
                           color: _strengthColor,
-                          fontSize: 12,
+                          fontSize: isDesktop ? 14.0 : 12.0,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 20),
-              _buildFieldLabel('Confirm Password'),
-              const SizedBox(height: 8),
+              SizedBox(height: isDesktop ? 24.0 : 20.0),
+              _buildFieldLabel('Confirm Password', isDesktop),
+              SizedBox(height: isDesktop ? 12.0 : 8.0),
               _buildProfessionalField(
                 controller: _confirmPasswordController,
                 hint: 'Re-enter password',
@@ -520,8 +548,9 @@ class _OrganisationRegistrationPageState
                   }
                   return null;
                 },
+                isDesktop: isDesktop,
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: isDesktop ? 48.0 : 40.0),
 
               // Navigation Buttons
               Row(
@@ -530,7 +559,7 @@ class _OrganisationRegistrationPageState
                     child: OutlinedButton(
                       onPressed: _goBack,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
                         side: BorderSide(color: colorScheme.outline),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -542,37 +571,39 @@ class _OrganisationRegistrationPageState
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
+                          fontSize: isDesktop ? 16.0 : 14.0,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: isDesktop ? 20.0 : 16.0),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _goToNextStep,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
+                          ? SizedBox(
+                              height: isDesktop ? 28.0 : 20.0,
+                              width: isDesktop ? 28.0 : 20.0,
                               child: CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'CONTINUE',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.0,
+                                fontSize: isDesktop ? 16.0 : 14.0,
                               ),
                             ),
                     ),
@@ -586,15 +617,15 @@ class _OrganisationRegistrationPageState
     );
   }
 
-  Widget _buildFieldLabel(String label) {
+  Widget _buildFieldLabel(String label, bool isDesktop) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 14,
+        style: TextStyle(
+          fontSize: isDesktop ? 16.0 : 14.0,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF64748B),
+          color: const Color(0xFF64748B),
         ),
       ),
     );
@@ -611,6 +642,7 @@ class _OrganisationRegistrationPageState
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     void Function(String)? onChanged,
+    required bool isDesktop,
   }) {
     final theme = Theme.of(context);
     return Container(
@@ -633,14 +665,14 @@ class _OrganisationRegistrationPageState
         inputFormatters: inputFormatters,
         validator: validator,
         onChanged: onChanged,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        style: TextStyle(fontSize: isDesktop ? 17.0 : 15.0, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
             color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-            fontSize: 14,
+            fontSize: isDesktop ? 16.0 : 14.0,
           ),
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: isDesktop ? 24.0 : 20.0),
           suffixIcon: isPassword
               ? IconButton(
                   icon: Icon(
@@ -648,15 +680,15 @@ class _OrganisationRegistrationPageState
                         ? Icons.visibility_off_rounded
                         : Icons.visibility_rounded,
                     color: theme.colorScheme.primary,
-                    size: 20,
+                    size: isDesktop ? 24.0 : 20.0,
                   ),
                   onPressed: onToggleVisibility,
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 20.0 : 16.0,
           ),
         ),
       ),

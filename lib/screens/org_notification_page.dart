@@ -23,11 +23,16 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       title: 'Organization Notifications',
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: NotificationService.streamForOrganisation(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -175,6 +180,8 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
             },
           );
         },
+      ),
+        ),
       ),
     );
   }

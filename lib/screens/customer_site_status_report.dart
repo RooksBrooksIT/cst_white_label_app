@@ -293,12 +293,17 @@ class _ProjectstageInsightsDashboardState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Project Stage Insights',
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -321,6 +326,8 @@ class _ProjectstageInsightsDashboardState
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

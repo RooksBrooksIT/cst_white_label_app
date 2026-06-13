@@ -126,22 +126,32 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final content = SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
-        children: [
-          _buildReferralSection(colorScheme),
-          const SizedBox(height: 16),
-          _buildSettingsSection(colorScheme),
-          const SizedBox(height: 16),
-          _buildSubscriptionSection(colorScheme),
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _buildLogoutSection(colorScheme),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    final content = Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isMobile ? double.infinity : 600,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            children: [
+              _buildReferralSection(colorScheme),
+              const SizedBox(height: 16),
+              _buildSettingsSection(colorScheme),
+              const SizedBox(height: 16),
+              _buildSubscriptionSection(colorScheme),
+              const SizedBox(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildLogoutSection(colorScheme),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
 

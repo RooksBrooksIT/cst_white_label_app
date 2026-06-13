@@ -20,6 +20,8 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final String? siteId = siteDetails != null
         ? (siteDetails!['siteId'] ?? siteDetails!['site'])?.toString()
         : null;
@@ -56,7 +58,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         ],
       ),
       body:
-          siteId == null ||
+          Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: siteId == null ||
               siteId.isEmpty ||
               paymentPeriod == null ||
               paymentPeriod.isEmpty
@@ -173,6 +178,8 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                 );
               },
             ),
+        ),
+      ),
     );
   }
 

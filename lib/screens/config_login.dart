@@ -218,113 +218,131 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1024;
+    bool isDesktop = screenWidth >= 1024;
+
+    double horizontalPadding = isDesktop ? 40 : (isTablet ? 32 : 24);
+    double maxContentWidth = 500;
 
     return GlassScaffold(
       onBack: () => Navigator.pop(context),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Icon Header or Org Logo
-              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
-                Container(
-                  width: 80,
-                  height: 80,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: colorScheme.outline, width: 2),
-                  ),
-                  child: Image.network(
-                    _tempLogoUrl!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Icon(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icon Header or Org Logo
+                if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                  Container(
+                    width: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    height: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    padding: EdgeInsets.all(isDesktop ? 10 : (isTablet ? 9 : 8)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: colorScheme.outline, width: 2),
+                    ),
+                    child: Image.network(
+                      _tempLogoUrl!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.manage_accounts_rounded,
+                        size: isDesktop ? 70 : (isTablet ? 65 : 60),
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    height: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
                       Icons.manage_accounts_rounded,
-                      size: 60,
+                      size: isDesktop ? 52 : (isTablet ? 46 : 40),
                       color: colorScheme.primary,
                     ),
                   ),
-                )
-              else
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colorScheme.primary.withOpacity(0.2),
-                      width: 2,
+                SizedBox(height: isDesktop ? 32 : (isTablet ? 28 : 24)),
+                Text(
+                  _tempOrgName ?? 'Manager Login',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontSize: isDesktop ? 30 : (isTablet ? 28 : 26),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                SizedBox(height: isDesktop ? 40 : (isTablet ? 36 : 32)),
+
+                GlassCard(
+                  padding: EdgeInsets.all(isDesktop ? 28 : (isTablet ? 26 : 24)),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        GlassTextField(
+                          controller: _referralController,
+                          label: 'Referral Code / Org Name',
+                          icon: Icons.business_rounded,
+                          enabled:
+                              _actualReferralCode == null && _tempOrgName == null,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        SizedBox(height: isDesktop ? 24 : (isTablet ? 22 : 20)),
+                        GlassTextField(
+                          controller: _usernameController,
+                          label: 'Username',
+                          icon: Icons.person_outline_rounded,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        SizedBox(height: isDesktop ? 24 : (isTablet ? 22 : 20)),
+                        GlassTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        SizedBox(height: isDesktop ? 36 : (isTablet ? 34 : 32)),
+                        SizedBox(
+                          width: double.infinity,
+                          child: GlassButton(
+                            label: 'LOGIN',
+                            isLoading: _isLoading,
+                            onPressed: _login,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Icon(
-                    Icons.manage_accounts_rounded,
-                    size: 40,
-                    color: colorScheme.primary,
-                  ),
                 ),
-              const SizedBox(height: 24),
-              Text(
-                _tempOrgName ?? 'Manager Login',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              GlassCard(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      GlassTextField(
-                        controller: _referralController,
-                        label: 'Referral Code / Org Name',
-                        icon: Icons.business_rounded,
-                        enabled:
-                            _actualReferralCode == null && _tempOrgName == null,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 20),
-                      GlassTextField(
-                        controller: _usernameController,
-                        label: 'Username',
-                        icon: Icons.person_outline_rounded,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 20),
-                      GlassTextField(
-                        controller: _passwordController,
-                        label: 'Password',
-                        icon: Icons.lock_outline_rounded,
-                        isPassword: true,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        child: GlassButton(
-                          label: 'LOGIN',
-                          isLoading: _isLoading,
-                          onPressed: _login,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                SizedBox(height: isDesktop ? 28 : (isTablet ? 26 : 24)),
+              ],
+            ),
           ),
+        ),
+      ),
         ),
       ),
     );

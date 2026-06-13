@@ -809,32 +809,37 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         ),
         SizedBox(width: Responsive.scaleH(context, 8)),
       ],
-      body: _isLoadingSites || _isLoadingMaterials
-          ? Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            )
-          : Column(
-              children: [
-                _buildModeToggle(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_transferMode == 0)
-                          ..._buildSiteToSiteUI()
-                        else
-                          ..._buildSiteToCompanyUI(),
-                      ],
-                    ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: _isLoadingSites || _isLoadingMaterials
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
                   ),
+                )
+              : Column(
+                  children: [
+                    _buildModeToggle(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_transferMode == 0)
+                              ..._buildSiteToSiteUI()
+                            else
+                              ..._buildSiteToCompanyUI(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+        ),
+      ),
     );
   }
 

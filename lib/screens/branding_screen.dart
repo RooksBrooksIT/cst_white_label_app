@@ -224,10 +224,14 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
-    final isSmallScreen = screenWidth < 600;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
 
     return Theme(
       data: AppTheme.getTheme(_selectedColor),
@@ -239,166 +243,235 @@ class _BrandingScreenState extends State<BrandingScreen> {
           return GlassScaffold(
             title: 'Branding',
             onBack: () => Navigator.pop(context),
-            body: CustomScrollView(
+            body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
-                  child: Column(
-                    children: [
-                      _buildStepIndicator(theme),
-                      const SizedBox(height: 24),
-                      // Responsive Branding Content Area (Customization Top, Mockup Bottom)
-                      Column(
-                        children: [
-                          // Top Section: Customization Controls
-                          Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen
-                                  ? 20
-                                  : screenWidth * 0.1,
-                              vertical: 32,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.cardColor,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: theme.dividerColor.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 32 : (isTablet ? 24 : 16),
+                      vertical: isDesktop ? 24 : 16,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Column(
+                          children: [
+                            _buildStepIndicator(theme, isDesktop, isTablet),
+                            SizedBox(height: isDesktop ? 32 : 24),
+                            // Responsive Branding Content Area (Customization Top, Mockup Bottom)
+                            Column(
                               children: [
-                                Text(
-                                  'App Personalization',
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        color: theme.colorScheme.onSurface,
-                                        letterSpacing: -0.5,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Configure your custom app identity and see live changes below.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-
-                                // App Section Area
+                                // Top Section: Customization Controls
                                 Container(
-                                  padding: const EdgeInsets.all(24),
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isDesktop ? 32 : 24,
+                                    vertical: isDesktop ? 40 : 32,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceVariant
-                                        .withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: theme.cardColor,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: theme.dividerColor.withOpacity(
+                                        0.2,
+                                      ),
+                                    ),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                        CrossAxisAlignment.stretch,
                                     children: [
-                                      _buildFieldLabel('App Name (Brand Name)'),
-                                      const SizedBox(height: 8),
-                                      _buildBrandingField(
-                                        controller: _appNameController,
-                                        hint: widget.orgName,
-                                        icon: Icons.edit_note_rounded,
+                                      Text(
+                                        'App Personalization',
+                                        style: theme.textTheme.headlineSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w900,
+                                              color:
+                                                  theme.colorScheme.onSurface,
+                                              letterSpacing: -0.5,
+                                              fontSize: isDesktop ? 28 : 24,
+                                            ),
                                       ),
-                                      const SizedBox(height: 24),
-                                      _buildFieldLabel('Primary Brand Color'),
-                                      const SizedBox(height: 12),
-                                      _buildColorPalette(),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Configure your custom app identity and see live changes below.',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontSize: isDesktop ? 16 : 14,
+                                            ),
+                                      ),
+                                      SizedBox(height: isDesktop ? 40 : 32),
+
+                                      // App Section Area
+                                      Container(
+                                        padding: EdgeInsets.all(
+                                          isDesktop ? 28 : 24,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme
+                                              .colorScheme
+                                              .surfaceVariant
+                                              .withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            _buildFieldLabel(
+                                              'App Name (Brand Name)',
+                                              isDesktop,
+                                              isTablet,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            _buildBrandingField(
+                                              controller: _appNameController,
+                                              hint: widget.orgName,
+                                              icon: Icons.edit_note_rounded,
+                                              isDesktop: isDesktop,
+                                              isTablet: isTablet,
+                                            ),
+                                            SizedBox(
+                                              height: isDesktop ? 32 : 24,
+                                            ),
+                                            _buildFieldLabel(
+                                              'Primary Brand Color',
+                                              isDesktop,
+                                              isTablet,
+                                            ),
+                                            SizedBox(
+                                              height: isDesktop ? 16 : 12,
+                                            ),
+                                            _buildColorPalette(
+                                              isDesktop,
+                                              isTablet,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          // Phone Mockup View
-                          _buildPhoneMockup(theme, screenWidth),
-                          const SizedBox(height: 48),
-                          // Navigation
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    side: BorderSide(color: theme.dividerColor),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'BACK',
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                SizedBox(height: isDesktop ? 40 : 32),
+                                // Phone Mockup View
+                                _buildPhoneMockup(
+                                  theme,
+                                  screenWidth,
+                                  isDesktop,
+                                  isTablet,
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _goToNextStep,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.primaryColor,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
+                                SizedBox(height: isDesktop ? 56 : 48),
+                                // Navigation
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isDesktop ? 20 : 16,
                                           ),
-                                        )
-                                      : const Text(
-                                          'CONTINUE',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                          side: BorderSide(
+                                            color: theme.dividerColor,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
                                           ),
                                         ),
+                                        child: Text(
+                                          'BACK',
+                                          style: TextStyle(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: isDesktop ? 16 : 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: isDesktop ? 20 : 16),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: _isLoading
+                                            ? null
+                                            : _goToNextStep,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: theme.primaryColor,
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isDesktop ? 20 : 16,
+                                          ),
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                          ),
+                                        ),
+                                        child: _isLoading
+                                            ? SizedBox(
+                                                height: isDesktop ? 24 : 20,
+                                                width: isDesktop ? 24 : 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                            : Text(
+                                                'CONTINUE',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: isDesktop ? 16 : 14,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 40),
-                        ],
+                                SizedBox(height: isDesktop ? 48 : 40),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
             ),
+        ),
+      ),
           );
         },
       ),
     );
   }
 
-  Widget _buildPhoneMockup(ThemeData theme, double screenWidth) {
+  Widget _buildPhoneMockup(
+    ThemeData theme,
+    double screenWidth,
+    bool isDesktop,
+    bool isTablet,
+  ) {
     final String previewName = _appNameController.text.trim().isNotEmpty
         ? _appNameController.text.trim()
         : widget.orgName;
 
     // Responsive sizing for mockup
-    final double mockupWidth = screenWidth < 600 ? 200 : 240;
+    final double mockupWidth = isDesktop ? 280 : (isTablet ? 240 : 200);
     final double mockupHeight = mockupWidth * 2;
 
     // Fixed mockup background (light)
@@ -539,13 +612,13 @@ class _BrandingScreenState extends State<BrandingScreen> {
     );
   }
 
-  Widget _buildStepIndicator(ThemeData theme) {
+  Widget _buildStepIndicator(ThemeData theme, bool isDesktop, bool isTablet) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 1;
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isDesktop ? 24 : 20),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
@@ -565,8 +638,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: isDesktop ? 44 : 36,
+                    height: isDesktop ? 44 : 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDone
@@ -577,10 +650,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
                     ),
                     child: Center(
                       child: isDone
-                          ? const Icon(
+                          ? Icon(
                               Icons.check,
                               color: Colors.white,
-                              size: 20,
+                              size: isDesktop ? 24 : 20,
                             )
                           : Text(
                               '${index + 1}',
@@ -588,20 +661,20 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 color: isActive
                                     ? Colors.white
                                     : colorScheme.onSurfaceVariant,
-                                fontSize: 14,
+                                fontSize: isDesktop ? 16 : 14,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isDesktop ? 12 : 8),
                   Text(
                     steps[index],
                     style: TextStyle(
                       color: isActive
                           ? colorScheme.primary
                           : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
+                      fontSize: isDesktop ? 14 : 12,
                       fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                     ),
                   ),
@@ -610,12 +683,12 @@ class _BrandingScreenState extends State<BrandingScreen> {
               // Connector line
               if (index < steps.length - 1)
                 Container(
-                  width: 40,
+                  width: isDesktop ? 60 : 40,
                   height: 2,
-                  margin: const EdgeInsets.only(
-                    bottom: 24,
-                    left: 12,
-                    right: 12,
+                  margin: EdgeInsets.only(
+                    bottom: isDesktop ? 30 : 24,
+                    left: isDesktop ? 16 : 12,
+                    right: isDesktop ? 16 : 12,
                   ),
                   decoration: BoxDecoration(
                     color: activeStep > index
@@ -631,15 +704,15 @@ class _BrandingScreenState extends State<BrandingScreen> {
     );
   }
 
-  Widget _buildFieldLabel(String label) {
+  Widget _buildFieldLabel(String label, bool isDesktop, bool isTablet) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 14,
+        style: TextStyle(
+          fontSize: isDesktop ? 16 : 14,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF64748B),
+          color: const Color(0xFF64748B),
         ),
       ),
     );
@@ -649,6 +722,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    required bool isDesktop,
+    required bool isTablet,
   }) {
     final theme = Theme.of(context);
     return Container(
@@ -659,29 +734,36 @@ class _BrandingScreenState extends State<BrandingScreen> {
       ),
       child: TextField(
         controller: controller,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontSize: isDesktop ? 17 : 15,
+          fontWeight: FontWeight.w500,
+        ),
         onChanged: (v) => setState(() {}),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
             color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-            fontSize: 14,
+            fontSize: isDesktop ? 16 : 14,
           ),
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          prefixIcon: Icon(
+            icon,
+            color: theme.colorScheme.primary,
+            size: isDesktop ? 24 : 20,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 20 : 16,
+            vertical: isDesktop ? 20 : 16,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildColorPalette() {
+  Widget _buildColorPalette(bool isDesktop, bool isTablet) {
     return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+      spacing: isDesktop ? 16 : 12,
+      runSpacing: isDesktop ? 16 : 12,
       children: _colorOptions.map((opt) {
         final isCustom = opt['isCustom'] == true;
         final c = isCustom ? _customColor : opt['color'] as Color;
@@ -702,8 +784,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                 },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 42,
-            height: 42,
+            width: isDesktop ? 52 : 42,
+            height: isDesktop ? 52 : 42,
             decoration: BoxDecoration(
               color: isCustom && !sel ? null : c,
               shape: BoxShape.circle,
@@ -728,14 +810,18 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   ? [
                       BoxShadow(
                         color: c.withOpacity(0.3),
-                        blurRadius: 8,
-                        spreadRadius: 1,
+                        blurRadius: isDesktop ? 12 : 8,
+                        spreadRadius: isDesktop ? 2 : 1,
                       ),
                     ]
                   : null,
             ),
             child: sel
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                ? Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: isDesktop ? 24 : 20,
+                  )
                 : null,
           ),
         );

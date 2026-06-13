@@ -1273,6 +1273,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: _transferMode == 0
           ? 'Company To Site Transfer'
@@ -1281,7 +1283,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           : 'Site To Company Transfer',
       onBack: () => Navigator.pop(context),
 
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2055,6 +2060,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               ),
             ],
           ],
+        ),
+      ),
         ),
       ),
     );

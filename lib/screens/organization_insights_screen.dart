@@ -253,195 +253,204 @@ class _OrganizationInsightsScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return GlassScaffold(
       title: 'Expenses Report',
       appBarBackgroundColor: Theme.of(context).colorScheme.primary,
       appBarForegroundColor: Theme.of(context).colorScheme.onPrimary,
       onBack: () => Navigator.pop(context),
-      body: FutureBuilder<List<SupervisorEntry>>(
-        future: supervisorEntriesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                'No supervisor entries found.',
-                style: TextStyle(color: theme.colorScheme.onSurface),
-              ),
-            );
-          }
-          final supervisorEntries = snapshot.data!;
-          final uniqueSiteIds = supervisorEntries
-              .where(
-                  (entry) => entry.siteId != null && entry.siteId!.isNotEmpty)
-              .map((entry) => entry.siteId!)
-              .toSet()
-              .toList();
-
-          if (uniqueSiteIds.isNotEmpty) {
-            selectedSupervisorEntry ??= supervisorEntries.firstWhereOrNull(
-              (entry) => entry.siteId == uniqueSiteIds.first,
-            ) ?? supervisorEntries.firstOrNull;
-          } else {
-            selectedSupervisorEntry ??= supervisorEntries.firstOrNull;
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Text(
-                  'Generate Reports',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: FutureBuilder<List<SupervisorEntry>>(
+            future: supervisorEntriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Select a site and report type to generate insights',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                );
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No supervisor entries found.',
+                    style: TextStyle(color: theme.colorScheme.onSurface),
                   ),
-                ),
-                const SizedBox(height: 24),
+                );
+              }
+              final supervisorEntries = snapshot.data!;
+              final uniqueSiteIds = supervisorEntries
+                  .where(
+                      (entry) => entry.siteId != null && entry.siteId!.isNotEmpty)
+                  .map((entry) => entry.siteId!)
+                  .toSet()
+                  .toList();
 
-                // Site Selection Card
-                _buildModernCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SELECT SITE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedSupervisorEntry?.siteId,
-                        items: uniqueSiteIds.map((siteId) {
-                          return DropdownMenuItem<String>(
-                            value: siteId,
-                            child: Text(
-                              siteId,
-                              style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newSiteId) {
-                          setState(() {
-                            selectedSupervisorEntry =
-                                supervisorEntries.firstWhere(
-                              (entry) => entry.siteId == newSiteId,
-                              orElse: () => supervisorEntries.first,
-                            );
-                          });
-                        },
-                        decoration: _inputDecoration(context),
-                        borderRadius: BorderRadius.circular(12),
-                        elevation: 2,
-                        isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
-                        dropdownColor: theme.cardColor,
-                      ),
-                    ],
-                  ),
-                ),
+              if (uniqueSiteIds.isNotEmpty) {
+                selectedSupervisorEntry ??= supervisorEntries.firstWhereOrNull(
+                  (entry) => entry.siteId == uniqueSiteIds.first,
+                ) ?? supervisorEntries.firstOrNull;
+              } else {
+                selectedSupervisorEntry ??= supervisorEntries.firstOrNull;
+              }
 
-                SizedBox(height: 20),
-
-                // Report Type Selection
-                _buildModernCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'REPORT TYPE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
-                          letterSpacing: 1.2,
-                        ),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Text(
+                      'Generate Reports',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
                       ),
-                      const SizedBox(height: 12),
-                      _buildReportOption(
-                        type: ReportType.dailyExpense,
-                        icon: Icons.today,
-                        title: 'Daily Expense',
-                        subtitle: 'View expenses for a specific day',
-                      ),
-                      Divider(height: 20, thickness: 0.5, ),
-                      _buildReportOption(
-                        type: ReportType.expenseRange,
-                        icon: Icons.date_range,
-                        title: 'Expense Range',
-                        subtitle: 'View expenses between dates',
-                      ),
-                      Divider(height: 20, thickness: 0.5, ),
-                      _buildReportOption(
-                        type: ReportType.siteSummary,
-                        icon: Icons.summarize,
-                        title: 'Site Summary',
-                        subtitle: 'Overview of site progress',
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: 20),
-
-                // Dynamic Input Section (Date/Range)
-                if (selectedReportType == ReportType.dailyExpense)
-                  _buildDateInputSection(
-                    title: 'SELECT DATE',
-                    date: selectedDate,
-                    onTap: () => _selectDate(context),
-                  ),
-
-                if (selectedReportType == ReportType.expenseRange)
-                  Column(
-                    children: [
-                      _buildDateInputSection(
-                        title: 'FROM DATE',
-                        date: fromDate,
-                        onTap: () => _selectFromDate(context),
-                      ),
-                      SizedBox(height: 16),
-                      _buildDateInputSection(
-                        title: 'TO DATE',
-                        date: toDate,
-                        onTap: () => _selectToDate(context),
-                      ),
-                    ],
-                  ),
-
-                SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: GlassButton(
-                      label: 'GENERATE REPORT',
-                      onPressed: _openReport,
                     ),
-                  ),
-              ],
-            ),
-          );
-        },
+                    const SizedBox(height: 8),
+                    Text(
+                      'Select a site and report type to generate insights',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Site Selection Card
+                    _buildModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SELECT SITE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: selectedSupervisorEntry?.siteId,
+                            items: uniqueSiteIds.map((siteId) {
+                              return DropdownMenuItem<String>(
+                                value: siteId,
+                                child: Text(
+                                  siteId,
+                                  style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newSiteId) {
+                              setState(() {
+                                selectedSupervisorEntry =
+                                    supervisorEntries.firstWhere(
+                                  (entry) => entry.siteId == newSiteId,
+                                  orElse: () => supervisorEntries.first,
+                                );
+                              });
+                            },
+                            decoration: _inputDecoration(context),
+                            borderRadius: BorderRadius.circular(12),
+                            elevation: 2,
+                            isExpanded: true,
+                            icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
+                            dropdownColor: theme.cardColor,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 20),
+
+                    // Report Type Selection
+                    _buildModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'REPORT TYPE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildReportOption(
+                            type: ReportType.dailyExpense,
+                            icon: Icons.today,
+                            title: 'Daily Expense',
+                            subtitle: 'View expenses for a specific day',
+                          ),
+                          Divider(height: 20, thickness: 0.5, ),
+                          _buildReportOption(
+                            type: ReportType.expenseRange,
+                            icon: Icons.date_range,
+                            title: 'Expense Range',
+                            subtitle: 'View expenses between dates',
+                          ),
+                          Divider(height: 20, thickness: 0.5, ),
+                          _buildReportOption(
+                            type: ReportType.siteSummary,
+                            icon: Icons.summarize,
+                            title: 'Site Summary',
+                            subtitle: 'Overview of site progress',
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 20),
+
+                    // Dynamic Input Section (Date/Range)
+                    if (selectedReportType == ReportType.dailyExpense)
+                      _buildDateInputSection(
+                        title: 'SELECT DATE',
+                        date: selectedDate,
+                        onTap: () => _selectDate(context),
+                      ),
+
+                    if (selectedReportType == ReportType.expenseRange)
+                      Column(
+                        children: [
+                          _buildDateInputSection(
+                            title: 'FROM DATE',
+                            date: fromDate,
+                            onTap: () => _selectFromDate(context),
+                          ),
+                          SizedBox(height: 16),
+                          _buildDateInputSection(
+                            title: 'TO DATE',
+                            date: toDate,
+                            onTap: () => _selectToDate(context),
+                          ),
+                        ],
+                      ),
+
+                    SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassButton(
+                          label: 'GENERATE REPORT',
+                          onPressed: _openReport,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

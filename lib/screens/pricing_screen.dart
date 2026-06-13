@@ -42,6 +42,8 @@ class PricingScreen extends StatefulWidget {
 
 class _PricingScreenState extends State<PricingScreen> {
   bool _isLoading = false;
+  String _selectedPlanType = 'Monthly';
+  String _selectedPlan = 'Silver';
 
   Future<void> _register() async {
     setState(() => _isLoading = true);
@@ -150,47 +152,63 @@ class _PricingScreenState extends State<PricingScreen> {
           builder: (ctx) {
             final theme = Theme.of(ctx);
             final colorScheme = theme.colorScheme;
+            final screenWidth = MediaQuery.of(ctx).size.width;
+            final isMobile = screenWidth < 600;
+            final isDesktop = screenWidth >= 1024;
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              contentPadding: const EdgeInsets.fromLTRB(32, 28, 32, 12),
-              actionsPadding: const EdgeInsets.fromLTRB(32, 0, 32, 24),
+              contentPadding: EdgeInsets.fromLTRB(
+                isDesktop ? 48 : 32,
+                isDesktop ? 36 : 28,
+                isDesktop ? 48 : 32,
+                isDesktop ? 16 : 12,
+              ),
+              actionsPadding: EdgeInsets.fromLTRB(
+                isDesktop ? 48 : 32,
+                0,
+                isDesktop ? 48 : 32,
+                isDesktop ? 32 : 24,
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(isDesktop ? 20 : 16),
                     decoration: BoxDecoration(
                       color: const Color(0xFF00A86B).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF00A86B),
-                      size: 48,
+                      color: const Color(0xFF00A86B),
+                      size: isDesktop ? 60 : 48,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: isDesktop ? 24 : 20),
                   Text(
                     'Registration Successful!',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      fontSize: isDesktop ? 26 : 22,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isDesktop ? 16 : 12),
                   Text(
                     'Your organization referral code is:',
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: isDesktop ? 17 : 14,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isDesktop ? 20 : 16),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 20,
+                    padding: EdgeInsets.symmetric(
+                      vertical: isDesktop ? 20 : 16,
+                      horizontal: isDesktop ? 24 : 20,
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withOpacity(0.08),
@@ -204,14 +222,14 @@ class _PricingScreenState extends State<PricingScreen> {
                         Text(
                           orgReferralCode,
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: isDesktop ? 36 : 28,
                             fontWeight: FontWeight.w800,
                             color: colorScheme.primary,
                             letterSpacing: 4,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: isDesktop ? 12 : 8),
                         TextButton.icon(
                           onPressed: () {
                             Clipboard.setData(
@@ -227,22 +245,26 @@ class _PricingScreenState extends State<PricingScreen> {
                           icon: Icon(
                             Icons.copy_rounded,
                             color: colorScheme.primary,
-                            size: 18,
+                            size: isDesktop ? 22 : 18,
                           ),
                           label: Text(
                             'Copy Code',
-                            style: TextStyle(color: colorScheme.primary),
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontSize: isDesktop ? 16 : 14,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isDesktop ? 20 : 16),
                   Text(
                     'Share this code with your managers and supervisors so they can join your organization.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       height: 1.5,
+                      fontSize: isDesktop ? 15 : 13,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -250,7 +272,7 @@ class _PricingScreenState extends State<PricingScreen> {
               ),
               actions: [
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: EdgeInsets.only(bottom: isDesktop ? 8 : 4),
                   child: Row(
                     children: [
                       Expanded(
@@ -259,16 +281,19 @@ class _PricingScreenState extends State<PricingScreen> {
                             Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: EdgeInsets.symmetric(
+                              vertical: isDesktop ? 18 : 14,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'CONTINUE TO DASHBOARD',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
+                              fontSize: isDesktop ? 16 : 14,
                             ),
                           ),
                         ),
@@ -344,265 +369,484 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0);
+    final maxContentWidth = 800.0;
 
-    return GlassScaffold(
-      title: 'Pricing & Registration',
-      onBack: () => Navigator.pop(context),
-      body: CustomScrollView(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                _buildStepIndicator(theme),
-                const SizedBox(height: 24),
-                _buildPricingContent(theme),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: isDesktop ? 32.0 : 20.0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(theme, isMobile, isTablet, isDesktop),
+                      SizedBox(height: isDesktop ? 24.0 : 20.0),
+                      _buildSubtitle(theme, isMobile, isTablet, isDesktop),
+                      SizedBox(height: isDesktop ? 24.0 : 20.0),
+                      _buildPlanTabs(theme, isMobile, isTablet, isDesktop),
+                      SizedBox(height: isDesktop ? 24.0 : 20.0),
+                      _buildPlanCards(theme, isMobile, isTablet, isDesktop),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStepIndicator(ThemeData theme) {
-    const steps = ['Details', 'Branding', 'Pricing'];
-    const activeStep = 2;
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(steps.length, (index) {
-          final isActive = activeStep == index;
-          final isDone = activeStep > index;
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Step circle and label
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone
-                          ? colorScheme.primary
-                          : (isActive
-                                ? colorScheme.primary
-                                : colorScheme.surfaceVariant),
-                    ),
-                    child: Center(
-                      child: isDone
-                          ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 20,
-                            )
-                          : Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                color: isActive
-                                    ? Colors.white
-                                    : colorScheme.onSurfaceVariant,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    steps[index],
-                    style: TextStyle(
-                      color: isActive
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              // Connector line
-              if (index < steps.length - 1)
-                Container(
-                  width: 40,
-                  height: 2,
-                  margin: const EdgeInsets.only(
-                    bottom: 24,
-                    left: 12,
-                    right: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: activeStep > index
-                        ? colorScheme.primary
-                        : colorScheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                ),
-            ],
-          );
-        }),
+        ),
       ),
     );
   }
 
-  Widget _buildPricingContent(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildHeader(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
+    return Row(
       children: [
-        Text(
-          'Select Your Plan',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Choose a plan that fits your organization needs.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 32),
-
-        // Single Plan for now
         Container(
-          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.primary,
-                colorScheme.primary.withOpacity(0.8),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: Colors.black.withOpacity(0.08),
                 blurRadius: 12,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Standard Plan',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Trial Period',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      '30 DAYS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Divider(color: Colors.white24),
-              const SizedBox(height: 24),
-              _buildPricingFeature('All core dashboard features'),
-              _buildPricingFeature('Unlimited site management'),
-              _buildPricingFeature('Custom branding support'),
-              _buildPricingFeature('Advanced financial reports'),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'COMPLETE REGISTRATION',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                ),
-              ),
-            ],
+          child: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_rounded),
+            padding: const EdgeInsets.all(16),
+          ),
+        ),
+        SizedBox(width: isDesktop ? 24.0 : 16.0),
+        Text(
+          'Choose Your Plan',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: isDesktop ? 28.0 : 24.0,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPricingFeature(String feature) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildSubtitle(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
+    return Text(
+      'Manage projects smarter with the right plan',
+      style: theme.textTheme.titleMedium?.copyWith(
+        color: Colors.black54,
+        fontSize: isDesktop ? 18.0 : 16.0,
+      ),
+    );
+  }
+
+  Widget _buildPlanTabs(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
+    final colorScheme = theme.colorScheme;
+    final tabs = ['Free Trial', 'Monthly', '6 Months', 'Yearly'];
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8E8),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
-        children: [
-          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-          const SizedBox(width: 12),
-          Text(
-            feature,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+        mainAxisSize: MainAxisSize.min,
+        children: tabs.map((tab) {
+          final isSelected = _selectedPlanType == tab;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedPlanType = tab;
+                  if (tab == 'Free Trial') {
+                    _selectedPlan = 'Free Trial';
+                  } else {
+                    _selectedPlan = 'Silver';
+                  }
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  vertical: isDesktop ? 12.0 : 10.0,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Text(
+                  tab,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: isDesktop ? 16.0 : 14.0,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPlanCards(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
+    final isFreeTrial = _selectedPlanType == 'Free Trial';
+    final is6Months = _selectedPlanType == '6 Months';
+    final isYearly = _selectedPlanType == 'Yearly';
+
+    if (isFreeTrial) {
+      return Column(
+        children: [
+          _buildPlanCard(
+            theme,
+            isMobile,
+            isTablet,
+            isDesktop,
+            'Free Trial',
+            'Experience our platform for 14 days',
+            'Free',
+            '',
+            [
+              'Basic Project Management',
+              'Task Tracking',
+              'Limited Team Members',
+              'Basic Reports',
+            ],
           ),
         ],
+      );
+    }
+
+    return Column(
+      children: [
+        _buildPlanCard(
+          theme,
+          isMobile,
+          isTablet,
+          isDesktop,
+          'Silver',
+          'For small teams starting out',
+          is6Months
+              ? '₹1,194'
+              : isYearly
+              ? '₹2,388'
+              : '₹199',
+          is6Months
+              ? '₹1,794'
+              : isYearly
+              ? '₹3,588'
+              : '₹299',
+          [
+            'Basic Project Management',
+            'Task Tracking',
+            'Limited Team Members (3-5)',
+            'Basic Reports',
+          ],
+        ),
+        SizedBox(height: isDesktop ? 20.0 : 16.0),
+        _buildPlanCard(
+          theme,
+          isMobile,
+          isTablet,
+          isDesktop,
+          'Gold',
+          'Comprehensive management',
+          is6Months
+              ? '₹5,994'
+              : isYearly
+              ? '₹11,988'
+              : '₹999',
+          is6Months
+              ? '₹8,994'
+              : isYearly
+              ? '₹17,988'
+              : '₹1499',
+          is6Months || isYearly
+              ? [
+                  'Medium teams (up to 20)',
+                  'Advanced collaboration',
+                  'Site monitoring',
+                  'Expense tracking',
+                  'Monthly reports',
+                ]
+              : [],
+        ),
+        SizedBox(height: isDesktop ? 20.0 : 16.0),
+        _buildPlanCard(
+          theme,
+          isMobile,
+          isTablet,
+          isDesktop,
+          'Platinum',
+          'For enterprise scale',
+          is6Months
+              ? '₹10,794'
+              : isYearly
+              ? '₹21,588'
+              : '₹1,799',
+          is6Months
+              ? '₹14,994'
+              : isYearly
+              ? '₹29,988'
+              : '₹2499',
+          [
+            'Medium teams (up to 20)',
+            'Advanced collaboration',
+            'Site monitoring',
+            'Expense tracking',
+            'Monthly reports',
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlanCard(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+    String planName,
+    String description,
+    String price,
+    String originalPrice,
+    List<String> features,
+  ) {
+    final colorScheme = theme.colorScheme;
+    final isSelected = _selectedPlan == planName;
+    final isFreeTrial = _selectedPlanType == 'Free Trial';
+    final is6Months = _selectedPlanType == '6 Months';
+    final isYearly = _selectedPlanType == 'Yearly';
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedPlan = planName;
+        });
+      },
+      child: Container(
+        padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? Colors.blue : const Color(0xFFE0E0E0),
+            width: isSelected ? 3.0 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : [],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: isDesktop ? 28.0 : 24.0,
+                      height: isDesktop ? 28.0 : 24.0,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey[400]!,
+                          width: 2.0,
+                        ),
+                        color: isSelected ? Colors.blue : Colors.transparent,
+                      ),
+                      child: isSelected
+                          ? Icon(
+                              Icons.circle,
+                              size: isDesktop ? 14.0 : 12.0,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    SizedBox(width: isDesktop ? 16.0 : 12.0),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          planName,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: isDesktop ? 26.0 : 22.0,
+                          ),
+                        ),
+                        SizedBox(height: 4.0),
+                        Text(
+                          description,
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: isDesktop ? 15.0 : 13.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      price,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isDesktop ? 32.0 : 28.0,
+                      ),
+                    ),
+                    if (originalPrice.isNotEmpty) ...[
+                      SizedBox(height: 4.0),
+                      Text(
+                        originalPrice,
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: isDesktop ? 16.0 : 14.0,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 4.0),
+                    Text(
+                      isFreeTrial
+                          ? '14-day trial'
+                          : is6Months
+                          ? '6 month'
+                          : isYearly
+                          ? 'Per year'
+                          : 'Per month',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: isDesktop ? 14.0 : 12.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            if (features.isNotEmpty) ...[
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              ...features.map((feature) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: isDesktop ? 10.0 : 8.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.description_rounded,
+                        size: isDesktop ? 20.0 : 18.0,
+                        color: Colors.black54,
+                      ),
+                      SizedBox(width: isDesktop ? 12.0 : 10.0),
+                      Text(
+                        feature,
+                        style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+            if (isSelected) ...[
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _register,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(
+                      vertical: isDesktop ? 18.0 : 14.0,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? SizedBox(
+                          height: isDesktop ? 24.0 : 20.0,
+                          width: isDesktop ? 24.0 : 20.0,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          isFreeTrial
+                              ? 'Start Free Trial'
+                              : 'Upgrade to $planName',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: isDesktop ? 16.0 : 14.0,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

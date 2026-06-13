@@ -37,10 +37,15 @@ class _ContractorPageState extends State<ContractorPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'New Contractor',
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,6 +266,8 @@ class _ContractorPageState extends State<ContractorPage> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

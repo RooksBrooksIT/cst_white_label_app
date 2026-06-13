@@ -158,6 +158,8 @@ class _DailySiteExpensesReportPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
     final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
@@ -172,7 +174,10 @@ class _DailySiteExpensesReportPageState
           onPressed: () => _handlePdfExport(context),
         ),
       ],
-      body: FutureBuilder<Map<String, dynamic>>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: FutureBuilder<Map<String, dynamic>>(
         future: _fetchAllReports(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting)
@@ -237,6 +242,8 @@ class _DailySiteExpensesReportPageState
             ),
           );
         },
+      ),
+        ),
       ),
     );
   }

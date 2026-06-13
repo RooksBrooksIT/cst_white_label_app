@@ -35,6 +35,8 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textColor = colorScheme.onSurface;
@@ -42,7 +44,10 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           // RECTANGULAR TOP BAR (NO CURVES) - Includes back button, optional title, and tab bar
           _buildRectangularTopBar(theme, colorScheme),
@@ -112,6 +117,8 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

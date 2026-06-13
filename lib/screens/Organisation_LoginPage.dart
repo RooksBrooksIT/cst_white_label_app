@@ -249,159 +249,189 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1024;
+    bool isDesktop = screenWidth >= 1024;
+
+    double horizontalPadding = isDesktop ? 40.0 : (isTablet ? 32.0 : 24.0);
+    double maxContentWidth = 500.0;
 
     return GlassScaffold(
       onBack: () => Navigator.pop(context),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Icon Header or Org Logo
-              if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
-                Container(
-                  width: 80,
-                  height: 80,
-                  padding: const EdgeInsets.all(8), // Small padding
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: colorScheme.outline, width: 2),
-                  ),
-                  child: Image.network(
-                    _tempLogoUrl!,
-                    fit: BoxFit.contain, // Use contain to prevent cropping
-                    errorBuilder: (context, error, stackTrace) => Icon(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              20,
+              horizontalPadding,
+              40,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icon Header or Org Logo
+                if (_tempLogoUrl != null && _tempLogoUrl!.isNotEmpty)
+                  Container(
+                    width: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    height: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    padding: EdgeInsets.all(
+                      isDesktop ? 10 : (isTablet ? 9 : 8),
+                    ),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: colorScheme.outline, width: 2),
+                    ),
+                    child: Image.network(
+                      _tempLogoUrl!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.business_rounded,
+                        size: isDesktop ? 70 : (isTablet ? 65 : 60),
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    height: isDesktop ? 110 : (isTablet ? 95 : 80),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.2),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
                       Icons.business_rounded,
-                      size: 60,
+                      size: isDesktop ? 52 : (isTablet ? 46 : 40),
                       color: colorScheme.primary,
                     ),
                   ),
-                )
-              else
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colorScheme.primary.withOpacity(0.2),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.business_rounded,
-                    size: 40,
-                    color: colorScheme.primary,
+                SizedBox(height: isDesktop ? 32 : (isTablet ? 28 : 24)),
+                Text(
+                  _tempOrgName ?? 'Organization Login',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontSize: isDesktop ? 30 : (isTablet ? 28 : 26),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
-              const SizedBox(height: 24),
-              Text(
-                _tempOrgName ?? 'Organization Login',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontSize: Responsive.fontSize(context, 26),
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 32),
+                SizedBox(height: isDesktop ? 40 : (isTablet ? 36 : 32)),
 
-              GlassCard(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      GlassTextField(
-                        controller: _usernameController,
-                        label: 'Username',
-                        icon: Icons.person_outline_rounded,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 20),
-                      GlassTextField(
-                        controller: _passwordController,
-                        label: 'Password',
-                        icon: Icons.lock_outline_rounded,
-                        isPassword: true,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        child: GlassButton(
-                          label: 'LOGIN',
-                          isLoading: _isLoading,
-                          onPressed: _login,
+                GlassCard(
+                  padding: EdgeInsets.all(
+                    isDesktop ? 28 : (isTablet ? 26 : 24),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        GlassTextField(
+                          controller: _usernameController,
+                          label: 'Username',
+                          icon: Icons.person_outline_rounded,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ResetPasswordScreen(),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: theme.primaryColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                        SizedBox(height: isDesktop ? 24 : (isTablet ? 22 : 20)),
+                        GlassTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        SizedBox(height: isDesktop ? 36 : (isTablet ? 34 : 32)),
+                        SizedBox(
+                          width: double.infinity,
+                          child: GlassButton(
+                            label: 'LOGIN',
+                            isLoading: _isLoading,
+                            onPressed: _login,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Don't have an account? ",
-                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const OrganisationRegistrationPage(),
+                        SizedBox(height: isDesktop ? 20 : (isTablet ? 18 : 16)),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ResetPasswordScreen(),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: theme.primaryColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+                            ),
+                          ),
                         ),
-                      );
-                    },
-                    child: Text(
-                      'Register Now',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
+                ),
+                SizedBox(height: isDesktop ? 20 : (isTablet ? 18 : 16)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Don't have an account? ",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const OrganisationRegistrationPage(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Register Now',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: isDesktop ? 24 : (isTablet ? 22 : 20)),
+              ],
+            ),
           ),
+        ),
+      ),
         ),
       ),
     );

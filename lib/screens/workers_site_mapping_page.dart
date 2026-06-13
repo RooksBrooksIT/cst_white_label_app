@@ -446,13 +446,18 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       title: 'Worker Site Mapping',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
@@ -479,6 +484,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
               _buildSubmitButton(),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

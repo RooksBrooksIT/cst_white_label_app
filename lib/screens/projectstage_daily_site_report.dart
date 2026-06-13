@@ -244,7 +244,10 @@ class _ProjectStageDailySiteExpensesReportPageState
           onPressed: _generatePdf,
         ),
       ],
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : (supervisorData == null &&
                 managerEntries.isEmpty &&
@@ -293,6 +296,8 @@ class _ProjectStageDailySiteExpensesReportPageState
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

@@ -30,88 +30,114 @@ class ContactSupportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
 
     return GlassScaffold(
       title: 'Contact Support',
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          children: [
-            const SizedBox(height: 32),
-            // Hero Section
-            _buildHero(theme, colorScheme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              children: [
+                SizedBox(height: isMobile ? 24 : 32),
+                // Hero Section
+                _buildHero(theme, colorScheme, isMobile, isTablet, isDesktop),
 
-            const SizedBox(height: 48),
+                SizedBox(height: isMobile ? 32 : 48),
 
-            // Email Card
-            _buildContactCard(
-              context,
-              theme: theme,
-              colorScheme: colorScheme,
-              icon: Icons.alternate_email_rounded,
-              title: 'Email Us',
-              subtitle: 'Our support team will respond shortly',
-              value: _email,
-              iconBgColor: Colors.blue.withOpacity(0.1),
-              iconColor: Colors.blue,
-              onTap: _launchEmail,
+                // Email Card
+                _buildContactCard(
+                  context,
+                  theme: theme,
+                  colorScheme: colorScheme,
+                  icon: Icons.alternate_email_rounded,
+                  title: 'Email Us',
+                  subtitle: 'Our support team will respond shortly',
+                  value: _email,
+                  iconBgColor: Colors.blue.withOpacity(0.1),
+                  iconColor: Colors.blue,
+                  onTap: _launchEmail,
+                  isMobile: isMobile,
+                  isTablet: isTablet,
+                  isDesktop: isDesktop,
+                ),
+
+                SizedBox(height: isMobile ? 12 : 16),
+
+                // Phone Card
+                _buildContactCard(
+                  context,
+                  theme: theme,
+                  colorScheme: colorScheme,
+                  icon: Icons.phone_iphone_rounded,
+                  title: 'Call Us',
+                  subtitle: 'Available for urgent inquiries',
+                  value: _phoneDisplay,
+                  iconBgColor: Colors.green.withOpacity(0.1),
+                  iconColor: Colors.green,
+                  onTap: _launchPhone,
+                  isMobile: isMobile,
+                  isTablet: isTablet,
+                  isDesktop: isDesktop,
+                ),
+
+                SizedBox(height: isMobile ? 32 : 40),
+
+                // Working Hours Section
+                _buildWorkingHours(theme, colorScheme, isMobile, isTablet, isDesktop),
+
+                SizedBox(height: isMobile ? 40 : 60),
+
+                // Footer Info
+                Text(
+                  'Thank you for being with us!',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                SizedBox(height: isMobile ? 24 : 32),
+              ],
             ),
-
-            const SizedBox(height: 16),
-
-            // Phone Card
-            _buildContactCard(
-              context,
-              theme: theme,
-              colorScheme: colorScheme,
-              icon: Icons.phone_iphone_rounded,
-              title: 'Call Us',
-              subtitle: 'Available for urgent inquiries',
-              value: _phoneDisplay,
-              iconBgColor: Colors.green.withOpacity(0.1),
-              iconColor: Colors.green,
-              onTap: _launchPhone,
-            ),
-
-            const SizedBox(height: 40),
-
-            // Working Hours Section
-            _buildWorkingHours(theme, colorScheme),
-
-            const SizedBox(height: 60),
-
-            // Footer Info
-            Text(
-              'Thank you for being with us!',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
+          ),
+        ),
+      ),
         ),
       ),
     );
   }
 
-  Widget _buildHero(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildHero(ThemeData theme, ColorScheme colorScheme, bool isMobile, bool isTablet, bool isDesktop) {
+    final heroSize = isMobile ? 100.0 : 120.0;
+    final iconSize = isMobile ? 48.0 : 56.0;
+
     return Column(
       children: [
         Container(
-          height: 120,
-          width: 120,
+          height: heroSize,
+          width: heroSize,
           decoration: BoxDecoration(
             color: colorScheme.primary.withOpacity(0.08),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
                 color: colorScheme.primary.withOpacity(0.1),
-                blurRadius: 40,
-                spreadRadius: 5,
+                blurRadius: isMobile ? 30 : 40,
+                spreadRadius: isMobile ? 3 : 5,
               ),
             ],
           ),
@@ -119,8 +145,8 @@ class ContactSupportScreen extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               Container(
-                height: 90,
-                width: 90,
+                height: isMobile ? 70 : 90,
+                width: isMobile ? 70 : 90,
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withOpacity(0.12),
                   shape: BoxShape.circle,
@@ -129,23 +155,24 @@ class ContactSupportScreen extends StatelessWidget {
               Icon(
                 Icons.support_agent_rounded,
                 color: colorScheme.primary,
-                size: 56,
+                size: iconSize,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isMobile ? 24 : 32),
         Text(
           'How can we help you?',
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
             color: colorScheme.onSurface,
             letterSpacing: -0.5,
+            fontSize: isMobile ? 22 : null,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: isMobile ? 8 : 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 20),
           child: Text(
             'Get in touch with Rooks And Brooks Technologies. We are dedicated to providing you the best support.',
             textAlign: TextAlign.center,
@@ -170,11 +197,17 @@ class ContactSupportScreen extends StatelessWidget {
     required Color iconBgColor,
     required Color iconColor,
     required VoidCallback onTap,
+    required bool isMobile,
+    required bool isTablet,
+    required bool isDesktop,
   }) {
+    final cardPadding = isMobile ? 16.0 : 20.0;
+    final iconPadding = isMobile ? 10.0 : 12.0;
+
     return GlassCard(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(cardPadding),
       margin: EdgeInsets.zero,
-      borderRadius: 24,
+      borderRadius: isMobile ? 20 : 24,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,14 +215,14 @@ class ContactSupportScreen extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(iconPadding),
                 decoration: BoxDecoration(
                   color: iconBgColor,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: iconColor, size: isMobile ? 22 : 24),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isMobile ? 12 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +234,7 @@ class ContactSupportScreen extends StatelessWidget {
                         color: colorScheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: isMobile ? 2 : 2),
                     Text(
                       subtitle,
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -213,13 +246,13 @@ class ContactSupportScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 16 : 20),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 10 : 12),
             width: double.infinity,
             decoration: BoxDecoration(
               color: colorScheme.surfaceVariant.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
               border: Border.all(color: colorScheme.outline.withOpacity(0.05)),
             ),
             child: Text(
@@ -229,7 +262,7 @@ class ContactSupportScreen extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
-                fontSize: 13,
+                fontSize: isMobile ? 13 : 13,
               ),
             ),
           ),
@@ -238,13 +271,13 @@ class ContactSupportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkingHours(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildWorkingHours(ThemeData theme, ColorScheme colorScheme, bool isMobile, bool isTablet, bool isDesktop) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 20 : 24),
       decoration: BoxDecoration(
         color: colorScheme.primary.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isMobile ? 20 : 24),
         border: Border.all(color: colorScheme.primary.withOpacity(0.08)),
       ),
       child: Column(
@@ -255,9 +288,9 @@ class ContactSupportScreen extends StatelessWidget {
               Icon(
                 Icons.schedule_rounded,
                 color: colorScheme.primary,
-                size: 20,
+                size: isMobile ? 18 : 20,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isMobile ? 10 : 12),
               Text(
                 'WORKING HOURS',
                 style: theme.textTheme.labelSmall?.copyWith(
@@ -268,7 +301,7 @@ class ContactSupportScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
           Text(
             'Monday – Saturday',
             style: theme.textTheme.bodyLarge?.copyWith(
@@ -276,7 +309,7 @@ class ContactSupportScreen extends StatelessWidget {
               color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isMobile ? 2 : 4),
           Text(
             '9:00 AM – 6:00 PM IST',
             style: theme.textTheme.bodyMedium?.copyWith(

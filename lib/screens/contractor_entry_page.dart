@@ -1623,6 +1623,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final double width = MediaQuery.of(context).size.width;
     final double hPad = getPad(width);
     final double sectionSpacing = width < 400
@@ -1644,7 +1646,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
               ),
             ]
           : null,
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
           horizontal: hPad,
           vertical: sectionSpacing,
@@ -1668,6 +1673,8 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             ),
             SizedBox(height: sectionSpacing * 2),
           ],
+        ),
+      ),
         ),
       ),
     );

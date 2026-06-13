@@ -567,31 +567,36 @@ class _ProjectstageInsightsDashboardState
 
     return GlassScaffold(
       title: 'Project Stage Insights',
-      body: FutureBuilder<List<SupervisorEntry>>(
-        future: supervisorEntriesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                'No supervisor entries found.',
-                style: theme.textTheme.bodyMedium,
-              ),
-            );
-          }
-          _allSupervisorEntriesCached ??= snapshot.data!;
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: FutureBuilder<List<SupervisorEntry>>(
+            future: supervisorEntriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+                  ),
+                );
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No supervisor entries found.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                );
+              }
+              _allSupervisorEntriesCached ??= snapshot.data!;
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+              return SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                 // Header
                 Text(
                   'Project Stage Reports',
@@ -884,6 +889,8 @@ class _ProjectstageInsightsDashboardState
             ),
           );
         },
+      ),
+        ),
       ),
     );
   }

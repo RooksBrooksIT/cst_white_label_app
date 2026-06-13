@@ -303,6 +303,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final primaryColor = colorScheme.primary;
@@ -310,7 +312,10 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
     return GlassScaffold(
       title: 'Project Stage Configuration',
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Column(
@@ -465,6 +470,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

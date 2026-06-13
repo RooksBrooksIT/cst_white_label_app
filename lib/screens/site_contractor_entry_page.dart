@@ -467,6 +467,8 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Contractor Entry',
       appBarForegroundColor: Colors.white,
@@ -489,7 +491,10 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
           },
         ),
       ],
-      body: LayoutBuilder(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -791,6 +796,8 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             ),
           );
         },
+      ),
+        ),
       ),
     );
   }

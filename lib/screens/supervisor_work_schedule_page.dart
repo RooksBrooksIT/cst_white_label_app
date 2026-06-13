@@ -391,8 +391,7 @@ class _SupervisorWorkSchedulePageState
       // Notify the organisation about the new work schedule request
       await NotificationService.notifyOrganisation(
         title: '📅 New Work Schedule Request',
-        body:
-            '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
         data: {
           'type': 'work_schedule',
           'wsReqId': wsReqId,
@@ -451,10 +450,15 @@ class _SupervisorWorkSchedulePageState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Work Schedule',
       onBack: () => Navigator.pop(context),
-      body: _isLoadingSupervisorSite
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoadingSupervisorSite
           ? Center(child: CircularProgressIndicator(color: mainColor))
           : _supervisorSiteError != null
           ? Center(
@@ -1015,6 +1019,8 @@ class _SupervisorWorkSchedulePageState
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

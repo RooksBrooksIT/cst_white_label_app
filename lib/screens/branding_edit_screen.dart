@@ -152,10 +152,22 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
     if (_isFetching) {
-      return const GlassScaffold(
+      return GlassScaffold(
         title: 'Branding',
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       );
     }
 
@@ -171,137 +183,159 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
             onBack: () => Navigator.pop(context),
             appBarBackgroundColor: colorScheme.primary,
             appBarForegroundColor: colorScheme.onPrimary,
-            body: IrregularBackground(
+            body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: IrregularBackground(
               color: _selectedColor,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'App Customization',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Update your app name, logo, and theme color.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                    ),
-                    const SizedBox(height: 32),
-                    _buildSection(
-                      context,
-                      title: 'App Information',
-                      icon: Icons.edit_rounded,
-                      child: GlassTextField(
-                        controller: _appNameController,
-                        label: 'App Name',
-                        icon: Icons.app_registration_rounded,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSection(
-                      context,
-                      title: 'Brand Color',
-                      icon: Icons.palette_rounded,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: _colorOptions.map((opt) {
-                              final isCustom = opt['isCustom'] == true;
-                              final c = isCustom
-                                  ? _customColor
-                                  : opt['color'] as Color;
-                              final isSelected = isCustom
-                                  ? (!_colorOptions.any(
-                                      (o) =>
-                                          o['isCustom'] != true &&
-                                          o['color'] == _selectedColor,
-                                    ))
-                                  : _selectedColor.value == c.value;
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 32 : (isTablet ? 24 : 16),
+                  vertical: isDesktop ? 32 : 24,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'App Customization',
+                          style: TextStyle(
+                            fontSize: isDesktop ? 32 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Update your app name, logo, and theme color.',
+                          style: TextStyle(
+                            color: const Color(0xFF64748B),
+                            fontSize: isDesktop ? 16 : 14,
+                          ),
+                        ),
+                        SizedBox(height: isDesktop ? 40 : 32),
+                        _buildSection(
+                          context,
+                          title: 'App Information',
+                          icon: Icons.edit_rounded,
+                          isDesktop: isDesktop,
+                          isTablet: isTablet,
+                          child: GlassTextField(
+                            controller: _appNameController,
+                            label: 'App Name',
+                            icon: Icons.app_registration_rounded,
+                          ),
+                        ),
+                        SizedBox(height: isDesktop ? 32 : 24),
+                        _buildSection(
+                          context,
+                          title: 'Brand Color',
+                          icon: Icons.palette_rounded,
+                          isDesktop: isDesktop,
+                          isTablet: isTablet,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: isDesktop ? 16 : 12,
+                                runSpacing: isDesktop ? 16 : 12,
+                                children: _colorOptions.map((opt) {
+                                  final isCustom = opt['isCustom'] == true;
+                                  final c = isCustom
+                                      ? _customColor
+                                      : opt['color'] as Color;
+                                  final isSelected = isCustom
+                                      ? (!_colorOptions.any(
+                                          (o) =>
+                                              o['isCustom'] != true &&
+                                              o['color'] == _selectedColor,
+                                        ))
+                                      : _selectedColor.value == c.value;
 
-                              return GestureDetector(
-                                onTap: isCustom
-                                    ? _showColorPicker
-                                    : () => setState(() => _selectedColor = c),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? c.withOpacity(0.1)
-                                        : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? c
-                                          : const Color(0xFFE2E8F0),
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: isCustom && !isSelected
-                                              ? null
-                                              : c,
-                                          shape: BoxShape.circle,
-                                          gradient: isCustom && !isSelected
-                                              ? const SweepGradient(
-                                                  colors: [
-                                                    Colors.red,
-                                                    Colors.blue,
-                                                    Colors.green,
-                                                    Colors.red,
-                                                  ],
-                                                )
-                                              : null,
-                                        ),
+                                  return GestureDetector(
+                                    onTap: isCustom
+                                        ? _showColorPicker
+                                        : () => setState(
+                                            () => _selectedColor = c,
+                                          ),
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: isDesktop ? 20 : 16,
+                                        vertical: isDesktop ? 12 : 8,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        opt['label'] as String,
-                                        style: TextStyle(
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? c.withOpacity(0.1)
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
                                           color: isSelected
                                               ? c
-                                              : const Color(0xFF64748B),
-                                          fontSize: 13,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
+                                              : const Color(0xFFE2E8F0),
+                                          width: 2,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: isDesktop ? 16 : 12,
+                                            height: isDesktop ? 16 : 12,
+                                            decoration: BoxDecoration(
+                                              color: isCustom && !isSelected
+                                                  ? null
+                                                  : c,
+                                              shape: BoxShape.circle,
+                                              gradient: isCustom && !isSelected
+                                                  ? const SweepGradient(
+                                                      colors: [
+                                                        Colors.red,
+                                                        Colors.blue,
+                                                        Colors.green,
+                                                        Colors.red,
+                                                      ],
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                          SizedBox(width: isDesktop ? 12 : 8),
+                                          Text(
+                                            opt['label'] as String,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? c
+                                                  : const Color(0xFF64748B),
+                                              fontSize: isDesktop ? 15 : 13,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        SizedBox(height: isDesktop ? 56 : 48),
+                        GlassButton(
+                          label: 'SAVE CHANGES',
+                          isLoading: _isLoading,
+                          onPressed: _saveChanges,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 48),
-                    GlassButton(
-                      label: 'SAVE CHANGES',
-                      isLoading: _isLoading,
-                      onPressed: _saveChanges,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
+        ),
+      ),
           );
         },
       ),
@@ -312,29 +346,35 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
     BuildContext context, {
     required String title,
     required IconData icon,
+    required bool isDesktop,
+    required bool isTablet,
     required Widget child,
   }) {
     final theme = Theme.of(context);
     return GlassCard(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isDesktop ? 24 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: 12),
+              Icon(
+                icon,
+                color: theme.colorScheme.primary,
+                size: isDesktop ? 24 : 20,
+              ),
+              SizedBox(width: isDesktop ? 16 : 12),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontSize: 16,
+                style: TextStyle(
+                  color: const Color(0xFF1E293B),
+                  fontSize: isDesktop ? 18 : 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isDesktop ? 24 : 20),
           child,
         ],
       ),

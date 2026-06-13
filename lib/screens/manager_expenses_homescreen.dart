@@ -11,6 +11,8 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final bool isSmallScreen = Responsive.isMobile(context);
     final theme = Theme.of(context);
     final userData = AuthService().userData;
@@ -20,7 +22,10 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
       title: 'Manager Expenses',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
         child: Column(
           children: [
@@ -65,6 +70,8 @@ class ManagerExpensesHomeScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

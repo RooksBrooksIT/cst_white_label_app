@@ -373,13 +373,18 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           ),
         ],
         padding: EdgeInsets.zero,
-        body: CustomScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            ..._buildGridSections(context, theme, categories, crossAxisCount),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                ..._buildGridSections(context, theme, categories, crossAxisCount),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
+          ),
         ),
       ),
     );

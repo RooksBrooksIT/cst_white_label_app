@@ -317,6 +317,8 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Vehicle Details',
       onBack: () => Navigator.pop(context),
@@ -328,7 +330,10 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
             tooltip: 'Delete Vehicle',
           ),
       ],
-      body: _isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16.0),
@@ -629,6 +634,8 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

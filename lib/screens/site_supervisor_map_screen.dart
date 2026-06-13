@@ -386,10 +386,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Site-Supervisor Mapping',
       onBack: () => Navigator.pop(context),
-      body: LayoutBuilder(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: LayoutBuilder(
         builder: (context, constraints) {
           double horizontalPadding = constraints.maxWidth * 0.06; // 6%
           double verticalPadding = constraints.maxHeight * 0.025; // 2.5%
@@ -430,6 +435,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             ),
           );
         },
+      ),
+        ),
       ),
     );
   }

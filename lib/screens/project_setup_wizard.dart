@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
@@ -273,27 +274,40 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         ),
       );
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      String address = '';
 
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        String address = [
-          place.name,
-          place.subLocality,
-          place.locality,
-          place.administrativeArea,
-          place.country,
-        ].where((p) => p != null && p.isNotEmpty).join(', ');
+      if (kIsWeb) {
+        address = 'Web Location';
+      } else {
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
 
-        setState(() {
-          _latitudeController.text = position.latitude.toStringAsFixed(6);
-          _longitudeController.text = position.longitude.toStringAsFixed(6);
-          _locationController.text = address;
-        });
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks.first;
+            address = [
+              place.name,
+              place.subLocality,
+              place.locality,
+              place.administrativeArea,
+              place.country,
+            ].where((p) => p != null && p.isNotEmpty).join(', ');
+          }
+        } catch (geocodingError) {
+          debugPrint('Geocoding error (falling back to coordinates only): $geocodingError');
+          address = 'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        }
       }
+
+      setState(() {
+        _latitudeController.text = position.latitude.toStringAsFixed(6);
+        _longitudeController.text = position.longitude.toStringAsFixed(6);
+        if (_locationController.text.isEmpty || _locationController.text == 'Web Location') {
+          _locationController.text = address;
+        }
+      });
     } catch (e) {
       _showErrorSnackBar('Error getting location: $e');
     } finally {
@@ -578,22 +592,27 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
           ),
       ],
-      body: Column(
-        children: [
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (index) => setState(() => _currentStep = index),
-              children: [
-                _buildSiteStep(),
-                _buildProjectStep(),
-                _buildMapStep(),
-              ],
-            ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (index) => setState(() => _currentStep = index),
+                  children: [
+                    _buildSiteStep(),
+                    _buildProjectStep(),
+                    _buildMapStep(),
+                  ],
+                ),
+              ),
+              if (!isKeyboardVisible) _buildNavigationButtons(),
+            ],
           ),
-          if (!isKeyboardVisible) _buildNavigationButtons(),
-        ],
+        ),
       ),
     );
   }
