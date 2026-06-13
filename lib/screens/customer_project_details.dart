@@ -174,6 +174,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     // Debug logging
     print('=== ProjectDetailsPage Debug ===');
     print('siteId: "${widget.siteId}"');
@@ -184,16 +186,24 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     print('================================');
 
     if (!_isServiceReady && !FirestoreService.isReady) {
-      return const GlassScaffold(
+      return GlassScaffold(
         title: 'Project Details',
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       );
     }
 
     return GlassScaffold(
       title: 'Project Details',
       onBack: () => Navigator.pop(context),
-      body: StreamBuilder<QuerySnapshot>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: StreamBuilder<QuerySnapshot>(
         stream: FirestoreService.getCollection(
           'projects',
         ).where('siteId', isEqualTo: widget.siteId).snapshots(),
@@ -363,6 +373,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
             ),
           );
         },
+      ),
+        ),
       ),
     );
   }
@@ -543,10 +555,14 @@ class ProjectListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
     return GlassScaffold(
       title: 'Projects',
       onBack: () => Navigator.pop(context),
-      body: StreamBuilder<QuerySnapshot>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: StreamBuilder<QuerySnapshot>(
         stream: FirestoreService.getCollection('projects').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -630,6 +646,8 @@ class ProjectListPage extends StatelessWidget {
             },
           );
         },
+      ),
+        ),
       ),
     );
   }

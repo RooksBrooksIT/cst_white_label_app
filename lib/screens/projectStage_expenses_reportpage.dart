@@ -146,6 +146,8 @@ class _ProjectStageExpensesReportPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
     final grandTotal =
@@ -164,7 +166,10 @@ class _ProjectStageExpensesReportPageState
           onPressed: isLoading ? null : _generatePdf,
         ),
       ],
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -179,6 +184,8 @@ class _ProjectStageExpensesReportPageState
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

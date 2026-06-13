@@ -483,10 +483,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Attendance Management',
       onBack: () => Navigator.pop(context),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,6 +510,8 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             // Submit Button
             if (_workers.isNotEmpty) _buildSubmitButton(),
           ],
+        ),
+      ),
         ),
       ),
     );

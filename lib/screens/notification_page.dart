@@ -35,6 +35,8 @@ class _NotificationPageState extends State<NotificationPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
 
     return GlassScaffold(
@@ -50,12 +52,17 @@ class _NotificationPageState extends State<NotificationPage>
           Tab(text: 'My Requests'),
         ],
       ),
-      body: TabBarView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: TabBarView(
         controller: _tabController,
         children: [
           _buildApprovalNotifications(cs),
           _buildMaterialRequestsList(cs),
         ],
+      ),
+        ),
       ),
     );
   }

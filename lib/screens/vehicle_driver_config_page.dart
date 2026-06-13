@@ -160,6 +160,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return DefaultTabController(
       length: 2,
       child: GlassScaffold(
@@ -175,7 +177,10 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
             Tab(icon: Icon(Icons.people), text: 'Existing Drivers'),
           ],
         ),
-        body: TabBarView(
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: TabBarView(
           controller: _tabController,
           children: [
             // New Driver Tab
@@ -481,6 +486,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }

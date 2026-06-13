@@ -101,10 +101,15 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Organisation Info',
       onBack: () => Navigator.pop(context),
-      body: _isFetching
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isFetching
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -176,6 +181,8 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 }

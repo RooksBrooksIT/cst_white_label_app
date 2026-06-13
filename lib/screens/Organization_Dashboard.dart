@@ -21,6 +21,7 @@ import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
 import '../utils/app_theme.dart';
+import '../utils/responsive.dart';
 import 'org_sub_menu_screen.dart';
 import 'org_menu_screen.dart';
 import 'manager_config_screen.dart';
@@ -126,13 +127,30 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         onPressed: () => _navigateToOrgMenu(context),
                       ),
                     ],
-                    body: CustomScrollView(
-                      controller: _scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
-                        ..._buildGridSections(context, theme),
-                        const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                      ],
+                    body: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: Responsive.maxContentWidth,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return CustomScrollView(
+                              controller: _scrollController,
+                              physics: const BouncingScrollPhysics(),
+                              slivers: [
+                                ..._buildGridSections(
+                                  context,
+                                  theme,
+                                  constraints.maxWidth,
+                                ),
+                                const SliverToBoxAdapter(
+                                  child: SizedBox(height: 100),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -144,9 +162,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  List<Widget> _buildGridSections(BuildContext context, ThemeData theme) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
+  List<Widget> _buildGridSections(
+    BuildContext context,
+    ThemeData theme,
+    double availableWidth,
+  ) {
+    final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
+    final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
+    final hPad = Responsive.horizontalPadding(context);
     final categories = _getCategories(theme);
     List<Widget> slivers = [];
 
@@ -157,7 +180,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 12),
             child: Row(
               children: [
                 Container(
@@ -179,8 +202,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     children: [
                       Text(
                         category.title,
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 16),
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.3,
                         ),
@@ -188,7 +211,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       Text(
                         category.subtitle,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: Responsive.fontSize(context, 11),
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -222,7 +245,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       // Items Grid for this section
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(horizontal: hPad),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate((context, index) {
               final item = category.items[index];
@@ -232,7 +255,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.8,
+              childAspectRatio: childAspectRatio,
             ),
           ),
         ),

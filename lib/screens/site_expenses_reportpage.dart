@@ -450,6 +450,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
@@ -461,7 +463,10 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         iconTheme: IconThemeData(color: Colors.white),
         centerTitle: true,
       ),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
@@ -714,6 +719,8 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

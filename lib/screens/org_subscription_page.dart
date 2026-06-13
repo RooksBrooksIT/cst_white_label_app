@@ -87,6 +87,8 @@ class _OrganizationSubscriptionPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isMobile = Responsive.isMobile(context);
@@ -96,7 +98,10 @@ class _OrganizationSubscriptionPageState
       child: GlassScaffold(
         title: 'Manage Subscription',
         onBack: _isActive ? () => Navigator.pop(context) : null,
-        body: _isLoading
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
                 child: Column(
@@ -110,6 +115,8 @@ class _OrganizationSubscriptionPageState
                   ],
                 ),
               ),
+        ),
+      ),
       ),
     );
   }

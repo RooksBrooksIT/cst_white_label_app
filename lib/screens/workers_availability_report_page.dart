@@ -109,6 +109,8 @@ class _WorkersAvailabilityReportPageState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
     final selectedMapping = _selectedMapping;
     final workers = List<Map<String, dynamic>>.from(
@@ -118,7 +120,10 @@ class _WorkersAvailabilityReportPageState
     return GlassScaffold(
       title: 'Workers Availability',
       onBack: () => Navigator.pop(context),
-      body: _isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -140,6 +145,8 @@ class _WorkersAvailabilityReportPageState
                 ),
               ],
             ),
+        ),
+      ),
     );
   }
 

@@ -101,15 +101,24 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Financial Status Report',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMsg != null
-          ? _buildErrorView(theme)
-          : _buildReportView(theme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMsg != null
+              ? _buildErrorView(theme)
+              : _buildReportView(theme),
+        ),
+      ),
     );
   }
 

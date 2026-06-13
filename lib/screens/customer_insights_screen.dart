@@ -397,6 +397,8 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -417,7 +419,10 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
           ),
         ),
       ),
-      body: _userSiteId == null && (supervisorEntriesFuture == null)
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _userSiteId == null && (supervisorEntriesFuture == null)
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -598,6 +603,8 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

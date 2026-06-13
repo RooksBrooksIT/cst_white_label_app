@@ -105,6 +105,8 @@ class _ToolMasterPageState extends State<ToolMasterPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
@@ -133,12 +135,17 @@ class _ToolMasterPageState extends State<ToolMasterPage>
           Tab(text: 'UPDATE COUNT'),
         ],
       ),
-      body: TabBarView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: TabBarView(
         controller: _tabController,
         children: [
           _buildNewTab(theme, isSmallScreen),
           _buildUpdateTab(theme, isSmallScreen),
         ],
+      ),
+        ),
       ),
     );
   }

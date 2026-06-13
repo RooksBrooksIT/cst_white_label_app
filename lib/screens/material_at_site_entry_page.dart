@@ -1314,12 +1314,17 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 2,
       child: GlassScaffold(
         title: 'Material at Site Entry',
-        body: Column(
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
           children: [
             // Tab bar
             Container(
@@ -1387,6 +1392,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }

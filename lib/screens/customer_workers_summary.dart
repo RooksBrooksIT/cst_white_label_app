@@ -43,10 +43,17 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     if (!_isServiceReady && !FirestoreService.isReady) {
-      return const GlassScaffold(
+      return GlassScaffold(
         title: 'Worker Summary',
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       );
     }
 
@@ -59,7 +66,10 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
           onPressed: _showFilterDialog,
         ),
       ],
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           // Filter Summary
           _buildFilterSummary(),
@@ -110,6 +120,8 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

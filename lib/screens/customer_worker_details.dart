@@ -46,17 +46,27 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     if (!_isServiceReady && !FirestoreService.isReady) {
-      return const GlassScaffold(
+      return GlassScaffold(
         title: 'Worker Details',
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       );
     }
 
     return GlassScaffold(
       title: 'Worker Details',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           // Filter Section
           _buildFilterSection(),
@@ -121,6 +131,8 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

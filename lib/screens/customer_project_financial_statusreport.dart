@@ -128,12 +128,17 @@ class _customerProjectFinancialStatusReportPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Project Status Report',
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,6 +160,8 @@ class _customerProjectFinancialStatusReportPageState
               isSecondary: true,
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

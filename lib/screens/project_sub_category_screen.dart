@@ -184,12 +184,17 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Sub Categories',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
@@ -345,6 +350,8 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
               ],
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

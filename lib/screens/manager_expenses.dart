@@ -12,7 +12,6 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/glass_button.dart';
-import '../utils/responsive.dart';
 
 class ManagerExpenses extends StatefulWidget {
   final bool hideAppBar;
@@ -385,37 +384,61 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isMobile = Responsive.isMobile(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
 
     return GlassScaffold(
       title: widget.hideAppBar ? null : 'Manager Expenses',
       appBarForegroundColor: Colors.white,
       onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildInfoSection(theme),
-            const SizedBox(height: 24),
-            _buildBillFormSection(theme),
-            const SizedBox(height: 24),
-            _buildBillsListSection(theme),
-            const SizedBox(height: 32),
-            GlassButton(
-              label: 'SUBMIT EXPENSES',
-              onPressed: isSubmitting || bills.isEmpty ? null : _handleSubmit,
-              isLoading: isSubmitting,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
+        padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0)),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 900.0 : double.infinity,
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInfoSection(theme, isDesktop, isTablet, isMobile),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
+                _buildBillFormSection(theme, isDesktop, isTablet, isMobile),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
+                _buildBillsListSection(theme, isDesktop, isTablet, isMobile),
+                SizedBox(height: isDesktop ? 40.0 : 32.0),
+                GlassButton(
+                  label: 'SUBMIT EXPENSES',
+                  onPressed: isSubmitting || bills.isEmpty
+                      ? null
+                      : _handleSubmit,
+                  isLoading: isSubmitting,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoSection(ThemeData theme) {
+  Widget _buildInfoSection(
+    ThemeData theme,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,61 +447,75 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             'Site & Project Details',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              fontSize: isDesktop ? 18.0 : 16.0,
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isDesktop ? 24.0 : 20.0),
           isLoadingSites
               ? const LinearProgressIndicator()
-              : _buildDropdown('Select Site ID', siteIds, selectedSiteId, (v) {
-                  setState(() {
-                    selectedSiteId = v;
-                    // Clear site detail fields immediately
-                    selectedSupervisorId = null;
-                    selectedProjectPhase = null;
-                    selectedProjectName = null;
-                    supervisorIdController.clear();
-                    projectPhaseController.clear();
-                    projectNameController.clear();
-                    // Reset bill list — start fresh for new site
-                    bills = [];
-                    initialBills = [];
-                    existingDailyTotal = 0.0;
-                  });
-                  if (v != null) {
-                    _loadSiteDetails(v);
-                    // Don't auto-load existing expenses;
-                    // bill list starts empty for new entry session
-                  }
-                }),
-          const SizedBox(height: 12),
+              : _buildDropdown(
+                  'Select Site ID',
+                  siteIds,
+                  selectedSiteId,
+                  (v) {
+                    setState(() {
+                      selectedSiteId = v;
+                      // Clear site detail fields immediately
+                      selectedSupervisorId = null;
+                      selectedProjectPhase = null;
+                      selectedProjectName = null;
+                      supervisorIdController.clear();
+                      projectPhaseController.clear();
+                      projectNameController.clear();
+                      // Reset bill list — start fresh for new site
+                      bills = [];
+                      initialBills = [];
+                      existingDailyTotal = 0.0;
+                    });
+                    if (v != null) {
+                      _loadSiteDetails(v);
+                      // Don't auto-load existing expenses;
+                      // bill list starts empty for new entry session
+                    }
+                  },
+                  isDesktop,
+                  isTablet,
+                  isMobile,
+                ),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: supervisorIdController,
             label: 'Supervisor',
             icon: Icons.person_outline,
             readOnly: true,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: projectPhaseController,
             label: 'Project Phase',
             icon: Icons.timeline_outlined,
             readOnly: true,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: projectNameController,
             label: 'Project Name',
             icon: Icons.assignment_outlined,
             readOnly: true,
           ),
-          const SizedBox(height: 12),
-          _buildDatePicker(theme),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
+          _buildDatePicker(theme, isDesktop, isTablet, isMobile),
         ],
       ),
     );
   }
 
-  Widget _buildBillFormSection(ThemeData theme) {
+  Widget _buildBillFormSection(
+    ThemeData theme,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,30 +524,31 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             'Add Bill',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              fontSize: isDesktop ? 18.0 : 16.0,
             ),
           ),
-          const SizedBox(height: 20),
-          _buildImagePicker(theme),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 24.0 : 20.0),
+          _buildImagePicker(theme, isDesktop, isTablet, isMobile),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: billNoController,
             label: 'Bill Number',
             icon: Icons.receipt_long_outlined,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: billDateController,
             label: 'Bill Date',
             icon: Icons.calendar_today_outlined,
             readOnly: true,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: billVendorController,
             label: 'Vendor Name',
             icon: Icons.storefront_outlined,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDesktop ? 16.0 : 12.0),
           GlassTextField(
             controller: billAmountController,
             label: 'Amount (₹)',
@@ -518,7 +556,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isDesktop ? 24.0 : 20.0),
           Align(
             alignment: Alignment.centerRight,
             child: GlassButton(
@@ -533,28 +571,33 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     );
   }
 
-  Widget _buildImagePicker(ThemeData theme) {
+  Widget _buildImagePicker(
+    ThemeData theme,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: _pickBillImage,
       child: Container(
-        height: 150,
+        height: isDesktop ? 180.0 : 150.0,
         width: double.infinity,
         decoration: BoxDecoration(
           color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: theme.dividerColor),
         ),
         child: _selectedBillImage != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     Image.file(_selectedBillImage!, fit: BoxFit.cover),
                     Positioned(
-                      top: 8,
-                      right: 8,
+                      top: isDesktop ? 12.0 : 8.0,
+                      right: isDesktop ? 12.0 : 8.0,
                       child: CircleAvatar(
                         backgroundColor: Colors.black54,
                         child: IconButton(
@@ -572,13 +615,16 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                 children: [
                   Icon(
                     Icons.add_a_photo_outlined,
-                    size: 40,
+                    size: isDesktop ? 50.0 : 40.0,
                     color: colorScheme.primary,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isDesktop ? 12.0 : 8.0),
                   Text(
                     'Upload Bill Copy (Optional)',
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: isDesktop ? 15.0 : 13.0,
+                    ),
                   ),
                 ],
               ),
@@ -586,7 +632,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     );
   }
 
-  Widget _buildBillsListSection(ThemeData theme) {
+  Widget _buildBillsListSection(
+    ThemeData theme,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     if (isLoadingBills) {
       return const GlassCard(
         child: Center(
@@ -606,14 +657,15 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             'Bills List',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              fontSize: isDesktop ? 18.0 : 16.0,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isDesktop ? 20.0 : 16.0),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               horizontalMargin: 0,
-              columnSpacing: 24,
+              columnSpacing: isDesktop ? 32.0 : 24.0,
               columns: const [
                 DataColumn(label: Text('Bill No')),
                 DataColumn(label: Text('Vendor')),
@@ -632,15 +684,30 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
                 return DataRow(
                   cells: [
-                    DataCell(Text(bill['billNo']?.toString() ?? '')),
-                    DataCell(Text(bill['billVendor']?.toString() ?? '')),
-                    DataCell(Text('₹ $amountStr')),
+                    DataCell(
+                      Text(
+                        bill['billNo']?.toString() ?? '',
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        bill['billVendor']?.toString() ?? '',
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '₹ $amountStr',
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                      ),
+                    ),
                     DataCell(
                       IconButton(
                         icon: Icon(
                           Icons.delete_outline,
                           color: theme.colorScheme.error,
-                          size: 20,
+                          size: isDesktop ? 24.0 : 20.0,
                         ),
                         onPressed: () =>
                             setState(() => bills.removeAt(entry.key)),
@@ -661,6 +728,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     List<String> items,
     String? value,
     Function(String?) onChanged,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -672,23 +742,30 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
         prefixIcon: Icon(
           Icons.location_on_outlined,
-          size: 20,
+          size: isDesktop ? 24.0 : 20.0,
           color: colorScheme.primary,
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.0),
           borderSide: BorderSide(color: theme.dividerColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
         ),
         filled: true,
         fillColor: theme.cardColor,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 20.0 : 16.0,
+          vertical: isDesktop ? 20.0 : 16.0,
+        ),
       ),
       dropdownColor: theme.cardColor,
-      style: TextStyle(color: colorScheme.onSurface),
+      style: TextStyle(
+        color: colorScheme.onSurface,
+        fontSize: isDesktop ? 15.0 : 14.0,
+      ),
       items: items.map((id) {
         final name = siteNameMap[id] ?? 'Unnamed Site';
         return DropdownMenuItem(
@@ -696,7 +773,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           child: Text(
             '$id - $name',
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: isDesktop ? 15.0 : 14.0),
           ),
         );
       }).toList(),
@@ -704,7 +781,12 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     );
   }
 
-  Widget _buildDatePicker(ThemeData theme) {
+  Widget _buildDatePicker(
+    ThemeData theme,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => _selectDate(context),
@@ -714,27 +796,34 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
           prefixIcon: Icon(
             Icons.calendar_today_outlined,
-            size: 20,
+            size: isDesktop ? 24.0 : 20.0,
             color: colorScheme.primary,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: theme.dividerColor),
           ),
           filled: true,
           fillColor: theme.cardColor,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 20.0 : 16.0,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               DateFormat('dd MMM yyyy').format(selectedDate),
-              style: TextStyle(color: colorScheme.onSurface),
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: isDesktop ? 15.0 : 13.0,
+              ),
             ),
             Icon(
               Icons.edit_calendar_outlined,
-              size: 18,
+              size: isDesktop ? 24.0 : 18.0,
               color: colorScheme.primary,
             ),
           ],

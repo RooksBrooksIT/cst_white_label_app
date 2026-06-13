@@ -130,11 +130,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       onBack: () => {}, // Disable back on welcome if needed, or just let it pop
       body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
             horizontal: Responsive.isMobile(context) ? 20 : 40,
@@ -234,6 +239,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

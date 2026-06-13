@@ -15,9 +15,14 @@ class PdfPreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Report Preview',
-      body: PdfPreview(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: PdfPreview(
         build: (format) => pdfBytes,
         allowPrinting: true,
         allowSharing: true,
@@ -26,6 +31,8 @@ class PdfPreviewPage extends StatelessWidget {
         maxPageWidth: 700,
         pdfFileName: fileName,
         loadingWidget: const Center(child: CircularProgressIndicator()),
+      ),
+        ),
       ),
     );
   }

@@ -233,13 +233,18 @@ class _WorkerAttendanceSalaryPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Worker Attendance & Summary',
       onBack: () => Navigator.pop(context),
-      body: _isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,6 +319,8 @@ class _WorkerAttendanceSalaryPageState
                 ),
               ],
             ),
+        ),
+      ),
     );
   }
 

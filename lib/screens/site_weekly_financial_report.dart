@@ -93,13 +93,20 @@ class _SiteWeeklyFinancialReportState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
     return GlassScaffold(
       title: 'Weekly Financial Report',
       onBack: () => Navigator.pop(context),
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : _buildBody(context),
+        ),
+      ),
     );
   }
 

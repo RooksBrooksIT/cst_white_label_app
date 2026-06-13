@@ -297,6 +297,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
@@ -313,7 +315,10 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
         iconTheme: IconThemeData(color: Colors.white),
         elevation: 0,
       ),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: FutureBuilder<Map<String, dynamic>?>(
           future: fetchProjectInfo(),
@@ -674,6 +679,8 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               },
             );
           },
+        ),
+      ),
         ),
       ),
     );

@@ -34,7 +34,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
     try {
       final sitesSnapshot = await FirestoreService.getCollection('Site').get();
 
-      final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
+      final mapSnapshot = await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).get();
       final Map<String, Map<String, dynamic>> supervisorMap = {};
       for (var doc in mapSnapshot.docs) {
         final data = doc.data();
@@ -44,13 +46,18 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
         }
       }
 
-      final projectsSnapshot = await FirestoreService.getCollection('projects').get();
+      final projectsSnapshot = await FirestoreService.getCollection(
+        'projects',
+      ).get();
       final Map<String, String> projectNames = {};
       for (var doc in projectsSnapshot.docs) {
         final data = doc.data();
         final sId = data['siteId']?.toString();
         final pName = data['projectName']?.toString();
-        if (sId != null && sId.isNotEmpty && pName != null && pName.isNotEmpty) {
+        if (sId != null &&
+            sId.isNotEmpty &&
+            pName != null &&
+            pName.isNotEmpty) {
           projectNames[sId] = pName;
         }
       }
@@ -62,7 +69,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
         return {
           'site': sId,
           'supervisor': mapping?['supervisor']?.toString() ?? 'Not Assigned',
-          'projectName': mapping?['projectName'] ?? projectNames[sId] ?? 'Not Assigned',
+          'projectName':
+              mapping?['projectName'] ?? projectNames[sId] ?? 'Not Assigned',
         };
       }).toList();
     } catch (e) {
@@ -223,10 +231,15 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Layout and Drawings',
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,6 +659,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
       bottomNavigationBar: Padding(

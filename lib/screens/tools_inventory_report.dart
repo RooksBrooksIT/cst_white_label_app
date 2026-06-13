@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/responsive.dart';
 import 'tools_inventory_details.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
@@ -115,6 +116,7 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Tools Inventory',
@@ -127,7 +129,14 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           tooltip: 'Refresh',
         ),
       ],
-      body: _buildBody(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: _buildBody(),
+        ),
+      ),
     );
   }
 

@@ -37,6 +37,8 @@ class SiteStatusReportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final statusColor = getStatusColor(context, status);
 
     return Scaffold(
@@ -61,7 +63,10 @@ class SiteStatusReportPage extends StatelessWidget {
           ),
         ],
       ),
-      body: Container(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Container(
         color: const Color(0xFFF8F9FA), // Light background
         child: FutureBuilder<QuerySnapshot>(
           future: FirestoreService.getCollection(
@@ -126,6 +131,8 @@ class SiteStatusReportPage extends StatelessWidget {
               },
             );
           },
+        ),
+      ),
         ),
       ),
     );

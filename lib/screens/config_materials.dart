@@ -600,22 +600,40 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
+
     return GlassScaffold(
       title: 'Material Master',
       onBack: () => Navigator.pop(context),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildModeSwitchButtons(),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _mode == 'category'
-                  ? _buildCategoryContent()
-                  : _buildUnitContent(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildModeSwitchButtons(),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: _mode == 'category'
+                      ? _buildCategoryContent()
+                      : _buildUnitContent(),
+                ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
         ),
       ),
     );

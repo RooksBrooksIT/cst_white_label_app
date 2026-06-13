@@ -565,10 +565,15 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Site Supervisor Configuration',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           const SizedBox(height: 16),
           // Top Two Buttons
@@ -657,6 +662,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             child: _selectedTab == 0 ? _buildCreateForm() : _buildInfoTable(),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

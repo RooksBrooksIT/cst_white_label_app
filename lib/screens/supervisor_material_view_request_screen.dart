@@ -70,10 +70,15 @@ class _SupervisorMaterialViewRequestScreenState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
     return GlassScaffold(
       title: 'Material Requests',
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           if (!FirestoreService.isReady)
             Container(
@@ -272,6 +277,8 @@ class _SupervisorMaterialViewRequestScreenState
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

@@ -74,169 +74,227 @@ class _MainDashboardState extends State<MainDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1024;
+    bool isDesktop = screenWidth >= 1024;
+
+    double horizontalPadding = isDesktop ? 40 : (isTablet ? 32 : 20);
+    double maxContentWidth = 1000;
 
     return GlassScaffold(
       onBack: () => Navigator.of(context).pop(),
-      body: _isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 12),
-                    // Header
-                    if (_isFromReferral) ...[
-                      // Organization Logo
-                      if (_logoUrl != null && _logoUrl!.isNotEmpty)
-                        Container(
-                          width: 110,
-                          height: 110,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: colorScheme.outline,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(height: isDesktop ? 16 : (isTablet ? 14 : 12)),
+                        // Header
+                        if (_isFromReferral) ...[
+                          // Organization Logo
+                          if (_logoUrl != null && _logoUrl!.isNotEmpty)
+                            Container(
+                              width: isDesktop ? 140 : (isTablet ? 125 : 110),
+                              height: isDesktop ? 140 : (isTablet ? 125 : 110),
+                              padding: EdgeInsets.all(
+                                isDesktop ? 6 : (isTablet ? 5 : 4),
                               ),
-                            ],
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: colorScheme.outline,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Image.network(
+                                _logoUrl!,
+                                fit: BoxFit.contain,
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: EdgeInsets.all(
+                                isDesktop ? 34 : (isTablet ? 31 : 28),
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.business_rounded,
+                                size: isDesktop ? 72 : (isTablet ? 66 : 60),
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          SizedBox(
+                            height: isDesktop ? 30 : (isTablet ? 27 : 24),
                           ),
-                          child: Image.network(_logoUrl!, fit: BoxFit.contain),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.08),
-                            shape: BoxShape.circle,
+                          ValueListenableBuilder<String>(
+                            valueListenable: AppTheme.appName,
+                            builder: (context, name, _) {
+                              return Text(
+                                name,
+                                textAlign: TextAlign.center,
+                                style: textTheme.headlineMedium?.copyWith(
+                                  fontSize: isDesktop
+                                      ? 34
+                                      : (isTablet ? 31 : 28),
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.5,
+                                ),
+                              );
+                            },
                           ),
-                          child: Icon(
-                            Icons.business_rounded,
-                            size: 60,
-                            color: colorScheme.primary,
+                          SizedBox(
+                            height: isDesktop ? 12 : (isTablet ? 10 : 8),
                           ),
-                        ),
-                      const SizedBox(height: 24),
-                      ValueListenableBuilder<String>(
-                        valueListenable: AppTheme.appName,
-                        builder: (context, name, _) {
-                          return Text(
-                            name,
+                          Text(
+                            'Select your role to continue',
                             textAlign: TextAlign.center,
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: Responsive.fontSize(context, 28),
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+                              color: colorScheme.onSurfaceVariant,
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Select your role to continue',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontSize: Responsive.fontSize(context, 14),
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ] else ...[
-                      // Generic Header
-                      Container(
-                        width: Responsive.scaleH(context, 120),
-                        height: Responsive.scaleH(context, 120),
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.08),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(60),
-                          child: Image.asset(
-                            'assets/images/logo_main.png',
-                            fit: BoxFit.contain,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      ValueListenableBuilder<String>(
-                        valueListenable: AppTheme.appName,
-                        builder: (context, name, _) {
-                          return Text(
-                            name,
-                            textAlign: TextAlign.center,
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: Responsive.fontSize(context, 28),
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
+                        ] else ...[
+                          // Generic Header
+                          Container(
+                            width: isDesktop ? 150 : (isTablet ? 135 : 120),
+                            height: isDesktop ? 150 : (isTablet ? 135 : 120),
+                            padding: EdgeInsets.all(
+                              isDesktop ? 6 : (isTablet ? 5 : 4),
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                isDesktop ? 75 : (isTablet ? 67 : 60),
+                              ),
+                              child: Image.asset(
+                                'assets/images/logo_main.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            height: isDesktop ? 34 : (isTablet ? 31 : 28),
+                          ),
+                          ValueListenableBuilder<String>(
+                            valueListenable: AppTheme.appName,
+                            builder: (context, name, _) {
+                              return Text(
+                                name,
+                                textAlign: TextAlign.center,
+                                style: textTheme.headlineMedium?.copyWith(
+                                  fontSize: isDesktop
+                                      ? 34
+                                      : (isTablet ? 31 : 28),
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
 
-                    const SizedBox(height: 48),
+                        SizedBox(height: isDesktop ? 56 : (isTablet ? 52 : 48)),
 
-                    // Role Cards
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Organization',
-                      subtitle: 'Manage org details & data',
-                      icon: Icons.business_center_rounded,
-                      accentColor: colorScheme.primary,
-                      destination: const Organisation_LoginPage(),
+                        // Role Cards
+                        _buildRoleCard(
+                          context: context,
+                          title: 'Organization',
+                          subtitle: 'Manage org details & data',
+                          icon: Icons.business_center_rounded,
+                          accentColor: colorScheme.primary,
+                          destination: const Organisation_LoginPage(),
+                          isMobile: isMobile,
+                          isTablet: isTablet,
+                          isDesktop: isDesktop,
+                        ),
+                        SizedBox(height: isDesktop ? 20 : (isTablet ? 18 : 16)),
+                        _buildRoleCard(
+                          context: context,
+                          title: 'Manager',
+                          subtitle: 'Configure settings & control',
+                          icon: Icons.manage_accounts_rounded,
+                          accentColor: colorScheme.secondary,
+                          destination: const ConfigLoginPage(),
+                          isMobile: isMobile,
+                          isTablet: isTablet,
+                          isDesktop: isDesktop,
+                        ),
+                        SizedBox(height: isDesktop ? 20 : (isTablet ? 18 : 16)),
+                        _buildRoleCard(
+                          context: context,
+                          title: 'Supervisor',
+                          subtitle: 'Manage site activities',
+                          icon: Icons.supervisor_account_rounded,
+                          accentColor: const Color(0xFF0EA5E9),
+                          destination: const SupervisorLoginPage(),
+                          isMobile: isMobile,
+                          isTablet: isTablet,
+                          isDesktop: isDesktop,
+                        ),
+                        SizedBox(height: isDesktop ? 20 : (isTablet ? 18 : 16)),
+                        _buildRoleCard(
+                          context: context,
+                          title: 'Customer',
+                          subtitle: 'View your project status',
+                          icon: Icons.person_rounded,
+                          accentColor: const Color(0xFF10B981),
+                          destination: const CustomerLoginPage(),
+                          isMobile: isMobile,
+                          isTablet: isTablet,
+                          isDesktop: isDesktop,
+                        ),
+                        SizedBox(
+                          height: isDesktop ? 48 : (isTablet ? 44 : 40),
+                        ), // Extra bottom padding
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Manager',
-                      subtitle: 'Configure settings & control',
-                      icon: Icons.manage_accounts_rounded,
-                      accentColor: colorScheme.secondary,
-                      destination: const ConfigLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Supervisor',
-                      subtitle: 'Manage site activities',
-                      icon: Icons.supervisor_account_rounded,
-                      accentColor: const Color(0xFF0EA5E9),
-                      destination: const SupervisorLoginPage(),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context: context,
-                      title: 'Customer',
-                      subtitle: 'View your project status',
-                      icon: Icons.person_rounded,
-                      accentColor: const Color(0xFF10B981),
-                      destination: const CustomerLoginPage(),
-                    ),
-                    const SizedBox(height: 40), // Extra bottom padding
-                  ],
+                  ),
                 ),
               ),
             ),
+        ),
+      ),
     );
   }
 
@@ -248,72 +306,89 @@ class _MainDashboardState extends State<MainDashboard> {
     String? logoPath,
     required Color accentColor,
     required Widget destination,
+    required bool isMobile,
+    required bool isTablet,
+    required bool isDesktop,
   }) {
     return GlassCard(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => destination),
       ),
-      child: Row(
-        children: [
-          // Icon circle
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [accentColor, accentColor.withOpacity(0.7)],
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: isDesktop ? 18 : (isTablet ? 16 : 14),
+          horizontal: isDesktop ? 20 : (isTablet ? 18 : 16),
+        ),
+        child: Row(
+          children: [
+            // Icon circle
+            Container(
+              width: isDesktop ? 68 : (isTablet ? 62 : 56),
+              height: isDesktop ? 68 : (isTablet ? 62 : 56),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [accentColor, accentColor.withOpacity(0.7)],
+                ),
+                borderRadius: BorderRadius.circular(
+                  isDesktop ? 20 : (isTablet ? 18 : 16),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              child: logoPath != null
+                  ? Padding(
+                      padding: EdgeInsets.all(
+                        isDesktop ? 5 : (isTablet ? 4.5 : 4.0),
+                      ),
+                      child: Image.asset(logoPath, fit: BoxFit.contain),
+                    )
+                  : Icon(
+                      icon,
+                      color: Colors.white,
+                      size: isDesktop ? 34 : (isTablet ? 31 : 28),
+                    ),
             ),
-            child: logoPath != null
-                ? Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Image.asset(logoPath, fit: BoxFit.contain),
-                  )
-                : Icon(icon, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 20),
-          // Text
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: Responsive.fontSize(context, 18),
-                    letterSpacing: -0.3,
+            SizedBox(width: isDesktop ? 24 : (isTablet ? 22 : 20)),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: isDesktop ? 20 : (isTablet ? 19 : 18),
+                      letterSpacing: -0.3,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  SizedBox(height: isDesktop ? 6 : (isTablet ? 5 : 4)),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: isDesktop ? 15 : (isTablet ? 14.5 : 14),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Arrow
-          Icon(
-            Icons.arrow_forward_ios_rounded,
-            color: Theme.of(context).colorScheme.primary,
-            size: 16,
-          ),
-        ],
+            // Arrow
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Theme.of(context).colorScheme.primary,
+              size: isDesktop ? 20 : (isTablet ? 18 : 16),
+            ),
+          ],
+        ),
       ),
     );
   }

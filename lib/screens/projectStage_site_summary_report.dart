@@ -221,6 +221,8 @@ class _ProjectstageSiteSummaryReportState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
@@ -232,7 +234,10 @@ class _ProjectstageSiteSummaryReportState
           onPressed: _generatePdf,
         ),
       ],
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -247,6 +252,8 @@ class _ProjectstageSiteSummaryReportState
                 ],
               ),
             ),
+        ),
+      ),
     );
   }
 

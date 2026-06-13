@@ -413,10 +413,15 @@ class _VehicleInventoryReportPageState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Vehicle Inventory Report',
       onBack: () => Navigator.pop(context),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
@@ -474,6 +479,8 @@ class _VehicleInventoryReportPageState
                     ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

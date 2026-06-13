@@ -91,9 +91,12 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     bool enabled = true,
     TextInputType keyboardType = TextInputType.text,
     IconData? prefixIcon,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: isDesktop ? 20.0 : 16.0),
       child: TextFormField(
         controller: controller,
         enabled: enabled,
@@ -101,49 +104,49 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon, color: primaryColor)
+              ? Icon(prefixIcon, color: primaryColor, size: isDesktop ? 24.0 : 20.0)
               : null,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: Colors.grey.shade300),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: Colors.grey.shade300),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryColor, width: 2),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: primaryColor, width: 2.0),
           ),
           filled: true,
           fillColor: enabled ? Colors.white : Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 20.0 : 16.0,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBillTable() {
+  Widget _buildBillTable(bool isDesktop, bool isTablet, bool isMobile) {
     if (bills.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          padding: EdgeInsets.symmetric(vertical: isDesktop ? 40.0 : 32.0),
           child: Column(
             children: [
               Icon(
                 Icons.receipt_long_rounded,
-                size: 64,
+                size: isDesktop ? 80.0 : 64.0,
                 color: Colors.grey.shade300,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
               Text(
                 'No bills added yet',
                 style: TextStyle(
                   color: Colors.grey.shade600,
-                  fontSize: 16,
+                  fontSize: isDesktop ? 18.0 : 16.0,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -156,53 +159,53 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: bills.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => SizedBox(height: isDesktop ? 16.0 : 12.0),
       itemBuilder: (context, index) {
         final bill = bills[index];
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.02),
-                blurRadius: 8,
+                blurRadius: 8.0,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? 20.0 : 16.0,
+              vertical: isDesktop ? 12.0 : 8.0,
             ),
             leading: CircleAvatar(
               backgroundColor: primaryColor.withOpacity(0.1),
-              child: Icon(Icons.receipt_rounded, color: primaryColor),
+              child: Icon(Icons.receipt_rounded, color: primaryColor, size: isDesktop ? 28.0 : 24.0),
             ),
             title: Text(
               bill['billVendor']!,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isDesktop ? 18.0 : 16.0),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
-                Text('Bill No: ${bill['billNo']} • ${bill['billDate']}'),
-                const SizedBox(height: 4),
+                SizedBox(height: isDesktop ? 6.0 : 4.0),
+                Text('Bill No: ${bill['billNo']} • ${bill['billDate']}', style: TextStyle(fontSize: isDesktop ? 14.0 : 12.0)),
+                SizedBox(height: isDesktop ? 6.0 : 4.0),
                 Text(
                   bill['billAmount']!,
                   style: TextStyle(
                     color: primaryColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: isDesktop ? 16.0 : 15.0,
                   ),
                 ),
               ],
             ),
             trailing: IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              icon: Icon(Icons.delete_outline_rounded, color: Colors.red, size: isDesktop ? 28.0 : 24.0),
               onPressed: () {
                 setState(() {
                   bills.removeAt(index);
@@ -270,29 +273,30 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     });
   }
 
-  Future<void> _showConfirmationDialog() async {
+  Future<void> _showConfirmationDialog(bool isDesktop, bool isTablet, bool isMobile) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Submission'),
+          title: Text('Confirm Submission', style: TextStyle(fontSize: isDesktop ? 20.0 : 18.0)),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text('Site: ${selectedSiteId ?? 'Not selected'}'),
-                Text('Date: ${DateFormat('dd/MM/yy').format(selectedDate)}'),
-                Text('Total Bills: ${bills.length}'),
-                const SizedBox(height: 16),
-                const Text(
+                Text('Site: ${selectedSiteId ?? 'Not selected'}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                Text('Date: ${DateFormat('dd/MM/yy').format(selectedDate)}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                Text('Total Bills: ${bills.length}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                SizedBox(height: isDesktop ? 20.0 : 16.0),
+                Text(
                   'Are you sure you want to submit this expense entry?',
+                  style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
                 ),
               ],
             ),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -301,11 +305,15 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 20.0 : 16.0,
+                  vertical: isDesktop ? 14.0 : 12.0,
+                ),
               ),
-              child: const Text('OK'),
+              child: Text('OK', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
               onPressed: () {
                 Navigator.of(context).pop();
-                _submitExpenseData();
+                _submitExpenseData(isDesktop, isTablet, isMobile);
               },
             ),
           ],
@@ -314,7 +322,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     );
   }
 
-  Future<void> _submitExpenseData() async {
+  Future<void> _submitExpenseData(bool isDesktop, bool isTablet, bool isMobile) async {
     if (isSubmitting) return;
     setState(() {
       isSubmitting = true;
@@ -434,17 +442,17 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(20.0),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 60),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.check_circle, color: Colors.green, size: isDesktop ? 80.0 : 60.0),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              Text(
                 'Your data was submitted successfully!',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: isDesktop ? 20.0 : 18.0, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -453,7 +461,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('OK', style: TextStyle(color: Colors.black)),
+              child: Text('OK', style: TextStyle(color: Colors.black, fontSize: isDesktop ? 15.0 : 13.0)),
             ),
           ],
         ),
@@ -513,254 +521,304 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
     return GlassScaffold(
       title: 'Company Expenses',
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          icon: Icon(Icons.refresh_rounded, color: Colors.white, size: isDesktop ? 28.0 : 24.0),
           onPressed: _loadSiteIds,
           tooltip: 'Refresh Site IDs',
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isDesktop ? 12.0 : 8.0),
       ],
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            _buildSectionCard(
-              title: 'Site & Project Info',
-              icon: Icons.location_on_rounded,
-              child: Column(
-                children: [
-                  isLoadingSites
-                      ? const Center(child: CircularProgressIndicator())
-                      : DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: selectedSiteId,
-                          decoration: InputDecoration(
-                            labelText: 'Site ID',
-                            prefixIcon: Icon(
-                              Icons.business_rounded,
-                              color: primaryColor,
+        padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0)),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isDesktop ? 900.0 : double.infinity),
+            child: Column(
+              children: [
+                _buildSectionCard(
+                  title: 'Site & Project Info',
+                  icon: Icons.location_on_rounded,
+                  child: Column(
+                    children: [
+                      isLoadingSites
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              value: selectedSiteId,
+                              decoration: InputDecoration(
+                                labelText: 'Site ID',
+                                prefixIcon: Icon(
+                                  Icons.business_rounded,
+                                  color: primaryColor,
+                                  size: isDesktop ? 24.0 : 20.0,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.0),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: isDesktop ? 20.0 : 16.0,
+                                  vertical: isDesktop ? 20.0 : 16.0,
+                                ),
+                              ),
+                              items: siteIds
+                                  .map(
+                                    (site) => DropdownMenuItem<String>(
+                                      value: site,
+                                      child: Text(
+                                        site,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedSiteId = value;
+                                });
+                                if (value != null) {
+                                  _loadSiteDetails(value);
+                                }
+                              },
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
+                      SizedBox(height: isDesktop ? 20.0 : 16.0),
+                      _buildLabeledTextField(
+                        'Supervisor ID',
+                        supervisorController,
+                        enabled: false,
+                        prefixIcon: Icons.person_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildLabeledTextField(
+                        'Project Phase',
+                        projectPhaseController,
+                        enabled: false,
+                        prefixIcon: Icons.flag_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      InkWell(
+                        onTap: () => _selectDate(context),
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isDesktop ? 20.0 : 16.0,
+                            vertical: isDesktop ? 20.0 : 16.0,
                           ),
-                          items: siteIds
-                              .map(
-                                (site) => DropdownMenuItem<String>(
-                                  value: site,
-                                  child: Text(
-                                    site,
-                                    overflow: TextOverflow.ellipsis,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12.0),
+                            color: Colors.white,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                color: primaryColor,
+                                size: isDesktop ? 24.0 : 20.0,
+                              ),
+                              SizedBox(width: isDesktop ? 16.0 : 12.0),
+                              Text(
+                                'Date',
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                DateFormat('dd/MM/yyyy').format(selectedDate),
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
+                ),
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                _buildSectionCard(
+                  title: 'Add Bill',
+                  icon: Icons.receipt_long_rounded,
+                  child: Column(
+                    children: [
+                      _buildLabeledTextField(
+                        'Bill No',
+                        billNoController,
+                        prefixIcon: Icons.numbers_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildLabeledTextField(
+                        'Bill Vendor',
+                        billVendorController,
+                        prefixIcon: Icons.store_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildLabeledTextField(
+                        'Bill Amount',
+                        billAmountController,
+                        prefixIcon: Icons.currency_rupee_rounded,
+                        keyboardType: TextInputType.number,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _addBill,
+                          icon: Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: Colors.white,
+                            size: isDesktop ? 24.0 : 20.0,
+                          ),
+                          label: Text(
+                            "Add Bill to List",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isDesktop ? 17.0 : 16.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            elevation: 2.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
+                ),
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                _buildSectionCard(
+                  title: 'Bills List',
+                  icon: Icons.list_alt_rounded,
+                  child: _buildBillTable(isDesktop, isTablet, isMobile),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
+                ),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                          side: BorderSide(color: Colors.grey.shade400, width: 2.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                        onPressed: isSubmitting ? null : _resetForm,
+                        child: Text(
+                          'Reset',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: isDesktop ? 17.0 : 16.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: isDesktop ? 20.0 : 16.0),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          elevation: 4.0,
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () {
+                                if (selectedSiteId == null ||
+                                    selectedSupervisorId == null ||
+                                    selectedProjectPhase == null ||
+                                    bills.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please fill all details and add at least one bill.',
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _showConfirmationDialog(isDesktop, isTablet, isMobile);
+                              },
+                        child: isSubmitting
+                            ? SizedBox(
+                                width: isDesktop ? 28.0 : 24.0,
+                                height: isDesktop ? 28.0 : 24.0,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.0,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
                                   ),
                                 ),
                               )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedSiteId = value;
-                            });
-                            if (value != null) {
-                              _loadSiteDetails(value);
-                            }
-                          },
-                        ),
-                  const SizedBox(height: 16),
-                  _buildLabeledTextField(
-                    'Supervisor ID',
-                    supervisorController,
-                    enabled: false,
-                    prefixIcon: Icons.person_rounded,
-                  ),
-                  _buildLabeledTextField(
-                    'Project Phase',
-                    projectPhaseController,
-                    enabled: false,
-                    prefixIcon: Icons.flag_rounded,
-                  ),
-                  InkWell(
-                    onTap: () => _selectDate(context),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            color: primaryColor,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Date',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(selectedDate),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              title: 'Add Bill',
-              icon: Icons.receipt_long_rounded,
-              child: Column(
-                children: [
-                  _buildLabeledTextField(
-                    'Bill No',
-                    billNoController,
-                    prefixIcon: Icons.numbers_rounded,
-                  ),
-                  _buildLabeledTextField(
-                    'Bill Vendor',
-                    billVendorController,
-                    prefixIcon: Icons.store_rounded,
-                  ),
-                  _buildLabeledTextField(
-                    'Bill Amount',
-                    billAmountController,
-                    prefixIcon: Icons.currency_rupee_rounded,
-                    keyboardType: TextInputType.number,
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _addBill,
-                      icon: const Icon(
-                        Icons.add_circle_outline_rounded,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        "Add Bill to List",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              title: 'Bills List',
-              icon: Icons.list_alt_rounded,
-              child: _buildBillTable(),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: Colors.grey.shade400, width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: isSubmitting ? null : _resetForm,
-                    child: const Text(
-                      'Reset',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 4,
-                    ),
-                    onPressed: isSubmitting
-                        ? null
-                        : () {
-                            if (selectedSiteId == null ||
-                                selectedSupervisorId == null ||
-                                selectedProjectPhase == null ||
-                                bills.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please fill all details and add at least one bill.',
-                                  ),
-                                  backgroundColor: Colors.redAccent,
+                            : Text(
+                                'Submit Expenses',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              );
-                              return;
-                            }
-                            _showConfirmationDialog();
-                          },
-                    child: isSubmitting
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
                               ),
-                            ),
-                          )
-                        : const Text(
-                            'Submit Expenses',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
+                SizedBox(height: isDesktop ? 40.0 : 32.0),
               ],
             ),
-            const SizedBox(height: 32),
-          ],
+          ),
+        ),
+      ),
         ),
       ),
     );
@@ -770,38 +828,41 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     required String title,
     required IconData icon,
     required Widget child,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     return Card(
-      elevation: 4,
+      elevation: 4.0,
       shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: EdgeInsets.all(isDesktop ? 14.0 : 10.0),
                   decoration: BoxDecoration(
                     color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.0),
                   ),
-                  child: Icon(icon, color: primaryColor, size: 24),
+                  child: Icon(icon, color: primaryColor, size: isDesktop ? 32.0 : 24.0),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isDesktop ? 20.0 : 16.0),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    fontSize: isDesktop ? 20.0 : 18.0,
                     letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isDesktop ? 24.0 : 20.0),
             child,
           ],
         ),

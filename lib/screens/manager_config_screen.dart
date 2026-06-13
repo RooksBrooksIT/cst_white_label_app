@@ -186,51 +186,62 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   }
 
   void _showSuccessDialog() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(isDesktop ? 32.0 : 24.0),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Lottie.asset(
                   'assets/animation/success.json',
-                  width: 100,
-                  height: 100,
+                  width: isDesktop ? 120.0 : 100.0,
+                  height: isDesktop ? 120.0 : 100.0,
                   repeat: false,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isDesktop ? 20.0 : 16.0),
                 Text(
                   'Success!',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: isDesktop ? 22.0 : 20.0,
                     fontWeight: FontWeight.bold,
                     color: primaryColor,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: isDesktop ? 12.0 : 8.0),
+                Text(
                   'Manager details have been saved successfully.',
                   textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12.0),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 40.0 : 32.0,
+                      vertical: isDesktop ? 16.0 : 12.0,
                     ),
                   ),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
+                  child: Text(
+                    'OK',
+                    style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+                  ),
                 ),
               ],
             ),
@@ -265,56 +276,85 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
     return GlassScaffold(
       title: 'Manager Configuration',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
-          const SizedBox(height: 16),
-          _buildTabToggle(),
-          const SizedBox(height: 16),
+          SizedBox(height: isDesktop ? 24.0 : 16.0),
+          _buildTabToggle(isDesktop, isTablet, isMobile),
+          SizedBox(height: isDesktop ? 24.0 : 16.0),
           Expanded(
-            child: _selectedTab == 0 ? _buildCreateForm() : _buildInfoTable(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDesktop ? 900.0 : double.infinity,
+                ),
+                child: _selectedTab == 0
+                    ? _buildCreateForm(isDesktop, isTablet, isMobile)
+                    : _buildInfoTable(isDesktop, isTablet, isMobile),
+              ),
+            ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
 
-  Widget _buildTabToggle() {
+  Widget _buildTabToggle(bool isDesktop, bool isTablet, bool isMobile) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0),
+      ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: Colors.grey[300]!),
         ),
         child: Row(
           children: [
-            _buildTabButton('Create Manager', 0),
-            _buildTabButton('Managers Info', 1),
+            _buildTabButton('Create Manager', 0, isDesktop, isTablet, isMobile),
+            _buildTabButton('Managers Info', 1, isDesktop, isTablet, isMobile),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTabButton(String title, int index) {
+  Widget _buildTabButton(
+    String title,
+    int index,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     final isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedTab = index),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
           decoration: BoxDecoration(
             color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(8.0),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: isDesktop ? 17.0 : 15.0,
               fontWeight: FontWeight.w600,
               color: isSelected ? Colors.white : primaryColor,
             ),
@@ -324,9 +364,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     );
   }
 
-  Widget _buildCreateForm() {
+  Widget _buildCreateForm(bool isDesktop, bool isTablet, bool isMobile) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0)),
       child: Form(
         key: _formKey,
         child: Column(
@@ -336,55 +376,76 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
               _fullNameController,
               isRequired: true,
               icon: Icons.person,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildTextField(
               'User Name',
               _userNameController,
               isRequired: true,
               icon: Icons.alternate_email,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildTextField(
               'Password',
               _passwordController,
               isRequired: true,
               isPassword: true,
               icon: Icons.lock,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildDropdown(
               'Designation',
               _selectedDesignation,
               _designationList,
               (val) => setState(() => _selectedDesignation = val),
               icon: Icons.badge,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildDropdown(
               'Department',
               _selectedDepartment,
               _departmentList,
               (val) => setState(() => _selectedDepartment = val),
               icon: Icons.business,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildTextField(
               'Contact No',
               _contactNoController,
               isRequired: true,
               keyboardType: TextInputType.phone,
               icon: Icons.phone,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isDesktop ? 20.0 : 16.0),
             _buildTextField(
               'Email',
               _emailController,
               keyboardType: TextInputType.emailAddress,
               icon: Icons.email,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
+              isMobile: isMobile,
             ),
-            const SizedBox(height: 32),
-            _buildActionButtons(),
+            SizedBox(height: isDesktop ? 40.0 : 32.0),
+            _buildActionButtons(isDesktop, isTablet, isMobile),
           ],
         ),
       ),
@@ -398,6 +459,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     bool isPassword = false,
     TextInputType? keyboardType,
     IconData? icon,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,18 +469,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         Text(
           '$label${isRequired ? ' *' : ''}',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: isDesktop ? 16.0 : 14.0,
             fontWeight: FontWeight.w600,
             color: primaryColor,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isDesktop ? 12.0 : 8.0),
         TextFormField(
           controller: controller,
           obscureText: isPassword && !_isPasswordVisible,
           keyboardType: keyboardType,
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: primaryColor, size: 20),
+            prefixIcon: Icon(
+              icon,
+              color: primaryColor,
+              size: isDesktop ? 24.0 : 20.0,
+            ),
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
@@ -434,12 +502,12 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 2),
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: primaryColor, width: 2.0),
             ),
           ),
           validator: (value) => (isRequired && (value == null || value.isEmpty))
@@ -456,6 +524,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     List<String> items,
     ValueChanged<String?> onChanged, {
     IconData? icon,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,12 +534,12 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         Text(
           '$label *',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: isDesktop ? 16.0 : 14.0,
             fontWeight: FontWeight.w600,
             color: primaryColor,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isDesktop ? 12.0 : 8.0),
         DropdownButtonFormField<String>(
           value: value,
           items: items
@@ -476,16 +547,20 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
               .toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: primaryColor, size: 20),
+            prefixIcon: Icon(
+              icon,
+              color: primaryColor,
+              size: isDesktop ? 24.0 : 20.0,
+            ),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 2),
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: primaryColor, width: 2.0),
             ),
           ),
           validator: (val) => val == null ? 'Please select $label' : null,
@@ -494,7 +569,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(bool isDesktop, bool isTablet, bool isMobile) {
     return Row(
       children: [
         Expanded(
@@ -502,41 +577,44 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             onPressed: _isSubmitting ? null : _validateAndSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
               ),
             ),
             child: _isSubmitting
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
+                ? SizedBox(
+                    height: isDesktop ? 24.0 : 20.0,
+                    width: isDesktop ? 24.0 : 20.0,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth: 2.0,
                       color: Colors.white,
                     ),
                   )
-                : const Text(
+                : Text(
                     'Create Account',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: isDesktop ? 17.0 : 16.0,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: isDesktop ? 16.0 : 12.0),
         Expanded(
           child: OutlinedButton(
             onPressed: _resetForm,
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
               ),
               side: BorderSide(color: primaryColor),
             ),
             child: Text(
               'Reset',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: isDesktop ? 17.0 : 16.0,
                 fontWeight: FontWeight.bold,
                 color: primaryColor,
               ),
@@ -547,7 +625,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     );
   }
 
-  Widget _buildInfoTable() {
+  Widget _buildInfoTable(bool isDesktop, bool isTablet, bool isMobile) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('manager').snapshots(),
       builder: (context, snapshot) {
@@ -555,17 +633,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
           return const Center(child: CircularProgressIndicator());
         final managers = snapshot.data!.docs;
         if (managers.isEmpty)
-          return const Center(child: Text('No managers found.'));
+          return Center(
+            child: Text(
+              'No managers found.',
+              style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+            ),
+          );
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0)),
           itemCount: managers.length,
           itemBuilder: (context, index) {
             final data = managers[index].data() as Map<String, dynamic>;
             return Card(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: EdgeInsets.only(bottom: isDesktop ? 16.0 : 12.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.0),
               ),
               child: ListTile(
                 leading: CircleAvatar(
@@ -574,10 +657,14 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
                 ),
                 title: Text(
                   data['FullName'] ?? 'No Name',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 16.0 : 14.0,
+                  ),
                 ),
                 subtitle: Text(
                   '${data['Designation']} • ${data['Department']}',
+                  style: TextStyle(fontSize: isDesktop ? 14.0 : 12.0),
                 ),
                 trailing: Text(
                   data['Status'] ?? 'Active',
@@ -586,9 +673,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
                         ? Colors.green
                         : Colors.red,
                     fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 14.0 : 12.0,
                   ),
                 ),
-                onTap: () => _showManagerDetails(data),
+                onTap: () =>
+                    _showManagerDetails(data, isDesktop, isTablet, isMobile),
               ),
             );
           },
@@ -597,14 +686,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     );
   }
 
-  void _showManagerDetails(Map<String, dynamic> data) {
+  void _showManagerDetails(
+    Map<String, dynamic> data,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
       ),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isDesktop ? 32.0 : 24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,39 +706,88 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             Text(
               data['FullName'],
               style: TextStyle(
-                fontSize: 24,
+                fontSize: isDesktop ? 26.0 : 24.0,
                 fontWeight: FontWeight.bold,
                 color: primaryColor,
               ),
             ),
-            const Divider(height: 32),
-            _buildDetailRow('Manager ID', data['ManagerId']),
-            _buildDetailRow('Username', data['UserName']),
-            _buildDetailRow('Designation', data['Designation']),
-            _buildDetailRow('Department', data['Department']),
-            _buildDetailRow('Contact', data['ContactNo']),
-            _buildDetailRow('Email', data['Email'] ?? 'N/A'),
-            const SizedBox(height: 16),
+            Divider(height: isDesktop ? 40.0 : 32.0),
+            _buildDetailRow(
+              'Manager ID',
+              data['ManagerId'],
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            _buildDetailRow(
+              'Username',
+              data['UserName'],
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            _buildDetailRow(
+              'Designation',
+              data['Designation'],
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            _buildDetailRow(
+              'Department',
+              data['Department'],
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            _buildDetailRow(
+              'Contact',
+              data['ContactNo'],
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            _buildDetailRow(
+              'Email',
+              data['Email'] ?? 'N/A',
+              isDesktop,
+              isTablet,
+              isMobile,
+            ),
+            SizedBox(height: isDesktop ? 24.0 : 16.0),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: isDesktop ? 12.0 : 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.grey,
               fontWeight: FontWeight.w500,
+              fontSize: isDesktop ? 15.0 : 13.0,
             ),
           ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: isDesktop ? 15.0 : 13.0,
+            ),
+          ),
         ],
       ),
     );

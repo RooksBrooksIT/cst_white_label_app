@@ -332,9 +332,14 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return GlassScaffold(
       title: 'Site to Company Return',
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -463,6 +468,8 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
             ),
             const SizedBox(height: 24),
           ],
+        ),
+      ),
         ),
       ),
     );

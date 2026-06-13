@@ -292,6 +292,14 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final maxContentWidth = 900.0;
+
     if (!_loading && requestedDays == 0 && actualDays == 0) {
       // Show message when no data is found after loading
       return Scaffold(
@@ -306,6 +314,9 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           elevation: 0,
         ),
         body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
@@ -343,6 +354,8 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
             ),
           ),
         ),
+        ),
+      ),
       );
     }
 
@@ -358,7 +371,12 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           iconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
         ),
-        body: Center(child: CircularProgressIndicator(color: _primaryColor)),
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator(color: _primaryColor)),
+        ),
+      ),
       );
     }
 
@@ -383,25 +401,38 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
             ),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              _headerCard(),
-              const SizedBox(height: 20),
-              _daysSummaryCard(),
-              const SizedBox(height: 20),
-              _labourTableSection(),
-              const SizedBox(height: 20),
-              _summaryCards(),
-              const SizedBox(height: 20),
-              _incentiveSlider(),
-              const SizedBox(height: 30),
-              _actionButtons(),
-              const SizedBox(height: 20),
-            ],
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 24 : (isTablet ? 20 : 16),
+            vertical: 16,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                children: [
+                  _headerCard(),
+                  const SizedBox(height: 20),
+                  _daysSummaryCard(),
+                  const SizedBox(height: 20),
+                  _labourTableSection(),
+                  const SizedBox(height: 20),
+                  _summaryCards(),
+                  const SizedBox(height: 20),
+                  _incentiveSlider(),
+                  const SizedBox(height: 30),
+                  _actionButtons(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ),
         ),
+        ),
+      ),
       ),
     );
   }

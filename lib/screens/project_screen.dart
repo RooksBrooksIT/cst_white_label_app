@@ -550,10 +550,16 @@ class _ProjectScreenState extends State<ProjectScreen>
       title: widget.hideAppBar ? null : "Project Configuration",
       appBarForegroundColor: Colors.white,
       onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final hPad = Responsive.horizontalPadding(context);
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 40),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Column(
+                  children: [
             // Toggle buttons for New/Update mode
             GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1655,6 +1661,10 @@ class _ProjectScreenState extends State<ProjectScreen>
             _buildActionButtons(context),
           ],
         ),
+      ),
+    ),
+  );
+        },
       ),
     );
   }

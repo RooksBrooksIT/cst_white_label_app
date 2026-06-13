@@ -65,163 +65,186 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final maxContentWidth = 900.0;
 
     return GlassScaffold(
       title: 'Incentive Calculation',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: _loading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _loading
           ? Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
               ),
             )
           : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GlassCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Calculate Incentives',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 24 : (isTablet ? 20 : 16),
+                      vertical: isDesktop ? 24 : 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GlassCard(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Calculate Incentives',
+                                    style: theme.textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Select site details to calculate incentives',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    'Site Information',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildDropdown(
+                                    label: 'Site ID',
+                                    value: _selectedSiteId,
+                                    items: _siteIds,
+                                    onChanged: (newValue) {
+                                      setState(() {
+                                        _selectedSiteId = newValue;
+                                        _supervisorName = newValue != null
+                                            ? (_siteSupervisors[newValue] ?? '')
+                                            : '';
+                                        _filteredProjectStages = newValue != null
+                                            ? _siteProjectStages[newValue]
+                                                      ?.toList() ??
+                                                  []
+                                            : [];
+                                        _selectedProjectStage = null;
+                                      });
+                                    },
+                                    validator: (value) => value == null
+                                        ? 'Please select Site ID'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  TextFormField(
+                                    decoration: InputDecoration(
+                                      labelText: 'Supervisor Name',
+                                      prefixIcon: Icon(
+                                        Icons.person_outline,
+                                        color: colorScheme.primary,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: theme.dividerColor,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: theme.cardColor,
+                                    ),
+                                    controller: TextEditingController(
+                                      text: _supervisorName,
+                                    ),
+                                    readOnly: true,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildDropdown(
+                                    label: 'Project Stage',
+                                    value: _selectedProjectStage,
+                                    items: _filteredProjectStages,
+                                    onChanged: (newValue) {
+                                      setState(() {
+                                        _selectedProjectStage = newValue;
+                                      });
+                                    },
+                                    validator: (value) => value == null
+                                        ? 'Please select Project Stage'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 32),
+                                  GlassButton(
+                                    label: 'CALCULATE',
+                                    onPressed: _calculate,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  GlassButton(
+                                    label: 'RESET',
+                                    onPressed: _reset,
+                                    isSecondary: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: colorScheme.primary.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
                                 color: colorScheme.primary,
+                                size: 24,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Select site details to calculate incentives',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            Text(
-                              'Site Information',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _buildDropdown(
-                              label: 'Site ID',
-                              value: _selectedSiteId,
-                              items: _siteIds,
-                              onChanged: (newValue) {
-                                setState(() {
-                                  _selectedSiteId = newValue;
-                                  _supervisorName = newValue != null
-                                      ? (_siteSupervisors[newValue] ?? '')
-                                      : '';
-                                  _filteredProjectStages = newValue != null
-                                      ? _siteProjectStages[newValue]
-                                                ?.toList() ??
-                                            []
-                                      : [];
-                                  _selectedProjectStage = null;
-                                });
-                              },
-                              validator: (value) => value == null
-                                  ? 'Please select Site ID'
-                                  : null,
-                            ),
-                            const SizedBox(height: 20),
-                            TextFormField(
-                              decoration: InputDecoration(
-                                labelText: 'Supervisor Name',
-                                prefixIcon: Icon(
-                                  Icons.person_outline,
-                                  color: colorScheme.primary,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: theme.dividerColor,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  'Select a site to view available project stages and calculate incentives',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                filled: true,
-                                fillColor: theme.cardColor,
                               ),
-                              controller: TextEditingController(
-                                text: _supervisorName,
-                              ),
-                              readOnly: true,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildDropdown(
-                              label: 'Project Stage',
-                              value: _selectedProjectStage,
-                              items: _filteredProjectStages,
-                              onChanged: (newValue) {
-                                setState(() {
-                                  _selectedProjectStage = newValue;
-                                });
-                              },
-                              validator: (value) => value == null
-                                  ? 'Please select Project Stage'
-                                  : null,
-                            ),
-                            const SizedBox(height: 32),
-                            GlassButton(
-                              label: 'CALCULATE',
-                              onPressed: _calculate,
-                            ),
-                            const SizedBox(height: 12),
-                            GlassButton(
-                              label: 'RESET',
-                              onPressed: _reset,
-                              isSecondary: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: colorScheme.primary.withOpacity(0.1),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: colorScheme.primary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            'Select a site to view available project stages and calculate incentives',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
+        ),
+      ),
     );
   }
 

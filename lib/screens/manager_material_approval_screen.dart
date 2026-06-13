@@ -37,51 +37,91 @@ class _ManagerMaterialApprovalScreenState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final maxContentWidth = 900.0;
+    final maxModalWidth = 700.0;
+
     return GlassScaffold(
       title: 'Material Approval',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           Container(
             color: theme.cardColor,
-            child: TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(text: "PENDING"),
-                Tab(text: "APPROVED"),
-              ],
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.colorScheme.primary,
-              indicatorWeight: 3,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: "PENDING"),
+                    Tab(text: "APPROVED"),
+                  ],
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                  indicatorColor: theme.colorScheme.primary,
+                  indicatorWeight: 3,
+                ),
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GlassTextField(
-              controller: _searchController,
-              label: 'Search Requests...',
-              icon: Icons.search,
-              onChanged: (v) =>
-                  setState(() => _searchQuery = v.trim().toLowerCase()),
+            padding: EdgeInsets.all(isDesktop ? 24 : 16.0),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: GlassTextField(
+                  controller: _searchController,
+                  label: 'Search Requests...',
+                  icon: Icons.search,
+                  onChanged: (v) =>
+                      setState(() => _searchQuery = v.trim().toLowerCase()),
+                ),
+              ),
             ),
           ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildRequestsList('Processing'),
-                _buildRequestsList('Approved'),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: _buildRequestsList('Processing'),
+                  ),
+                ),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: _buildRequestsList('Approved'),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
+        ),
+      ),
     );
   }
 
   Widget _buildRequestsList(String status) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final maxModalWidth = 700.0;
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection(
         'siteMaterialsRequest',
@@ -135,25 +175,46 @@ class _ManagerMaterialApprovalScreenState
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 16),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final docId = docs[index].id;
-            return _buildRequestCard(data, docId);
+            return _buildRequestCard(
+              data,
+              docId,
+              isDesktop,
+              isTablet,
+              isMobile,
+              maxModalWidth,
+            );
           },
         );
       },
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> data, String docId) {
+  Widget _buildRequestCard(
+    Map<String, dynamic> data,
+    String docId,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+    double maxModalWidth,
+  ) {
     final theme = Theme.of(context);
     final status = data['status'] ?? 'Processing';
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      onTap: () => _showRequestDetails(data, docId),
+      onTap: () => _showRequestDetails(
+        data,
+        docId,
+        isDesktop,
+        isTablet,
+        isMobile,
+        maxModalWidth,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -252,7 +313,14 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  void _showRequestDetails(Map<String, dynamic> data, String docId) {
+  void _showRequestDetails(
+    Map<String, dynamic> data,
+    String docId,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+    double maxModalWidth,
+  ) {
     final theme = Theme.of(context);
     final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
     final isProcessing = data['status'] == 'Processing';
@@ -261,96 +329,101 @@ class _ManagerMaterialApprovalScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => GlassCard(
-        borderRadius: 24,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                data['matReqId'] ?? 'Request Details',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _infoRow(Icons.calendar_today_outlined, data['date'] ?? ''),
-              _infoRow(Icons.person_outline, data['supervisorName'] ?? ''),
-              const SizedBox(height: 24),
-              Text(
-                'REQUESTED MATERIALS',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  letterSpacing: 1.2,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: materials.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (c, i) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      materials[i]['materialName'] ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
-                    ),
-                    trailing: _buildPriorityChip(
-                      materials[i]['priority'] ?? 'Normal',
+      builder: (ctx) => Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxModalWidth),
+          child: GlassCard(
+            borderRadius: 24,
+            child: Padding(
+              padding: EdgeInsets.all(isDesktop ? 32 : (isTablet ? 24 : 24)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  Text(
+                    data['matReqId'] ?? 'Request Details',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _infoRow(Icons.calendar_today_outlined, data['date'] ?? ''),
+                  _infoRow(Icons.person_outline, data['supervisorName'] ?? ''),
+                  const SizedBox(height: 24),
+                  Text(
+                    'REQUESTED MATERIALS',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      letterSpacing: 1.2,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: materials.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (c, i) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          materials[i]['materialName'] ?? 'Unknown',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
+                        ),
+                        trailing: _buildPriorityChip(
+                          materials[i]['priority'] ?? 'Normal',
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isProcessing) ...[
+                    const SizedBox(height: 32),
+                    GlassButton(
+                      label: 'APPROVE REQUEST',
+                      onPressed: () async {
+                        await FirestoreService.getCollection(
+                          'siteMaterialsRequest',
+                        ).doc(docId).update({'status': 'Approved'});
+
+                        // Notify supervisor of material approval
+                        final supName =
+                            data['supervisorName']?.toString() ?? '';
+                        final reqId = data['matReqId']?.toString() ?? '';
+                        final siteId = data['siteId']?.toString() ?? '';
+                        if (supName.isNotEmpty) {
+                          await NotificationService.notifySupervisor(
+                            supervisorName: supName,
+                            title: '✅ Material Request Approved',
+                                body: 'Your material request $reqId for Site $siteId has been approved by the organization.',
+                            data: {
+                              'type': 'material_approval',
+                              'matReqId': reqId,
+                              'siteId': siteId,
+                              'status': 'Approved',
+                            },
+                          );
+                        }
+
+                        if (mounted) Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ],
               ),
-              if (isProcessing) ...[
-                const SizedBox(height: 32),
-                GlassButton(
-                  label: 'APPROVE REQUEST',
-                  onPressed: () async {
-                    await FirestoreService.getCollection(
-                      'siteMaterialsRequest',
-                    ).doc(docId).update({'status': 'Approved'});
-
-                    // Notify supervisor of material approval
-                    final supName = data['supervisorName']?.toString() ?? '';
-                    final reqId = data['matReqId']?.toString() ?? '';
-                    final siteId = data['siteId']?.toString() ?? '';
-                    if (supName.isNotEmpty) {
-                      await NotificationService.notifySupervisor(
-                        supervisorName: supName,
-                        title: '✅ Material Request Approved',
-                        body:
-                            'Your material request $reqId for Site $siteId has been approved by the organization.',
-                        data: {
-                          'type': 'material_approval',
-                          'matReqId': reqId,
-                          'siteId': siteId,
-                          'status': 'Approved',
-                        },
-                      );
-                    }
-
-                    if (mounted) Navigator.pop(context);
-                  },
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

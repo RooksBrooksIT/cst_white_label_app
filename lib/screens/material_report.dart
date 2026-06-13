@@ -115,24 +115,31 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
         ),
       ],
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildSelectionCard(theme),
-            const SizedBox(height: 24),
-            if (selectedMaterial != null) ...[
-              _buildReportHeader(theme),
-              const SizedBox(height: 16),
-              if (isReportLoading)
-                const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-              else if (reportRows.isEmpty)
-                _buildEmptyState(theme)
-              else
-                _buildReportTable(theme),
-            ],
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildSelectionCard(theme),
+                const SizedBox(height: 24),
+                if (selectedMaterial != null) ...[
+                  _buildReportHeader(theme),
+                  const SizedBox(height: 16),
+                  if (isReportLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                  else if (reportRows.isEmpty)
+                    _buildEmptyState(theme)
+                  else
+                    _buildReportTable(theme),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

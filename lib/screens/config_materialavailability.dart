@@ -11,7 +11,7 @@ class MaterialAvailability extends StatefulWidget {
 }
 
 class _MaterialAvailabilityState extends State<MaterialAvailability> {
-// Removed unused _firestore field
+  // Removed unused _firestore field
 
   String? _selectedMaterial;
   int _count = 0;
@@ -536,10 +536,21 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
+
     return GlassScaffold(
       title: 'Material Availability',
       onBack: () => Navigator.pop(context),
-      body: _isLoadingMaterials
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoadingMaterials
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -558,25 +569,48 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
             )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Mode Selection Buttons
-                  _buildModeSelectionButtons(),
-                  const SizedBox(height: 24),
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 24.0,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Mode Selection Buttons
+                      _buildModeSelectionButtons(isMobile, isTablet, isDesktop),
+                      const SizedBox(height: 24),
 
-                  // Add/Update Material Section based on mode
-                  _isNewMode
-                      ? _buildNewMaterialSection()
-                      : _buildUpdateMaterialSection(),
-                ],
+                      // Add/Update Material Section based on mode
+                      _isNewMode
+                          ? _buildNewMaterialSection(
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            )
+                          : _buildUpdateMaterialSection(
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            ),
+                    ],
+                  ),
+                ),
               ),
             ),
+        ),
+      ),
     );
   }
 
-  Widget _buildModeSelectionButtons() {
+  Widget _buildModeSelectionButtons(
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
+    final padding = isMobile ? 12.0 : 16.0;
     return Row(
       children: [
         Expanded(
@@ -589,7 +623,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               foregroundColor: _isNewMode
                   ? Colors.white
                   : Theme.of(context).primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: padding),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
@@ -601,11 +635,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             ),
             child: Text(
               'New',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: isMobile ? 12 : 16),
         Expanded(
           child: ElevatedButton(
             onPressed: _switchToUpdateMode,
@@ -616,7 +653,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               foregroundColor: !_isNewMode
                   ? Colors.white
                   : Theme.of(context).primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: padding),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
@@ -628,7 +665,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             ),
             child: Text(
               'Update',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -636,7 +676,11 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     );
   }
 
-  Widget _buildNewMaterialSection() {
+  Widget _buildNewMaterialSection(
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -704,7 +748,11 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     );
   }
 
-  Widget _buildUpdateMaterialSection() {
+  Widget _buildUpdateMaterialSection(
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

@@ -14,100 +14,114 @@ class InsightsDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isMobile = Responsive.isMobile(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isDesktop = screenWidth >= 1024;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0);
 
     return GlassScaffold(
       title: 'Insights Dashboard',
       appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Analytics & Reports',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 16 : 24,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Access detailed reports and insights for your projects and sites',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildSectionCard(
-              context,
-              icon: Icons.receipt_long_outlined,
-              title: 'Site/Project Expenses Report',
-              description:
-                  'View and analyze all expenses related to your site or project in detail.',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const OrganizationInsightsScreen(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Analytics & Reports',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              context,
-              icon: Icons.timeline_outlined,
-              title: 'Site/Project Stage Expenses',
-              description:
-                  'Track expenses by project stage for better cost management.',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ProjectstageInsightsDashboard(),
+                const SizedBox(height: 8),
+                Text(
+                  'Access detailed reports and insights for your projects and sites',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              context,
-              icon: Icons.bar_chart_outlined,
-              title: 'Site/Project Status Report',
-              description:
-                  'Monitor the current status and progress of your site or project.',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SiteStatusReportScreen(),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  context,
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Site/Project Expenses Report',
+                  description:
+                      'View and analyze all expenses related to your site or project in detail.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrganizationInsightsScreen(),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              context,
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Financial Status Report',
-              description:
-                  'Get a detailed overview of your project\'s financial health and budget utilization.',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProjectFinancialStatusReportPage(),
+                const SizedBox(height: 16),
+                _buildSectionCard(
+                  context,
+                  icon: Icons.timeline_outlined,
+                  title: 'Site/Project Stage Expenses',
+                  description:
+                      'Track expenses by project stage for better cost management.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProjectstageInsightsDashboard(),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                _buildSectionCard(
+                  context,
+                  icon: Icons.bar_chart_outlined,
+                  title: 'Site/Project Status Report',
+                  description:
+                      'Monitor the current status and progress of your site or project.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SiteStatusReportScreen(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSectionCard(
+                  context,
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Financial Status Report',
+                  description:
+                      'Get a detailed overview of your project\'s financial health and budget utilization.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProjectFinancialStatusReportPage(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSectionCard(
+                  context,
+                  icon: Icons.assignment_outlined,
+                  title: 'Contractor Report',
+                  description:
+                      'View contractor-wise entries and totals saved via Contractor Entry.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ContractorReportPage()),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
             ),
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              context,
-              icon: Icons.assignment_outlined,
-              title: 'Contractor Report',
-              description:
-                  'View contractor-wise entries and totals saved via Contractor Entry.',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ContractorReportPage()),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
     );
