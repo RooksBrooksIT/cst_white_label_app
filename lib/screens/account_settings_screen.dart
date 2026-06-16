@@ -123,6 +123,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                             TermsHelper.showTermsDialog(
                               context,
                               onAccepted: () {},
+                              readOnly: true,
                             );
                           },
                           isDesktop: isDesktop,

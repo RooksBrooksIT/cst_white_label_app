@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:demo_cst/screens/site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
@@ -596,7 +597,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     context,
     MaterialPageRoute(
       builder: (context) =>
-          const OrganizationSiteEntry(userName: '', userDetails: {}),
+          const SiteEntryPage(userName: '', userDetails: {}),
     ),
   );
 

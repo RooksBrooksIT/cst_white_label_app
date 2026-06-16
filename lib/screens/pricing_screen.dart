@@ -13,6 +13,8 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/enums.dart';
 import '../services/auth_service.dart';
+import 'package:intl/intl.dart';
+import '../utils/terms_helper.dart';
 
 class PricingScreen extends StatefulWidget {
   final String orgName;
@@ -44,6 +46,7 @@ class _PricingScreenState extends State<PricingScreen> {
   bool _isLoading = false;
   String _selectedPlanType = 'Monthly';
   String _selectedPlan = 'Silver';
+  int _goldProjectsCount = 10;
 
   Future<void> _register() async {
     setState(() => _isLoading = true);
@@ -70,7 +73,16 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // Subscription dates
       final now = DateTime.now();
-      final endDate = now.add(const Duration(days: 30));
+      final DateTime endDate;
+      if (_selectedPlanType == 'Free Trial') {
+        endDate = now.add(const Duration(days: 14));
+      } else if (_selectedPlanType == '6 Months') {
+        endDate = now.add(const Duration(days: 180));
+      } else if (_selectedPlanType == 'Yearly') {
+        endDate = now.add(const Duration(days: 365));
+      } else {
+        endDate = now.add(const Duration(days: 30));
+      }
 
       // Write to Firestore
       await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -109,10 +121,24 @@ class _PricingScreenState extends State<PricingScreen> {
 
         // 4. Subscription Document
         transaction.set(dataColl.doc('subscription'), {
-          'subscriptionPlan': '30 days',
+          'subscriptionPlan': _selectedPlan.toLowerCase(),
           'subscriptionStartDate': Timestamp.fromDate(now),
           'subscriptionEndDate': Timestamp.fromDate(endDate),
           'isSubscriptionActive': true,
+          'maxProjects': _selectedPlan == 'Gold'
+              ? _goldProjectsCount
+              : _selectedPlan == 'Silver'
+                  ? 3
+                  : _selectedPlan == 'Platinum'
+                      ? 99999
+                      : 1, // Free Trial
+          'maxUsers': _selectedPlan == 'Gold'
+              ? (_goldProjectsCount * 1.5).round()
+              : _selectedPlan == 'Silver'
+                  ? 5
+                  : _selectedPlan == 'Platinum'
+                      ? 99999
+                      : 2, // Free Trial
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -367,6 +393,15 @@ class _PricingScreenState extends State<PricingScreen> {
     }
   }
 
+  String _formatPrice(int amount) {
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
+    return formatter.format(amount);
+  }
+
   @override
   Widget build(BuildContext context) {
     
@@ -605,24 +640,23 @@ class _PricingScreenState extends State<PricingScreen> {
           'Gold',
           'Comprehensive management',
           is6Months
-              ? '₹5,994'
+              ? _formatPrice((_goldProjectsCount * 599.4).round())
               : isYearly
-              ? '₹11,988'
-              : '₹999',
+              ? _formatPrice((_goldProjectsCount * 1198.8).round())
+              : _formatPrice((_goldProjectsCount * 99.9).round()),
           is6Months
-              ? '₹8,994'
+              ? _formatPrice((_goldProjectsCount * 899.4).round())
               : isYearly
-              ? '₹17,988'
-              : '₹1499',
-          is6Months || isYearly
-              ? [
-                  'Medium teams (up to 20)',
-                  'Advanced collaboration',
-                  'Site monitoring',
-                  'Expense tracking',
-                  'Monthly reports',
-                ]
-              : [],
+              ? _formatPrice((_goldProjectsCount * 1798.8).round())
+              : _formatPrice((_goldProjectsCount * 149.9).round()),
+          [
+            'Up to $_goldProjectsCount Projects & Active Sites',
+            'Up to ${(_goldProjectsCount / 2).round().clamp(2, 25)} Managers',
+            'Up to $_goldProjectsCount Supervisors',
+            'Advanced collaboration',
+            'Site monitoring & Expense tracking',
+            'Monthly report views',
+          ],
         ),
         SizedBox(height: isDesktop ? 20.0 : 16.0),
         _buildPlanCard(
@@ -786,65 +820,171 @@ class _PricingScreenState extends State<PricingScreen> {
                 ),
               ],
             ),
-            if (features.isNotEmpty) ...[
-              SizedBox(height: isDesktop ? 20.0 : 16.0),
-              ...features.map((feature) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: isDesktop ? 10.0 : 8.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.description_rounded,
-                        size: isDesktop ? 20.0 : 18.0,
-                        color: Colors.black54,
-                      ),
-                      SizedBox(width: isDesktop ? 12.0 : 10.0),
-                      Text(
-                        feature,
-                        style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ],
-            if (isSelected) ...[
-              SizedBox(height: isDesktop ? 20.0 : 16.0),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(
-                      vertical: isDesktop ? 18.0 : 14.0,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? SizedBox(
-                          height: isDesktop ? 24.0 : 20.0,
-                          width: isDesktop ? 24.0 : 20.0,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: isSelected
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (planName == 'Gold') ...[
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Customize Projects Limit',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isDesktop ? 16.0 : 14.0,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$_goldProjectsCount Projects',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: isDesktop ? 14.0 : 12.0,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        )
-                      : Text(
-                          isFreeTrial
-                              ? 'Start Free Trial'
-                              : 'Upgrade to $planName',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: isDesktop ? 16.0 : 14.0,
+                          const SizedBox(height: 8),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: Colors.blue,
+                              inactiveTrackColor: Colors.grey[200],
+                              thumbColor: Colors.blue,
+                              overlayColor: Colors.blue.withOpacity(0.1),
+                              valueIndicatorColor: Colors.blue,
+                              valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                            ),
+                            child: Slider(
+                              value: _goldProjectsCount.toDouble(),
+                              min: 5.0,
+                              max: 50.0,
+                              divisions: 45,
+                              label: '$_goldProjectsCount Projects',
+                              onChanged: (double newValue) {
+                                setState(() {
+                                  _goldProjectsCount = newValue.round();
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                        if (features.isNotEmpty) ...[
+                          SizedBox(height: isDesktop ? 20.0 : 16.0),
+                          ...features.map((feature) {
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: isDesktop ? 10.0 : 8.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.description_rounded,
+                                    size: isDesktop ? 20.0 : 18.0,
+                                    color: Colors.black54,
+                                  ),
+                                  SizedBox(width: isDesktop ? 12.0 : 10.0),
+                                  Text(
+                                    feature,
+                                    style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                        SizedBox(height: isDesktop ? 20.0 : 16.0),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _register,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                vertical: isDesktop ? 18.0 : 14.0,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? SizedBox(
+                                    height: isDesktop ? 24.0 : 20.0,
+                                    width: isDesktop ? 24.0 : 20.0,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    isFreeTrial
+                                        ? 'Start Free Trial'
+                                        : 'Upgrade to $planName',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: isDesktop ? 16.0 : 14.0,
+                                    ),
+                                  ),
                           ),
                         ),
-                ),
-              ),
-            ],
+                        const SizedBox(height: 12),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              TermsHelper.showTermsDialog(
+                                context,
+                                onAccepted: () {},
+                                readOnly: true,
+                              );
+                            },
+                            child: RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 12.0 : 11.0,
+                                  color: Colors.grey[600],
+                                  fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: isFreeTrial
+                                        ? 'By starting the trial, you agree to our '
+                                        : 'By upgrading, you agree to our ',
+                                  ),
+                                  TextSpan(
+                                    text: 'Terms & Conditions & Refund Policy',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
