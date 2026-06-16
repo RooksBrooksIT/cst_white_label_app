@@ -133,42 +133,42 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          if (_categories.isEmpty) {
-            _categories = [
-              'Residential',
-              'Commercial',
-              'Industrial',
-              'Infrastructure',
-            ];
-          }
+          // if (_categories.isEmpty) {
+          //   _categories = [
+          //     'Residential',
+          //     'Commercial',
+          //     'Industrial',
+          //     'Infrastructure',
+          //   ];
+          // }
 
           _subCategories = results[1].docs
               .map((doc) => doc['projectSubCategory']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          if (_subCategories.isEmpty) {
-            _subCategories = [
-              'New Construction',
-              'Renovation',
-              'Expansion',
-              'Maintenance',
-            ];
-          }
+          // if (_subCategories.isEmpty) {
+          //   _subCategories = [
+          //     'New Construction',
+          //     'Renovation',
+          //     'Expansion',
+          //     'Maintenance',
+          //   ];
+          // }
 
           _contracts = results[2].docs
               .map((doc) => doc['projectContract']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          if (_contracts.isEmpty) {
-            _contracts = [
-              'Fixed Price',
-              'Cost Plus',
-              'Unit Price',
-              'Time & Materials',
-            ];
-          }
+          // if (_contracts.isEmpty) {
+          //   _contracts = [
+          //     'Fixed Price',
+          //     'Cost Plus',
+          //     'Unit Price',
+          //     'Time & Materials',
+          //   ];
+          // }
 
           _statuses = results[3].docs
               .map((doc) => doc['projectState']?.toString() ?? '')
@@ -202,6 +202,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
           if (_statuses.isEmpty) {
             _statuses = [
+              'Started',
               'Not Started',
               'Ongoing',
               'On Hold',
@@ -210,23 +211,23 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ];
           }
 
-          if (_projectStagesList.isEmpty) {
-            _projectStagesList = [
-              'Planning',
-              'Foundation',
-              'Structure',
-              'Finishing',
-              'Handover',
-            ];
-          }
+          // if (_projectStagesList.isEmpty) {
+          //   _projectStagesList = [
+          //     'Planning',
+          //     'Foundation',
+          //     'Structure',
+          //     'Finishing',
+          //     'Handover',
+          //   ];
+          // }
 
-          if (_contractors.isEmpty) {
-            _contractors = [
-              'General Contractor',
-              'Sub Contractor',
-              'Independent',
-            ];
-          }
+          // if (_contractors.isEmpty) {
+          //   _contractors = [
+          //     'General Contractor',
+          //     'Sub Contractor',
+          //     'Independent',
+          //   ];
+          // }
 
           _isLoadingDropdowns = false;
         });

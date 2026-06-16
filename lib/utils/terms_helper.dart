@@ -19,19 +19,27 @@ class TermsHelper {
   static void showTermsDialog(
     BuildContext context, {
     required VoidCallback onAccepted,
+    bool readOnly = false,
   }) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => _TermsDialog(onAccepted: onAccepted),
+      barrierDismissible: readOnly,
+      builder: (context) => _TermsDialog(
+        onAccepted: onAccepted,
+        readOnly: readOnly,
+      ),
     );
   }
 }
 
 class _TermsDialog extends StatefulWidget {
   final VoidCallback onAccepted;
+  final bool readOnly;
 
-  const _TermsDialog({required this.onAccepted});
+  const _TermsDialog({
+    required this.onAccepted,
+    this.readOnly = false,
+  });
 
   @override
   State<_TermsDialog> createState() => _TermsDialogState();
@@ -39,6 +47,14 @@ class _TermsDialog extends StatefulWidget {
 
 class _TermsDialogState extends State<_TermsDialog> {
   bool _isAccepted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.readOnly) {
+      _isAccepted = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,9 +174,14 @@ class _TermsDialogState extends State<_TermsDialog> {
                           '8. GOVERNING LAW',
                           'These Terms shall be governed and construed in accordance with the laws of the jurisdiction in which the company is registered, without regard to its conflict of law provisions.',
                         ),
+                        _buildSection(
+                          theme,
+                          '9. SUBSCRIPTION & REFUND POLICY',
+                          'Subscriptions are billed on a recurring basis (monthly, bi-annually, or annually) depending on the selected plan. You may cancel your subscription at any time. Refund requests for subscription fees are eligible within 7 days of the initial purchase or renewal date. To request a refund, please contact our support team at support@rookstechnologies.com. Approved refunds will be processed and credited back to your original payment method within 5–7 business days. No refunds will be provided for partial subscription periods or unused plan limits.',
+                        ),
                         const SizedBox(height: 12),
                         Text(
-                          'Last Updated: May 28, 2026',
+                          'Last Updated: June 16, 2026',
                           style: TextStyle(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 11,
@@ -184,40 +205,44 @@ class _TermsDialogState extends State<_TermsDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Material(
-                      color: Colors.transparent,
-                      child: CheckboxListTile(
-                        value: _isAccepted,
-                        onChanged: (value) {
-                          setState(() {
-                            _isAccepted = value ?? false;
-                          });
-                        },
-                        title: Text(
-                          'I agree to the Terms & Conditions',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onSurface,
+                    if (!widget.readOnly) ...[
+                      Material(
+                        color: Colors.transparent,
+                        child: CheckboxListTile(
+                          value: _isAccepted,
+                          onChanged: (value) {
+                            setState(() {
+                              _isAccepted = value ?? false;
+                            });
+                          },
+                          title: Text(
+                            'I agree to the Terms & Conditions',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          activeColor: theme.primaryColor,
                         ),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        activeColor: theme.primaryColor,
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
                     GlassButton(
-                      label: 'CONTINUE',
-                      onPressed: _isAccepted
-                          ? () async {
-                              await TermsHelper.acceptTerms();
-                              if (mounted) {
-                                Navigator.pop(context);
-                                widget.onAccepted();
-                              }
-                            }
-                          : null,
+                      label: widget.readOnly ? 'CLOSE' : 'CONTINUE',
+                      onPressed: widget.readOnly
+                          ? () => Navigator.pop(context)
+                          : (_isAccepted
+                              ? () async {
+                                  await TermsHelper.acceptTerms();
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    widget.onAccepted();
+                                  }
+                                }
+                              : null),
                     ),
                   ],
                 ),

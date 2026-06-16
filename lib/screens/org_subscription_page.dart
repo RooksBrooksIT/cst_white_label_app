@@ -6,6 +6,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import '../utils/terms_helper.dart';
 
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
@@ -112,6 +113,27 @@ class _OrganizationSubscriptionPageState
                     _buildPlanDetailsSection(theme),
                     const SizedBox(height: 32),
                     _buildSupportSection(theme, colorScheme),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          TermsHelper.showTermsDialog(
+                            context,
+                            onAccepted: () {},
+                            readOnly: true,
+                          );
+                        },
+                        child: Text(
+                          'View Terms & Conditions & Refund Policy',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
