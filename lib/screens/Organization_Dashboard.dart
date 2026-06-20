@@ -128,28 +128,33 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         onPressed: () => _navigateToOrgMenu(context),
                       ),
                     ],
-                    body: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: Responsive.maxContentWidth,
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return CustomScrollView(
-                              controller: _scrollController,
-                              physics: const BouncingScrollPhysics(),
-                              slivers: [
-                                ..._buildGridSections(
-                                  context,
-                                  theme,
-                                  constraints.maxWidth,
-                                ),
-                                const SliverToBoxAdapter(
-                                  child: SizedBox(height: 100),
-                                ),
-                              ],
-                            );
-                          },
+                    body: SafeArea(
+                      bottom: true,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: Responsive.maxContentWidth,
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return CustomScrollView(
+                                controller: _scrollController,
+                                physics: const BouncingScrollPhysics(),
+                                slivers: [
+                                  ..._buildGridSections(
+                                    context,
+                                    theme,
+                                    constraints.maxWidth,
+                                  ),
+                                  SliverToBoxAdapter(
+                                    child: SizedBox(
+                                      height: Responsive.spacing(context, 100),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -181,22 +186,29 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 12),
+            padding: EdgeInsets.fromLTRB(
+              hPad,
+              Responsive.spacing(context, 24),
+              hPad,
+              Responsive.spacing(context, 12),
+            ),
             child: Row(
               children: [
                 Container(
-                  width: 4,
-                  height: 24,
+                  width: Responsive.scaleH(context, 4),
+                  height: Responsive.scaleV(context, 24),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [category.color, category.color.withOpacity(0.5)],
                     ),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 4),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: Responsive.scaleH(context, 12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,18 +232,20 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.scaleH(context, 8),
+                    vertical: Responsive.scaleV(context, 4),
                   ),
                   decoration: BoxDecoration(
                     color: category.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 20),
+                    ),
                   ),
                   child: Text(
                     '${category.items.length}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: Responsive.fontSize(context, 11),
                       fontWeight: FontWeight.w600,
                       color: category.color,
                     ),
@@ -254,8 +268,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             }, childCount: category.items.length),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
+              crossAxisSpacing: Responsive.spacing(context, 8),
+              mainAxisSpacing: Responsive.spacing(context, 8),
               childAspectRatio: childAspectRatio,
             ),
           ),
@@ -270,75 +284,88 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
+      ),
       color: theme.cardColor,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           item.onTap();
         },
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
             color: theme.cardColor,
             border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
-                blurRadius: 12,
-                spreadRadius: 1,
-                offset: const Offset(0, 4),
+                blurRadius: Responsive.scaleH(context, 12),
+                spreadRadius: Responsive.scaleH(context, 1),
+                offset: Offset(0, Responsive.scaleV(context, 4)),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(Responsive.spacing(context, 6)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(Responsive.spacing(context, 6)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [item.color, item.color.withOpacity(0.7)],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 10),
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: item.color.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        blurRadius: Responsive.scaleH(context, 3),
+                        offset: Offset(0, Responsive.scaleV(context, 1.5)),
                       ),
                     ],
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: 20),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.2,
+                  child: Icon(
+                    item.icon,
+                    color: Colors.white,
+                    size: Responsive.scaleH(context, 18),
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.subtitle,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.2,
+                SizedBox(height: Responsive.spacing(context, 6)),
+                Flexible(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 10),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: Responsive.spacing(context, 1.5)),
+                Flexible(
+                  child: Text(
+                    item.subtitle,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 8),
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -596,8 +623,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   void _navigateToSiteExpenses(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) =>
-          const SiteEntryPage(userName: '', userDetails: {}),
+      builder: (context) => const SiteEntryPage(userName: '', userDetails: {}),
     ),
   );
 

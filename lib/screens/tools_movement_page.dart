@@ -365,16 +365,19 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           Tab(text: 'Site to Company'),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildCompanyToSiteTab(_tools),
-          _buildSiteToCompanyTab(_tools),
-        ],
-      ),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildCompanyToSiteTab(_tools),
+                _buildSiteToCompanyTab(_tools),
+              ],
+            ),
+          ),
         ),
       ),
     );

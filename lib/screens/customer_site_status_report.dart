@@ -293,8 +293,6 @@ class _ProjectstageInsightsDashboardState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
@@ -302,30 +300,32 @@ class _ProjectstageInsightsDashboardState
       title: 'Project Stage Insights',
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildSiteHeader(theme),
-                  const SizedBox(height: 24),
-                  _buildStageCostCard(theme),
-                  const SizedBox(height: 24),
-                  _buildSelectionCard(theme),
-                  const SizedBox(height: 24),
-                  _buildReportTypeSelector(theme, isMobile),
-                  const SizedBox(height: 32),
-                  GlassButton(
-                    label: 'GENERATE REPORT',
-                    onPressed: _openReport,
-                    icon: Icons.analytics_outlined,
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildSiteHeader(theme),
+                      const SizedBox(height: 24),
+                      _buildStageCostCard(theme),
+                      const SizedBox(height: 24),
+                      _buildSelectionCard(theme),
+                      const SizedBox(height: 24),
+                      _buildReportTypeSelector(theme, isMobile),
+                      const SizedBox(height: 32),
+                      GlassButton(
+                        label: 'GENERATE REPORT',
+                        onPressed: _openReport,
+                        icon: Icons.analytics_outlined,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
         ),
       ),
     );

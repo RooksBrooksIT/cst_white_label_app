@@ -20,6 +20,7 @@ import 'package:demo_cst/screens/landing_page.dart';
 import 'package:demo_cst/screens/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding_edit_screen.dart';
 import 'package:demo_cst/screens/contact_support_screen.dart';
+import 'package:demo_cst/widgets/connectivity_wrapper.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -51,7 +52,9 @@ class MyApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               theme: AppTheme.getTheme(primary),
               navigatorKey: navigatorKey,
-
+              builder: (context, child) {
+                return ConnectivityWrapper(child: child!);
+              },
               // Define initial route
               initialRoute: '/',
 

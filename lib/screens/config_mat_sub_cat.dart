@@ -213,10 +213,12 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
     return GlassScaffold(
       title: 'Material Sub Category Master',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _loading
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -386,6 +388,7 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                 ),
               ),
             ),
+          ),
         ),
       ),
     );

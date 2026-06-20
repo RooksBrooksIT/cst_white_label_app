@@ -404,14 +404,12 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       appBar: AppBar(
         title: const Text(
           'CST Insights',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFFFFFFFF),
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Theme.of(context).primaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20.0),
@@ -421,188 +419,193 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: _userSiteId == null && (supervisorEntriesFuture == null)
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
 
-                  // Site Cost Card
-                  _buildModernCard(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // Site Cost Card
+                      _buildModernCard(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              selectedReportType == ReportType.dailyExpense
-                                  ? 'DAILY COST'
-                                  : selectedReportType ==
-                                        ReportType.expenseRange
-                                  ? 'RANGE COST'
-                                  : 'TOTAL SITE COST',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).primaryColor,
-                                letterSpacing: 1.2,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedReportType == ReportType.dailyExpense
+                                      ? 'DAILY COST'
+                                      : selectedReportType ==
+                                            ReportType.expenseRange
+                                      ? 'RANGE COST'
+                                      : 'TOTAL SITE COST',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).primaryColor,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Overall Expenses',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Overall Expenses',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                            if (_isLoadingCost)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              Text(
+                                '₹ ${_totalSiteCost.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).primaryColor,
+                                ),
                               ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Dynamic Input Section (Date/Range)
+                      if (selectedReportType == ReportType.dailyExpense)
+                        _buildDateInputSection(
+                          title: 'SELECT DATE',
+                          date: selectedDate,
+                          onTap: () => _selectDate(context),
+                        ),
+
+                      if (selectedReportType == ReportType.expenseRange)
+                        Column(
+                          children: [
+                            _buildDateInputSection(
+                              title: 'FROM DATE',
+                              date: fromDate,
+                              onTap: () => _selectFromDate(context),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDateInputSection(
+                              title: 'TO DATE',
+                              date: toDate,
+                              onTap: () => _selectToDate(context),
                             ),
                           ],
                         ),
-                        if (_isLoadingCost)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          Text(
-                            '₹ ${_totalSiteCost.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
 
-                  const SizedBox(height: 16),
+                      const SizedBox(height: 24),
 
-                  // Dynamic Input Section (Date/Range)
-                  if (selectedReportType == ReportType.dailyExpense)
-                    _buildDateInputSection(
-                      title: 'SELECT DATE',
-                      date: selectedDate,
-                      onTap: () => _selectDate(context),
-                    ),
-
-                  if (selectedReportType == ReportType.expenseRange)
-                    Column(
-                      children: [
-                        _buildDateInputSection(
-                          title: 'FROM DATE',
-                          date: fromDate,
-                          onTap: () => _selectFromDate(context),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildDateInputSection(
-                          title: 'TO DATE',
-                          date: toDate,
-                          onTap: () => _selectToDate(context),
-                        ),
-                      ],
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Report Type Selection
-                  _buildModernCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'REPORT TYPE',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildReportOption(
-                          type: ReportType.dailyExpense,
-                          icon: Icons.today,
-                          title: 'Daily Expense',
-                          subtitle: 'View expenses for a specific day',
-                        ),
-                        const Divider(height: 24, thickness: 0.5),
-                        _buildReportOption(
-                          type: ReportType.expenseRange,
-                          icon: Icons.date_range,
-                          title: 'Expense Range',
-                          subtitle: 'View expenses between dates',
-                        ),
-                        const Divider(height: 24, thickness: 0.5),
-                        _buildReportOption(
-                          type: ReportType.siteSummary,
-                          icon: Icons.summarize,
-                          title: 'Site Summary',
-                          subtitle: 'Overview of site progress',
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Generate Report Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _openReport,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 2,
-                      ),
-                      child: const Text(
-                        'GENERATE REPORT',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Show empty state message at bottom if no entries found
-                  if (_userSiteId != null)
-                    FutureBuilder<List<CustomerEntry>>(
-                      future: supervisorEntriesFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.done &&
-                            (!snapshot.hasData || snapshot.data!.isEmpty)) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 24),
-                            child: Center(
-                              child: Text(
-                                'Note: No historical supervisor logs found for this site.',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                ),
+                      // Report Type Selection
+                      _buildModernCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'REPORT TYPE',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                                letterSpacing: 1.2,
                               ),
                             ),
-                          );
-                        }
-                        return const SizedBox();
-                      },
-                    ),
-                ],
-              ),
-            ),
+                            const SizedBox(height: 12),
+                            _buildReportOption(
+                              type: ReportType.dailyExpense,
+                              icon: Icons.today,
+                              title: 'Daily Expense',
+                              subtitle: 'View expenses for a specific day',
+                            ),
+                            const Divider(height: 24, thickness: 0.5),
+                            _buildReportOption(
+                              type: ReportType.expenseRange,
+                              icon: Icons.date_range,
+                              title: 'Expense Range',
+                              subtitle: 'View expenses between dates',
+                            ),
+                            const Divider(height: 24, thickness: 0.5),
+                            _buildReportOption(
+                              type: ReportType.siteSummary,
+                              icon: Icons.summarize,
+                              title: 'Site Summary',
+                              subtitle: 'Overview of site progress',
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Generate Report Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _openReport,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'GENERATE REPORT',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Show empty state message at bottom if no entries found
+                      if (_userSiteId != null)
+                        FutureBuilder<List<CustomerEntry>>(
+                          future: supervisorEntriesFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                    ConnectionState.done &&
+                                (!snapshot.hasData || snapshot.data!.isEmpty)) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 24),
+                                child: Center(
+                                  child: Text(
+                                    'Note: No historical supervisor logs found for this site.',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
         ),
       ),
     );

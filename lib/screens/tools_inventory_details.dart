@@ -258,27 +258,30 @@ class _ToolsInventoryDetailsPageState extends State<ToolsInventoryDetailsPage> {
       appBarBackgroundColor: colorScheme.primary,
       appBarForegroundColor: colorScheme.onPrimary,
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
-              ? _buildErrorView(errorMessage!)
-              : SizedBox.expand(
-                  child: Column(
-                    children: [
-                      _buildToolHeaderCard(colorScheme),
-                      const SizedBox(height: 16),
-                      // Expanded table container with proper constraints
-                      Expanded(
-                        child: _buildDistributionTableCard(colorScheme),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                    ? _buildErrorView(errorMessage!)
+                    : SizedBox.expand(
+                        child: Column(
+                          children: [
+                            _buildToolHeaderCard(colorScheme),
+                            const SizedBox(height: 16),
+                            // Expanded table container with proper constraints
+                            Expanded(
+                              child: _buildDistributionTableCard(colorScheme),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildActionButtons(context),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildActionButtons(context),
-                    ],
-                  ),
-                ),
+          ),
         ),
       ),
     );

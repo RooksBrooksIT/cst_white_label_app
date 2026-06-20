@@ -12,41 +12,51 @@ class IrregularBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isDesktop = screenWidth >= 1024;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    double blobSize1 = isDesktop ? 600 : (isTablet ? 500 : 400);
+    double blobSize2 = isDesktop ? 450 : (isTablet ? 375 : 300);
+    double blobSize3 = isDesktop ? 300 : (isTablet ? 250 : 200);
+    double blobSize4 = isDesktop ? 270 : (isTablet ? 225 : 180);
+
     return Stack(
       children: [
         // Top-right blob
         Positioned(
-          top: -120,
-          right: -100,
+          top: -blobSize1 * 0.3,
+          right: -blobSize1 * 0.25,
           child: CustomPaint(
-            size: const Size(400, 400),
+            size: Size(blobSize1, blobSize1),
             painter: _BlobPainter(color.withOpacity(0.08)),
           ),
         ),
         // Bottom-left blob
         Positioned(
-          bottom: -100,
-          left: -80,
+          bottom: -blobSize2 * 0.33,
+          left: -blobSize2 * 0.27,
           child: CustomPaint(
-            size: const Size(300, 300),
+            size: Size(blobSize2, blobSize2),
             painter: _BlobPainter(color.withOpacity(0.06)),
           ),
         ),
-        // Bottom-right blob (Added for full page coverage)
+        // Bottom-right blob
         Positioned(
-          bottom: -50,
-          right: -60,
+          bottom: -blobSize3 * 0.25,
+          right: -blobSize3 * 0.3,
           child: CustomPaint(
-            size: const Size(200, 200),
+            size: Size(blobSize3, blobSize3),
             painter: _BlobPainter(color.withOpacity(0.04)),
           ),
         ),
         // Middle-right subtle blob
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.35,
-          right: -80,
+          top: screenHeight * 0.35,
+          right: -blobSize4 * 0.44,
           child: CustomPaint(
-            size: const Size(180, 180),
+            size: Size(blobSize4, blobSize4),
             painter: _BlobPainter(color.withOpacity(0.03)),
           ),
         ),

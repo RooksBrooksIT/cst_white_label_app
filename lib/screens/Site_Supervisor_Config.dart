@@ -570,99 +570,110 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     return GlassScaffold(
       title: 'Site Supervisor Configuration',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Column(
-        children: [
-          const SizedBox(height: 16),
-          // Top Two Buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 0
-                            ? primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // Top Two Buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _selectedTab == 0
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedTab = 0;
+                                });
+                              },
+                              child: Text(
+                                'Create Supervisor',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTab == 0
+                                      ? Colors.white
+                                      : primaryColor,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _selectedTab = 0;
-                          });
-                        },
-                        child: Text(
-                          'Create Supervisor',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: _selectedTab == 0
-                                ? Colors.white
-                                : primaryColor,
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _selectedTab == 1
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedTab = 1;
+                                });
+                              },
+                              child: Text(
+                                'Supervisors Info',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTab == 1
+                                      ? Colors.white
+                                      : primaryColor,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 1
-                            ? primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _selectedTab = 1;
-                          });
-                        },
-                        child: Text(
-                          'Supervisors Info',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: _selectedTab == 1
-                                ? Colors.white
-                                : primaryColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                // Content
+                Expanded(
+                  child: _selectedTab == 0
+                      ? _buildCreateForm()
+                      : _buildInfoTable(),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          // Content
-          Expanded(
-            child: _selectedTab == 0 ? _buildCreateForm() : _buildInfoTable(),
-          ),
-        ],
-      ),
         ),
       ),
     );
@@ -950,7 +961,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     children: [
                       Icon(Icons.person_add, size: 20),
                       SizedBox(width: 8),
-                      Text('Create Account', style: TextStyle(fontSize: 16)),
+                      Text('Create ', style: TextStyle(fontSize: 16)),
                     ],
                   ),
           ),

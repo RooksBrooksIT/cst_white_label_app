@@ -326,6 +326,17 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     }
   }
 
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _loadSiteIds(),
+      if (selectedSiteId != null) _loadSiteDetails(selectedSiteId!),
+    ]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Data refreshed successfully!')),
+    );
+  }
+
   Future<void> _addBill() async {
     if (billNoController.text.isEmpty ||
         billVendorController.text.isEmpty ||
@@ -384,8 +395,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -397,37 +406,53 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       title: widget.hideAppBar ? null : 'Manager Expenses',
       appBarForegroundColor: Colors.white,
       onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
+      actions: [
+        if (!widget.hideAppBar)
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: _refreshData,
+          ),
+      ],
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: SingleChildScrollView(
-        padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0)),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isDesktop ? 900.0 : double.infinity,
+            padding: EdgeInsets.all(
+              isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildInfoSection(theme, isDesktop, isTablet, isMobile),
-                SizedBox(height: isDesktop ? 32.0 : 24.0),
-                _buildBillFormSection(theme, isDesktop, isTablet, isMobile),
-                SizedBox(height: isDesktop ? 32.0 : 24.0),
-                _buildBillsListSection(theme, isDesktop, isTablet, isMobile),
-                SizedBox(height: isDesktop ? 40.0 : 32.0),
-                GlassButton(
-                  label: 'SUBMIT EXPENSES',
-                  onPressed: isSubmitting || bills.isEmpty
-                      ? null
-                      : _handleSubmit,
-                  isLoading: isSubmitting,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDesktop ? 900.0 : double.infinity,
                 ),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildInfoSection(theme, isDesktop, isTablet, isMobile),
+                    SizedBox(height: isDesktop ? 32.0 : 24.0),
+                    _buildBillFormSection(theme, isDesktop, isTablet, isMobile),
+                    SizedBox(height: isDesktop ? 32.0 : 24.0),
+                    _buildBillsListSection(
+                      theme,
+                      isDesktop,
+                      isTablet,
+                      isMobile,
+                    ),
+                    SizedBox(height: isDesktop ? 40.0 : 32.0),
+                    GlassButton(
+                      label: 'SUBMIT EXPENSES',
+                      onPressed: isSubmitting || bills.isEmpty
+                          ? null
+                          : _handleSubmit,
+                      isLoading: isSubmitting,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
         ),
       ),
     );

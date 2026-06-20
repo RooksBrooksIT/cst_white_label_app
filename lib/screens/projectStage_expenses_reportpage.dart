@@ -146,8 +146,6 @@ class _ProjectStageExpensesReportPageState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
     final grandTotal =
@@ -159,31 +157,35 @@ class _ProjectStageExpensesReportPageState
 
     return GlassScaffold(
       title: 'Stage Expense Analysis',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'Export PDF',
           onPressed: isLoading ? null : _generatePdf,
         ),
       ],
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeader(theme),
-                  const SizedBox(height: 24),
-                  _buildFinanceSummary(theme),
-                  const SizedBox(height: 24),
-                  _buildBreakdownSection(theme),
-                ],
-              ),
-            ),
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(theme),
+                      const SizedBox(height: 24),
+                      _buildFinanceSummary(theme),
+                      const SizedBox(height: 24),
+                      _buildBreakdownSection(theme),
+                    ],
+                  ),
+                ),
         ),
       ),
     );

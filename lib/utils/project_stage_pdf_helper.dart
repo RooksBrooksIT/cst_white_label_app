@@ -18,6 +18,7 @@ class ProjectStagePdfHelper {
     required double grandTotal,
     required PdfColor primaryColor,
   }) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final orgDetails = await PdfTemplates.fetchOrgDetails();
     final dateFormat = DateFormat('dd MMM yyyy');
@@ -86,7 +87,11 @@ class ProjectStagePdfHelper {
           if (materialsList.isNotEmpty) ...[
             pw.Text(
               'Materials Detailed Breakdown',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -103,9 +108,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               oddRowDecoration: const pw.BoxDecoration(
                 color: PdfColors.grey100,
               ),
@@ -117,7 +124,11 @@ class ProjectStagePdfHelper {
           if (laboursList.isNotEmpty) ...[
             pw.Text(
               'Labour Detailed Breakdown',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -134,9 +145,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               oddRowDecoration: const pw.BoxDecoration(
                 color: PdfColors.grey100,
               ),
@@ -148,7 +161,11 @@ class ProjectStagePdfHelper {
           if (supervisorData != null) ...[
             pw.Text(
               'Other Supervisor Expenses',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -170,9 +187,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             ),
             pw.SizedBox(height: 24),
           ],
@@ -181,7 +200,11 @@ class ProjectStagePdfHelper {
           if (managerBills != null && managerBills.isNotEmpty) ...[
             pw.Text(
               'Manager Bills Breakdown',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -198,9 +221,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               oddRowDecoration: const pw.BoxDecoration(
                 color: PdfColors.grey100,
               ),
@@ -212,7 +237,11 @@ class ProjectStagePdfHelper {
           if (organizationBills != null && organizationBills.isNotEmpty) ...[
             pw.Text(
               'Organization Bills Breakdown',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -229,9 +258,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               oddRowDecoration: const pw.BoxDecoration(
                 color: PdfColors.grey100,
               ),
@@ -243,7 +274,11 @@ class ProjectStagePdfHelper {
           if (contractorExpenses != null && contractorExpenses.isNotEmpty) ...[
             pw.Text(
               'Contractor Expenses Breakdown',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.SizedBox(height: 8),
             pw.Table.fromTextArray(
@@ -259,9 +294,11 @@ class ProjectStagePdfHelper {
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
               headerDecoration: pw.BoxDecoration(color: primaryColor),
               cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               oddRowDecoration: const pw.BoxDecoration(
                 color: PdfColors.grey100,
               ),
@@ -287,6 +324,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 16,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
                 pw.Text(
@@ -295,6 +333,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 18,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
               ],
@@ -320,6 +359,7 @@ class ProjectStagePdfHelper {
     required double incentiveTotal,
     required PdfColor primaryColor,
   }) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final orgDetails = await PdfTemplates.fetchOrgDetails();
     final dateFormat = DateFormat('dd MMM yyyy');
@@ -360,7 +400,11 @@ class ProjectStagePdfHelper {
           pw.SizedBox(height: 32),
           pw.Text(
             'Expense Breakdown by Category',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 14,
+              font: PdfTemplates.boldFont,
+            ),
           ),
           pw.SizedBox(height: 12),
           pw.Table.fromTextArray(
@@ -375,9 +419,11 @@ class ProjectStagePdfHelper {
             headerStyle: pw.TextStyle(
               color: PdfColors.white,
               fontWeight: pw.FontWeight.bold,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: primaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
           ),
           pw.SizedBox(height: 32),
           pw.Container(
@@ -395,6 +441,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 16,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
                 pw.Text(
@@ -403,6 +450,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 18,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
               ],
@@ -424,6 +472,7 @@ class ProjectStagePdfHelper {
     required num grandTotal,
     required PdfColor primaryColor,
   }) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
@@ -452,14 +501,28 @@ class ProjectStagePdfHelper {
           pw.SizedBox(height: 24),
           pw.Text(
             'Project Information',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 14,
+              font: PdfTemplates.boldFont,
+            ),
           ),
           pw.SizedBox(height: 8),
           pw.Table.fromTextArray(
             headers: ['Label', 'Details'],
             data: [
-              ['Project Name', projectInfo?['projectName'] ?? 'N/A'],
-              ['Site Location', projectInfo?['siteLocation'] ?? 'N/A'],
+              [
+                'Project Name',
+                projectInfo?['projectName'] ??
+                    projectInfo?['siteName'] ??
+                    'N/A',
+              ],
+              [
+                'Site Location',
+                projectInfo?['siteLocation'] ??
+                    projectInfo?['location'] ??
+                    'N/A',
+              ],
               ['Owner Name', projectInfo?['ownerName'] ?? 'N/A'],
               [
                 'Project Budget',
@@ -469,14 +532,20 @@ class ProjectStagePdfHelper {
             headerStyle: pw.TextStyle(
               color: PdfColors.white,
               fontWeight: pw.FontWeight.bold,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: primaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
           ),
           pw.SizedBox(height: 24),
           pw.Text(
             'Expense Breakdown',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 14,
+              font: PdfTemplates.boldFont,
+            ),
           ),
           pw.SizedBox(height: 8),
           pw.Table.fromTextArray(
@@ -487,9 +556,11 @@ class ProjectStagePdfHelper {
             headerStyle: pw.TextStyle(
               color: PdfColors.white,
               fontWeight: pw.FontWeight.bold,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: primaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
           ),
           pw.SizedBox(height: 32),
           pw.Container(
@@ -507,6 +578,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 16,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
                 pw.Text(
@@ -515,6 +587,7 @@ class ProjectStagePdfHelper {
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 18,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
               ],

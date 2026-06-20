@@ -292,13 +292,16 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           Tab(text: 'WORKERS LIST'),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: TabBarView(
-        controller: _tabController,
-        children: [_buildCreateWorkerTab(), _buildWorkersListTab()],
-      ),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: TabBarView(
+          controller: _tabController,
+          children: [_buildCreateWorkerTab(), _buildWorkersListTab()],
+        ),
+          ),
         ),
       ),
     );

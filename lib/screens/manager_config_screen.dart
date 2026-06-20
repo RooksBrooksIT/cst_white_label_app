@@ -286,28 +286,31 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     return GlassScaffold(
       title: 'Manager Configuration',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Column(
-        children: [
-          SizedBox(height: isDesktop ? 24.0 : 16.0),
-          _buildTabToggle(isDesktop, isTablet, isMobile),
-          SizedBox(height: isDesktop ? 24.0 : 16.0),
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isDesktop ? 900.0 : double.infinity,
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Column(
+              children: [
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                _buildTabToggle(isDesktop, isTablet, isMobile),
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktop ? 900.0 : double.infinity,
+                      ),
+                      child: _selectedTab == 0
+                          ? _buildCreateForm(isDesktop, isTablet, isMobile)
+                          : _buildInfoTable(isDesktop, isTablet, isMobile),
+                    ),
+                  ),
                 ),
-                child: _selectedTab == 0
-                    ? _buildCreateForm(isDesktop, isTablet, isMobile)
-                    : _buildInfoTable(isDesktop, isTablet, isMobile),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
         ),
       ),
     );

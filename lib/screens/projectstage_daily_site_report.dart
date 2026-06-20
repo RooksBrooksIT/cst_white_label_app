@@ -238,9 +238,11 @@ class _ProjectStageDailySiteExpensesReportPageState
 
     return GlassScaffold(
       title: 'Daily Site Report',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: _generatePdf,
         ),
       ],

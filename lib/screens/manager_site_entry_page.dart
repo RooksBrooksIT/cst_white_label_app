@@ -342,6 +342,18 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return total;
   }
 
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _fetchSites(),
+      _fetchMaterialOptions(),
+      _fetchLabourOptions(),
+    ]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Data refreshed successfully!')),
+    );
+  }
+
   void _resetForm() {
     setState(() {
       materials.clear();
@@ -630,6 +642,13 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       title: widget.hideAppBar ? null : 'Manager Daily Site Entry',
       appBarForegroundColor: Colors.white,
       onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
+      actions: [
+        if (!widget.hideAppBar)
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: _refreshData,
+          ),
+      ],
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
