@@ -215,8 +215,6 @@ class _OrganisationRegistrationPageState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -229,47 +227,75 @@ class _OrganisationRegistrationPageState
     return GlassScaffold(
       title: 'Register Organization',
       onBack: _goBack,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: isDesktop ? 32.0 : 20.0),
-                  child: Column(
-                    children: [
-                      _buildStepIndicator(theme, isMobile, isTablet, isDesktop),
-                      SizedBox(height: isDesktop ? 32.0 : 24.0),
-                      FadeTransition(
-                        opacity: _opacityAnimation,
-                        child: AnimatedBuilder(
-                          animation: _translateAnimation,
-                          builder: (context, child) => Transform.translate(
-                            offset: Offset(0, _translateAnimation.value),
-                            child: child,
-                          ),
-                          child: _buildStep1(theme, isMobile, isTablet, isDesktop),
+      body: SafeArea(
+        bottom: true,
+        top: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: isDesktop ? 32.0 : 20.0,
+                        ),
+                        child: Column(
+                          children: [
+                            _buildStepIndicator(
+                              theme,
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            ),
+                            SizedBox(height: isDesktop ? 32.0 : 24.0),
+                            FadeTransition(
+                              opacity: _opacityAnimation,
+                              child: AnimatedBuilder(
+                                animation: _translateAnimation,
+                                builder: (context, child) =>
+                                    Transform.translate(
+                                      offset: Offset(
+                                        0,
+                                        _translateAnimation.value,
+                                      ),
+                                      child: child,
+                                    ),
+                                child: _buildStep1(
+                                  theme,
+                                  isMobile,
+                                  isTablet,
+                                  isDesktop,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
         ),
       ),
     );
   }
 
-  Widget _buildStepIndicator(ThemeData theme, bool isMobile, bool isTablet, bool isDesktop) {
+  Widget _buildStepIndicator(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0;
     final colorScheme = theme.colorScheme;
@@ -287,81 +313,98 @@ class _OrganisationRegistrationPageState
           final isActive = activeStep == index;
           final isDone = activeStep > index;
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Step circle and label
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: isDesktop ? 44.0 : 36.0,
-                    height: isDesktop ? 44.0 : 36.0,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone
-                          ? colorScheme.primary
-                          : (isActive
+          return Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Step circle and label
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: isDesktop ? 44.0 : 36.0,
+                        height: isDesktop ? 44.0 : 36.0,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone
                               ? colorScheme.primary
-                              : colorScheme.surfaceVariant),
-                    ),
-                    child: Center(
-                      child: isDone
-                          ? Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: isDesktop ? 24.0 : 20.0,
-                            )
-                          : Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                color: isActive
-                                    ? Colors.white
-                                    : colorScheme.onSurfaceVariant,
-                                fontSize: isDesktop ? 16.0 : 14.0,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
-                  SizedBox(height: isDesktop ? 10.0 : 8.0),
-                  Text(
-                    steps[index],
-                    style: TextStyle(
-                      color: isActive
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: isDesktop ? 14.0 : 12.0,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              // Connector line
-              if (index < steps.length - 1)
-                Container(
-                  width: isDesktop ? 50.0 : 40.0,
-                  height: 2.0,
-                  margin: EdgeInsets.only(
-                    bottom: isDesktop ? 28.0 : 24.0,
-                    left: isDesktop ? 16.0 : 12.0,
-                    right: isDesktop ? 16.0 : 12.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: activeStep > index
-                        ? colorScheme.primary
-                        : colorScheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(1),
+                              : (isActive
+                                    ? colorScheme.primary
+                                    : colorScheme.surfaceVariant),
+                        ),
+                        child: Center(
+                          child: isDone
+                              ? Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: isDesktop ? 24.0 : 20.0,
+                                )
+                              : Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: isActive
+                                        ? Colors.white
+                                        : colorScheme.onSurfaceVariant,
+                                    fontSize: isDesktop ? 16.0 : 14.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      SizedBox(height: isDesktop ? 10.0 : 8.0),
+                      Text(
+                        steps[index],
+                        style: TextStyle(
+                          color: isActive
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          fontSize: isDesktop ? 14.0 : 12.0,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-            ],
+                // Connector line
+                if (index < steps.length - 1)
+                  Flexible(
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 60.0,
+                        minWidth: 20.0,
+                      ),
+                      height: 2.0,
+                      margin: EdgeInsets.only(
+                        bottom: isDesktop ? 28.0 : 24.0,
+                        left: isDesktop ? 16.0 : (isMobile ? 8.0 : 12.0),
+                        right: isDesktop ? 16.0 : (isMobile ? 8.0 : 12.0),
+                      ),
+                      decoration: BoxDecoration(
+                        color: activeStep > index
+                            ? colorScheme.primary
+                            : colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           );
         }),
       ),
     );
   }
 
-  Widget _buildStep1(ThemeData theme, bool isMobile, bool isTablet, bool isDesktop) {
+  Widget _buildStep1(
+    ThemeData theme,
+    bool isMobile,
+    bool isTablet,
+    bool isDesktop,
+  ) {
     final colorScheme = theme.colorScheme;
 
     return Column(
@@ -492,7 +535,10 @@ class _OrganisationRegistrationPageState
               // Strength Indicator
               if (_passwordStrength.isNotEmpty)
                 Padding(
-                  padding: EdgeInsets.only(top: isDesktop ? 12.0 : 8.0, left: 4.0),
+                  padding: EdgeInsets.only(
+                    top: isDesktop ? 12.0 : 8.0,
+                    left: 4.0,
+                  ),
                   child: Row(
                     children: [
                       Container(
@@ -559,7 +605,9 @@ class _OrganisationRegistrationPageState
                     child: OutlinedButton(
                       onPressed: _goBack,
                       style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isDesktop ? 20.0 : 16.0,
+                        ),
                         side: BorderSide(color: colorScheme.outline),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -583,7 +631,9 @@ class _OrganisationRegistrationPageState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isDesktop ? 20.0 : 16.0,
+                        ),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -665,14 +715,21 @@ class _OrganisationRegistrationPageState
         inputFormatters: inputFormatters,
         validator: validator,
         onChanged: onChanged,
-        style: TextStyle(fontSize: isDesktop ? 17.0 : 15.0, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontSize: isDesktop ? 17.0 : 15.0,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
             color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
             fontSize: isDesktop ? 16.0 : 14.0,
           ),
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: isDesktop ? 24.0 : 20.0),
+          prefixIcon: Icon(
+            icon,
+            color: theme.colorScheme.primary,
+            size: isDesktop ? 24.0 : 20.0,
+          ),
           suffixIcon: isPassword
               ? IconButton(
                   icon: Icon(

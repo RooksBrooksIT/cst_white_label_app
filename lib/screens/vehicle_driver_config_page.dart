@@ -177,317 +177,320 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
             Tab(icon: Icon(Icons.people), text: 'Existing Drivers'),
           ],
         ),
-        body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: TabBarView(
-          controller: _tabController,
-          children: [
-            // New Driver Tab
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  _isEditing ? Icons.edit : Icons.person_add,
-                                  color: Theme.of(context).colorScheme.primary,
+        body: SafeArea(
+          bottom: true,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // New Driver Tab
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          Card(
+                            elevation: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _isEditing ? Icons.edit : Icons.person_add,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isEditing
+                                            ? 'Edit Driver - $_currentDriverId'
+                                            : 'Add New Driver',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _driverNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Driver Name',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.person),
+                                    ),
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Enter driver name' : null,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextFormField(
+                                    controller: _driverPhoneController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Phone Number',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.phone),
+                                    ),
+                                    inputFormatters: [
+                                      // Allow only numbers and limit to 10 digits
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(10),
+                                    ],
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) {
+                                        return 'Enter phone number';
+                                      } else if (!RegExp(r'^\d+$').hasMatch(v)) {
+                                        return 'Only numbers are allowed';
+                                      } else if (v.length != 10) {
+                                        return 'Phone number must be 10 digits';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  TextFormField(
+                                    controller: _driverLicenseController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'License Number',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.card_membership),
+                                    ),
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Enter license number' : null,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextFormField(
+                                    controller: _experienceController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Experience (years)',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.work),
+                                    ),
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Enter experience' : null,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextFormField(
+                                    controller: _driverAddressController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Address',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.location_on),
+                                    ),
+                                    maxLines: 2,
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Enter address' : null,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'Status:',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                      const SizedBox(width: 20),
+                                      DropdownButton<String>(
+                                        value: _driverStatus,
+                                        items: ['Active', 'Inactive']
+                                            .map(
+                                              (e) => DropdownMenuItem(
+                                                value: e,
+                                                child: Text(e),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (val) =>
+                                            setState(() => _driverStatus = val!),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _saveDriver,
+                                  icon: Icon(
+                                    _isEditing ? Icons.save : Icons.person_add,
+                                  ),
+                                  label: Text(
+                                    _isEditing ? 'Update Driver' : 'Save Driver',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _isEditing
-                                      ? 'Edit Driver - $_currentDriverId'
-                                      : 'Add New Driver',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.primary,
+                              ),
+                              if (_isEditing) ...[
+                                const SizedBox(width: 10),
+                                ElevatedButton.icon(
+                                  onPressed: _resetForm,
+                                  icon: const Icon(Icons.cancel),
+                                  label: const Text('Cancel'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.grey,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                   ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _driverNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Driver Name',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.person),
-                              ),
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Enter driver name' : null,
-                            ),
+                            ],
+                          ),
+                          if (_isEditing) ...[
                             const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _driverPhoneController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Phone Number',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.phone),
+                            const Text(
+                              'Note: Click "Update Driver" to save changes',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontStyle: FontStyle.italic,
                               ),
-                              inputFormatters: [
-                                // Allow only numbers and limit to 10 digits
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
-                              ],
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Enter phone number';
-                                } else if (!RegExp(r'^\d+$').hasMatch(v)) {
-                                  return 'Only numbers are allowed';
-                                } else if (v.length != 10) {
-                                  return 'Phone number must be 10 digits';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 10),
-
-                            TextFormField(
-                              controller: _driverLicenseController,
-                              decoration: const InputDecoration(
-                                labelText: 'License Number',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.card_membership),
-                              ),
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Enter license number' : null,
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _experienceController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Experience (years)',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.work),
-                              ),
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Enter experience' : null,
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _driverAddressController,
-                              decoration: const InputDecoration(
-                                labelText: 'Address',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.location_on),
-                              ),
-                              maxLines: 2,
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Enter address' : null,
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Text(
-                                  'Status:',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(width: 20),
-                                DropdownButton<String>(
-                                  value: _driverStatus,
-                                  items: ['Active', 'Inactive']
-                                      .map(
-                                        (e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text(e),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (val) =>
-                                      setState(() => _driverStatus = val!),
-                                ),
-                              ],
                             ),
                           ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _saveDriver,
-                            icon: Icon(
-                              _isEditing ? Icons.save : Icons.person_add,
-                            ),
-                            label: Text(
-                              _isEditing ? 'Update Driver' : 'Save Driver',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        if (_isEditing) ...[
-                          const SizedBox(width: 10),
-                          ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            icon: const Icon(Icons.cancel),
-                            label: const Text('Cancel'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
                         ],
-                      ],
-                    ),
-                    if (_isEditing) ...[
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Note: Click "Update Driver" to save changes',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontStyle: FontStyle.italic,
-                        ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+
+                  // Existing Drivers Tab
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirestoreService
+                        .getCollection('drivers')
+                        .orderBy('driverId')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final drivers = snapshot.data!.docs;
+
+                      if (drivers.isEmpty) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'No drivers found',
+                                style: TextStyle(fontSize: 18, color: Colors.grey),
+                              ),
+                              Text(
+                                'Add a new driver in the "New Driver" tab',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: drivers.length,
+                        itemBuilder: (context, index) {
+                          final driver = drivers[index];
+                          final data = driver.data() as Map<String, dynamic>;
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: 2,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                child: Text(
+                                  data['driverId']?.toString().substring(2) ?? '',
+                                  style: const TextStyle(),
+                                ),
+                              ),
+                              title: Text(
+                                data['driverName'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text('Phone: ${data['driverPhone'] ?? ''}'),
+                                  Text('License: ${data['driverLicense'] ?? ''}'),
+                                  Text(
+                                    'Experience: ${data['experience'] ?? '0'} years',
+                                  ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              (data['status'] ?? 'Active') == 'Active'
+                                                  ? Colors.green.withOpacity(0.2)
+                                                  : Colors.red.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          data['status'] ?? 'Active',
+                                          style: TextStyle(
+                                            color:
+                                                (data['status'] ?? 'Active') ==
+                                                    'Active'
+                                                    ? Colors.green
+                                                    : Colors.red,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () => _editDriver(driver),
+                                    icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
+                                    tooltip: 'Edit Driver',
+                                  ),
+                                  IconButton(
+                                    onPressed: () => _deleteDriver(data['driverId']),
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    tooltip: 'Delete Driver',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-
-            // Existing Drivers Tab
-            StreamBuilder<QuerySnapshot>(
-              stream: FirestoreService
-                  .getCollection('drivers')
-                  .orderBy('driverId')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final drivers = snapshot.data!.docs;
-
-                if (drivers.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No drivers found',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
-                        ),
-                        Text(
-                          'Add a new driver in the "New Driver" tab',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: drivers.length,
-                  itemBuilder: (context, index) {
-                    final driver = drivers[index];
-                    final data = driver.data() as Map<String, dynamic>;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          child: Text(
-                            data['driverId']?.toString().substring(2) ?? '',
-                            style: const TextStyle(),
-                          ),
-                        ),
-                        title: Text(
-                          data['driverName'] ?? '',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text('Phone: ${data['driverPhone'] ?? ''}'),
-                            Text('License: ${data['driverLicense'] ?? ''}'),
-                            Text(
-                              'Experience: ${data['experience'] ?? '0'} years',
-                            ),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        (data['status'] ?? 'Active') == 'Active'
-                                        ? Colors.green.withOpacity(0.2)
-                                        : Colors.red.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    data['status'] ?? 'Active',
-                                    style: TextStyle(
-                                      color:
-                                          (data['status'] ?? 'Active') ==
-                                              'Active'
-                                          ? Colors.green
-                                          : Colors.red,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () => _editDriver(driver),
-                              icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
-                              tooltip: 'Edit Driver',
-                            ),
-                            IconButton(
-                              onPressed: () => _deleteDriver(data['driverId']),
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              tooltip: 'Delete Driver',
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ],
+          ),
         ),
-        ),
-      ),
       ),
     );
   }

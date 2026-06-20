@@ -611,29 +611,32 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
     return GlassScaffold(
       title: 'Material Master',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16.0),
+      body: SafeArea(
+        bottom: true,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildModeSwitchButtons(),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: _mode == 'category'
-                      ? _buildCategoryContent()
-                      : _buildUnitContent(),
-                ),
-              ],
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildModeSwitchButtons(),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _mode == 'category'
+                        ? _buildCategoryContent()
+                        : _buildUnitContent(),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
+          ),
         ),
       ),
     );

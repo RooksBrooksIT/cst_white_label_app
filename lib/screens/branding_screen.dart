@@ -224,8 +224,6 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
@@ -243,217 +241,245 @@ class _BrandingScreenState extends State<BrandingScreen> {
           return GlassScaffold(
             title: 'Branding',
             onBack: () => Navigator.pop(context),
-            body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 32 : (isTablet ? 24 : 16),
-                      vertical: isDesktop ? 24 : 16,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1000),
-                        child: Column(
-                          children: [
-                            _buildStepIndicator(theme, isDesktop, isTablet),
-                            SizedBox(height: isDesktop ? 32 : 24),
-                            // Responsive Branding Content Area (Customization Top, Mockup Bottom)
-                            Column(
-                              children: [
-                                // Top Section: Customization Controls
-                                Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isDesktop ? 32 : 24,
-                                    vertical: isDesktop ? 40 : 32,
+            body: SafeArea(
+              top: true,
+              bottom: true,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isDesktop ? 32 : (isTablet ? 24 : 16),
+                            vertical: isDesktop ? 24 : 16,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1000),
+                              child: Column(
+                                children: [
+                                  _buildStepIndicator(
+                                    theme,
+                                    isDesktop,
+                                    isTablet,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: theme.cardColor,
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(
-                                      color: theme.dividerColor.withOpacity(
-                                        0.2,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
+                                  SizedBox(height: isDesktop ? 32 : 24),
+                                  // Responsive Branding Content Area (Customization Top, Mockup Bottom)
+                                  Column(
                                     children: [
-                                      Text(
-                                        'App Personalization',
-                                        style: theme.textTheme.headlineSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w900,
-                                              color:
-                                                  theme.colorScheme.onSurface,
-                                              letterSpacing: -0.5,
-                                              fontSize: isDesktop ? 28 : 24,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Configure your custom app identity and see live changes below.',
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                              fontSize: isDesktop ? 16 : 14,
-                                            ),
-                                      ),
-                                      SizedBox(height: isDesktop ? 40 : 32),
-
-                                      // App Section Area
+                                      // Top Section: Customization Controls
                                       Container(
-                                        padding: EdgeInsets.all(
-                                          isDesktop ? 28 : 24,
+                                        width: double.infinity,
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: isDesktop ? 32 : 24,
+                                          vertical: isDesktop ? 40 : 32,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: theme
-                                              .colorScheme
-                                              .surfaceVariant
-                                              .withOpacity(0.3),
+                                          color: theme.cardColor,
                                           borderRadius: BorderRadius.circular(
-                                            20,
+                                            24,
+                                          ),
+                                          border: Border.all(
+                                            color: theme.dividerColor
+                                                .withOpacity(0.2),
                                           ),
                                         ),
                                         child: Column(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                              CrossAxisAlignment.stretch,
                                           children: [
-                                            _buildFieldLabel(
-                                              'App Name (Brand Name)',
-                                              isDesktop,
-                                              isTablet,
+                                            Text(
+                                              'App Personalization',
+                                              style: theme
+                                                  .textTheme
+                                                  .headlineSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w900,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onSurface,
+                                                    letterSpacing: -0.5,
+                                                    fontSize: isDesktop
+                                                        ? 28
+                                                        : 24,
+                                                  ),
                                             ),
                                             const SizedBox(height: 8),
-                                            _buildBrandingField(
-                                              controller: _appNameController,
-                                              hint: widget.orgName,
-                                              icon: Icons.edit_note_rounded,
-                                              isDesktop: isDesktop,
-                                              isTablet: isTablet,
+                                            Text(
+                                              'Configure your custom app identity and see live changes below.',
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                    fontSize: isDesktop
+                                                        ? 16
+                                                        : 14,
+                                                  ),
                                             ),
                                             SizedBox(
-                                              height: isDesktop ? 32 : 24,
+                                              height: isDesktop ? 40 : 32,
                                             ),
-                                            _buildFieldLabel(
-                                              'Primary Brand Color',
-                                              isDesktop,
-                                              isTablet,
-                                            ),
-                                            SizedBox(
-                                              height: isDesktop ? 16 : 12,
-                                            ),
-                                            _buildColorPalette(
-                                              isDesktop,
-                                              isTablet,
+
+                                            // App Section Area
+                                            Container(
+                                              padding: EdgeInsets.all(
+                                                isDesktop ? 28 : 24,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: theme
+                                                    .colorScheme
+                                                    .surfaceVariant
+                                                    .withOpacity(0.3),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  _buildFieldLabel(
+                                                    'App Name (Brand Name)',
+                                                    isDesktop,
+                                                    isTablet,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  _buildBrandingField(
+                                                    controller:
+                                                        _appNameController,
+                                                    hint: widget.orgName,
+                                                    icon:
+                                                        Icons.edit_note_rounded,
+                                                    isDesktop: isDesktop,
+                                                    isTablet: isTablet,
+                                                  ),
+                                                  SizedBox(
+                                                    height: isDesktop ? 32 : 24,
+                                                  ),
+                                                  _buildFieldLabel(
+                                                    'Primary Brand Color',
+                                                    isDesktop,
+                                                    isTablet,
+                                                  ),
+                                                  SizedBox(
+                                                    height: isDesktop ? 16 : 12,
+                                                  ),
+                                                  _buildColorPalette(
+                                                    isDesktop,
+                                                    isTablet,
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(height: isDesktop ? 40 : 32),
-                                // Phone Mockup View
-                                _buildPhoneMockup(
-                                  theme,
-                                  screenWidth,
-                                  isDesktop,
-                                  isTablet,
-                                ),
-                                SizedBox(height: isDesktop ? 56 : 48),
-                                // Navigation
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: isDesktop ? 20 : 16,
-                                          ),
-                                          side: BorderSide(
-                                            color: theme.dividerColor,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'BACK',
-                                          style: TextStyle(
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: isDesktop ? 16 : 14,
-                                          ),
-                                        ),
+                                      SizedBox(height: isDesktop ? 40 : 32),
+                                      // Phone Mockup View
+                                      _buildPhoneMockup(
+                                        theme,
+                                        screenWidth,
+                                        isDesktop,
+                                        isTablet,
                                       ),
-                                    ),
-                                    SizedBox(width: isDesktop ? 20 : 16),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : _goToNextStep,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: theme.primaryColor,
-                                          foregroundColor: Colors.white,
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: isDesktop ? 20 : 16,
-                                          ),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                          ),
-                                        ),
-                                        child: _isLoading
-                                            ? SizedBox(
-                                                height: isDesktop ? 24 : 20,
-                                                width: isDesktop ? 24 : 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: Colors.white,
-                                                    ),
-                                              )
-                                            : Text(
-                                                'CONTINUE',
+                                      SizedBox(height: isDesktop ? 56 : 48),
+                                      // Navigation
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              style: OutlinedButton.styleFrom(
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: isDesktop ? 20 : 16,
+                                                ),
+                                                side: BorderSide(
+                                                  color: theme.dividerColor,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'BACK',
                                                 style: TextStyle(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: isDesktop ? 16 : 14,
                                                 ),
                                               ),
+                                            ),
+                                          ),
+                                          SizedBox(width: isDesktop ? 20 : 16),
+                                          Expanded(
+                                            child: ElevatedButton(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : _goToNextStep,
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    theme.primaryColor,
+                                                foregroundColor: Colors.white,
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: isDesktop ? 20 : 16,
+                                                ),
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              child: _isLoading
+                                                  ? SizedBox(
+                                                      height: isDesktop
+                                                          ? 24
+                                                          : 20,
+                                                      width: isDesktop
+                                                          ? 24
+                                                          : 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: Colors.white,
+                                                          ),
+                                                    )
+                                                  : Text(
+                                                      'CONTINUE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: isDesktop
+                                                            ? 16
+                                                            : 14,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: isDesktop ? 48 : 40),
-                              ],
+                                      SizedBox(height: isDesktop ? 48 : 40),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-        ),
-      ),
           );
         },
       ),
@@ -630,74 +656,86 @@ class _BrandingScreenState extends State<BrandingScreen> {
           final isActive = activeStep == index;
           final isDone = activeStep > index;
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Step circle and label
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: isDesktop ? 44 : 36,
-                    height: isDesktop ? 44 : 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone
-                          ? colorScheme.primary
-                          : (isActive
-                                ? colorScheme.primary
-                                : colorScheme.surfaceVariant),
-                    ),
-                    child: Center(
-                      child: isDone
-                          ? Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: isDesktop ? 24 : 20,
-                            )
-                          : Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                color: isActive
-                                    ? Colors.white
-                                    : colorScheme.onSurfaceVariant,
-                                fontSize: isDesktop ? 16 : 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
-                  SizedBox(height: isDesktop ? 12 : 8),
-                  Text(
-                    steps[index],
-                    style: TextStyle(
-                      color: isActive
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: isDesktop ? 14 : 12,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              // Connector line
-              if (index < steps.length - 1)
-                Container(
-                  width: isDesktop ? 60 : 40,
-                  height: 2,
-                  margin: EdgeInsets.only(
-                    bottom: isDesktop ? 30 : 24,
-                    left: isDesktop ? 16 : 12,
-                    right: isDesktop ? 16 : 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: activeStep > index
-                        ? colorScheme.primary
-                        : colorScheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(1),
+          return Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Step circle and label
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: isDesktop ? 44 : 36,
+                        height: isDesktop ? 44 : 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone
+                              ? colorScheme.primary
+                              : (isActive
+                                    ? colorScheme.primary
+                                    : colorScheme.surfaceVariant),
+                        ),
+                        child: Center(
+                          child: isDone
+                              ? Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: isDesktop ? 24 : 20,
+                                )
+                              : Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: isActive
+                                        ? Colors.white
+                                        : colorScheme.onSurfaceVariant,
+                                    fontSize: isDesktop ? 16 : 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      SizedBox(height: isDesktop ? 12 : 8),
+                      Text(
+                        steps[index],
+                        style: TextStyle(
+                          color: isActive
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          fontSize: isDesktop ? 14 : 12,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-            ],
+                // Connector line
+                if (index < steps.length - 1)
+                  Flexible(
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 60.0,
+                        minWidth: 20.0,
+                      ),
+                      height: 2,
+                      margin: EdgeInsets.only(
+                        bottom: isDesktop ? 30 : 24,
+                        left: isDesktop ? 16 : (isTablet ? 12 : 8),
+                        right: isDesktop ? 16 : (isTablet ? 12 : 8),
+                      ),
+                      decoration: BoxDecoration(
+                        color: activeStep > index
+                            ? colorScheme.primary
+                            : colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           );
         }),
       ),

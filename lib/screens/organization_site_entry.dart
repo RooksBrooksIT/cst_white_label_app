@@ -97,7 +97,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       final sitesSnapshot = await FirestoreService.sites.get();
       final Map<String, String> siteNames = {
         for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
 
       // 2. Fetch site mappings using FirestoreService
@@ -111,9 +111,12 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
               'siteId': sId,
               'siteName': siteNames[sId] ?? 'Unnamed Site',
               'supervisor': data['supervisor']?.toString() ?? 'Not Available',
-              'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
+              'supervisorId':
+                  (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
+                  'Not Available',
               'location': data['location']?.toString() ?? 'Not Available',
-              'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+              'projectStage':
+                  data['projectStage']?.toString() ?? 'Not Available',
             };
           })
           .where((site) => site['siteId']!.isNotEmpty)
@@ -373,6 +376,18 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     total += int.tryParse(transportCost.text) ?? 0;
     total += int.tryParse(fuelCost.text) ?? 0;
     return total;
+  }
+
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _fetchSites(),
+      _fetchMaterialOptions(),
+      _fetchLabourOptions(),
+    ]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Data refreshed successfully!')),
+    );
   }
 
   void _resetForm() {
@@ -901,21 +916,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (_) => SupervisorDashboard(
-                      username: widget.userName,
-                      supervisorId: supervisorId ?? '',
-                      supervisorName: supervisorName ?? '',
-                    ),
-              ),
-              (route) => false,
-            );
-          },
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: _refreshData,
         ),
       ],
       body: LayoutBuilder(
@@ -1009,7 +1011,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                               const SizedBox(width: 10),
                               Text(
                                 selectedDate != null
-                                    ? DateFormat('dd MMM yyyy').format(selectedDate!)
+                                    ? DateFormat(
+                                        'dd MMM yyyy',
+                                      ).format(selectedDate!)
                                     : 'No date chosen',
                                 style: const TextStyle(fontSize: 16),
                               ),
@@ -1056,17 +1060,18 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                               ),
-                              items: (_filteredMaterialOptions ?? materialOptions)
-                                  .map(
-                                    (item) => DropdownMenuItem(
-                                      value: item,
-                                      child: Text(
-                                        item,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                              items:
+                                  (_filteredMaterialOptions ?? materialOptions)
+                                      .map(
+                                        (item) => DropdownMenuItem(
+                                          value: item,
+                                          child: Text(
+                                            item,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
                               onChanged: (value) =>
                                   setState(() => selectedMaterial = value),
                             ),
@@ -1103,15 +1108,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: GlassButton(
-                                    label:
-                                        _showCustomMaterialFields
-                                            ? 'Hide Others'
-                                            : 'Others',
+                                    label: _showCustomMaterialFields
+                                        ? 'Hide Others'
+                                        : 'Others',
                                     icon: Icons.more_horiz,
                                     onPressed: () => setState(
-                                      () =>
-                                          _showCustomMaterialFields =
-                                              !_showCustomMaterialFields,
+                                      () => _showCustomMaterialFields =
+                                          !_showCustomMaterialFields,
                                     ),
                                     isSecondary: true,
                                   ),
@@ -1249,15 +1252,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: GlassButton(
-                                    label:
-                                        _showCustomLabourFields
-                                            ? 'Hide Others'
-                                            : 'Others',
+                                    label: _showCustomLabourFields
+                                        ? 'Hide Others'
+                                        : 'Others',
                                     icon: Icons.more_horiz,
                                     onPressed: () => setState(
-                                      () =>
-                                          _showCustomLabourFields =
-                                              !_showCustomLabourFields,
+                                      () => _showCustomLabourFields =
+                                          !_showCustomLabourFields,
                                     ),
                                     isSecondary: true,
                                   ),

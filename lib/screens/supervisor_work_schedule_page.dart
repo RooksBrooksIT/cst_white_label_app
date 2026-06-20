@@ -391,7 +391,8 @@ class _SupervisorWorkSchedulePageState
       // Notify the organisation about the new work schedule request
       await NotificationService.notifyOrganisation(
         title: '📅 New Work Schedule Request',
-        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        body:
+            '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
         data: {
           'type': 'work_schedule',
           'wsReqId': wsReqId,
@@ -455,570 +456,621 @@ class _SupervisorWorkSchedulePageState
     return GlassScaffold(
       title: 'Work Schedule',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _isLoadingSupervisorSite
-          ? Center(child: CircularProgressIndicator(color: mainColor))
-          : _supervisorSiteError != null
-          ? Center(
-              child: Text(
-                _supervisorSiteError!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 16,
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: 24.0,
-                            horizontal: 20.0,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.person, color: mainColor, size: 36),
-                              SizedBox(height: 10),
-                              Text(
-                                widget.supervisorName,
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: mainColor,
-                                  letterSpacing: 1.2,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 6),
-                              Text(
-                                'ID: ${widget.supervisorId}',
-                                style: TextStyle(fontSize: 16),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 20),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            value: _selectedSiteId,
-                            decoration: InputDecoration(
-                              labelText: 'Site ID',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                              prefixIcon: Icon(
-                                Icons.location_on_outlined,
-                                color: mainColor,
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
-                            ),
-                            items: _siteMaps.map((site) {
-                              final siteId = site['id']?.toString() ?? '';
-                              final displayName =
-                                  site['displayName']?.toString() ?? siteId;
-                              return DropdownMenuItem(
-                                value: siteId,
-                                child: Text(
-                                  displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedSiteId = value;
-                                _updateSiteDetails(value);
-                              });
-                            },
-                          ),
-                          SizedBox(height: 20),
-                          Text(
-                            'Project Stage: ${_projectStage ?? "-"}',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          Text(
-                            'Location: ${_siteLocation ?? "-"}',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          SizedBox(height: 20),
-                          _buildTextField(
-                            _locationController,
-                            'Location',
-                            Icons.map_outlined,
-                          ),
-                          SizedBox(height: 20),
-                          _buildTextField(
-                            _supervisorController,
-                            'Supervisor',
-                            Icons.person_outline,
-                          ),
-                          SizedBox(height: 20),
-                          _buildTextField(
-                            _projectNameController,
-                            'Project Name',
-                            Icons.work_outline,
-                          ),
-                          SizedBox(height: 20),
-                          _buildTextField(
-                            _projectPhaseController,
-                            'Project Stage',
-                            Icons.work_outline,
-                          ),
-                          SizedBox(height: 20),
-                          TextField(
-                            controller: _daysController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Number of Days',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                              prefixIcon: Icon(
-                                Icons.calendar_today,
-                                color: mainColor,
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
-                            ),
-                          ),
-                        ],
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: _isLoadingSupervisorSite
+                ? Center(child: CircularProgressIndicator(color: mainColor))
+                : _supervisorSiteError != null
+                ? Center(
+                    child: Text(
+                      _supervisorSiteError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 16,
                       ),
                     ),
-                  ),
-                  SizedBox(height: 20),
-                  _buildCalendar(),
-                  SizedBox(height: 20),
-                  Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  )
+                : SingleChildScrollView(
+                    padding: EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: mainColor,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(18),
-                              topRight: Radius.circular(18),
-                            ),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 20,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.group_add, size: 26),
-                              SizedBox(width: 10),
-                              Text(
-                                'Add Labour',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 24.0,
+                                  horizontal: 20.0,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.person,
+                                      color: mainColor,
+                                      size: 36,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      widget.supervisorName,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: mainColor,
+                                        letterSpacing: 1.2,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'ID: ${widget.supervisorId}',
+                                      style: TextStyle(fontSize: 16),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _labours.isEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'No labours found. Please add labours in Firestore.',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
-                                          ),
-                                        ),
-                                        SizedBox(height: 10),
-                                      ],
-                                    )
-                                  : DropdownButtonFormField<
-                                      Map<String, dynamic>
-                                    >(
-                                      value: _selectedLabour,
-                                      isExpanded: true,
-                                      decoration: InputDecoration(
-                                        labelText: 'Select Labour',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: mainColor,
-                                          ),
-                                        ),
-                                        prefixIcon: Icon(
-                                          Icons.person,
-                                          color: mainColor,
-                                        ),
-                                        filled: true,
+                        SizedBox(height: 20),
+                        Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  value: _selectedSiteId,
+                                  decoration: InputDecoration(
+                                    labelText: 'Site ID',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
                                       ),
-                                      items: _labours.map((labour) {
-                                        final designation =
-                                            labour['designation'] ?? '';
-                                        final labourId =
-                                            labour['labourId'] ?? '';
-                                        return DropdownMenuItem(
-                                          value: labour,
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.badge,
-                                                color: mainColor,
-                                                size: 18,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text(
-                                                '${labour['name'] ?? ''} ',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              if (designation.isNotEmpty) ...[
-                                                SizedBox(width: 8),
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .secondaryContainer,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    designation,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: mainColor,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                              if (labourId.isNotEmpty) ...[
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  '($labourId)',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _selectedLabour = value;
-                                        });
-                                      },
                                     ),
-                              SizedBox(height: 20),
-                              if (_selectedLabour != null) ...[
-                                Card(
-                                  elevation: 2,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    prefixIcon: Icon(
+                                      Icons.location_on_outlined,
+                                      color: mainColor,
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerLowest,
                                   ),
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerLow,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(14),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.assignment_ind,
-                                              color: mainColor,
-                                            ),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Designation:',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              _selectedLabour!['designation'] ??
-                                                  '-',
-                                              style: TextStyle(fontSize: 16),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.confirmation_num,
-                                              color: mainColor,
-                                            ),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Count:',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            SizedBox(width: 8),
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: mainColor,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    icon: Icon(
-                                                      Icons.remove,
-                                                      size: 18,
-                                                    ),
-                                                    onPressed:
-                                                        _selectedLabourCount > 1
-                                                        ? () {
-                                                            setState(() {
-                                                              _selectedLabourCount--;
-                                                            });
-                                                          }
-                                                        : null,
-                                                  ),
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 8.0,
-                                                        ),
-                                                    child: Text(
-                                                      '$_selectedLabourCount',
-                                                      style: TextStyle(
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  IconButton(
-                                                    icon: Icon(
-                                                      Icons.add,
-                                                      size: 18,
-                                                    ),
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedLabourCount++;
-                                                      });
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                  items: _siteMaps.map((site) {
+                                    final siteId = site['id']?.toString() ?? '';
+                                    final displayName =
+                                        site['displayName']?.toString() ??
+                                        siteId;
+                                    return DropdownMenuItem(
+                                      value: siteId,
+                                      child: Text(
+                                        displayName,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedSiteId = value;
+                                      _updateSiteDetails(value);
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 20),
+                                Text(
+                                  'Project Stage: ${_projectStage ?? "-"}',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                Text(
+                                  'Location: ${_siteLocation ?? "-"}',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                SizedBox(height: 20),
+                                _buildTextField(
+                                  _locationController,
+                                  'Location',
+                                  Icons.map_outlined,
+                                ),
+                                SizedBox(height: 20),
+                                _buildTextField(
+                                  _supervisorController,
+                                  'Supervisor',
+                                  Icons.person_outline,
+                                ),
+                                SizedBox(height: 20),
+                                _buildTextField(
+                                  _projectNameController,
+                                  'Project Name',
+                                  Icons.work_outline,
+                                ),
+                                SizedBox(height: 20),
+                                _buildTextField(
+                                  _projectPhaseController,
+                                  'Project Stage',
+                                  Icons.work_outline,
+                                ),
+                                SizedBox(height: 20),
+                                TextField(
+                                  controller: _daysController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Number of Days',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
+                                      ),
                                     ),
+                                    prefixIcon: Icon(
+                                      Icons.calendar_today,
+                                      color: mainColor,
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerLowest,
                                   ),
                                 ),
                               ],
-                              SizedBox(height: 20),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton.icon(
-                                    onPressed: _selectedLabour == null
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              final labourToAdd =
-                                                  Map<String, dynamic>.from(
-                                                    _selectedLabour!,
-                                                  );
-                                              labourToAdd['count'] =
-                                                  _selectedLabourCount;
-                                              _addedLabours.add(labourToAdd);
-                                              _selectedLabourCount = 1;
-                                            });
-                                          },
-                                    icon: Icon(Icons.add),
-                                    label: Text(
-                                      'Add Labours',
-                                      style: TextStyle(),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: mainColor,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
-                                      ),
-                                    ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        _buildCalendar(),
+                        SizedBox(height: 20),
+                        Card(
+                          elevation: 6,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: mainColor,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(18),
+                                    topRight: Radius.circular(18),
                                   ),
-                                ],
-                              ),
-                              SizedBox(height: 30),
-                              if (_addedLabours.isNotEmpty)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 20,
+                                ),
+                                child: Row(
                                   children: [
+                                    Icon(Icons.group_add, size: 26),
+                                    SizedBox(width: 10),
                                     Text(
-                                      'Added Labours:',
+                                      'Add Labour',
                                       style: TextStyle(
+                                        fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          DataTable(
-                                            columns: [
-                                              DataColumn(
-                                                label: Text('Designation'),
-                                              ),
-                                              DataColumn(label: Text('Count')),
-                                            ],
-                                            rows: _addedLabours.map((labour) {
-                                              final count =
-                                                  labour['count'] ?? 1;
-                                              return DataRow(
-                                                cells: [
-                                                  DataCell(
-                                                    Text(
-                                                      labour['designation'] ??
-                                                          '',
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    Text(count.toString()),
-                                                  ),
-                                                ],
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _labours.isEmpty
+                                        ? Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'No labours found. Please add labours in Firestore.',
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                              SizedBox(height: 10),
+                                            ],
+                                          )
+                                        : DropdownButtonFormField<
+                                            Map<String, dynamic>
+                                          >(
+                                            value: _selectedLabour,
+                                            isExpanded: true,
+                                            decoration: InputDecoration(
+                                              labelText: 'Select Labour',
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                borderSide: BorderSide(
+                                                  color: mainColor,
+                                                ),
+                                              ),
+                                              prefixIcon: Icon(
+                                                Icons.person,
+                                                color: mainColor,
+                                              ),
+                                              filled: true,
+                                            ),
+                                            items: _labours.map((labour) {
+                                              final designation =
+                                                  labour['designation'] ?? '';
+                                              final labourId =
+                                                  labour['labourId'] ?? '';
+                                              return DropdownMenuItem(
+                                                value: labour,
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.badge,
+                                                      color: mainColor,
+                                                      size: 18,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      '${labour['name'] ?? ''} ',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    if (designation
+                                                        .isNotEmpty) ...[
+                                                      SizedBox(width: 8),
+                                                      Container(
+                                                        padding:
+                                                            EdgeInsets.symmetric(
+                                                              horizontal: 8,
+                                                              vertical: 2,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: Theme.of(context)
+                                                              .colorScheme
+                                                              .secondaryContainer,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          designation,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: mainColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                    if (labourId
+                                                        .isNotEmpty) ...[
+                                                      SizedBox(width: 8),
+                                                      Text(
+                                                        '($labourId)',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _selectedLabour = value;
+                                              });
+                                            },
+                                          ),
+                                    SizedBox(height: 20),
+                                    if (_selectedLabour != null) ...[
+                                      Card(
+                                        elevation: 2,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerLow,
+                                        child: Padding(
+                                          padding: EdgeInsets.all(14),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.assignment_ind,
+                                                    color: mainColor,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    'Designation:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    _selectedLabour!['designation'] ??
+                                                        '-',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 12),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.confirmation_num,
+                                                    color: mainColor,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    'Count:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Container(
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: mainColor,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        IconButton(
+                                                          icon: Icon(
+                                                            Icons.remove,
+                                                            size: 18,
+                                                          ),
+                                                          onPressed:
+                                                              _selectedLabourCount >
+                                                                  1
+                                                              ? () {
+                                                                  setState(() {
+                                                                    _selectedLabourCount--;
+                                                                  });
+                                                                }
+                                                              : null,
+                                                        ),
+                                                        Padding(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8.0,
+                                                              ),
+                                                          child: Text(
+                                                            '$_selectedLabourCount',
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        IconButton(
+                                                          icon: Icon(
+                                                            Icons.add,
+                                                            size: 18,
+                                                          ),
+                                                          onPressed: () {
+                                                            setState(() {
+                                                              _selectedLabourCount++;
+                                                            });
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    SizedBox(height: 20),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        ElevatedButton.icon(
+                                          onPressed: _selectedLabour == null
+                                              ? null
+                                              : () {
+                                                  setState(() {
+                                                    final labourToAdd =
+                                                        Map<
+                                                          String,
+                                                          dynamic
+                                                        >.from(
+                                                          _selectedLabour!,
+                                                        );
+                                                    labourToAdd['count'] =
+                                                        _selectedLabourCount;
+                                                    _addedLabours.add(
+                                                      labourToAdd,
+                                                    );
+                                                    _selectedLabourCount = 1;
+                                                  });
+                                                },
+                                          icon: Icon(Icons.add),
+                                          label: Text(
+                                            'Add Labours',
+                                            style: TextStyle(),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: mainColor,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 24,
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 30),
+                                    if (_addedLabours.isNotEmpty)
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Added Labours:',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                DataTable(
+                                                  columns: [
+                                                    DataColumn(
+                                                      label: Text(
+                                                        'Designation',
+                                                      ),
+                                                    ),
+                                                    DataColumn(
+                                                      label: Text('Count'),
+                                                    ),
+                                                  ],
+                                                  rows: _addedLabours.map((
+                                                    labour,
+                                                  ) {
+                                                    final count =
+                                                        labour['count'] ?? 1;
+                                                    return DataRow(
+                                                      cells: [
+                                                        DataCell(
+                                                          Text(
+                                                            labour['designation'] ??
+                                                                '',
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            count.toString(),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
+                        ),
+                        SizedBox(height: 30),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ElevatedButton(
+                              onPressed: _isSubmitting ? null : _resetForm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 15,
+                                ),
+                              ),
+                              child: Text('Reset', style: TextStyle()),
+                            ),
+                            ElevatedButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _submitForApproval,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: mainColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 15,
+                                ),
+                              ),
+                              child: _isSubmitting
+                                  ? SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Send for Approval',
+                                      style: TextStyle(),
+                                    ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 30),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton(
-                        onPressed: _isSubmitting ? null : _resetForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 15,
-                          ),
-                        ),
-                        child: Text('Reset', style: TextStyle()),
-                      ),
-                      ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitForApproval,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: mainColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 15,
-                          ),
-                        ),
-                        child: _isSubmitting
-                            ? SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text('Send for Approval', style: TextStyle()),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          ),
         ),
       ),
     );
@@ -1138,22 +1190,28 @@ class _SupervisorWorkSchedulePageState
   }
 
   Widget _buildLegendItem(Color color, String label) {
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

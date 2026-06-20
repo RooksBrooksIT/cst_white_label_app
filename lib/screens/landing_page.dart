@@ -9,8 +9,6 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final primaryColor = theme.primaryColor;
@@ -25,17 +23,16 @@ class LandingPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: IrregularBackground(
+      body: IrregularBackground(
         color: primaryColor,
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Center(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                constraints: BoxConstraints(
+                  maxWidth: isMobile ? double.infinity : 600,
+                ),
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: horizontalPadding,
@@ -224,8 +221,6 @@ class LandingPage extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
         ),
       ),
     );

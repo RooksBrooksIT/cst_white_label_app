@@ -31,9 +31,9 @@ class Responsive {
 
   /// Responsive child aspect ratio for dashboard grid cards.
   static double gridChildAspectRatio(double availableWidth) {
-    if (availableWidth < 600) return 0.85;
-    if (availableWidth < 1024) return 0.90;
-    return 1.0;
+    if (availableWidth < 600) return 0.95;
+    if (availableWidth < 1024) return 1.0;
+    return 1.1;
   }
 
   // Scale horizontally based on screen width relative to design width (375)

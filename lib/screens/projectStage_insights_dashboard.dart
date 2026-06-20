@@ -567,6 +567,8 @@ class _ProjectstageInsightsDashboardState
 
     return GlassScaffold(
       title: 'Project Stage Insights',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -578,7 +580,9 @@ class _ProjectstageInsightsDashboardState
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.primaryColor,
+                    ),
                   ),
                 );
               }
@@ -597,299 +601,306 @@ class _ProjectstageInsightsDashboardState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                // Header
-                Text(
-                  'Project Stage Reports',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Generate detailed reports by project stage',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                    // Header
+                    Text(
+                      'Project Stage Reports',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Generate detailed reports by project stage',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
-                // Site Selection
-                GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SELECT SITE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: theme.primaryColor,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedSiteId,
-                        items: allSiteIds.map((siteId) {
-                          return DropdownMenuItem<String>(
-                            value: siteId,
-                            child: Text(
-                              siteId,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: theme.colorScheme.onSurface,
-                              ),
+                    // Site Selection
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SELECT SITE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryColor,
+                              letterSpacing: 1.2,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newSiteId) async {
-                          setState(() {
-                            selectedSiteId = newSiteId;
-                            selectedProjectStage = null;
-                            projectStages = [];
-                            siteSupervisorEntries = [];
-                            selectedSupervisorEntry = null;
-                          });
-                          await _fetchProjectStagesForSite(newSiteId);
-                        },
-                        decoration: _inputDecoration(theme),
-                        borderRadius: BorderRadius.circular(8),
-                        elevation: 2,
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: theme.primaryColor,
-                        ),
-                        dropdownColor: theme.cardColor,
-                      ),
-                      if (selectedSupervisorEntry?.siteName != null &&
-                          selectedSupervisorEntry!.siteName!.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Project Name: ${selectedSupervisorEntry!.siteName}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Project Stage Selection
-                GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'PROJECT STAGE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: theme.primaryColor,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedProjectStage,
-                        items: projectStages.map((stage) {
-                          return DropdownMenuItem<String>(
-                            value: stage,
-                            child: Text(
-                              stage,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: theme.colorScheme.onSurface,
-                              ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedSiteId,
+                            items: allSiteIds.map((siteId) {
+                              return DropdownMenuItem<String>(
+                                value: siteId,
+                                child: Text(
+                                  siteId,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newSiteId) async {
+                              setState(() {
+                                selectedSiteId = newSiteId;
+                                selectedProjectStage = null;
+                                projectStages = [];
+                                siteSupervisorEntries = [];
+                                selectedSupervisorEntry = null;
+                              });
+                              await _fetchProjectStagesForSite(newSiteId);
+                            },
+                            decoration: _inputDecoration(theme),
+                            borderRadius: BorderRadius.circular(8),
+                            elevation: 2,
+                            isExpanded: true,
+                            icon: Icon(
+                              Icons.arrow_drop_down,
+                              color: theme.primaryColor,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newStage) {
-                          setState(() {
-                            selectedProjectStage = newStage;
-                            _updateSelectedSupervisorEntry();
-                          });
-                          _calculateStageCost();
-                        },
-                        decoration: _inputDecoration(theme),
-                        borderRadius: BorderRadius.circular(8),
-                        elevation: 2,
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: theme.primaryColor,
-                        ),
-                        dropdownColor: theme.cardColor,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Display Stage Cost
-                if (selectedProjectStage != null)
-                  GlassCard(
-                    color: theme.primaryColor.withValues(alpha: 0.1),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                            dropdownColor: theme.cardColor,
+                          ),
+                          if (selectedSupervisorEntry?.siteName != null &&
+                              selectedSupervisorEntry!
+                                  .siteName!
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 12),
                             Text(
-                              selectedReportType == ReportType.dailyExpense
-                                  ? 'DAILY COST'
-                                  : selectedReportType ==
-                                        ReportType.expenseRange
-                                  ? 'RANGE COST'
-                                  : 'TOTAL STAGE COST',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: theme.primaryColor,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              selectedProjectStage!,
+                              'Project Name: ${selectedSupervisorEntry!.siteName}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
-                        ),
-                        if (isLoadingCost)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Project Stage Selection
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '₹ ${currentStageCost.toStringAsFixed(2)}',
+                            'PROJECT STAGE',
                             style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryColor,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedProjectStage,
+                            items: projectStages.map((stage) {
+                              return DropdownMenuItem<String>(
+                                value: stage,
+                                child: Text(
+                                  stage,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newStage) {
+                              setState(() {
+                                selectedProjectStage = newStage;
+                                _updateSelectedSupervisorEntry();
+                              });
+                              _calculateStageCost();
+                            },
+                            decoration: _inputDecoration(theme),
+                            borderRadius: BorderRadius.circular(8),
+                            elevation: 2,
+                            isExpanded: true,
+                            icon: Icon(
+                              Icons.arrow_drop_down,
                               color: theme.primaryColor,
                             ),
+                            dropdownColor: theme.cardColor,
                           ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                // Report Type Selection
-                GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'REPORT TYPE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: theme.primaryColor,
-                          letterSpacing: 1.2,
+                    // Display Stage Cost
+                    if (selectedProjectStage != null)
+                      GlassCard(
+                        color: theme.primaryColor.withValues(alpha: 0.1),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedReportType == ReportType.dailyExpense
+                                      ? 'DAILY COST'
+                                      : selectedReportType ==
+                                            ReportType.expenseRange
+                                      ? 'RANGE COST'
+                                      : 'TOTAL STAGE COST',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.primaryColor,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  selectedProjectStage!,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (isLoadingCost)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              Text(
+                                '₹ ${currentStageCost.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.primaryColor,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _buildReportOption(
-                        type: ReportType.dailyExpense,
-                        icon: Icons.today_outlined,
-                        title: 'Daily Expense',
-                        subtitle: 'View expenses for a specific day',
-                        theme: theme,
-                      ),
-                      const Divider(height: 20, thickness: 0.5),
-                      _buildReportOption(
-                        type: ReportType.expenseRange,
-                        icon: Icons.date_range_outlined,
-                        title: 'Expense Range',
-                        subtitle: 'View expenses between dates',
-                        theme: theme,
-                      ),
-                      const Divider(height: 20, thickness: 0.5),
-                      _buildReportOption(
-                        type: ReportType.siteSummary,
-                        icon: Icons.summarize_outlined,
-                        title: 'Site Summary',
-                        subtitle: 'Overview of site progress',
-                        theme: theme,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                // Date Selection
-                if (selectedReportType == ReportType.dailyExpense)
-                  _buildDateInputSection(
-                    title: 'SELECT DATE',
-                    date: selectedDate,
-                    onTap: () => _selectDate(context),
-                    theme: theme,
-                  ),
-
-                if (selectedReportType == ReportType.expenseRange)
-                  Column(
-                    children: [
-                      _buildDateInputSection(
-                        title: 'FROM DATE',
-                        date: fromDate,
-                        onTap: () => _selectFromDate(context),
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDateInputSection(
-                        title: 'TO DATE',
-                        date: toDate,
-                        onTap: () => _selectToDate(context),
-                        theme: theme,
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 32),
-
-                // Generate Report Button
-                GlassButton(
-                  label: 'GENERATE REPORT',
-                  icon: Icons.analytics_outlined,
-                  onPressed: () => _handleGenerateReport(theme, snapshot.data!),
-                ),
-                const SizedBox(height: 32),
-                GlassCard(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: theme.primaryColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Select a site and project stage to generate detailed reports',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.8,
+                    // Report Type Selection
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'REPORT TYPE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryColor,
+                              letterSpacing: 1.2,
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          _buildReportOption(
+                            type: ReportType.dailyExpense,
+                            icon: Icons.today_outlined,
+                            title: 'Daily Expense',
+                            subtitle: 'View expenses for a specific day',
+                            theme: theme,
+                          ),
+                          const Divider(height: 20, thickness: 0.5),
+                          _buildReportOption(
+                            type: ReportType.expenseRange,
+                            icon: Icons.date_range_outlined,
+                            title: 'Expense Range',
+                            subtitle: 'View expenses between dates',
+                            theme: theme,
+                          ),
+                          const Divider(height: 20, thickness: 0.5),
+                          _buildReportOption(
+                            type: ReportType.siteSummary,
+                            icon: Icons.summarize_outlined,
+                            title: 'Site Summary',
+                            subtitle: 'Overview of site progress',
+                            theme: theme,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Date Selection
+                    if (selectedReportType == ReportType.dailyExpense)
+                      _buildDateInputSection(
+                        title: 'SELECT DATE',
+                        date: selectedDate,
+                        onTap: () => _selectDate(context),
+                        theme: theme,
+                      ),
+
+                    if (selectedReportType == ReportType.expenseRange)
+                      Column(
+                        children: [
+                          _buildDateInputSection(
+                            title: 'FROM DATE',
+                            date: fromDate,
+                            onTap: () => _selectFromDate(context),
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildDateInputSection(
+                            title: 'TO DATE',
+                            date: toDate,
+                            onTap: () => _selectToDate(context),
+                            theme: theme,
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 32),
+
+                    // Generate Report Button
+                    GlassButton(
+                      label: 'GENERATE REPORT',
+                      icon: Icons.analytics_outlined,
+                      onPressed: () =>
+                          _handleGenerateReport(theme, snapshot.data!),
+                    ),
+                    const SizedBox(height: 32),
+                    GlassCard(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: theme.primaryColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Select a site and project stage to generate detailed reports',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
         ),
       ),
     );

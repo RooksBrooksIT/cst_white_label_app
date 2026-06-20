@@ -262,9 +262,33 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, dynamic>?> fetchProjectInfo() async {
     try {
-      final query = await FirestoreService.getCollection(
+      // Try 1: query projects by siteId field
+      var query = await FirestoreService.getCollection(
         'projects',
       ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+
+      // Try 2: query by site field
+      if (query.docs.isEmpty) {
+        query = await FirestoreService.getCollection(
+          'projects',
+        ).where('site', isEqualTo: widget.siteId).limit(1).get();
+      }
+
+      // Try 3: query by siteName from Site collection
+      if (query.docs.isEmpty) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          final sName = siteData['siteName']?.toString();
+          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
+            query = await FirestoreService.getCollection(
+              'projects',
+            ).where('siteName', isEqualTo: sName).limit(1).get();
+          }
+        }
+      }
 
       Map<String, dynamic>? data = query.docs.isNotEmpty
           ? query.docs.first.data()
@@ -317,79 +341,15 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: FutureBuilder<Map<String, dynamic>?>(
-          future: fetchProjectInfo(),
-          builder: (context, projectSnapshot) {
-            if (projectSnapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                ),
-              );
-            }
-            if (projectSnapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, color: primaryColor, size: 48),
-                    SizedBox(height: 16),
-                    Text(
-                      'Failed to load project data',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-            if (!projectSnapshot.hasData || projectSnapshot.data == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search_off, color: primaryColor, size: 48),
-                    SizedBox(height: 16),
-                    Text(
-                      'Project not found',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'No project found for site ID: ${widget.siteId}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: textColor.withOpacity(0.7)),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            final project = projectSnapshot.data!;
-            final site =
-                project['siteLocation']?.toString() ??
-                project['location']?.toString() ??
-                'N/A';
-            final projectName = project['projectName']?.toString() ?? 'N/A';
-            final budget = (project['projectBudget'] ?? 0) as num;
-            final plannedStartDate = project['plannedStartDate'] as Timestamp?;
-            final amountSpent = (project['amountSpent'] ?? 0) as num;
-            final currentStatus = project['currentStatus']?.toString() ?? 'N/A';
-
-            return FutureBuilder<Map<String, num>>(
-              future: fetchExpenseTotals(),
-              builder: (context, expenseSnapshot) {
-                if (expenseSnapshot.connectionState ==
+            padding: const EdgeInsets.all(16.0),
+            child: FutureBuilder<Map<String, dynamic>?>(
+              future: fetchProjectInfo(),
+              builder: (context, projectSnapshot) {
+                if (projectSnapshot.connectionState ==
                     ConnectionState.waiting) {
                   return Center(
                     child: CircularProgressIndicator(
@@ -397,7 +357,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     ),
                   );
                 }
-                if (expenseSnapshot.hasError) {
+                if (projectSnapshot.hasError) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -409,7 +369,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          'Failed to load expenses',
+                          'Failed to load project data',
                           style: TextStyle(
                             fontSize: 16,
                             color: textColor,
@@ -420,20 +380,49 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     ),
                   );
                 }
-                final expenseTotals = expenseSnapshot.data ?? {};
-                num totalSupervisorExpenses = expenseTotals.values.fold(
-                  0,
-                  (a, b) => a + b,
-                );
+                if (!projectSnapshot.hasData || projectSnapshot.data == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, color: primaryColor, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          'Project not found',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: textColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'No project found for site ID: ${widget.siteId}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: textColor.withOpacity(0.7)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                return FutureBuilder<List<dynamic>>(
-                  future: Future.wait([
-                    fetchManagerExpenses(),
-                    fetchOrganizationExpenses(),
-                    fetchContractorAndIncentiveExpenses(),
-                  ]),
-                  builder: (context, otherSnapshot) {
-                    if (otherSnapshot.connectionState ==
+                final project = projectSnapshot.data!;
+                final site =
+                    project['siteLocation']?.toString() ??
+                    project['location']?.toString() ??
+                    'N/A';
+                final projectName = project['projectName']?.toString() ?? 'N/A';
+                final budget = (project['projectBudget'] ?? 0) as num;
+                final plannedStartDate =
+                    project['plannedStartDate'] as Timestamp?;
+                final amountSpent = (project['amountSpent'] ?? 0) as num;
+                final currentStatus =
+                    project['currentStatus']?.toString() ?? 'N/A';
+
+                return FutureBuilder<Map<String, num>>(
+                  future: fetchExpenseTotals(),
+                  builder: (context, expenseSnapshot) {
+                    if (expenseSnapshot.connectionState ==
                         ConnectionState.waiting) {
                       return Center(
                         child: CircularProgressIndicator(
@@ -443,244 +432,298 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         ),
                       );
                     }
-                    final managerExpenses = otherSnapshot.data?[0] ?? 0;
-                    final orgExpenses = otherSnapshot.data?[1] ?? 0;
-                    final contractorIncentive =
-                        otherSnapshot.data?[2] ??
-                        {'contractor': 0, 'incentive': 0};
-
-                    final contractorExpenses =
-                        contractorIncentive['contractor'] ?? 0;
-                    final incentiveExpenses =
-                        contractorIncentive['incentive'] ?? 0;
-
-                    final grandTotal =
-                        totalSupervisorExpenses +
-                        managerExpenses +
-                        orgExpenses +
-                        contractorExpenses +
-                        incentiveExpenses;
-
-                    return SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Project Overview Card
-                          Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                    if (expenseSnapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: primaryColor,
+                              size: 48,
                             ),
-                            margin: EdgeInsets.only(bottom: 20),
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                            SizedBox(height: 16),
+                            Text(
+                              'Failed to load expenses',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: textColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    final expenseTotals = expenseSnapshot.data ?? {};
+                    num totalSupervisorExpenses = expenseTotals.values.fold(
+                      0,
+                      (a, b) => a + b,
+                    );
+
+                    return FutureBuilder<List<dynamic>>(
+                      future: Future.wait([
+                        fetchManagerExpenses(),
+                        fetchOrganizationExpenses(),
+                        fetchContractorAndIncentiveExpenses(),
+                      ]),
+                      builder: (context, otherSnapshot) {
+                        if (otherSnapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                primaryColor,
+                              ),
+                            ),
+                          );
+                        }
+                        final managerExpenses = otherSnapshot.data?[0] ?? 0;
+                        final orgExpenses = otherSnapshot.data?[1] ?? 0;
+                        final contractorIncentive =
+                            otherSnapshot.data?[2] ??
+                            {'contractor': 0, 'incentive': 0};
+
+                        final contractorExpenses =
+                            contractorIncentive['contractor'] ?? 0;
+                        final incentiveExpenses =
+                            contractorIncentive['incentive'] ?? 0;
+
+                        final grandTotal =
+                            totalSupervisorExpenses +
+                            managerExpenses +
+                            orgExpenses +
+                            contractorExpenses +
+                            incentiveExpenses;
+
+                        return SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Project Overview Card
+                              Card(
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                margin: EdgeInsets.only(bottom: 20),
+                                child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Icon(
-                                        Icons.assignment,
-                                        color: primaryColor,
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.assignment,
+                                            color: primaryColor,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Text(
+                                            'Project Overview',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w600,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(width: 12),
-                                      Text(
-                                        'Project Overview',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                          color: primaryColor,
-                                        ),
+                                      SizedBox(height: 16),
+                                      _buildInfoRow('Site Location', site),
+                                      _buildInfoRow(
+                                        'Project Name',
+                                        projectName,
+                                      ),
+                                      _buildInfoRow(
+                                        'Start Date',
+                                        formatDate(plannedStartDate),
+                                      ),
+                                      _buildInfoRow(
+                                        'Budget',
+                                        formatCurrency(budget),
+                                      ),
+                                      _buildInfoRow(
+                                        'Amount Spent',
+                                        formatCurrency(amountSpent),
+                                      ),
+                                      _buildInfoRow(
+                                        'Current Status',
+                                        currentStatus,
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 16),
-                                  _buildInfoRow('Site Location', site),
-                                  _buildInfoRow('Project Name', projectName),
-                                  _buildInfoRow(
-                                    'Start Date',
-                                    formatDate(plannedStartDate),
-                                  ),
-                                  _buildInfoRow(
-                                    'Budget',
-                                    formatCurrency(budget),
-                                  ),
-                                  _buildInfoRow(
-                                    'Amount Spent',
-                                    formatCurrency(amountSpent),
-                                  ),
-                                  _buildInfoRow(
-                                    'Current Status',
-                                    currentStatus,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
 
-                          // Expenses Section
-                          Text(
-                            'Expense Breakdown',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
-                            ),
-                          ),
-                          SizedBox(height: 12),
-
-                          // Site Supervisor Expenses
-                          _buildExpenseCard(
-                            title: 'Site Supervisor Expenses',
-                            icon: Icons.engineering,
-                            expenseTotals: expenseTotals,
-                            total: totalSupervisorExpenses,
-                          ),
-                          SizedBox(height: 16),
-
-                          // Manager Expenses
-                          _buildSimpleExpenseCard(
-                            title: 'Manager Expenses',
-                            icon: Icons.manage_accounts,
-                            amount: managerExpenses,
-                          ),
-                          SizedBox(height: 16),
-
-                          // Organization Expenses
-                          _buildSimpleExpenseCard(
-                            title: 'Organization Expenses',
-                            icon: Icons.business,
-                            amount: orgExpenses,
-                          ),
-                          SizedBox(height: 16),
-
-                          // Contractor Expenses
-                          _buildSimpleExpenseCard(
-                            title: 'Contractor Expenses',
-                            icon: Icons.construction,
-                            amount: contractorExpenses,
-                          ),
-                          SizedBox(height: 16),
-
-                          // Incentive Expenses
-                          _buildSimpleExpenseCard(
-                            title: 'Incentive Expenses',
-                            icon: Icons.monetization_on,
-                            amount: incentiveExpenses,
-                          ),
-                          SizedBox(height: 24),
-
-                          // Grand Total Card
-                          Container(
-                            padding: EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: primaryColor.withOpacity(0.3),
-                                width: 1,
+                              // Expenses Section
+                              Text(
+                                'Expense Breakdown',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                              SizedBox(height: 12),
+
+                              // Site Supervisor Expenses
+                              _buildExpenseCard(
+                                title: 'Site Supervisor Expenses',
+                                icon: Icons.engineering,
+                                expenseTotals: expenseTotals,
+                                total: totalSupervisorExpenses,
+                              ),
+                              SizedBox(height: 16),
+
+                              // Manager Expenses
+                              _buildSimpleExpenseCard(
+                                title: 'Manager Expenses',
+                                icon: Icons.manage_accounts,
+                                amount: managerExpenses,
+                              ),
+                              SizedBox(height: 16),
+
+                              // Organization Expenses
+                              _buildSimpleExpenseCard(
+                                title: 'Organization Expenses',
+                                icon: Icons.business,
+                                amount: orgExpenses,
+                              ),
+                              SizedBox(height: 16),
+
+                              // Contractor Expenses
+                              _buildSimpleExpenseCard(
+                                title: 'Contractor Expenses',
+                                icon: Icons.construction,
+                                amount: contractorExpenses,
+                              ),
+                              SizedBox(height: 16),
+
+                              // Incentive Expenses
+                              _buildSimpleExpenseCard(
+                                title: 'Incentive Expenses',
+                                icon: Icons.monetization_on,
+                                amount: incentiveExpenses,
+                              ),
+                              SizedBox(height: 24),
+
+                              // Grand Total Card
+                              Container(
+                                padding: EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: primaryColor.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
                                   children: [
-                                    Icon(
-                                      Icons.calculate,
-                                      color: primaryColor,
-                                      size: 28,
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.calculate,
+                                          color: primaryColor,
+                                          size: 28,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          'Total Expenses',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(width: 10),
+                                    SizedBox(height: 12),
                                     Text(
-                                      'Total Expenses',
+                                      formatCurrency(grandTotal),
                                       style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                         color: primaryColor,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      '${(grandTotal / budget * 100).toStringAsFixed(1)}% of total budget',
+                                      style: TextStyle(
+                                        color: textColor.withOpacity(0.7),
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 12),
-                                Text(
-                                  formatCurrency(grandTotal),
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  '${(grandTotal / budget * 100).toStringAsFixed(1)}% of total budget',
-                                  style: TextStyle(
-                                    color: textColor.withOpacity(0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 24),
+                              ),
+                              SizedBox(height: 24),
 
-                          // PDF Button
-                          SizedBox(
-                            height: 50,
-                            child: ElevatedButton.icon(
-                              onPressed: _isSaving
-                                  ? null
-                                  : () async {
-                                      setState(() {
-                                        _isSaving = true;
-                                      });
-                                      await Printing.layoutPdf(
-                                        onLayout: (PdfPageFormat format) async {
-                                          return await _generatePdf(
-                                            project: project,
-                                            expenseTotals: expenseTotals,
-                                            totalExpenses:
-                                                totalSupervisorExpenses,
-                                            managerExpenses: managerExpenses,
-                                            orgExpenses: orgExpenses,
-                                            contractorExpenses:
-                                                contractorExpenses,
-                                            incentiveExpenses:
-                                                incentiveExpenses,
-                                            grandTotal: grandTotal,
+                              // PDF Button
+                              SizedBox(
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSaving
+                                      ? null
+                                      : () async {
+                                          setState(() {
+                                            _isSaving = true;
+                                          });
+                                          await Printing.layoutPdf(
+                                            onLayout:
+                                                (PdfPageFormat format) async {
+                                                  return await _generatePdf(
+                                                    project: project,
+                                                    expenseTotals:
+                                                        expenseTotals,
+                                                    totalExpenses:
+                                                        totalSupervisorExpenses,
+                                                    managerExpenses:
+                                                        managerExpenses,
+                                                    orgExpenses: orgExpenses,
+                                                    contractorExpenses:
+                                                        contractorExpenses,
+                                                    incentiveExpenses:
+                                                        incentiveExpenses,
+                                                    grandTotal: grandTotal,
+                                                  );
+                                                },
                                           );
+                                          setState(() {
+                                            _isSaving = false;
+                                          });
                                         },
-                                      );
-                                      setState(() {
-                                        _isSaving = false;
-                                      });
-                                    },
-                              icon: Icon(Icons.picture_as_pdf),
-                              label: Text(
-                                _isSaving
-                                    ? 'Generating PDF...'
-                                    : 'Generate PDF Report',
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  icon: Icon(Icons.picture_as_pdf),
+                                  label: Text(
+                                    _isSaving
+                                        ? 'Generating PDF...'
+                                        : 'Generate PDF Report',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                  ),
                                 ),
-                                elevation: 2,
                               ),
-                            ),
+                              SizedBox(height: 16),
+                            ],
                           ),
-                          SizedBox(height: 16),
-                        ],
-                      ),
+                        );
+                      },
                     );
                   },
                 );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
         ),
       ),
     );
@@ -858,6 +901,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     required num incentiveExpenses,
     required num grandTotal,
   }) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
     final orgDetails = await PdfTemplates.fetchOrgDetails();
@@ -903,7 +947,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             children: [
               PdfTemplates.buildMetaBox(
                 'Budget',
-                '₹${NumberFormat('#,##,###').format(budget)}',
+                '₹' + '${NumberFormat('#,##,###').format(budget)}',
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(
@@ -924,17 +968,25 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             style: pw.TextStyle(
               fontSize: 18,
               fontWeight: pw.FontWeight.bold,
+              font: PdfTemplates.boldFont,
               color: PdfColor.fromInt(primaryColor.value),
             ),
           ),
           pw.SizedBox(height: 12),
           pw.Text(
             'Site Supervisor Expenses',
-            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              font: PdfTemplates.boldFont,
+            ),
           ),
           pw.SizedBox(height: 8),
           expenseTotals.isEmpty
-              ? pw.Text('No expenses recorded')
+              ? pw.Text(
+                  'No expenses recorded',
+                  style: pw.TextStyle(font: PdfTemplates.regularFont),
+                )
               : pw.Table(
                   border: pw.TableBorder.all(color: PdfColors.grey300),
                   children: [
@@ -945,14 +997,20 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                           padding: pw.EdgeInsets.all(8),
                           child: pw.Text(
                             'Category',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              font: PdfTemplates.boldFont,
+                            ),
                           ),
                         ),
                         pw.Padding(
                           padding: pw.EdgeInsets.all(8),
                           child: pw.Text(
                             'Amount',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              font: PdfTemplates.boldFont,
+                            ),
                             textAlign: pw.TextAlign.right,
                           ),
                         ),
@@ -966,12 +1024,18 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                             child: pw.Text(
                               entry.key[0].toUpperCase() +
                                   entry.key.substring(1),
+                              style: pw.TextStyle(
+                                font: PdfTemplates.regularFont,
+                              ),
                             ),
                           ),
                           pw.Padding(
                             padding: pw.EdgeInsets.all(8),
                             child: pw.Text(
                               '₹${NumberFormat('#,##,###').format(entry.value)}',
+                              style: pw.TextStyle(
+                                font: PdfTemplates.regularFont,
+                              ),
                               textAlign: pw.TextAlign.right,
                             ),
                           ),
@@ -984,14 +1048,20 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                           padding: pw.EdgeInsets.all(8),
                           child: pw.Text(
                             'Total',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              font: PdfTemplates.boldFont,
+                            ),
                           ),
                         ),
                         pw.Padding(
                           padding: pw.EdgeInsets.all(8),
                           child: pw.Text(
                             '₹${NumberFormat('#,##,###').format(totalExpenses)}',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              font: PdfTemplates.boldFont,
+                            ),
                             textAlign: pw.TextAlign.right,
                           ),
                         ),
@@ -1016,12 +1086,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         'Manager Expenses',
                         style: pw.TextStyle(
                           fontWeight: pw.FontWeight.bold,
+                          font: PdfTemplates.boldFont,
                           color: PdfColors.grey700,
                         ),
                       ),
                       pw.Text(
                         '₹${NumberFormat('#,##,###').format(managerExpenses)}',
-                        style: pw.TextStyle(fontSize: 16),
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          font: PdfTemplates.regularFont,
+                        ),
                       ),
                     ],
                   ),
@@ -1042,12 +1116,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         'Organization Expenses',
                         style: pw.TextStyle(
                           fontWeight: pw.FontWeight.bold,
+                          font: PdfTemplates.boldFont,
                           color: PdfColors.grey700,
                         ),
                       ),
                       pw.Text(
                         '₹${NumberFormat('#,##,###').format(orgExpenses)}',
-                        style: pw.TextStyle(fontSize: 16),
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          font: PdfTemplates.regularFont,
+                        ),
                       ),
                     ],
                   ),
@@ -1072,12 +1150,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         'Contractor Expenses',
                         style: pw.TextStyle(
                           fontWeight: pw.FontWeight.bold,
+                          font: PdfTemplates.boldFont,
                           color: PdfColors.grey700,
                         ),
                       ),
                       pw.Text(
                         '₹${NumberFormat('#,##,###').format(contractorExpenses)}',
-                        style: pw.TextStyle(fontSize: 16),
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          font: PdfTemplates.regularFont,
+                        ),
                       ),
                     ],
                   ),
@@ -1098,12 +1180,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         'Incentive Expenses',
                         style: pw.TextStyle(
                           fontWeight: pw.FontWeight.bold,
+                          font: PdfTemplates.boldFont,
                           color: PdfColors.grey700,
                         ),
                       ),
                       pw.Text(
                         '₹${NumberFormat('#,##,###').format(incentiveExpenses)}',
-                        style: pw.TextStyle(fontSize: 16),
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          font: PdfTemplates.regularFont,
+                        ),
                       ),
                     ],
                   ),
@@ -1126,6 +1212,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                   style: pw.TextStyle(
                     fontSize: 16,
                     fontWeight: pw.FontWeight.bold,
+                    font: PdfTemplates.boldFont,
                     color: PdfColors.white,
                   ),
                 ),
@@ -1134,6 +1221,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
+                    font: PdfTemplates.boldFont,
                     color: PdfColors.white,
                   ),
                 ),

@@ -225,15 +225,19 @@ class _SiteScreenState extends State<SiteScreen>
             ].where((part) => part?.isNotEmpty ?? false).join(', ');
           }
         } catch (geocodingError) {
-          debugPrint('Geocoding error (falling back to coordinates only): $geocodingError');
-          address = 'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+          debugPrint(
+            'Geocoding error (falling back to coordinates only): $geocodingError',
+          );
+          address =
+              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
         }
       }
 
       setState(() {
         _latitudeController.text = position.latitude.toStringAsFixed(6);
         _longitudeController.text = position.longitude.toStringAsFixed(6);
-        if (_locationController.text.isEmpty || _locationController.text == 'Web Location') {
+        if (_locationController.text.isEmpty ||
+            _locationController.text == 'Web Location') {
           _locationController.text = address;
         }
       });
@@ -300,13 +304,18 @@ class _SiteScreenState extends State<SiteScreen>
           ],
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: TabBarView(
-        controller: _tabController,
-        children: [_buildNewSiteTab(), _buildAllSiteTab()],
-      ),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [_buildNewSiteTab(), _buildAllSiteTab()],
+            ),
+          ),
         ),
       ),
     );

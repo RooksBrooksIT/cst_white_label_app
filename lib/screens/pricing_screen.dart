@@ -128,17 +128,17 @@ class _PricingScreenState extends State<PricingScreen> {
           'maxProjects': _selectedPlan == 'Gold'
               ? _goldProjectsCount
               : _selectedPlan == 'Silver'
-                  ? 3
-                  : _selectedPlan == 'Platinum'
-                      ? 99999
-                      : 1, // Free Trial
+              ? 3
+              : _selectedPlan == 'Platinum'
+              ? 99999
+              : 1, // Free Trial
           'maxUsers': _selectedPlan == 'Gold'
               ? (_goldProjectsCount * 1.5).round()
               : _selectedPlan == 'Silver'
-                  ? 5
-                  : _selectedPlan == 'Platinum'
-                      ? 99999
-                      : 2, // Free Trial
+              ? 5
+              : _selectedPlan == 'Platinum'
+              ? 99999
+              : 2, // Free Trial
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -404,8 +404,6 @@ class _PricingScreenState extends State<PricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -417,39 +415,60 @@ class _PricingScreenState extends State<PricingScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: isDesktop ? 32.0 : 20.0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(theme, isMobile, isTablet, isDesktop),
-                      SizedBox(height: isDesktop ? 24.0 : 20.0),
-                      _buildSubtitle(theme, isMobile, isTablet, isDesktop),
-                      SizedBox(height: isDesktop ? 24.0 : 20.0),
-                      _buildPlanTabs(theme, isMobile, isTablet, isDesktop),
-                      SizedBox(height: isDesktop ? 24.0 : 20.0),
-                      _buildPlanCards(theme, isMobile, isTablet, isDesktop),
-                    ],
+      body: SafeArea(
+        bottom: true,
+        top: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: isDesktop ? 32.0 : 20.0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeader(theme, isMobile, isTablet, isDesktop),
+                            SizedBox(height: isDesktop ? 24.0 : 20.0),
+                            _buildSubtitle(
+                              theme,
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            ),
+                            SizedBox(height: isDesktop ? 24.0 : 20.0),
+                            _buildPlanTabs(
+                              theme,
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            ),
+                            SizedBox(height: isDesktop ? 24.0 : 20.0),
+                            _buildPlanCards(
+                              theme,
+                              isMobile,
+                              isTablet,
+                              isDesktop,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
         ),
       ),
     );
@@ -542,6 +561,7 @@ class _PricingScreenState extends State<PricingScreen> {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   vertical: isDesktop ? 12.0 : 10.0,
+                  horizontal: isMobile ? 4.0 : 8.0,
                 ),
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.white : Colors.transparent,
@@ -560,9 +580,11 @@ class _PricingScreenState extends State<PricingScreen> {
                   tab,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    fontSize: isDesktop ? 16.0 : 14.0,
+                    fontSize: isDesktop ? 16.0 : (isMobile ? 12.0 : 14.0),
                   ),
                   textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -737,50 +759,59 @@ class _PricingScreenState extends State<PricingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: isDesktop ? 28.0 : 24.0,
-                      height: isDesktop ? 28.0 : 24.0,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.grey[400]!,
-                          width: 2.0,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: isDesktop ? 28.0 : 24.0,
+                        height: isDesktop ? 28.0 : 24.0,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.blue : Colors.grey[400]!,
+                            width: 2.0,
+                          ),
+                          color: isSelected ? Colors.blue : Colors.transparent,
                         ),
-                        color: isSelected ? Colors.blue : Colors.transparent,
+                        child: isSelected
+                            ? Icon(
+                                Icons.circle,
+                                size: isDesktop ? 14.0 : 12.0,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
-                      child: isSelected
-                          ? Icon(
-                              Icons.circle,
-                              size: isDesktop ? 14.0 : 12.0,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                    SizedBox(width: isDesktop ? 16.0 : 12.0),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          planName,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: isDesktop ? 26.0 : 22.0,
-                          ),
+                      SizedBox(width: isDesktop ? 16.0 : 12.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              planName,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: isDesktop ? 26.0 : 22.0,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 4.0),
+                            Text(
+                              description,
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: isDesktop ? 15.0 : 13.0,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 4.0),
-                        Text(
-                          description,
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: isDesktop ? 15.0 : 13.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
+                SizedBox(width: isDesktop ? 16.0 : 8.0),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -790,6 +821,8 @@ class _PricingScreenState extends State<PricingScreen> {
                         fontWeight: FontWeight.bold,
                         fontSize: isDesktop ? 32.0 : 28.0,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (originalPrice.isNotEmpty) ...[
                       SizedBox(height: 4.0),
@@ -800,6 +833,8 @@ class _PricingScreenState extends State<PricingScreen> {
                           fontSize: isDesktop ? 16.0 : 14.0,
                           decoration: TextDecoration.lineThrough,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                     SizedBox(height: 4.0),
@@ -815,6 +850,8 @@ class _PricingScreenState extends State<PricingScreen> {
                         color: Colors.grey[500],
                         fontSize: isDesktop ? 14.0 : 12.0,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -871,7 +908,9 @@ class _PricingScreenState extends State<PricingScreen> {
                               thumbColor: Colors.blue,
                               overlayColor: Colors.blue.withOpacity(0.1),
                               valueIndicatorColor: Colors.blue,
-                              valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                              valueIndicatorTextStyle: const TextStyle(
+                                color: Colors.white,
+                              ),
                             ),
                             child: Slider(
                               value: _goldProjectsCount.toDouble(),
@@ -891,8 +930,11 @@ class _PricingScreenState extends State<PricingScreen> {
                           SizedBox(height: isDesktop ? 20.0 : 16.0),
                           ...features.map((feature) {
                             return Padding(
-                              padding: EdgeInsets.only(bottom: isDesktop ? 10.0 : 8.0),
+                              padding: EdgeInsets.only(
+                                bottom: isDesktop ? 10.0 : 8.0,
+                              ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
                                     Icons.description_rounded,
@@ -900,9 +942,15 @@ class _PricingScreenState extends State<PricingScreen> {
                                     color: Colors.black54,
                                   ),
                                   SizedBox(width: isDesktop ? 12.0 : 10.0),
-                                  Text(
-                                    feature,
-                                    style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+                                  Expanded(
+                                    child: Text(
+                                      feature,
+                                      style: TextStyle(
+                                        fontSize: isDesktop ? 16.0 : 14.0,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -960,7 +1008,8 @@ class _PricingScreenState extends State<PricingScreen> {
                                 style: TextStyle(
                                   fontSize: isDesktop ? 12.0 : 11.0,
                                   color: Colors.grey[600],
-                                  fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                                  fontFamily:
+                                      theme.textTheme.bodyMedium?.fontFamily,
                                 ),
                                 children: [
                                   TextSpan(

@@ -128,40 +128,42 @@ class _customerProjectFinancialStatusReportPageState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Project Status Report',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_userSiteId != null) _buildUserSiteHeader(theme),
-            const SizedBox(height: 24),
-            _buildDetailsCard(theme),
-            const SizedBox(height: 32),
-            GlassButton(
-              label: 'FINANCIAL STATUS',
-              onPressed: _showFinancialStatus,
-              icon: Icons.pie_chart_outline,
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_userSiteId != null) _buildUserSiteHeader(theme),
+                const SizedBox(height: 24),
+                _buildDetailsCard(theme),
+                const SizedBox(height: 32),
+                GlassButton(
+                  label: 'FINANCIAL STATUS',
+                  onPressed: _showFinancialStatus,
+                  icon: Icons.pie_chart_outline,
+                ),
+                const SizedBox(height: 12),
+                GlassButton(
+                  label: 'PROJECT INDICATOR',
+                  onPressed: _showProjectIndicator,
+                  icon: Icons.analytics_outlined,
+                  isSecondary: true,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            GlassButton(
-              label: 'PROJECT INDICATOR',
-              onPressed: _showProjectIndicator,
-              icon: Icons.analytics_outlined,
-              isSecondary: true,
-            ),
-          ],
-        ),
-      ),
+          ),
         ),
       ),
     );

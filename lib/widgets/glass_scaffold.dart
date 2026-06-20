@@ -107,7 +107,10 @@ class GlassScaffold extends StatelessWidget {
               ),
             ),
             child: SafeArea(
-              bottom: bottomNavigationBar == null,
+              top: true,
+              bottom: true,
+              left: true,
+              right: true,
               child: Padding(
                 padding:
                     (padding ??

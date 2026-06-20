@@ -56,9 +56,33 @@ class _ProjectstageSiteSummaryReportState
 
   Future<Map<String, dynamic>?> _fetchProjectInfo() async {
     try {
-      final snap = await FirestoreService.getCollection(
+      // Try 1: query projects by siteId field
+      var snap = await FirestoreService.getCollection(
         'projects',
       ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+
+      // Try 2: query by site field
+      if (snap.docs.isEmpty) {
+        snap = await FirestoreService.getCollection(
+          'projects',
+        ).where('site', isEqualTo: widget.siteId).limit(1).get();
+      }
+
+      // Try 3: query by siteName from Site collection
+      if (snap.docs.isEmpty) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          final sName = siteData['siteName']?.toString();
+          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
+            snap = await FirestoreService.getCollection(
+              'projects',
+            ).where('siteName', isEqualTo: sName).limit(1).get();
+          }
+        }
+      }
 
       Map<String, dynamic>? data = snap.docs.isNotEmpty
           ? snap.docs.first.data()
@@ -221,37 +245,39 @@ class _ProjectstageSiteSummaryReportState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Site Summary Report',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: _generatePdf,
         ),
       ],
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildProjectCard(theme),
-                  const SizedBox(height: 24),
-                  _buildFinanceCard(theme),
-                  const SizedBox(height: 24),
-                  _buildBreakdownSection(theme),
-                ],
-              ),
-            ),
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildProjectCard(theme),
+                      const SizedBox(height: 24),
+                      _buildFinanceCard(theme),
+                      const SizedBox(height: 24),
+                      _buildBreakdownSection(theme),
+                    ],
+                  ),
+                ),
         ),
       ),
     );

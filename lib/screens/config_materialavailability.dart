@@ -547,10 +547,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     return GlassScaffold(
       title: 'Material Availability',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _isLoadingMaterials
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: _isLoadingMaterials
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -600,6 +602,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 ),
               ),
             ),
+          ),
         ),
       ),
     );

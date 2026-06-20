@@ -270,10 +270,12 @@ class _LabourScreenState extends State<LabourScreen> {
     return GlassScaffold(
       title: 'Labour Configuration',
       onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: isLoading
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -601,6 +603,7 @@ class _LabourScreenState extends State<LabourScreen> {
                 ),
               ),
             ),
+          ),
         ),
       ),
     );

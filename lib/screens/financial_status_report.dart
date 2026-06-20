@@ -43,15 +43,33 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   Future<void> _fetchProjectData() async {
     try {
       final col = FirestoreService.getCollection('projects');
+      // Try 1: query projects by siteId field
       QuerySnapshot<Map<String, dynamic>> query = await col
           .where('siteId', isEqualTo: widget.siteId)
           .limit(1)
           .get();
+      // Try 2: query by site field
       if (query.docs.isEmpty) {
         query = await col
-            .where('siteid', isEqualTo: widget.siteId)
+            .where('site', isEqualTo: widget.siteId)
             .limit(1)
             .get();
+      }
+      // Try 3: query by siteName from Site collection
+      if (query.docs.isEmpty) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          final sName = siteData['siteName']?.toString();
+          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
+            query = await col
+                .where('siteName', isEqualTo: sName)
+                .limit(1)
+                .get();
+          }
+        }
       }
 
       Map<String, dynamic> data = {};
@@ -72,6 +90,13 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           }
           if (data['siteName'] == null) {
             data['siteName'] = siteData['siteName'];
+          }
+          // Merge start date if missing
+          if (data['actualStartDate'] == null &&
+              data['actualStateDate'] == null &&
+              data['plannedStartDate'] == null &&
+              data['startDate'] == null) {
+            data['actualStartDate'] = siteData['startDate'];
           }
         }
       } catch (e) {
@@ -266,7 +291,9 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             'Actual Start',
             _formatDate(
               projectData?['actualStartDate'] ??
-                  projectData?['actualStateDate'],
+                  projectData?['actualStateDate'] ??
+                  projectData?['plannedStartDate'] ??
+                  projectData?['startDate'],
             ),
             Icons.calendar_today_outlined,
           ),
@@ -421,12 +448,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   int _calculateDuration() {
     final start =
-        projectData?['actualStartDate'] ?? projectData?['actualStateDate'];
+        projectData?['actualStartDate'] ??
+        projectData?['actualStateDate'] ??
+        projectData?['plannedStartDate'] ??
+        projectData?['startDate'];
     if (start is! Timestamp) return 0;
     return DateTime.now().difference(start.toDate()).inDays;
   }
 
   Future<void> _generateAndPreviewPDF() async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
@@ -481,7 +512,12 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
               ),
               PdfTemplates.buildMetaBox(
                 'Start Date',
-                _formatDate(projectData?['actualStartDate']),
+                _formatDate(
+                  projectData?['actualStartDate'] ??
+                      projectData?['actualStateDate'] ??
+                      projectData?['plannedStartDate'] ??
+                      projectData?['startDate'],
+                ),
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(
@@ -500,23 +536,26 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
               fontSize: 14,
               fontWeight: pw.FontWeight.bold,
               color: pdfPrimaryColor,
+              font: PdfTemplates.boldFont,
             ),
           ),
           pw.SizedBox(height: 8),
           pw.Table.fromTextArray(
             headers: ['Financial Metric', 'Amount (INR)'],
             data: [
-              ['Total Project Budget', budget.toStringAsFixed(2)],
-              ['Total Amount Received', received.toStringAsFixed(2)],
-              ['Total Amount Spent', spent.toStringAsFixed(2)],
-              ['Remaining Balance', balance.toStringAsFixed(2)],
+              ['Total Project Budget', '₹${budget.toStringAsFixed(2)}'],
+              ['Total Amount Received', '₹${received.toStringAsFixed(2)}'],
+              ['Total Amount Spent', '₹${spent.toStringAsFixed(2)}'],
+              ['Remaining Balance', '₹${balance.toStringAsFixed(2)}'],
             ],
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
           pw.SizedBox(height: 32),
@@ -536,6 +575,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                   style: pw.TextStyle(
                     fontSize: 12,
                     fontWeight: pw.FontWeight.bold,
+                    font: PdfTemplates.boldFont,
                   ),
                 ),
                 pw.SizedBox(height: 8),
@@ -543,7 +583,10 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                   children: [
                     pw.Text(
                       'Budget Utilization: ',
-                      style: const pw.TextStyle(fontSize: 10),
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        font: PdfTemplates.regularFont,
+                      ),
                     ),
                     pw.Text(
                       '${budget > 0 ? (spent / budget * 100).toStringAsFixed(1) : 0}%',
@@ -551,6 +594,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                         fontSize: 10,
                         fontWeight: pw.FontWeight.bold,
                         color: pdfPrimaryColor,
+                        font: PdfTemplates.boldFont,
                       ),
                     ),
                   ],
@@ -560,7 +604,10 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                   children: [
                     pw.Text(
                       'Estimated Completion Weight: ',
-                      style: const pw.TextStyle(fontSize: 10),
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        font: PdfTemplates.regularFont,
+                      ),
                     ),
                     pw.Text(
                       '${projectData?['completionPercentage'] ?? 0}%',
@@ -568,6 +615,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
                         fontSize: 10,
                         fontWeight: pw.FontWeight.bold,
                         color: pdfPrimaryColor,
+                        font: PdfTemplates.boldFont,
                       ),
                     ),
                   ],

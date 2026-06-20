@@ -336,140 +336,143 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
     return GlassScaffold(
       title: 'Site to Company Return',
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            GlassCard(
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSectionHeader('Return Details'),
-                  const SizedBox(height: 16),
-                  _buildInputField(
-                    controller: _managerNameController,
-                    label: 'Manager Name',
-                    icon: Icons.person,
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader('Return Details'),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _managerNameController,
+                          label: 'Manager Name',
+                          icon: Icons.person,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDatePicker(),
+                        const SizedBox(height: 16),
+                        _buildDropdownField(
+                          value: _selectedSiteId,
+                          label: 'Site ID',
+                          items: _siteIds,
+                          onChanged: (newValue) {
+                            setState(() {
+                              _selectedSiteId = newValue;
+                            });
+                            _fetchAndSetProjectName(newValue);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _projectNameController,
+                          label: 'Project Name',
+                          icon: Icons.business,
+                          readOnly: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInputField(
+                          controller: _supervisorNameController,
+                          label: 'Supervisor Name',
+                          icon: Icons.badge,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildDatePicker(),
-                  const SizedBox(height: 16),
-                  _buildDropdownField(
-                    value: _selectedSiteId,
-                    label: 'Site ID',
-                    items: _siteIds,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedSiteId = newValue;
-                      });
-                      _fetchAndSetProjectName(newValue);
-                    },
+                  const SizedBox(height: 20),
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader('Tools Selection'),
+                        const SizedBox(height: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildDropdownField(
+                              value: _selectedTool,
+                              label: 'Select Tool',
+                              items: _tools.map((t) => t['name'] as String).toList(),
+                              onChanged: (newValue) {
+                                setState(() {
+                                  _selectedTool = newValue;
+                                  _toolCountController.clear();
+                                  _toolCount = null;
+                                });
+                                _fetchAvailableCountForSelectedTool(newValue);
+                              },
+                            ),
+                            const SizedBox(height: 4),
+                            _AvailableCountWithWarning(
+                              availableCount: _selectedToolAvailableCount,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInputField(
+                              controller: _toolCountController,
+                              label: 'Count',
+                              icon: Icons.onetwothree,
+                              keyboardType: TextInputType.number,
+                              onChanged: (value) {
+                                setState(() {
+                                  _toolCount = int.tryParse(value);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        GlassButton(
+                          label: 'Add Tool',
+                          onPressed: _addTool,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildInputField(
-                    controller: _projectNameController,
-                    label: 'Project Name',
-                    icon: Icons.business,
-                    readOnly: true,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInputField(
-                    controller: _supervisorNameController,
-                    label: 'Supervisor Name',
-                    icon: Icons.badge,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader('Tools Selection'),
-                  const SizedBox(height: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  if (_addedTools.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader('Selected Tools'),
+                          const SizedBox(height: 16),
+                          _buildToolsTable(),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  Row(
                     children: [
-                      _buildDropdownField(
-                        value: _selectedTool,
-                        label: 'Select Tool',
-                        items: _tools.map((t) => t['name'] as String).toList(),
-                        onChanged: (newValue) {
-                          setState(() {
-                            _selectedTool = newValue;
-                            _toolCountController.clear();
-                            _toolCount = null;
-                          });
-                          _fetchAvailableCountForSelectedTool(newValue);
-                        },
+                      Expanded(
+                        child: GlassButton(
+                          label: 'Cancel',
+                          isSecondary: true,
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      _AvailableCountWithWarning(
-                        availableCount: _selectedToolAvailableCount,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInputField(
-                        controller: _toolCountController,
-                        label: 'Count',
-                        icon: Icons.onetwothree,
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            _toolCount = int.tryParse(value);
-                          });
-                        },
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: GlassButton(
+                          label: 'Save Return',
+                          onPressed: _saveReturn,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  GlassButton(
-                    label: 'Add Tool',
-                    onPressed: _addTool,
-                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
-            if (_addedTools.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionHeader('Selected Tools'),
-                    const SizedBox(height: 16),
-                    _buildToolsTable(),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: GlassButton(
-                    label: 'Cancel',
-                    isSecondary: true,
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GlassButton(
-                    label: 'Save Return',
-                    onPressed: _saveReturn,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+          ),
         ),
       ),
     );

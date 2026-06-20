@@ -135,16 +135,19 @@ class _ToolMasterPageState extends State<ToolMasterPage>
           Tab(text: 'UPDATE COUNT'),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildNewTab(theme, isSmallScreen),
-          _buildUpdateTab(theme, isSmallScreen),
-        ],
-      ),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildNewTab(theme, isSmallScreen),
+                _buildUpdateTab(theme, isSmallScreen),
+              ],
+            ),
+          ),
         ),
       ),
     );
