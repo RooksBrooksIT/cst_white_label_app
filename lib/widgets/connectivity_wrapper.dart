@@ -15,6 +15,8 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
   final Connectivity _connectivity = Connectivity();
   bool _isOffline = false;
 
+
+
   @override
   void initState() {
     super.initState();
