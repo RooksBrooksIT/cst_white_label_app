@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' show TableHelper;
 import 'package:printing/printing.dart';
 import '../utils/pdf_templates.dart';
 
@@ -22,7 +21,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   String? selectedMaterial;
   bool isLoadingNames = true;
   bool isReportLoading = false;
-  List<_SiteMaterialRow> reportRows = [];
+  List<SiteMaterialRow> reportRows = [];
 
   @override
   void initState() {
@@ -39,7 +38,12 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     try {
       final snapshot = await FirestoreService.materialCategories.get();
       final names = snapshot.docs
-          .map((doc) => (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '').toString().trim())
+          .map(
+            (doc) =>
+                (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '')
+                    .toString()
+                    .trim(),
+          )
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();
@@ -60,7 +64,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     });
 
     try {
-      final q = await FirestoreService.getCollection('materialsInventory').where('materialName', isEqualTo: materialName).get();
+      final q = await FirestoreService.getCollection(
+        'materialsInventory',
+      ).where('materialName', isEqualTo: materialName).get();
       final Map<String, double> qtyBySite = {};
       for (final doc in q.docs) {
         final data = doc.data();
@@ -68,17 +74,27 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         if (sites is List) {
           for (final s in sites) {
             if (s is Map<String, dynamic>) {
-              final siteId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
+              final siteId = (s['siteId'] ?? s['siteid'] ?? '')
+                  .toString()
+                  .trim();
               if (siteId.isEmpty) continue;
               final qty = _parseNumber(s['materialQty']);
-              qtyBySite.update(siteId, (prev) => prev + qty, ifAbsent: () => qty);
+              qtyBySite.update(
+                siteId,
+                (prev) => prev + qty,
+                ifAbsent: () => qty,
+              );
             }
           }
         }
       }
 
-      final rows = qtyBySite.entries.map((e) => _SiteMaterialRow(siteId: e.key, qty: e.value)).toList();
-      rows.sort((a, b) => a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()));
+      final rows = qtyBySite.entries
+          .map((e) => SiteMaterialRow(siteId: e.key, qty: e.value))
+          .toList();
+      rows.sort(
+        (a, b) => a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()),
+      );
 
       setState(() {
         reportRows = rows;
@@ -92,7 +108,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   double _parseNumber(dynamic v) {
     if (v == null) return 0.0;
     if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
+    if (v is String) {
+      return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
+    }
     return 0.0;
   }
 
@@ -112,7 +130,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         ),
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.white),
-          onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
+          onPressed: selectedMaterial != null
+              ? () => _fetchMaterialReport(selectedMaterial!)
+              : null,
         ),
       ],
       body: Center(
@@ -131,7 +151,12 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                   _buildReportHeader(theme),
                   const SizedBox(height: 16),
                   if (isReportLoading)
-                    const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else if (reportRows.isEmpty)
                     _buildEmptyState(theme)
                   else
@@ -150,9 +175,17 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Inventory Insights', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Inventory Insights',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 4),
-          Text('Select a material to view its distribution across sites.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            'Select a material to view its distribution across sites.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 20),
           if (isLoadingNames)
             const LinearProgressIndicator()
@@ -162,14 +195,23 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
               decoration: InputDecoration(
                 labelText: 'Material Name',
                 prefixIcon: const Icon(Icons.inventory_2_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 filled: true,
                 fillColor: theme.colorScheme.surface,
               ),
-              items: materialNames.map((name) => DropdownMenuItem(
-                value: name,
-                child: Text(name, style: TextStyle(color: theme.colorScheme.onSurface)),
-              )).toList(),
+              items: materialNames
+                  .map(
+                    (name) => DropdownMenuItem(
+                      value: name,
+                      child: Text(
+                        name,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
+                      ),
+                    ),
+                  )
+                  .toList(),
               dropdownColor: theme.colorScheme.surfaceContainerHighest,
               onChanged: (val) {
                 setState(() => selectedMaterial = val);
@@ -187,10 +229,20 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         Container(
           width: 4,
           height: 24,
-          decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+            color: theme.primaryColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         const SizedBox(width: 12),
-        Text('DISTRIBUTION REPORT', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          'DISTRIBUTION REPORT',
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -202,9 +254,16 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           padding: const EdgeInsets.all(40.0),
           child: Column(
             children: [
-              Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.outlineVariant),
+              Icon(
+                Icons.inbox_outlined,
+                size: 48,
+                color: theme.colorScheme.outlineVariant,
+              ),
               const SizedBox(height: 16),
-              const Text('No site data found for this material.', style: TextStyle(fontWeight: FontWeight.w500)),
+              const Text(
+                'No site data found for this material.',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
             ],
           ),
         ),
@@ -219,12 +278,26 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.05), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+            decoration: BoxDecoration(
+              color: theme.primaryColor.withValues(alpha: 0.05),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Across active sites', style: TextStyle(fontWeight: FontWeight.w600)),
-                Text('${reportRows.length} sites', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Across active sites',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '${reportRows.length} sites',
+                  style: TextStyle(
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -236,8 +309,21 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
             itemBuilder: (ctx, i) {
               final row = reportRows[i];
               return ListTile(
-                title: Text(row.siteId, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                trailing: Text(row.qty.toStringAsFixed(row.qty % 1 == 0 ? 0 : 2), style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor, fontSize: 16)),
+                title: Text(
+                  row.siteId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+                trailing: Text(
+                  row.qty.toStringAsFixed(row.qty % 1 == 0 ? 0 : 2),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor,
+                    fontSize: 16,
+                  ),
+                ),
               );
             },
           ),
@@ -245,9 +331,12 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       ),
     );
   }
+
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.toARGB32(),
+    );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(
@@ -263,15 +352,33 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Material Name', selectedMaterial ?? 'N/A', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Total Sites', '${reportRows.length}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Material Name',
+                selectedMaterial ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Total Sites',
+                '${reportRows.length}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
-          pw.Table.fromTextArray(
+          TableHelper.fromTextArray(
             headers: ['Site ID', 'Quantity'],
-            data: reportRows.map((r) => [r.siteId, r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2)]).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            data: reportRows
+                .map(
+                  (r) => [
+                    r.siteId,
+                    r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2),
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
@@ -285,8 +392,8 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   }
 }
 
-class _SiteMaterialRow {
+class SiteMaterialRow {
   final String siteId;
   final double qty;
-  _SiteMaterialRow({required this.siteId, required this.qty});
+  SiteMaterialRow({required this.siteId, required this.qty});
 }

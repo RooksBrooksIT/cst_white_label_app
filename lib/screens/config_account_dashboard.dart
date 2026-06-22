@@ -149,11 +149,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF8E24AA),
       ),
       DashboardItem(
-        'Vehicle Configuration',
-        Icons.settings_rounded,
-        Colors.red,
-        'Vehicle specifications',
-        Colors.red,
+        'Vehicle Driver Configuration',
+        Icons.person_rounded,
+        Colors.blue,
+        'Driver profiles',
+        Colors.blue,
       ),
     ],
     "Project Configuration": [
@@ -268,11 +268,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     ],
     "Vehicle Fleet": [
       DashboardItem(
-        'Vehicle Driver Configuration',
-        Icons.person_rounded,
-        Colors.blue,
-        'Driver profiles',
-        Colors.blue,
+        'Vehicle Fleet',
+        Icons.settings_rounded,
+        Colors.red,
+        'Vehicle specifications',
+        Colors.red,
       ),
       DashboardItem(
         'Vehicle Details',
@@ -783,7 +783,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Workers Site Mapping': WorkerMappingPage(),
       'Workers Availability': const WorkersAvailabilityReportPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),
-      'Vehicle Configuration': AddVehicleLogPage(),
+      'Vehicle Fleet': AddVehicleLogPage(),
       'Vehicle Driver Configuration': VehicleDriverConfigPage(),
       "Vehicle Details": VehicleDetailsPage(),
       "Vehicle Inventory": VehicleInventoryReportPage(),
