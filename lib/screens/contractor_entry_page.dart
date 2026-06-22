@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/expense_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -74,6 +74,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   dynamic contractStartDate;
   dynamic contractEndDate;
 
+  List<Map<String, dynamic>> contractorDocs = [];
+  List<String> contractorOptions = [];
+  bool isLoadingContractors = true;
+
   List<Map<String, dynamic>> materials = [];
   List<Map<String, dynamic>> labours = [];
 
@@ -133,6 +137,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     _fetchMaterialOptions();
     _fetchLabourOptions();
     _fetchSiteIds();
+    _fetchContractors();
   }
 
   @override
@@ -377,6 +382,71 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       setState(() {
         labourError = 'Failed to load labours';
         isLoadingLabours = false;
+      });
+    }
+  }
+
+  Future<void> _fetchContractors() async {
+    setState(() {
+      isLoadingContractors = true;
+    });
+    try {
+      final snapshot = await FirestoreService.contractors.get();
+      final docs = <Map<String, dynamic>>[];
+      final options = <String>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['contractorName']?.toString() ?? '';
+        if (name.isNotEmpty) {
+          docs.add(data);
+          options.add(name);
+        }
+      }
+      setState(() {
+        contractorDocs = docs;
+        contractorOptions = options;
+        // If pre-selected contractor exists, keep it; else set first
+        if (_selectedContractorName == null ||
+            !contractorOptions.contains(_selectedContractorName)) {
+          _selectedContractorName = contractorOptions.isNotEmpty
+              ? contractorOptions.first
+              : null;
+          if (_selectedContractorName != null) {
+            _contractorNameController.text = _selectedContractorName!;
+          }
+        }
+        isLoadingContractors = false;
+      });
+      // If we have a selected contractor, auto-fill project field
+      if (_selectedContractorName != null) {
+        await _fetchProjectForContractor(_selectedContractorName!);
+      }
+    } catch (e) {
+      debugPrint('Failed to load contractors: $e');
+      setState(() {
+        isLoadingContractors = false;
+      });
+    }
+  }
+
+  Future<void> _fetchProjectForContractor(String contractorName) async {
+    try {
+      // Find the contractor doc from our stored list
+      final contractorDoc = contractorDocs.firstWhere(
+        (doc) => doc['contractorName'] == contractorName,
+        orElse: () => {},
+      );
+      final contractorField =
+          contractorDoc['contractorField']?.toString() ?? '';
+      setState(() {
+        _selectedProjectField = contractorField;
+        _projectFieldController.text = contractorField;
+      });
+    } catch (e) {
+      debugPrint('Failed to fetch project for contractor: $e');
+      setState(() {
+        _selectedProjectField = null;
+        _projectFieldController.clear();
       });
     }
   }
@@ -1111,27 +1181,53 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             color: _primaryColor,
           ),
           const SizedBox(height: 18),
-          _buildInputField(
-            label: 'Contractor Name',
-            child: TextField(
-              controller: _contractorNameController,
-              readOnly: widget.showLogout,
-              onChanged: (val) => _selectedContractorName = val,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Enter contractor name',
-              ),
-            ),
-          ),
+          isLoadingContractors
+              ? Center(child: CircularProgressIndicator(color: _primaryColor))
+              : _buildInputField(
+                  label: 'Contractor Name',
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: contractorOptions.contains(_selectedContractorName)
+                        ? _selectedContractorName
+                        : null,
+                    items: contractorOptions
+                        .map(
+                          (name) => DropdownMenuItem<String>(
+                            value: name,
+                            child: Text(name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: widget.showLogout
+                        ? null
+                        : (val) async {
+                            setState(() {
+                              _selectedContractorName = val;
+                              if (val != null) {
+                                _contractorNameController.text = val;
+                              }
+                            });
+                            if (val != null) {
+                              await _fetchProjectForContractor(val);
+                              // Also refresh site IDs since they depend on contractor
+                              await _fetchSiteIds();
+                            }
+                          },
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Select contractor',
+                    ),
+                  ),
+                ),
           _buildInputField(
             label: 'Project Field',
             child: TextField(
               controller: _projectFieldController,
-              readOnly: widget.showLogout,
+              readOnly: widget.showLogout || _selectedContractorName != null,
               onChanged: (val) => _selectedProjectField = val,
               decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: 'Enter project field',
+                hintText: 'Select a contractor to auto-fill',
               ),
             ),
           ),
@@ -1648,33 +1744,35 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
           : null,
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: hPad,
-          vertical: sectionSpacing,
-        ),
-        child: Column(
-          children: [
-            _buildContractorDetailsCard(),
-            SizedBox(height: sectionSpacing),
-            _buildMaterialSection(),
-            SizedBox(height: sectionSpacing),
-            _buildLabourSection(),
-            SizedBox(height: sectionSpacing),
-            _buildAdditionalCostsSection(),
-            SizedBox(height: sectionSpacing),
-            _buildSummarySection(),
-            const SizedBox(height: 32),
-            GlassButton(
-              onPressed: isSaving ? null : _saveToFirestore,
-              label: 'SAVE ENTRY',
-              isLoading: isSaving,
+            padding: EdgeInsets.symmetric(
+              horizontal: hPad,
+              vertical: sectionSpacing,
             ),
-            SizedBox(height: sectionSpacing * 2),
-          ],
-        ),
-      ),
+            child: Column(
+              children: [
+                _buildContractorDetailsCard(),
+                SizedBox(height: sectionSpacing),
+                _buildMaterialSection(),
+                SizedBox(height: sectionSpacing),
+                _buildLabourSection(),
+                SizedBox(height: sectionSpacing),
+                _buildAdditionalCostsSection(),
+                SizedBox(height: sectionSpacing),
+                _buildSummarySection(),
+                const SizedBox(height: 32),
+                GlassButton(
+                  onPressed: isSaving ? null : _saveToFirestore,
+                  label: 'SAVE ENTRY',
+                  isLoading: isSaving,
+                ),
+                SizedBox(height: sectionSpacing * 2),
+              ],
+            ),
+          ),
         ),
       ),
     );

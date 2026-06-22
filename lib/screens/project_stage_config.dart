@@ -30,115 +30,120 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Container(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Add New Stage',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _newStageController,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: 'Stage Name',
-                        labelStyle: TextStyle(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 600),
+                child: Container(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add New Stage',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
                           color: Theme.of(context).colorScheme.primary,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _newStageController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: 'Stage Name',
+                          labelStyle: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
-                            width: 2,
                           ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).cardColor,
-                      ),
-                      cursorColor: Theme.of(context).colorScheme.primary,
-                      onChanged: (value) async {
-                        final duplicate = await _isDuplicateStage(value.trim());
-                        setState(() {
-                          isDuplicate = duplicate;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primary,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save', style: TextStyle()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isDuplicate
-                                ? Colors.grey
-                                : Theme.of(context).colorScheme.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
                             ),
-                            elevation: 2,
                           ),
-                          onPressed: isDuplicate
-                              ? null
-                              : () async {
-                                  final newStage = _newStageController.text
-                                      .trim();
-                                  if (newStage.isEmpty) return;
-
-                                  final nextId = await _getNextStageId();
-                                  await FirestoreService.getCollection(
-                                    'projectStages',
-                                  ).doc(nextId).set({
-                                    'projectStageId': nextId,
-                                    'projectStage': newStage,
-                                  });
-
-                                  Navigator.of(context).pop();
-                                  setState(() {
-                                    _selectedStage = newStage;
-                                  });
-                                  await DialogUtils.showSuccessDialog(
-                                    context,
-                                    message: 'Stage added successfully!',
-                                  );
-                                },
+                          filled: true,
+                          fillColor: Theme.of(context).cardColor,
                         ),
-                      ],
-                    ),
-                    if (isDuplicate)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12.0),
-                        child: Text(
-                          'This stage already exists.',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 14,
-                          ),
-                        ),
+                        cursorColor: Theme.of(context).colorScheme.primary,
+                        onChanged: (value) async {
+                          final duplicate = await _isDuplicateStage(
+                            value.trim(),
+                          );
+                          setState(() {
+                            isDuplicate = duplicate;
+                          });
+                        },
                       ),
-                  ],
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.save),
+                            label: const Text('Save', style: TextStyle()),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDuplicate
+                                  ? Colors.grey
+                                  : Theme.of(context).colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: isDuplicate
+                                ? null
+                                : () async {
+                                    final newStage = _newStageController.text
+                                        .trim();
+                                    if (newStage.isEmpty) return;
+
+                                    final nextId = await _getNextStageId();
+                                    await FirestoreService.getCollection(
+                                      'projectStages',
+                                    ).doc(nextId).set({
+                                      'projectStageId': nextId,
+                                      'projectStage': newStage,
+                                    });
+
+                                    Navigator.of(context).pop();
+                                    setState(() {
+                                      _selectedStage = newStage;
+                                    });
+                                    await DialogUtils.showSuccessDialog(
+                                      context,
+                                      message: 'Stage added successfully!',
+                                    );
+                                  },
+                          ),
+                        ],
+                      ),
+                      if (isDuplicate)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: Text(
+                            'This stage already exists.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -156,48 +161,51 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: Theme.of(context).colorScheme.error,
-                  size: 60,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 500),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 60,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15),
-                ),
-                const SizedBox(height: 20),
-                Builder(
-                  builder: (context) {
-                    final cs = Theme.of(context).colorScheme;
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.error,
-                        foregroundColor: cs.onError,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                  const SizedBox(height: 20),
+                  Builder(
+                    builder: (context) {
+                      final cs = Theme.of(context).colorScheme;
+                      return ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cs.error,
+                          foregroundColor: cs.onError,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('OK'),
-                    );
-                  },
-                ),
-              ],
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('OK'),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -317,7 +325,7 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: isMobile ? double.infinity : 600,
+              maxWidth: isMobile ? double.infinity : 800,
             ),
             child: SingleChildScrollView(
               child: Padding(
@@ -327,7 +335,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                   children: [
                     // --- Project Stage Card ---
                     Container(
-                      constraints: const BoxConstraints(maxWidth: 500),
+                      constraints: BoxConstraints(
+                        maxWidth: isMobile ? double.infinity : 700,
+                      ),
                       child: GlassCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,21 +467,29 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Expanded(
-                            child: GlassButton(
-                              label: 'BACK',
-                              onPressed: () => Navigator.of(context).pop(),
-                              isSecondary: true,
+                          Flexible(
+                            flex: isMobile ? 1 : 0,
+                            child: Container(
+                              constraints: BoxConstraints(maxWidth: 300),
+                              child: GlassButton(
+                                label: 'BACK',
+                                onPressed: () => Navigator.of(context).pop(),
+                                isSecondary: true,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Expanded(
-                            child: GlassButton(
-                              label: 'DELETE',
-                              onPressed: _selectedStage != null
-                                  ? _deleteSelectedStage
-                                  : null,
-                              isSecondary: true,
+                          Flexible(
+                            flex: isMobile ? 1 : 0,
+                            child: Container(
+                              constraints: BoxConstraints(maxWidth: 300),
+                              child: GlassButton(
+                                label: 'DELETE',
+                                onPressed: _selectedStage != null
+                                    ? _deleteSelectedStage
+                                    : null,
+                                isSecondary: true,
+                              ),
                             ),
                           ),
                         ],
