@@ -77,18 +77,26 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
       final oldPassword = _oldPasswordController.text.trim();
       final newPassword = _newPasswordController.text.trim();
 
-      // Verify old password globally using the new top-level mapping
-      final userDoc = await FirebaseFirestore.instance
-          .collection('globalUsers')
-          .doc(username)
+      // Verify old password globally using the admin collection group
+      final userQuery = await FirebaseFirestore.instance
+          .collectionGroup('admin')
+          .where('username', isEqualTo: username)
           .get();
 
-      if (!userDoc.exists || userDoc.data()?['password'] != oldPassword) {
+      // Find the 'data' document
+      DocumentSnapshot<Map<String, dynamic>>? dataDoc;
+      for (var doc in userQuery.docs) {
+        if (doc.id == 'data') {
+          dataDoc = doc;
+          break;
+        }
+      }
+
+      if (dataDoc == null || dataDoc.data()?['password'] != oldPassword) {
         _showError('Incorrect old password');
       } else {
         // Update to new password via the found document reference
-        final userDocRef = userDoc.reference;
-        await userDocRef.update({'password': newPassword});
+        await dataDoc.reference.update({'password': newPassword});
 
         _showSuccess('Password updated successfully');
         if (mounted) Navigator.pop(context);
@@ -105,12 +113,17 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
 
     return GlassScaffold(
       title: 'Reset Password',
       onBack: () => Navigator.pop(context),
       body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -181,6 +194,8 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

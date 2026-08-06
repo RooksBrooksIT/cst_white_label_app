@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'Supervisor_material_information.dart';
 import 'material_at_site_entry_page.dart';
 import 'material_request_form.dart';
-import 'notification_page.dart';
 import 'supervisor_material_view_request_screen.dart';
 import 'supervisor_tool_movement.dart';
 import 'supervisor_verification_page.dart';
@@ -13,9 +12,9 @@ import 'supervisor_work_schedule_page.dart';
 import 'supervisor_worker_att_page.dart';
 import '../widgets/glass_scaffold.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
+import 'org_sub_menu_screen.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
@@ -32,145 +31,32 @@ class SupervisorDashboard extends StatefulWidget {
   _SupervisorDashboardState createState() => _SupervisorDashboardState();
 }
 
+class _CategoryData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<SubMenuItem> items;
+
+  _CategoryData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.items,
+  });
+}
+
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
-  late Map<String, List<DashboardItem>> groupedItems;
+  final ScrollController _scrollController = ScrollController();
   DateTime? _lastBackPressTime;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final colorScheme = Theme.of(context).colorScheme;
-    groupedItems = {
-      "Expenses": [
-        DashboardItem(
-          'Site Supervisor Expenses',
-          Icons.monetization_on_outlined,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            SupervisorVerificationPage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Requests": [
-        DashboardItem(
-          'Materials Request Form',
-          Icons.inventory_2_outlined,
-          colorScheme.secondary,
-          () => _navigate(
-            context,
-            MaterialRequestForm(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Work Schedule Request',
-          Icons.schedule_outlined,
-          colorScheme.tertiary,
-          () => _navigate(
-            context,
-            SupervisorWorkSchedulePage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Site Info": [
-        DashboardItem(
-          'Materials',
-          Icons.warehouse_outlined,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            MaterialAtSiteEntryPage(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Materials information',
-          Icons.info_outline,
-          colorScheme.primary,
-          () => _navigate(context, SupervisorMaterialInfoScreen()),
-        ),
-        DashboardItem(
-          'Tools Movement',
-          Icons.handyman_outlined,
-          colorScheme.secondary,
-          () => _navigate(
-            context,
-            SiteToCompanyReturn(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-      ],
-      "Others": [
-        DashboardItem(
-          'Site Approvals',
-          Icons.check_circle_outline,
-          colorScheme.primary,
-          () => _navigate(
-            context,
-            ViewApprovalScreen(
-              supervisorId: widget.supervisorId,
-              supervisorName: widget.supervisorName,
-            ),
-          ),
-        ),
-        DashboardItem(
-          'Materials Approvals',
-          Icons.fact_check_outlined,
-          colorScheme.secondary,
-          () {
-            _navigate(
-              context,
-              SupervisorMaterialViewRequestScreen(
-                supervisorId: widget.supervisorId,
-                supervisorName: widget.supervisorName,
-              ),
-            );
-          },
-        ),
-        DashboardItem(
-          'Workers Attendance',
-          Icons.people_alt_rounded,
-          colorScheme.tertiary,
-          () {
-            _navigate(context, AttendanceManagementPage());
-          },
-        ),
-        DashboardItem(
-          'Privacy Policy',
-          Icons.privacy_tip_rounded,
-          colorScheme.primary,
-          () async {
-            final Uri url = Uri.parse(
-              'https://sites.google.com/view/cst-whitelabel-app/home',
-            );
-            if (!await launchUrl(url)) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Could not open privacy policy')),
-                );
-              }
-            }
-          },
-        ),
-      ],
-    };
-  }
-
-  void _navigate(BuildContext context, Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -178,19 +64,40 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text(
-          "Logout",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+          ],
         ),
-        content: const Text("Are you sure you want to logout?"),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(fontSize: 16),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("No", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await AuthService().logout();
@@ -202,7 +109,18 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 );
               }
             },
-            child: Text("Yes", style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
           ),
         ],
       ),
@@ -211,6 +129,13 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
+
+    final categories = _getCategories(colorScheme);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -237,224 +162,392 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       },
       child: GlassScaffold(
         title: 'Supervisor Dashboard',
-        onBack: () => _showLogoutDialog(context),
         actions: [
-          StreamBuilder<int>(
-            stream: NotificationService.unreadCountForSupervisor(
-                widget.supervisorName),
-            builder: (context, snapshot) {
-              final count = snapshot.data ?? 0;
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.notifications_outlined,
-                        color: Theme.of(context).colorScheme.onPrimary),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => NotificationPage(
-                              supervisorName: widget.supervisorName),
-                        ),
-                      );
-                    },
-                  ),
-                  if (count > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.error,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                            minWidth: 18, minHeight: 18),
-                        child: Text(
-                          count > 9 ? '9+' : '$count',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onError,
-                              fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () => _showLogoutDialog(context),
           ),
         ],
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.isMobile(context) ? 16 : 32,
-          vertical: 24,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildProfileSection(),
-            const SizedBox(height: 32),
-            ...groupedItems.entries.map((entry) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(entry.key),
-                  ...entry.value.map((item) => _buildMenuCard(item)),
-                ],
-              );
-            }),
-            const SizedBox(height: 40),
-          ],
+        padding: EdgeInsets.zero,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                ..._buildGridSections(context, theme, categories, crossAxisCount),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
+          ),
         ),
       ),
-    ),
     );
   }
 
-  Widget _buildProfileSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.24),
-              shape: BoxShape.circle,
-            ),
-            child: CircleAvatar(
-              radius: 30,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              child: Icon(
-                Icons.person_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 32,
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  List<Widget> _buildGridSections(
+    BuildContext context,
+    ThemeData theme,
+    List<_CategoryData> categories,
+    int crossAxisCount,
+  ) {
+    List<Widget> slivers = [];
+
+    for (var category in categories) {
+      if (category.items.isEmpty) continue;
+
+      // Section Header
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Row(
               children: [
-                Text(
-                  widget.supervisorName,
-                  style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 24),
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    letterSpacing: -0.5,
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [category.color, category.color.withOpacity(0.5)],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Site Supervisor • ID: ${widget.supervisorId}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        category.subtitle,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${category.items.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: category.color,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 40, bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 20,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(2),
+      // Items Grid for this section
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = category.items[index];
+              return _buildGridItem(context, item);
+            }, childCount: category.items.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.8,
             ),
           ),
-          const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 12),
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 2.0,
-            ),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
+
+    return slivers;
   }
 
-  Widget _buildMenuCard(DashboardItem item) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
-        onTap: item.onTap,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: theme.cardColor,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          item.onTap();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: theme.cardColor,
+            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(item.icon, color: item.color, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 16),
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [item.color, item.color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(item.icon, color: Colors.white, size: 20),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              size: 24,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
-}
 
-class DashboardItem {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
+  List<_CategoryData> _getCategories(ColorScheme colorScheme) {
+    final primary = colorScheme.primary;
+    final secondary = colorScheme.secondary;
 
-  DashboardItem(this.title, this.icon, this.color, this.onTap);
+    return [
+      _CategoryData(
+        title: "Expenses & Finance",
+        subtitle: "Manage site expenses and verifications",
+        icon: Icons.account_balance_wallet_rounded,
+        color: primary,
+        gradientColors: [primary, primary.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Site Supervisor Expenses',
+            subtitle: 'Log and track daily site expenses',
+            icon: Icons.monetization_on_rounded,
+            color: primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorVerificationPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Material Requests",
+        subtitle: "Request and track materials and tools",
+        icon: Icons.inventory_2_rounded,
+        color: primary.withBlue(150), // Use a variation of brand color
+        gradientColors: [
+          primary.withBlue(150),
+          primary.withBlue(150).withOpacity(0.7),
+        ],
+        items: [
+          SubMenuItem(
+            title: 'Materials Request Form',
+            subtitle: 'Submit new material requests',
+            icon: Icons.add_shopping_cart_rounded,
+            color: primary.withBlue(150),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialRequestForm(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Materials Approvals',
+            subtitle: 'Check status of material requests',
+            icon: Icons.fact_check_rounded,
+            color: primary.withBlue(180),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorMaterialViewRequestScreen(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Site Operations",
+        subtitle: "Schedules, attendance and site info",
+        icon: Icons.engineering_rounded,
+        color: secondary,
+        gradientColors: [secondary, secondary.withOpacity(0.7)],
+        items: [
+          SubMenuItem(
+            title: 'Work Schedule Request',
+            subtitle: 'Manage site work schedules',
+            icon: Icons.calendar_today_rounded,
+            color: secondary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorWorkSchedulePage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Site Approvals',
+            subtitle: 'View pending site approvals',
+            icon: Icons.check_circle_rounded,
+            color: secondary.withOpacity(0.8).withBlue(200),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ViewApprovalScreen(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Workers Attendance',
+            subtitle: 'Track worker daily attendance',
+            icon: Icons.people_rounded,
+            color: secondary.withOpacity(0.9),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AttendanceManagementPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _CategoryData(
+        title: "Inventory & Tools",
+        subtitle: "Manage materials and tool movements",
+        icon: Icons.construction_rounded,
+        color: primary.withGreen(150),
+        gradientColors: [
+          primary.withGreen(150),
+          primary.withGreen(150).withOpacity(0.7),
+        ],
+        items: [
+          SubMenuItem(
+            title: 'Materials at Site',
+            subtitle: 'Current material stock at site',
+            icon: Icons.warehouse_rounded,
+            color: primary.withGreen(150),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialAtSiteEntryPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Materials Information',
+            subtitle: 'General material specifications',
+            icon: Icons.info_rounded,
+            color: primary.withGreen(180),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorMaterialInfoScreen(),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Tools Movement',
+            subtitle: 'Track tools return and movement',
+            icon: Icons.handyman_rounded,
+            color: primary.withGreen(200),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SiteToCompanyReturn(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
 }

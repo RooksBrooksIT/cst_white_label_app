@@ -37,12 +37,28 @@ class AppTheme {
   /// Synchronizes branding from Firestore for a given organization.
   static Future<void> syncWithFirestore(String orgId) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .doc('organisation/$orgId/admin/branding')
+      // Use the consistent path from FirestoreService: organisation/{id}/data/branding
+      final brandingDoc = await FirebaseFirestore.instance
+          .collection('organisation')
+          .doc(orgId)
+          .collection('data')
+          .doc('branding')
           .get();
 
-      if (doc.exists) {
-        final data = doc.data()!;
+      DocumentSnapshot<Map<String, dynamic>> finalDoc = brandingDoc;
+
+      if (!brandingDoc.exists) {
+        debugPrint(
+          'AppTheme: Branding doc not found in data/branding, falling back to root.',
+        );
+        finalDoc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .get();
+      }
+
+      if (finalDoc.exists) {
+        final data = finalDoc.data()!;
         final String? newAppName = data['appName'] as String?;
         final String? newColorHex = data['primaryColor'] as String?;
 

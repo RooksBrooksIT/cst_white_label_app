@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
+import '../utils/dialog_utils.dart';
 
 class ConfigMaterialsScreen extends StatefulWidget {
   const ConfigMaterialsScreen({super.key});
@@ -164,7 +165,10 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
       await batch.commit();
 
       if (mounted) {
-        _showSuccessSnackbar('All entries saved successfully!');
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'All entries saved successfully!',
+        );
         _resetFormFields();
       }
     } catch (e) {
@@ -192,12 +196,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
 
   void _showSuccessSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
-    );
+    DialogUtils.showSuccessDialog(context, message: message);
   }
 
   void _showWarningSnackbar(String message) {
@@ -283,7 +282,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
               child: _buildModeButton(
                 label: 'Unit',
                 mode: 'unit',
-                activeColor: Theme.of(context).colorScheme.secondary,
+                activeColor: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],
@@ -430,7 +429,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.secondary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -454,7 +453,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(
                           context,
-                        ).colorScheme.secondary,
+                        ).colorScheme.primary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
@@ -517,9 +516,7 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
   Widget _buildExistingValuesSection(String type) {
     final collectionName = type == 'category' ? 'materialCategories' : 'materialUnits';
     final fieldName = type == 'category' ? 'matCategory' : 'matUnit';
-    final color = type == 'category' 
-        ? Theme.of(context).colorScheme.primary 
-        : Theme.of(context).colorScheme.secondary;
+    final color = Theme.of(context).colorScheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,21 +600,43 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
+
     return GlassScaffold(
       title: 'Material Master',
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildModeSwitchButtons(),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _mode == 'category'
-                  ? _buildCategoryContent()
-                  : _buildUnitContent(),
+      onBack: () => Navigator.pop(context),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildModeSwitchButtons(),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _mode == 'category'
+                        ? _buildCategoryContent()
+                        : _buildUnitContent(),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
+        ),
+          ),
         ),
       ),
     );

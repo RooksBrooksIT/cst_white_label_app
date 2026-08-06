@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/firestore_service.dart';
-import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,18 +10,19 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
 import '../utils/pdf_templates.dart';
-import '../utils/app_theme.dart';
 
 class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
   final String? siteId;
   final DateTime date;
+  final String? projectStage;
 
   const DailySiteExpensesReportPage({
     super.key,
     required this.supervisorId,
     required this.siteId,
     required this.date,
+    this.projectStage,
   });
 
   @override
@@ -41,21 +41,84 @@ class _DailySiteExpensesReportPageState
     final supervisorDoc = await FirestoreService.getCollection(
       'siteSupervisorEntries',
     ).doc(_documentId).get();
-    final managerQuery = await FirestoreService.getCollection(
+
+    // Check if supervisor entry matches projectStage if provided
+    DocumentSnapshot? filteredSupervisorDoc;
+    if (supervisorDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredSupervisorDoc = supervisorDoc;
+        }
+      } else {
+        filteredSupervisorDoc = supervisorDoc;
+      }
+    }
+
+    final managerDoc = await FirestoreService.getCollection(
       'managerExpenses',
-    ).where('siteId', isEqualTo: widget.siteId).limit(20).get();
-    final orgQuery = await FirestoreService.getCollection(
+    ).doc(_documentId).get();
+
+    // Check if manager entry matches projectStage if provided
+    DocumentSnapshot? filteredManagerDoc;
+    if (managerDoc.exists) {
+      if (widget.projectStage != null) {
+        final data = managerDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredManagerDoc = managerDoc;
+        }
+      } else {
+        filteredManagerDoc = managerDoc;
+      }
+    }
+
+    Query<Map<String, dynamic>> orgQuery = FirestoreService.getCollection(
       'organizationExpenses',
-    ).where('siteId', isEqualTo: widget.siteId).limit(20).get();
-    final contractorQuery =
-        await FirestoreService.getCollection('contractorEntries')
+    ).where('siteId', isEqualTo: widget.siteId);
+
+    if (widget.projectStage != null) {
+      // organizationEntries often use projectField or projectStage
+      // We'll fetch and filter in memory to be safe, or use multiple where if possible
+    }
+
+    final orgSnapshot = await orgQuery.limit(50).get();
+    List<DocumentSnapshot> filteredOrgEntries = orgSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredOrgEntries = orgSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
+    Query<Map<String, dynamic>> contractorQuery =
+        FirestoreService.getCollection('contractorEntries')
             .where('siteId', isEqualTo: widget.siteId)
             .where(
               'date',
               isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-            )
-            .limit(20)
-            .get();
+            );
+
+    final contractorSnapshot = await contractorQuery.limit(50).get();
+    List<DocumentSnapshot> filteredContractorEntries = contractorSnapshot.docs;
+    if (widget.projectStage != null) {
+      filteredContractorEntries = contractorSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        return docStage == widget.projectStage?.trim();
+      }).toList();
+    }
+
     final incentiveQuery =
         await FirestoreService.getCollection('totalSiteExpensesPerDay')
             .where('siteId', isEqualTo: widget.siteId)
@@ -66,14 +129,30 @@ class _DailySiteExpensesReportPageState
             .limit(1)
             .get();
 
+    DocumentSnapshot? filteredIncentiveDoc;
+    if (incentiveQuery.docs.isNotEmpty) {
+      final doc = incentiveQuery.docs.first;
+      if (widget.projectStage != null) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == widget.projectStage?.trim()) {
+          filteredIncentiveDoc = doc;
+        }
+      } else {
+        filteredIncentiveDoc = doc;
+      }
+    }
+
     return {
-      'supervisor': supervisorDoc.exists ? supervisorDoc : null,
-      'managerEntries': managerQuery.docs,
-      'organizationEntries': orgQuery.docs,
-      'contractorEntries': contractorQuery.docs,
-      'incentiveDoc': incentiveQuery.docs.isNotEmpty
-          ? incentiveQuery.docs.first
-          : null,
+      'supervisor': filteredSupervisorDoc,
+      'managerEntries': filteredManagerDoc != null
+          ? <DocumentSnapshot>[filteredManagerDoc]
+          : <DocumentSnapshot>[],
+      'organizationEntries': filteredOrgEntries,
+      'contractorEntries': filteredContractorEntries,
+      'incentiveDoc': filteredIncentiveDoc,
     };
   }
 
@@ -85,77 +164,92 @@ class _DailySiteExpensesReportPageState
 
     return GlassScaffold(
       title: 'Daily Site Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: () => _handlePdfExport(context),
         ),
       ],
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _fetchAllReports(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: _fetchAllReports(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const Center(child: CircularProgressIndicator());
+              if (snapshot.hasError)
+                return Center(child: Text('Error: ${snapshot.error}'));
 
-          final data = snapshot.data!;
-          final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
-          final managerEntries =
-              data['managerEntries'] as List<DocumentSnapshot>;
-          final orgEntries =
-              data['organizationEntries'] as List<DocumentSnapshot>;
-          final contractorEntries =
-              data['contractorEntries'] as List<DocumentSnapshot>;
-          final incentiveDoc = data['incentiveDoc'] as DocumentSnapshot?;
+              final data = snapshot.data!;
+              final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
+              final managerEntries = (data['managerEntries'] as List? ?? [])
+                  .cast<DocumentSnapshot>();
+              final orgEntries = (data['organizationEntries'] as List? ?? [])
+                  .cast<DocumentSnapshot>();
+              final contractorEntries =
+                  (data['contractorEntries'] as List? ?? [])
+                      .cast<DocumentSnapshot>();
+              final incentiveDoc = data['incentiveDoc'] as DocumentSnapshot?;
 
-          if (supervisorDoc == null &&
-              managerEntries.isEmpty &&
-              orgEntries.isEmpty &&
-              contractorEntries.isEmpty &&
-              incentiveDoc == null) {
-            return _buildNoDataView(theme, dateStr);
-          }
+              if (supervisorDoc == null &&
+                  managerEntries.isEmpty &&
+                  orgEntries.isEmpty &&
+                  contractorEntries.isEmpty &&
+                  incentiveDoc == null) {
+                return _buildNoDataView(theme, dateStr);
+              }
 
-          final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
-          final totalAmount = _calculateTotal(data);
+              final supervisorData =
+                  supervisorDoc?.data() as Map<String, dynamic>?;
+              final totalAmount = _calculateTotal(data);
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildSummaryHeader(theme, dateStr, totalAmount),
-                const SizedBox(height: 24),
-                if (supervisorData != null)
-                  _buildSupervisorSection(theme, supervisorData),
-                if (managerEntries.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildBillsSection(theme, 'Manager Expenses', managerEntries),
-                ],
-                if (orgEntries.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildBillsSection(
-                    theme,
-                    'Organization Expenses',
-                    orgEntries,
-                  ),
-                ],
-                if (contractorEntries.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildContractorSection(theme, contractorEntries),
-                ],
-                const SizedBox(height: 40),
-                GlassButton(
-                  label: 'EXPORT FULL REPORT',
-                  onPressed: () => _handlePdfExport(context),
-                  icon: Icons.picture_as_pdf,
+              return SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildSummaryHeader(theme, dateStr, totalAmount),
+                    const SizedBox(height: 24),
+                    if (supervisorData != null)
+                      _buildSupervisorSection(theme, supervisorData),
+                    if (managerEntries.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildBillsSection(
+                        theme,
+                        'Manager Expenses',
+                        managerEntries,
+                      ),
+                    ],
+                    if (orgEntries.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildBillsSection(
+                        theme,
+                        'Organization Expenses',
+                        orgEntries,
+                      ),
+                    ],
+                    if (contractorEntries.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildContractorSection(theme, contractorEntries),
+                    ],
+                    const SizedBox(height: 40),
+                    GlassButton(
+                      label: 'EXPORT FULL REPORT',
+                      onPressed: () => _handlePdfExport(context),
+                      icon: Icons.picture_as_pdf,
+                    ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -441,19 +535,24 @@ class _DailySiteExpensesReportPageState
       total +=
           (supervisorDoc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
 
-    for (var doc in data['managerEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['managerEntries'] as List? ?? []).cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
       for (var b in bills) total += _parseAmount(b['billAmount']);
     }
 
-    for (var doc in data['organizationEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['organizationEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
       for (var b in bills) total += _parseAmount(b['billAmount']);
     }
 
-    for (var doc in data['contractorEntries'] as List<DocumentSnapshot>) {
+    for (var doc
+        in (data['contractorEntries'] as List? ?? [])
+            .cast<DocumentSnapshot>()) {
       total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
     }
 
@@ -475,6 +574,7 @@ class _DailySiteExpensesReportPageState
   }
 
   Future<void> _handlePdfExport(BuildContext context) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
       Theme.of(context).primaryColor.value,
@@ -486,12 +586,12 @@ class _DailySiteExpensesReportPageState
 
     final supervisorDoc = reportData['supervisor'] as DocumentSnapshot?;
     final supervisorData = supervisorDoc?.data() as Map<String, dynamic>?;
-    final managerEntries =
-        reportData['managerEntries'] as List<DocumentSnapshot>;
-    final orgEntries =
-        reportData['organizationEntries'] as List<DocumentSnapshot>;
-    final contractorEntries =
-        reportData['contractorEntries'] as List<DocumentSnapshot>;
+    final managerEntries = (reportData['managerEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final orgEntries = (reportData['organizationEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
+    final contractorEntries = (reportData['contractorEntries'] as List? ?? [])
+        .cast<DocumentSnapshot>();
 
     pdf.addPage(
       pw.MultiPage(
@@ -529,6 +629,7 @@ class _DailySiteExpensesReportPageState
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 14,
                 color: pdfPrimaryColor,
+                font: PdfTemplates.boldFont,
               ),
             ),
             pw.SizedBox(height: 8),
@@ -538,6 +639,7 @@ class _DailySiteExpensesReportPageState
                 style: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
                   fontSize: 10,
+                  font: PdfTemplates.boldFont,
                 ),
               ),
               pw.Table.fromTextArray(
@@ -549,7 +651,9 @@ class _DailySiteExpensesReportPageState
                 headerStyle: pw.TextStyle(
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
+                  font: PdfTemplates.boldFont,
                 ),
+                cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               ),
               pw.SizedBox(height: 10),
             ],
@@ -560,6 +664,7 @@ class _DailySiteExpensesReportPageState
                 style: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
                   fontSize: 10,
+                  font: PdfTemplates.boldFont,
                 ),
               ),
               pw.Table.fromTextArray(
@@ -571,13 +676,19 @@ class _DailySiteExpensesReportPageState
                 headerStyle: pw.TextStyle(
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
+                  font: PdfTemplates.boldFont,
                 ),
+                cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               ),
               pw.SizedBox(height: 10),
             ],
             pw.Text(
               'Other Supervisor Expenses',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+                font: PdfTemplates.boldFont,
+              ),
             ),
             pw.Table.fromTextArray(
               headers: ['Expense', 'Amount'],
@@ -590,7 +701,9 @@ class _DailySiteExpensesReportPageState
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             ),
             pw.SizedBox(height: 20),
           ],
@@ -603,6 +716,7 @@ class _DailySiteExpensesReportPageState
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 14,
                 color: pdfPrimaryColor,
+                font: PdfTemplates.boldFont,
               ),
             ),
             pw.SizedBox(height: 8),
@@ -626,7 +740,9 @@ class _DailySiteExpensesReportPageState
                 headerStyle: pw.TextStyle(
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
+                  font: PdfTemplates.boldFont,
                 ),
+                cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               );
             }),
             pw.SizedBox(height: 20),
@@ -640,6 +756,7 @@ class _DailySiteExpensesReportPageState
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 14,
                 color: pdfPrimaryColor,
+                font: PdfTemplates.boldFont,
               ),
             ),
             pw.SizedBox(height: 8),
@@ -663,7 +780,9 @@ class _DailySiteExpensesReportPageState
                 headerStyle: pw.TextStyle(
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
+                  font: PdfTemplates.boldFont,
                 ),
+                cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
               );
             }),
             pw.SizedBox(height: 20),
@@ -677,6 +796,7 @@ class _DailySiteExpensesReportPageState
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 14,
                 color: pdfPrimaryColor,
+                font: PdfTemplates.boldFont,
               ),
             ),
             pw.SizedBox(height: 8),
@@ -694,7 +814,9 @@ class _DailySiteExpensesReportPageState
               headerStyle: pw.TextStyle(
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
               ),
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             ),
           ],
         ],

@@ -24,7 +24,7 @@
 //         title: Text('Labour Config'),
 //         centerTitle: true,
 //       ),
-//       body: SingleChildScrollView(
+//       body: Center(
 //         padding: EdgeInsets.all(16.0),
 //         child: Card(
 //           elevation: 4,

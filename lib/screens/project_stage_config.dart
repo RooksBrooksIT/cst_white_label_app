@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lottie/lottie.dart';
 import '../services/firestore_service.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/glass_card.dart';
@@ -119,7 +119,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                   setState(() {
                                     _selectedStage = newStage;
                                   });
-                                  await _showSuccessAnimation(
+                                  await DialogUtils.showSuccessDialog(
+                                    context,
                                     message: 'Stage added successfully!',
                                   );
                                 },
@@ -142,57 +143,6 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
               ),
             );
           },
-        );
-      },
-    );
-  }
-
-  Future<void> _showSuccessAnimation({
-    String message = 'Stage added successfully!',
-  }) async {
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Lottie.asset(
-                  'assets/animation/success.json',
-                  width: 150,
-                  height: 150,
-                  repeat: false,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  message,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('OK', style: TextStyle()),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -342,7 +292,10 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
         _selectedStage = null;
       });
 
-      await _showSuccessAnimation(message: 'Stage deleted successfully!');
+      await DialogUtils.showSuccessDialog(
+        context,
+        message: 'Stage deleted successfully!',
+      );
     } catch (e) {
       _showErrorModal(context, 'Error', 'Failed to delete stage: $e');
     }
@@ -350,162 +303,184 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final primaryColor = colorScheme.primary;
 
     return GlassScaffold(
       title: 'Project Stage Configuration',
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // --- Project Stage Card ---
-              Container(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Project Stage',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                          fontSize: 18,
+      onBack: () => Navigator.pop(context),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // --- Project Stage Card ---
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 500),
+                      child: GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Project Stage',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: StreamBuilder<QuerySnapshot>(
+                                    stream: FirestoreService.getCollection(
+                                      'projectStages',
+                                    ).snapshots(),
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData ||
+                                          snapshot.data == null) {
+                                        return const LinearProgressIndicator();
+                                      }
+                                      final stages = snapshot.data!.docs
+                                          .map(
+                                            (doc) =>
+                                                doc['projectStage']
+                                                    ?.toString() ??
+                                                '',
+                                          )
+                                          .where((val) => val.isNotEmpty)
+                                          .toSet()
+                                          .toList();
+
+                                      bool isStageSelected =
+                                          _selectedStage != null &&
+                                          stages.contains(_selectedStage);
+
+                                      final dropdownValue = isStageSelected
+                                          ? _selectedStage
+                                          : null;
+
+                                      return DropdownButtonFormField<String>(
+                                        value: dropdownValue,
+                                        isExpanded: true,
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: theme.cardColor,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          hintText: 'Select project stage',
+                                        ),
+                                        icon: Icon(
+                                          Icons.arrow_drop_down,
+                                          color: primaryColor,
+                                        ),
+                                        dropdownColor: theme.cardColor,
+                                        items: stages.map((stage) {
+                                          return DropdownMenuItem<String>(
+                                            value: stage,
+                                            child: Text(
+                                              stage,
+                                              style: TextStyle(
+                                                color:
+                                                    theme.colorScheme.onSurface,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (String? newValue) {
+                                          if (newValue != null &&
+                                              stages.contains(newValue)) {
+                                            setState(() {
+                                              _selectedStage = newValue;
+                                            });
+                                          } else {
+                                            _showErrorModal(
+                                              context,
+                                              'Invalid Selection',
+                                              'Please try again.',
+                                            );
+                                          }
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Tooltip(
+                                  message: "Add New Stage",
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onTap: () => _showAddStageDialog(),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: primaryColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.add,
+                                        size: 24,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Row(
+                    ),
+
+                    const SizedBox(height: 50),
+
+                    // --- Action Buttons ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Expanded(
-                            child: StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectStages',
-                              ).snapshots(),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData || snapshot.data == null) {
-                                  return const LinearProgressIndicator();
-                                }
-                                final stages = snapshot.data!.docs
-                                    .map((doc) => doc['projectStage']?.toString() ?? '')
-                                    .where((val) => val.isNotEmpty)
-                                    .toSet()
-                                    .toList();
-
-                                bool isStageSelected =
-                                    _selectedStage != null &&
-                                    stages.contains(_selectedStage);
-
-                                final dropdownValue = isStageSelected
-                                    ? _selectedStage
-                                    : null;
-
-                                return DropdownButtonFormField<String>(
-                                  value: dropdownValue,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: theme.cardColor,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    hintText: 'Select project stage',
-                                  ),
-                                  icon: Icon(
-                                    Icons.arrow_drop_down,
-                                    color: primaryColor,
-                                  ),
-                                  dropdownColor: theme.cardColor,
-                                  items: stages.map((stage) {
-                                    return DropdownMenuItem<String>(
-                                      value: stage,
-                                      child: Text(
-                                        stage,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurface,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    if (newValue != null &&
-                                        stages.contains(newValue)) {
-                                      setState(() {
-                                        _selectedStage = newValue;
-                                      });
-                                    } else {
-                                      _showErrorModal(
-                                        context,
-                                        'Invalid Selection',
-                                        'Please try again.',
-                                      );
-                                    }
-                                  },
-                                );
-                              },
+                            child: GlassButton(
+                              label: 'BACK',
+                              onPressed: () => Navigator.of(context).pop(),
+                              isSecondary: true,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Tooltip(
-                            message: "Add New Stage",
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () => _showAddStageDialog(),
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: primaryColor,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.add,
-                                  size: 24,
-                                  color: Colors.white,
-                                ),
-                              ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GlassButton(
+                              label: 'DELETE',
+                              onPressed: _selectedStage != null
+                                  ? _deleteSelectedStage
+                                  : null,
+                              isSecondary: true,
                             ),
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 50),
-
-              // --- Action Buttons ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: GlassButton(
-                        label: 'BACK',
-                        onPressed: () => Navigator.of(context).pop(),
-                        isSecondary: true,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: GlassButton(
-                        label: 'DELETE',
-                        onPressed: _selectedStage != null
-                            ? _deleteSelectedStage
-                            : null,
-                        isSecondary: true,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

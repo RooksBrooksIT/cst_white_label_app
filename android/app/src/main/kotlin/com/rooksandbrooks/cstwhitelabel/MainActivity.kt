@@ -1,4 +1,4 @@
-package com.example.demo_cst
+package com.rooksandbrooks.cstwhitelabel
 
 import io.flutter.embedding.android.FlutterActivity
 

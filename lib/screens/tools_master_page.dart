@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
+import '../utils/dialog_utils.dart';
 
 class ToolMasterPage extends StatefulWidget {
   const ToolMasterPage({super.key});
@@ -104,17 +105,20 @@ class _ToolMasterPageState extends State<ToolMasterPage>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
     return GlassScaffold(
       title: 'Tool Master',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       bottom: TabBar(
         controller: _tabController,
-        labelColor: theme.colorScheme.primary,
-        unselectedLabelColor: const Color.fromARGB(255, 255, 255, 255),
-        indicatorColor: theme.colorScheme.primary,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white,
+        indicatorColor: Colors.white,
         indicatorWeight: 3,
         indicatorSize: TabBarIndicatorSize.label,
         labelStyle: TextStyle(
@@ -131,12 +135,20 @@ class _ToolMasterPageState extends State<ToolMasterPage>
           Tab(text: 'UPDATE COUNT'),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildNewTab(theme, isSmallScreen),
-          _buildUpdateTab(theme, isSmallScreen),
-        ],
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildNewTab(theme, isSmallScreen),
+                _buildUpdateTab(theme, isSmallScreen),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -463,7 +475,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         Expanded(
           child: OutlinedButton.icon(
             icon: Icon(Icons.clear, size: 20),
-            label: Text('Cancel'),
+            label: Text('Clear'),
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.primary,
               side: BorderSide(color: theme.colorScheme.primary),
@@ -493,22 +505,48 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     if (newCount == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Count must be a number.')));
+      ).showSnackBar(const SnackBar(content: Text('Count must be a number.')));
       return;
     }
 
     try {
+      // 1. Update the 'tools' collection
       await FirestoreService.getCollection('tools')
           .doc(_selectedToolDocId)
           .update({'toolCount': newCount, 'availableCount': newCount});
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tool count updated successfully!')),
-      );
+      // 2. Update the 'toolsAtCompany' collection to reflect the new count backend-wide
+      final toolCode = _selectedToolData?['toolCode']?.toString();
+      if (toolCode != null && toolCode.isNotEmpty) {
+        await FirestoreService.getCollection(
+          'toolsAtCompany',
+        ).doc(toolCode).set({
+          'toolCode': toolCode,
+          'availableCount': newCount,
+        }, SetOptions(merge: true));
+      }
 
-      _fetchTools();
-      _onToolSelected(_selectedToolDocId);
+      if (!mounted) return;
+
+      // 3. Immediately reflect changes in the UI state
+      setState(() {
+        if (_selectedToolData != null) {
+          // Creating a new map ensures the widget recognizes the change
+          _selectedToolData = Map<String, dynamic>.from(_selectedToolData!);
+          _selectedToolData!['toolCount'] = newCount;
+          _selectedToolData!['availableCount'] = newCount;
+        }
+      });
+
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Tool count updated successfully!',
+        );
+      }
+
+      // 4. Fetch the latest tools in the background to sync the dropdown
+      await _fetchTools();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -613,10 +651,12 @@ class _ToolMasterPageState extends State<ToolMasterPage>
         'toolsAtCompany',
       ).doc(toolCode).set({'toolCode': toolCode, 'availableCount': toolCount});
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Tool saved successfully!')));
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Tool saved successfully!',
+        );
+      }
 
       // Clear form
       _toolNameController.clear();

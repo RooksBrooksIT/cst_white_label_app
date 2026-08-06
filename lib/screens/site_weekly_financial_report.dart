@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'dart:async';
 import 'site_weekly_financial_report2.dart';
+import '../widgets/glass_scaffold.dart';
 
 class SiteWeeklyFinancialReports extends StatefulWidget {
   const SiteWeeklyFinancialReports({super.key});
@@ -62,9 +63,7 @@ class _SiteWeeklyFinancialReportState
 
       supervisorMaps = snapshot.docs.isEmpty
           ? []
-          : snapshot.docs
-                .map((doc) => doc.data())
-                .toList();
+          : snapshot.docs.map((doc) => doc.data()).toList();
 
       if (mounted) {
         setState(() {
@@ -94,33 +93,20 @@ class _SiteWeeklyFinancialReportState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Weekly Financial Report',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: isLoading
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
+    final colorScheme = Theme.of(context).colorScheme;
+    return GlassScaffold(
+      title: 'Weekly Financial Report',
+      onBack: () => Navigator.pop(context),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : _buildBody(context),
+        ),
+      ),
     );
   }
 
@@ -258,6 +244,7 @@ class _SiteWeeklyFinancialReportState
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedYear,
+          isExpanded: true,
           decoration: _inputDecoration(context, 'Select Year'),
           dropdownColor: theme.cardColor,
           style: TextStyle(color: colorScheme.onSurface),
@@ -268,11 +255,15 @@ class _SiteWeeklyFinancialReportState
               child: Text((DateTime.now().year - 2 + i).toString()),
             ),
           ),
-          onChanged: (val) => setState(() => _selectedYear = val),
+          onChanged: (val) => setState(() {
+            _selectedYear = val;
+            _selectedWeek = null;
+          }),
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<int>(
           value: _selectedMonth,
+          isExpanded: true,
           decoration: _inputDecoration(context, 'Select Month'),
           dropdownColor: theme.cardColor,
           style: TextStyle(color: colorScheme.onSurface),
@@ -280,7 +271,10 @@ class _SiteWeeklyFinancialReportState
             12,
             (i) => DropdownMenuItem(value: i + 1, child: Text(_monthNames[i])),
           ),
-          onChanged: (val) => setState(() => _selectedMonth = val),
+          onChanged: (val) => setState(() {
+            _selectedMonth = val;
+            _selectedWeek = null;
+          }),
         ),
         const SizedBox(height: 24),
         Text(

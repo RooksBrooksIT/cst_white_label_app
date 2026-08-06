@@ -33,6 +33,9 @@ class _ProjectStageDailySiteExpensesReportPageState
     extends State<ProjectStageDailySiteExpensesReportPage> {
   bool isLoading = true;
   Map<String, dynamic>? supervisorData;
+  List<DocumentSnapshot> managerEntries = [];
+  List<DocumentSnapshot> orgEntries = [];
+  List<DocumentSnapshot> contractorEntries = [];
   double grandTotal = 0;
 
   @override
@@ -49,17 +52,177 @@ class _ProjectStageDailySiteExpensesReportPageState
   Future<void> _loadReport() async {
     setState(() => isLoading = true);
     try {
-      final doc = await FirestoreService.getCollection(
-        'siteSupervisorEntries',
-      ).doc(_documentId).get();
-      if (doc.exists) {
-        supervisorData = doc.data() as Map<String, dynamic>?;
-        grandTotal = _toNum(supervisorData?['totalAmount']);
+      final results = await Future.wait([
+        FirestoreService.getCollection(
+          'siteSupervisorEntries',
+        ).doc(_documentId).get(),
+        // Check both siteId and site for broader compatibility
+        _fetchCollectionBySite('managerExpenses'),
+        _fetchCollectionBySite('organizationExpenses'),
+        _fetchCollectionBySite('contractorEntries'),
+        _fetchCollectionBySite('managerEntries'),
+        _fetchCollectionBySite('organizationEntries'),
+      ]);
+
+      final supervisorDoc = results[0] as DocumentSnapshot;
+      final managerDocs = results[1] as List<DocumentSnapshot>;
+      final orgDocs = results[2] as List<DocumentSnapshot>;
+      final contractorDocs = results[3] as List<DocumentSnapshot>;
+      final managerEntryDocs = results[4] as List<DocumentSnapshot>;
+      final orgEntryDocs = results[5] as List<DocumentSnapshot>;
+
+      final targetStage = widget.projectStage.trim();
+      final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+
+      bool filterEntry(DocumentSnapshot doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage != targetStage) return false;
+
+        // 1. Check top-level date
+        final rawDate = data['date'] ?? data['entryDate'];
+        DateTime? entryDate;
+        if (rawDate is Timestamp) {
+          entryDate = rawDate.toDate();
+        } else if (rawDate is String) {
+          entryDate = DateTime.tryParse(rawDate);
+        }
+
+        if (entryDate != null) {
+          final entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
+          if (entryDateStr == formattedDateYMD) return true;
+        }
+
+        // 2. Check bills list
+        final bills = data['bills'] as List? ?? [];
+        return bills.any((bill) {
+          final billDateRaw = bill['billDate'];
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            return billDateStr == formattedDateYMD;
+          }
+          return false;
+        });
       }
+
+      // 1. Supervisor Data
+      if (supervisorDoc.exists) {
+        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage == targetStage) {
+          supervisorData = data;
+        }
+      }
+
+      // 2. Manager Data
+      managerEntries = [
+        ...managerDocs.where(filterEntry),
+        ...managerEntryDocs.where(filterEntry),
+      ];
+
+      // 3. Org Data
+      orgEntries = [
+        ...orgDocs.where(filterEntry),
+        ...orgEntryDocs.where(filterEntry),
+      ];
+
+      // 4. Contractor Data
+      contractorEntries = contractorDocs.where(filterEntry).toList();
+
+      _calculateGrandTotal();
+
       setState(() => isLoading = false);
     } catch (e) {
+      print('Error loading report: $e');
       setState(() => isLoading = false);
     }
+  }
+
+  Future<List<DocumentSnapshot>> _fetchCollectionBySite(
+    String collection,
+  ) async {
+    final snapshots = await Future.wait([
+      FirestoreService.getCollection(
+        collection,
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        collection,
+      ).where('site', isEqualTo: widget.siteId).get(),
+    ]);
+    return [...snapshots[0].docs, ...snapshots[1].docs];
+  }
+
+  void _calculateGrandTotal() {
+    double total = 0;
+    final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+
+    // Supervisor Total
+    if (supervisorData != null) {
+      total += _toNum(supervisorData!['totalAmount']);
+    }
+
+    // Manager Total
+    for (var doc in managerEntries) {
+      final data = doc.data() as Map<String, dynamic>;
+      final bills = data['bills'] as List? ?? [];
+      for (var bill in bills) {
+        final billDateRaw = bill['billDate'];
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
+
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            total += _toNum(bill['billAmount']);
+          }
+        }
+      }
+    }
+
+    // Org Total
+    for (var doc in orgEntries) {
+      final data = doc.data() as Map<String, dynamic>;
+      final bills = data['bills'] as List? ?? [];
+      for (var bill in bills) {
+        final billDateRaw = bill['billDate'];
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
+
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            total += _toNum(bill['billAmount']);
+          }
+        }
+      }
+    }
+
+    // Contractor Total
+    for (var doc in contractorEntries) {
+      final data = doc.data() as Map<String, dynamic>;
+      total += _toNum(data['totalAmount']);
+    }
+
+    grandTotal = total;
   }
 
   double _toNum(dynamic v) {
@@ -75,15 +238,23 @@ class _ProjectStageDailySiteExpensesReportPageState
 
     return GlassScaffold(
       title: 'Daily Site Report',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: _generatePdf,
         ),
       ],
-      body: isLoading
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : (supervisorData == null)
+          : (supervisorData == null &&
+                managerEntries.isEmpty &&
+                orgEntries.isEmpty &&
+                contractorEntries.isEmpty)
           ? _buildEmptyState(theme)
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -94,10 +265,149 @@ class _ProjectStageDailySiteExpensesReportPageState
                   const SizedBox(height: 24),
                   _buildTotalCard(theme),
                   const SizedBox(height: 24),
-                  _buildCategoryBreakdown(theme),
+                  if (supervisorData != null) ...[
+                    _buildCategoryBreakdown(theme),
+                    const SizedBox(height: 24),
+                  ],
+                  if (managerEntries.isNotEmpty) ...[
+                    _buildBillsBreakdown(
+                      theme,
+                      'Manager Expenses',
+                      managerEntries,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (orgEntries.isNotEmpty) ...[
+                    _buildBillsBreakdown(
+                      theme,
+                      'Organization Expenses',
+                      orgEntries,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (contractorEntries.isNotEmpty) ...[
+                    _buildContractorBreakdown(theme),
+                    const SizedBox(height: 24),
+                  ],
+                  const SizedBox(height: 32),
+                  GlassButton(
+                    label: 'Generate PDF',
+                    icon: Icons.picture_as_pdf_rounded,
+                    onPressed: _generatePdf,
+                  ),
                 ],
               ),
             ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBillsBreakdown(
+    ThemeData theme,
+    String title,
+    List<DocumentSnapshot> entries,
+  ) {
+    final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+    double sectionTotal = 0;
+    final List<Map<String, dynamic>> dailyBills = [];
+
+    for (var doc in entries) {
+      final data = doc.data() as Map<String, dynamic>;
+      final bills = data['bills'] as List? ?? [];
+      for (var bill in bills) {
+        final billDateRaw = bill['billDate'];
+        DateTime? billDate;
+        if (billDateRaw is Timestamp) {
+          billDate = billDateRaw.toDate();
+        } else if (billDateRaw is String) {
+          billDate = DateTime.tryParse(billDateRaw);
+        }
+
+        if (billDate != null) {
+          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+          if (billDateStr == formattedDateYMD) {
+            dailyBills.add(bill);
+            sectionTotal += _toNum(bill['billAmount']);
+          }
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...dailyBills.map(
+          (b) => _categoryItem(
+            b['billVendor'] ?? 'Unknown Vendor',
+            _toNum(b['billAmount']),
+            Icons.receipt_long_outlined,
+            theme,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, right: 8),
+          child: Text(
+            'Total: ₹ ${sectionTotal.toStringAsFixed(2)}',
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContractorBreakdown(ThemeData theme) {
+    double sectionTotal = 0;
+    for (var doc in contractorEntries) {
+      sectionTotal += _toNum((doc.data() as Map)['totalAmount']);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'CONTRACTOR EXPENSES',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...contractorEntries.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return _categoryItem(
+            data['contractorName'] ?? 'Contractor Entry',
+            _toNum(data['totalAmount']),
+            Icons.construction_outlined,
+            theme,
+          );
+        }),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, right: 8),
+          child: Text(
+            'Total: ₹ ${sectionTotal.toStringAsFixed(2)}',
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -212,18 +522,46 @@ class _ProjectStageDailySiteExpensesReportPageState
     );
   }
 
+  List<Map<String, dynamic>> _parseEntryList(dynamic rawData) {
+    if (rawData == null) return [];
+    if (rawData is List) {
+      return rawData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    if (rawData is Map) {
+      final Map<dynamic, dynamic> map = rawData;
+      final List<Map<String, dynamic>> list = [];
+      final sortedKeys =
+          map.keys
+              .map((k) => int.tryParse(k.toString()))
+              .where((k) => k != null)
+              .cast<int>()
+              .toList()
+            ..sort();
+      for (var key in sortedKeys) {
+        final val = map[key.toString()] ?? map[key];
+        if (val is Map) {
+          list.add(Map<String, dynamic>.from(val));
+        }
+      }
+      return list;
+    }
+    return [];
+  }
+
   double _calculateMaterials() {
     double total = 0;
-    if (supervisorData?['materials'] is List) {
-      for (var m in supervisorData!['materials']) total += _toNum(m['amount']);
+    final list = _parseEntryList(supervisorData?['materials']);
+    for (var m in list) {
+      total += _toNum(m['amount']);
     }
     return total;
   }
 
   double _calculateLabours() {
     double total = 0;
-    if (supervisorData?['labours'] is List) {
-      for (var l in supervisorData!['labours']) total += _toNum(l['amount']);
+    final list = _parseEntryList(supervisorData?['labours']);
+    for (var l in list) {
+      total += _toNum(l['amount']);
     }
     return total;
   }
@@ -265,17 +603,78 @@ class _ProjectStageDailySiteExpensesReportPageState
   }
 
   Future<void> _generatePdf() async {
-    if (supervisorData == null) return;
+    if (supervisorData == null &&
+        managerEntries.isEmpty &&
+        orgEntries.isEmpty &&
+        contractorEntries.isEmpty)
+      return;
+
     final pdfPrimaryColor = PdfColor.fromInt(
       Theme.of(context).primaryColor.value,
     );
+    final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+
     try {
+      // Collect manager bills for this specific day
+      final List<Map<String, dynamic>> managerBills = [];
+      for (var doc in managerEntries) {
+        final data = doc.data() as Map<String, dynamic>;
+        final bills = data['bills'] as List? ?? [];
+        for (var bill in bills) {
+          final billDateRaw = bill['billDate'];
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            if (billDateStr == formattedDateYMD) {
+              managerBills.add(Map<String, dynamic>.from(bill));
+            }
+          }
+        }
+      }
+
+      // Collect org bills for this specific day
+      final List<Map<String, dynamic>> organizationBills = [];
+      for (var doc in orgEntries) {
+        final data = doc.data() as Map<String, dynamic>;
+        final bills = data['bills'] as List? ?? [];
+        for (var bill in bills) {
+          final billDateRaw = bill['billDate'];
+          DateTime? billDate;
+          if (billDateRaw is Timestamp) {
+            billDate = billDateRaw.toDate();
+          } else if (billDateRaw is String) {
+            billDate = DateTime.tryParse(billDateRaw);
+          }
+
+          if (billDate != null) {
+            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
+            if (billDateStr == formattedDateYMD) {
+              organizationBills.add(Map<String, dynamic>.from(bill));
+            }
+          }
+        }
+      }
+
+      // Collect contractor expenses
+      final List<Map<String, dynamic>> contractorExpenses = contractorEntries
+          .map((doc) => Map<String, dynamic>.from(doc.data() as Map))
+          .toList();
+
       final pdfBytes = await ProjectStagePdfHelper.buildDailyReport(
         siteId: widget.siteId ?? 'N/A',
         supervisorId: widget.supervisorId,
         date: widget.date,
         projectStage: widget.projectStage,
         supervisorData: supervisorData,
+        managerBills: managerBills,
+        organizationBills: organizationBills,
+        contractorExpenses: contractorExpenses,
         grandTotal: grandTotal,
         primaryColor: pdfPrimaryColor,
       );
@@ -292,9 +691,9 @@ class _ProjectStageDailySiteExpensesReportPageState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to generate PDF: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
     }
   }
 }

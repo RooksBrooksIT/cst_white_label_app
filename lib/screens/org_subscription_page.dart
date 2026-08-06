@@ -6,6 +6,7 @@ import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../utils/responsive.dart';
+import '../utils/terms_helper.dart';
 
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
@@ -31,13 +32,21 @@ class _OrganizationSubscriptionPageState
 
   Future<void> _fetchSubscriptionData() async {
     try {
-      final doc = await FirestoreService.subscriptionDoc.get();
+      var doc = await FirestoreService.subscriptionDoc.get();
+
+      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint('OrganizationSubscriptionPage: Subscription doc not found in admin, falling back to root.');
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (doc.exists && mounted) {
         final data = doc.data()!;
         setState(() {
           _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Unknown');
           
-          final isActiveField = data['isSubscriptionActive'] as bool? ?? false;
+          // Default to true if missing to avoid lockouts during trial/transition
+          final isActiveField = data['isSubscriptionActive'] as bool? ?? true;
           final expiry = data['subscriptionEndDate'] as Timestamp?;
           
           bool isExpired = false;
@@ -79,6 +88,8 @@ class _OrganizationSubscriptionPageState
 
   @override
   Widget build(BuildContext context) {
+    
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isMobile = Responsive.isMobile(context);
@@ -88,7 +99,10 @@ class _OrganizationSubscriptionPageState
       child: GlassScaffold(
         title: 'Manage Subscription',
         onBack: _isActive ? () => Navigator.pop(context) : null,
-        body: _isLoading
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
                 child: Column(
@@ -99,9 +113,32 @@ class _OrganizationSubscriptionPageState
                     _buildPlanDetailsSection(theme),
                     const SizedBox(height: 32),
                     _buildSupportSection(theme, colorScheme),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          TermsHelper.showTermsDialog(
+                            context,
+                            onAccepted: () {},
+                            readOnly: true,
+                          );
+                        },
+                        child: Text(
+                          'View Terms & Conditions & Refund Policy',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
+        ),
+      ),
       ),
     );
   }

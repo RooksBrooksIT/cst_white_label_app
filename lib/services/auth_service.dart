@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
 
@@ -13,6 +14,7 @@ class AuthService {
   AuthService._internal();
 
   static late SharedPreferences _prefs;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Keys
   static const String _isLoggedInKey = 'auth_is_logged_in';
@@ -56,21 +58,30 @@ class AuthService {
       return true; // Only enforce for organizations
 
     try {
-      final doc = await FirestoreService.subscriptionDoc.get();
+      var doc = await FirestoreService.subscriptionDoc.get();
+
+      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint(
+          'AuthService: Subscription doc not found in admin, falling back to root.',
+        );
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (!doc.exists) return false;
 
       final data = doc.data()!;
-      final isActive = data['isSubscriptionActive'] as bool? ?? false;
+      // Default to true if fields are missing to avoid locking out valid users
+      // during transitions or if initialization hasn't finished.
+      final isActive = data['isSubscriptionActive'] as bool? ?? true;
       final endDate = data['subscriptionEndDate'] as Timestamp?;
 
       if (!isActive) return false;
-      if (endDate == null) return true; // Assume lifetime if no end date
+      if (endDate == null) return true; // Assume lifetime/trial if no end date
 
       return endDate.toDate().isAfter(DateTime.now());
     } catch (e) {
       debugPrint('Error checking subscription status: $e');
-      // In case of error, we might want to allow access if they were recently active,
-      // but for strict enforcement, we return false or the last known state.
       return true; // Default to true to avoid locking users out on network issues
     }
   }
@@ -88,6 +99,7 @@ class AuthService {
     // Automatically refresh branding if orgId is available
     final orgId = data['dynamicPath'] ?? data['orgId'];
     if (orgId != null && orgId.toString().isNotEmpty) {
+      FirestoreService.setOrgPath(orgId.toString());
       await refreshBranding(orgId.toString());
     }
   }
@@ -95,7 +107,19 @@ class AuthService {
   /// Fetch and apply organization branding from Firestore
   Future<void> refreshBranding(String orgId) async {
     try {
-      final doc = await FirestoreService.brandingDocWithId(orgId).get();
+      var doc = await FirestoreService.brandingDocWithId(orgId).get();
+
+      // Fallback: If admin/branding doc doesn't exist, check root doc (legacy)
+      if (!doc.exists) {
+        debugPrint(
+          'AuthService: Branding doc not found in admin, falling back to root.',
+        );
+        doc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .get();
+      }
+
       if (doc.exists) {
         final data = doc.data()!;
         final appName = data['appName'] as String?;
@@ -134,6 +158,9 @@ class AuthService {
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userDataKey);
 
+    // Sign out from Firebase if needed
+    await _auth.signOut();
+
     // Clear all legacy keys to be safe
     final keys = _prefs.getKeys();
     for (String key in keys) {
@@ -143,6 +170,54 @@ class AuthService {
           key.startsWith('cust_')) {
         await _prefs.remove(key);
       }
+    }
+  }
+
+  /// Send a password reset email using Firebase Authentication
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+      rethrow;
+    }
+  }
+
+  /// Create a new user with email and password in Firebase Authentication
+  Future<UserCredential> registerWithEmail(
+    String email,
+    String password,
+  ) async {
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Register Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Register error: $e');
+      rethrow;
+    }
+  }
+
+  /// Sign in with email and password in Firebase Authentication
+  Future<UserCredential> loginWithEmail(String email, String password) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Login Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Login error: $e');
+      rethrow;
     }
   }
 

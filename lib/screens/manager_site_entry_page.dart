@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../services/expense_service.dart';
-import 'supervisor_dashboard.dart';
 import 'package:intl/intl.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
@@ -11,10 +10,12 @@ import '../widgets/glass_button.dart';
 class ManagerSiteEntryPage extends StatefulWidget {
   final String userName;
   final Map<String, dynamic> userDetails;
+  final bool hideAppBar;
   const ManagerSiteEntryPage({
     super.key,
     required this.userName,
     required this.userDetails,
+    this.hideAppBar = false,
   });
 
   @override
@@ -67,6 +68,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   bool _showCustomLabourFields = false;
   final _customLabourNameController = TextEditingController();
   final _customLabourSalaryController = TextEditingController(text: '0');
+  final _customLabourQtyController = TextEditingController(text: '0');
 
   // Update mode state
   bool isUpdateMode = false;
@@ -102,6 +104,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     _customMaterialPriceController.dispose();
     _customLabourNameController.dispose();
     _customLabourSalaryController.dispose();
+    _customLabourQtyController.dispose();
     super.dispose();
   }
 
@@ -290,7 +293,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
   void _addCustomLabour() {
     final name = _customLabourNameController.text.trim();
-    final qty = int.tryParse(labourQtyController.text) ?? 0;
+    final qty = int.tryParse(_customLabourQtyController.text) ?? 0;
     final salary = int.tryParse(_customLabourSalaryController.text) ?? 0;
 
     if (name.isNotEmpty && qty > 0) {
@@ -299,7 +302,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         labourSalaries[name] = salary;
         _showCustomLabourFields = false;
         _customLabourNameController.clear();
-        labourQtyController.text = '0';
+        _customLabourQtyController.text = '0';
         _customLabourSalaryController.text = '0';
       });
     }
@@ -339,6 +342,18 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return total;
   }
 
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _fetchSites(),
+      _fetchMaterialOptions(),
+      _fetchLabourOptions(),
+    ]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Data refreshed successfully!')),
+    );
+  }
+
   void _resetForm() {
     setState(() {
       materials.clear();
@@ -355,6 +370,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       _customMaterialPriceController.text = '0';
       _customLabourNameController.clear();
       _customLabourSalaryController.text = '0';
+      _customLabourQtyController.text = '0';
       _showCustomMaterialFields = false;
       _showCustomLabourFields = false;
       isUpdateMode = false;
@@ -392,28 +408,83 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (siteCode.isEmpty) return;
     setState(() => isSaving = true);
     final docId = '${siteCode}_${DateFormat('ddMMyyyy').format(selectedDate!)}';
-    final data = {
-      "date": selectedDate!.toIso8601String(),
-      "siteId": siteCode,
-      "totalAmount": _getTotalAmount(),
-      "materials": materials,
-      "labours": labours,
-      "food": int.tryParse(foodCost.text) ?? 0,
-      "transport": int.tryParse(transportCost.text) ?? 0,
-      "fuel": int.tryParse(fuelCost.text) ?? 0,
-      "supervisorId": supervisorId,
-      "supervisorName": supervisorName,
-      "projectName": projectName,
-      "siteLocation": siteLocation,
-      "projectStage": projectStage,
-      "morningStatus": morningStatusController.text,
-      "afternoonStatus": afternoonStatusController.text,
-    };
+
+    // Build new materials list with computed amounts
+    List<Map<String, dynamic>> newMaterials = materials
+        .map(
+          (m) => {
+            "type": m['type'] ?? '',
+            "quantity": m['quantity'] ?? 0,
+            "unitPrice": materialPrices[m['type'] ?? ''] ?? 0,
+            "amount":
+                (materialPrices[m['type'] ?? ''] ?? 0) * (m['quantity'] ?? 0),
+          },
+        )
+        .toList();
+
+    // Build new labours list with computed amounts
+    List<Map<String, dynamic>> newLabours = labours
+        .map(
+          (l) => {
+            "type": l['type'] ?? '',
+            "count": l['count'] ?? 0,
+            "unitSalary": labourSalaries[l['type'] ?? ''] ?? 0,
+            "amount":
+                (labourSalaries[l['type'] ?? ''] ?? 0) * (l['count'] ?? 0),
+          },
+        )
+        .toList();
+
     try {
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final existingDoc = await FirestoreService.siteSupervisorEntries
           .doc(docId)
-          .set(data);
+          .get();
+      final bool docExists = existingDoc.exists;
+
+      if (docExists) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Duplicate Entry'),
+            content: const Text(
+              'An entry for this site and date already exists.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        setState(() {
+          isSaving = false;
+        });
+        return;
+      }
+
+      final Map<String, dynamic> data = {
+        "date": selectedDate!.toIso8601String(),
+        "siteId": siteCode,
+        "totalAmount": _getTotalAmount(),
+        "materials": newMaterials,
+        "labours": newLabours,
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "supervisorId": supervisorId,
+        "supervisorName": supervisorName,
+        "projectName": projectName,
+        "siteLocation": siteLocation,
+        "projectStage": projectStage,
+        "morningStatus": morningStatusController.text,
+        "afternoonStatus": afternoonStatusController.text,
+        "isManagerEntry": true,
+        "createdBy": "manager",
+      };
+
+      await FirestoreService.siteSupervisorEntries.doc(docId).set(data);
       await ExpenseService.updateTotalSiteExpense(siteCode);
       if (mounted)
         ScaffoldMessenger.of(
@@ -434,21 +505,24 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (siteCode.isEmpty) return;
     setState(() => isLoadingEntryDates = true);
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
+      final query = await FirestoreService.siteSupervisorEntries
           .where('siteId', isEqualTo: siteCode)
           .get();
 
       final entries = <Map<String, dynamic>>[];
       for (var doc in query.docs) {
-        final data = doc.data();
-        final rawDate = data['date'];
-        DateTime? dt;
-        if (rawDate is String)
-          dt = DateTime.tryParse(rawDate);
-        else if (rawDate is Timestamp)
-          dt = rawDate.toDate();
-        if (dt != null) entries.add({'docId': doc.id, 'date': dt});
+        final data = doc.data() as Map<String, dynamic>;
+        final isManager = data['isManagerEntry'] == true;
+        final isOrg = data['isOrgEntry'] == true;
+        if (isManager || isOrg) {
+          final rawDate = data['date'];
+          DateTime? dt;
+          if (rawDate is String)
+            dt = DateTime.tryParse(rawDate);
+          else if (rawDate is Timestamp)
+            dt = rawDate.toDate();
+          if (dt != null) entries.add({'docId': doc.id, 'date': dt});
+        }
       }
       entries.sort(
         (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
@@ -503,10 +577,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
   Future<void> _loadEntryByDocId(String docId) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
-          .doc(docId)
-          .get();
+      final doc = await FirestoreService.siteSupervisorEntries.doc(docId).get();
       if (!doc.exists) return;
       final data = doc.data()!;
       setState(() {
@@ -537,19 +608,19 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (_updateDocId == null) return;
     setState(() => isSaving = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('siteSupervisorEntries')
-          .doc(_updateDocId)
-          .update({
-            "materials": materials,
-            "labours": labours,
-            "food": int.tryParse(foodCost.text) ?? 0,
-            "transport": int.tryParse(transportCost.text) ?? 0,
-            "fuel": int.tryParse(fuelCost.text) ?? 0,
-            "morningStatus": morningStatusController.text,
-            "afternoonStatus": afternoonStatusController.text,
-            "totalAmount": _getTotalAmount(),
-          });
+      await FirestoreService.siteSupervisorEntries.doc(_updateDocId).update({
+        "materials": materials,
+        "labours": labours,
+        "food": int.tryParse(foodCost.text) ?? 0,
+        "transport": int.tryParse(transportCost.text) ?? 0,
+        "fuel": int.tryParse(fuelCost.text) ?? 0,
+        "morningStatus": morningStatusController.text,
+        "afternoonStatus": afternoonStatusController.text,
+        "totalAmount": _getTotalAmount(),
+        "isManagerEntry": true,
+        "createdBy": "manager",
+      });
+      await ExpenseService.updateTotalSiteExpense(siteCode);
       if (mounted)
         ScaffoldMessenger.of(
           context,
@@ -568,25 +639,15 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
-      title: 'Manager Daily Site Entry',
-      onBack: () => Navigator.pop(context),
+      title: widget.hideAppBar ? null : 'Manager Daily Site Entry',
+      appBarForegroundColor: Colors.white,
+      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SupervisorDashboard(
-                  username: widget.userName,
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
-              ),
-              (route) => false,
-            );
-          },
-        ),
+        if (!widget.hideAppBar)
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: _refreshData,
+          ),
       ],
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -1127,19 +1188,53 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildQtyField('Qty', _customMaterialQtyController),
-                            const SizedBox(height: 8),
-                            _buildQtyField(
-                              'Price',
-                              _customMaterialPriceController,
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                icon: Icon(
+                                  _showCustomMaterialFields
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  color: primaryColor,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showCustomMaterialFields =
+                                        !_showCustomMaterialFields;
+                                  });
+                                },
+                                label: Text(
+                                  _showCustomMaterialFields
+                                      ? 'Hide Other Materials'
+                                      : 'Other Materials',
+                                  style: TextStyle(color: primaryColor),
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            GlassButton(
-                              label: 'ADD CUSTOM',
-                              icon: Icons.check,
-                              onPressed: _addCustomMaterial,
-                              isSecondary: true,
-                            ),
+                            if (_showCustomMaterialFields) ...[
+                              const SizedBox(height: 8),
+                              _buildTextField(
+                                'Material Name',
+                                _customMaterialNameController,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildQtyField(
+                                'Qty',
+                                _customMaterialQtyController,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildQtyField(
+                                'Unit Price',
+                                _customMaterialPriceController,
+                              ),
+                              const SizedBox(height: 8),
+                              GlassButton(
+                                label: 'ADD OTHER MATERIAL',
+                                icon: Icons.check,
+                                onPressed: _addCustomMaterial,
+                                isSecondary: true,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -1178,15 +1273,27 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             onPressed: _addLabour,
                             isSecondary: true,
                           ),
-                          TextButton(
-                            onPressed: () => setState(
-                              () => _showCustomLabourFields =
-                                  !_showCustomLabourFields,
-                            ),
-                            child: Text(
-                              _showCustomLabourFields
-                                  ? 'Hide Custom'
-                                  : 'Add Custom Labour',
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              icon: Icon(
+                                _showCustomLabourFields
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: primaryColor,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _showCustomLabourFields =
+                                      !_showCustomLabourFields;
+                                });
+                              },
+                              label: Text(
+                                _showCustomLabourFields
+                                    ? 'Hide Custom Labour'
+                                    : 'Add Custom Labour',
+                                style: TextStyle(color: primaryColor),
+                              ),
                             ),
                           ),
                           if (_showCustomLabourFields) ...[
@@ -1199,6 +1306,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               'Salary',
                               _customLabourSalaryController,
                             ),
+                            const SizedBox(height: 8),
+                            _buildQtyField('Count', _customLabourQtyController),
                             const SizedBox(height: 8),
                             GlassButton(
                               label: 'ADD CUSTOM',
@@ -1233,12 +1342,26 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             fuelCost,
                             icon: Icons.local_gas_station,
                           ),
+                          const SizedBox(height: 12),
+                          GlassButton(
+                            label: 'ADD',
+                            icon: Icons.add,
+                            onPressed: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() {});
+                            },
+                            isSecondary: true,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
 
-                    if (materials.isNotEmpty || labours.isNotEmpty)
+                    if (materials.isNotEmpty ||
+                        labours.isNotEmpty ||
+                        (int.tryParse(foodCost.text) ?? 0) > 0 ||
+                        (int.tryParse(transportCost.text) ?? 0) > 0 ||
+                        (int.tryParse(fuelCost.text) ?? 0) > 0)
                       GlassCard(
                         title:
                             'Today\'s Summary (Total: ₹${_getTotalAmount()})',
@@ -1320,11 +1443,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Widget _buildTextField(String label, TextEditingController ctrl) {
     return TextField(
       controller: ctrl,
-      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1337,12 +1458,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return TextField(
       controller: ctrl,
       keyboardType: TextInputType.number,
-      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         prefixIcon: icon != null ? Icon(icon, color: primaryColor) : null,
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1355,12 +1474,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return TextField(
       controller: ctrl,
       maxLines: 2,
-      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: primaryColor),
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1372,41 +1489,28 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         columnSpacing: 20,
         columns: const [
           DataColumn(
-            label: Text('Item', style: TextStyle(color: Colors.white70)),
+            label: Text('Item', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           DataColumn(
-            label: Text('Qty', style: TextStyle(color: Colors.white70)),
+            label: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           DataColumn(
-            label: Text('Amt', style: TextStyle(color: Colors.white70)),
+            label: Text('Amt', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-          DataColumn(
-            label: Text('', style: TextStyle(color: Colors.white70)),
-          ),
+          DataColumn(label: Text('')),
         ],
         rows: [
           ...materials.asMap().entries.map(
             (e) => DataRow(
               cells: [
-                DataCell(
-                  Text(
-                    e.value['type'],
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '${e.value['quantity']}',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
+                DataCell(Text(e.value['type'])),
+                DataCell(Text('${e.value['quantity']}')),
                 DataCell(
                   Text(
                     _calculateMaterialAmount(
                       e.value['type'],
                       e.value['quantity'],
                     ),
-                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 DataCell(
@@ -1425,22 +1529,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           ...labours.asMap().entries.map(
             (e) => DataRow(
               cells: [
-                DataCell(
-                  Text(
-                    e.value['type'],
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '${e.value['count']}',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
+                DataCell(Text(e.value['type'])),
+                DataCell(Text('${e.value['count']}')),
                 DataCell(
                   Text(
                     _calculateLabourAmount(e.value['type'], e.value['count']),
-                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 DataCell(
@@ -1456,6 +1549,60 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
               ],
             ),
           ),
+          if ((int.tryParse(foodCost.text) ?? 0) > 0)
+            DataRow(
+              cells: [
+                const DataCell(Text('Food')),
+                const DataCell(Text('-')),
+                DataCell(Text('₹${foodCost.text}')),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => foodCost.text = '0'),
+                  ),
+                ),
+              ],
+            ),
+          if ((int.tryParse(transportCost.text) ?? 0) > 0)
+            DataRow(
+              cells: [
+                const DataCell(Text('Transport')),
+                const DataCell(Text('-')),
+                DataCell(Text('₹${transportCost.text}')),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => transportCost.text = '0'),
+                  ),
+                ),
+              ],
+            ),
+          if ((int.tryParse(fuelCost.text) ?? 0) > 0)
+            DataRow(
+              cells: [
+                const DataCell(Text('Fuel')),
+                const DataCell(Text('-')),
+                DataCell(Text('₹${fuelCost.text}')),
+                DataCell(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => fuelCost.text = '0'),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

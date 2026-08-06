@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 import '../services/firestore_service.dart';
 import 'project_screen.dart';
 
@@ -57,6 +59,7 @@ class _SiteScreenState extends State<SiteScreen>
           .map((doc) => doc['projectCategory']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
       return categories;
     } catch (e) {
@@ -73,7 +76,24 @@ class _SiteScreenState extends State<SiteScreen>
           .map((doc) => doc['projectState']?.toString().trim())
           .where((val) => val != null && val.isNotEmpty)
           .cast<String>()
+          .toSet()
           .toList();
+
+      // Add default status options if they are not already present
+      final defaultStatuses = [
+        'Planning',
+        'Started',
+        'In Progress',
+        'On Hold',
+        'Completed',
+        'Cancelled',
+      ];
+      for (var status in defaultStatuses) {
+        if (!statusList.contains(status)) {
+          statusList.add(status);
+        }
+      }
+
       return statusList;
     } catch (e) {
       throw 'Failed to load status options: $e';
@@ -159,27 +179,68 @@ class _SiteScreenState extends State<SiteScreen>
       if (permission == LocationPermission.deniedForever) {
         throw 'Location permissions are permanently denied';
       }
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        String address = [
-          place.street,
-          place.locality,
-          place.administrativeArea,
-          place.country,
-        ].where((part) => part?.isNotEmpty ?? false).join(', ');
-        setState(() {
-          _latitudeController.text = position.latitude.toStringAsFixed(6);
-          _longitudeController.text = position.longitude.toStringAsFixed(6);
-          _locationController.text = address;
-        });
+      final Position position;
+      Position? tempPosition;
+      try {
+        tempPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('High accuracy getCurrentPosition failed/timed out: $e');
+        // Fallback 1: Try retrieving the last known position
+        tempPosition = await Geolocator.getLastKnownPosition();
+        if (tempPosition == null) {
+          debugPrint('Last known position is null, attempting low accuracy...');
+          // Fallback 2: Try low accuracy with a short timeout as a final attempt
+          tempPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 5),
+          );
+        }
       }
+
+      if (tempPosition == null) {
+        throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
+      }
+      position = tempPosition;
+
+      String address = '';
+
+      if (kIsWeb) {
+        address = 'Web Location';
+      } else {
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks.first;
+            address = [
+              place.street,
+              place.locality,
+              place.administrativeArea,
+              place.country,
+            ].where((part) => part?.isNotEmpty ?? false).join(', ');
+          }
+        } catch (geocodingError) {
+          debugPrint(
+            'Geocoding error (falling back to coordinates only): $geocodingError',
+          );
+          address =
+              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        }
+      }
+
+      setState(() {
+        _latitudeController.text = position.latitude.toStringAsFixed(6);
+        _longitudeController.text = position.longitude.toStringAsFixed(6);
+        if (_locationController.text.isEmpty ||
+            _locationController.text == 'Web Location') {
+          _locationController.text = address;
+        }
+      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -198,6 +259,8 @@ class _SiteScreenState extends State<SiteScreen>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     if (_tabController == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -209,6 +272,7 @@ class _SiteScreenState extends State<SiteScreen>
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Site Details',
           style: TextStyle(color: Colors.white),
@@ -227,7 +291,8 @@ class _SiteScreenState extends State<SiteScreen>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -239,9 +304,19 @@ class _SiteScreenState extends State<SiteScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildNewSiteTab(), _buildAllSiteTab()],
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [_buildNewSiteTab(), _buildAllSiteTab()],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -665,7 +740,9 @@ class _SiteScreenState extends State<SiteScreen>
                         ? 'Select $label'
                         : DateFormat('MMM d, yyyy').format(date),
                     style: TextStyle(
-                      color: date == null ? Colors.grey.shade600 : Colors.black87,
+                      color: date == null
+                          ? Colors.grey.shade600
+                          : Colors.black87,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -724,13 +801,6 @@ class _SiteScreenState extends State<SiteScreen>
           label: 'Reset',
           color: Colors.orange.shade700,
           onPressed: _resetForm,
-        ),
-        _buildActionButton(
-          context,
-          icon: Icons.cancel,
-          label: 'Cancel',
-          color: Colors.red.shade700,
-          onPressed: () => Navigator.pop(context),
         ),
       ],
     );
@@ -895,66 +965,112 @@ class _SiteScreenState extends State<SiteScreen>
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        final primaryColor = Theme.of(dialogContext).primaryColor;
-        return Center(
+        final theme = Theme.of(dialogContext);
+        final primaryColor = theme.primaryColor;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
           child: Container(
-            width: 280,
-            padding: const EdgeInsets.all(30),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Lottie.asset(
-                  'assets/animation/success.json',
-                  width: 140,
-                  height: 140,
-                  repeat: false,
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Lottie.asset(
+                      'assets/animation/success.json',
+                      width: 120,
+                      height: 120,
+                      repeat: false,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 24),
                 Text(
-                  'Site Created!',
-                  style: TextStyle(
-                    fontSize: 22,
+                  'Success!',
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Project created with ID $siteId.\nPlease update the project details.',
+                RichText(
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 17, color: Colors.black87),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.5,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
-                    ),
-                    elevation: 5,
-                  ),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProjectScreen(projectId: projectId),
+                    children: [
+                      const TextSpan(text: 'New site registered as '),
+                      TextSpan(
+                        text: siteId,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
                       ),
-                    );
-                  },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                      const TextSpan(
+                        text:
+                            '.\n\nPlease proceed to update the project configuration.',
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ProjectScreen(projectId: projectId),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

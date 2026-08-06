@@ -14,10 +14,11 @@ import 'contact_support_screen.dart';
 import 'org_reset_password_screen.dart';
 import 'org_subscription_page.dart';
 import 'org_information_screen.dart';
+import 'about_us_screen.dart';
+import '../widgets/glass_scaffold.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   /// When [standalone] is true (default), the screen is shown as a separate
-
   final bool standalone;
   const OrgMenuScreen({super.key, this.standalone = true});
 
@@ -40,20 +41,40 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      // Fetch referal codes using centralized FirestoreService path resolution
-      final referalDoc = await FirestoreService.referralDoc.get();
+      // Ensure FirestoreService has a valid org path before reading
+      if (!FirestoreService.isReady) {
+        await FirestoreService.initialize();
+      }
 
-      if (referalDoc.exists && mounted) {
-        final refData = referalDoc.data()!;
+      // ── Referral code ────────────────────────────────────────────────────
+      final referralDoc = await FirestoreService.referralDoc.get();
+
+      String? code;
+      if (referralDoc.exists) {
+        final refData = referralDoc.data()!;
+        code =
+            refData['orgReferralCode'] as String? ??
+            refData['referralCode'] as String?;
+      }
+
+      // Fallback: some legacy orgs stored the code on the root org document
+      if (code == null || code.isEmpty) {
+        final rootDoc = await FirestoreService.rootOrgDoc.get();
+        if (rootDoc.exists) {
+          final rootData = rootDoc.data()!;
+          code =
+              rootData['orgReferralCode'] as String? ??
+              rootData['referralCode'] as String?;
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          _orgCode =
-              refData['orgReferralCode'] ??
-              refData['referralCode'] ??
-              'Not Set';
+          _orgCode = (code != null && code.isNotEmpty) ? code : 'Not Set';
         });
       }
 
-      // Fetch subscription data
+      // ── Subscription ─────────────────────────────────────────────────────
       final subDoc = await FirestoreService.subscriptionDoc.get();
 
       if (subDoc.exists && mounted) {
@@ -71,12 +92,30 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             _subscriptionExpiry = 'Never';
           }
         });
+      } else if (mounted) {
+        // Fallback: check root org doc for legacy subscription data
+        final rootDoc = await FirestoreService.rootOrgDoc.get();
+        if (rootDoc.exists && mounted) {
+          final rootData = rootDoc.data()!;
+          setState(() {
+            _subscriptionPlan = rootData['subscriptionPlan'] ?? 'No Plan';
+            _isSubscriptionActive = rootData['isSubscriptionActive'] ?? false;
+            final expiry = rootData['subscriptionEndDate'];
+            if (expiry is Timestamp) {
+              _subscriptionExpiry = DateFormat(
+                'dd MMM yyyy',
+              ).format(expiry.toDate());
+            } else {
+              _subscriptionExpiry = 'Never';
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching org data: $e');
       if (mounted) {
         setState(() {
-          _orgCode = 'Error';
+          _orgCode = 'Not Available';
           _subscriptionPlan = 'Error';
         });
       }
@@ -85,22 +124,34 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final content = SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.isMobile(context) ? 20.0 : 32.0),
-      child: Column(
-        children: [
-          _buildProfileSection(colorScheme),
-          const SizedBox(height: 32),
-          _buildReferralSection(colorScheme),
-          const SizedBox(height: 16),
-          _buildSettingsSection(colorScheme),
-          const SizedBox(height: 16),
-          _buildSubscriptionSection(colorScheme),
-          const SizedBox(height: 32),
-          _buildLogoutSection(colorScheme),
-          const SizedBox(height: 24),
-        ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    final content = Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isMobile ? double.infinity : 600,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            children: [
+              _buildReferralSection(colorScheme),
+              const SizedBox(height: 16),
+              _buildSettingsSection(colorScheme),
+              const SizedBox(height: 16),
+              _buildSubscriptionSection(colorScheme),
+              const SizedBox(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildLogoutSection(colorScheme),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
       ),
     );
 
@@ -109,39 +160,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       return content;
     }
 
-    // Standalone: wrap in a full Scaffold with AppBar.
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        toolbarHeight: 70,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shadowColor: Colors.black26,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(32),
-            bottomRight: Radius.circular(32),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Menu',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      body: SafeArea(child: content),
+    // Standalone: wrap in a GlassScaffold
+    return GlassScaffold(
+      title: 'Menu',
+      onBack: () => Navigator.pop(context),
+      body: content,
     );
   }
 
@@ -149,17 +172,31 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     return Column(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: 70,
+          height: 70,
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
+            color: Colors.white,
             shape: BoxShape.circle,
-            color: colorScheme.primary.withOpacity(0.12),
             border: Border.all(
               color: colorScheme.primary.withOpacity(0.2),
               width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Icon(Icons.business, color: colorScheme.primary, size: 40),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: Image.asset(
+              'assets/images/logo_main.png',
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         ValueListenableBuilder<String>(
@@ -171,7 +208,8 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               style: TextStyle(
                 color: const Color(0xFF1E293B),
                 fontSize: Responsive.fontSize(context, 24),
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
               ),
             );
           },
@@ -181,33 +219,40 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildReferralSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Referral Program',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Referral Program',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Share these codes with your team members to register them under your organization.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 13,
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Share these codes with your team members to register them under your organization.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          _buildCodeRow('Referral', _orgCode, colorScheme),
-        ],
+            ),
+            const SizedBox(height: 20),
+            _buildCodeRow('Referral', _orgCode, colorScheme),
+          ],
+        ),
       ),
     );
   }
@@ -227,10 +272,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         ),
         const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
@@ -241,8 +286,8 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 style: TextStyle(
                   color: colorScheme.primary,
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
                 ),
               ),
               IconButton(
@@ -268,138 +313,160 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildSettingsSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.settings_suggest_rounded,
-                color: colorScheme.secondary,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Settings',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.settings_suggest_rounded,
+                  color: colorScheme.secondary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Settings',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsTile(
+              icon: Icons.business_rounded,
+              title: 'Organisation Information',
+              subtitle: 'Update address and phone details',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrgInformationScreen(),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingsTile(
-            icon: Icons.business_rounded,
-            title: 'Organisation Information',
-            subtitle: 'Update address and phone details',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrgInformationScreen(),
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.color_lens_outlined,
+              title: 'Brand Color',
+              subtitle: 'Change app theme color',
+              onTap: () => Navigator.pushNamed(context, '/branding'),
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.lock_reset_rounded,
+              title: 'Reset Password',
+              subtitle: 'Update your account password',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrgResetPasswordScreen(),
+                ),
               ),
             ),
-          ),
-
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.color_lens_outlined,
-            title: 'Brand Color',
-            subtitle: 'Change app theme color',
-            onTap: () => Navigator.pushNamed(context, '/branding'),
-          ),
-
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.lock_reset_rounded,
-            title: 'Reset Password',
-            subtitle: 'Update your account password',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrgResetPasswordScreen(),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.headset_mic_rounded,
+              title: 'Contact Support',
+              subtitle: 'Get help from our team',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ContactSupportScreen(),
+                ),
               ),
             ),
-          ),
-
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.headset_mic_rounded,
-            title: 'Contact Support',
-            subtitle: 'Get help from our team',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ContactSupportScreen(),
-              ),
-            ),
-          ),
-
-          const Divider(color: Color(0xFFF1F5F9), height: 24),
-          _buildSettingsTile(
-            icon: Icons.privacy_tip_rounded,
-            title: 'Privacy Policy',
-            subtitle: 'View our privacy policy',
-            onTap: () async {
-              final Uri url = Uri.parse(
-                'https://sites.google.com/view/cst-whitelabel-app/home',
-              );
-              if (!await launchUrl(url)) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not open privacy policy'),
-                    ),
-                  );
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.privacy_tip_rounded,
+              title: 'Privacy Policy',
+              subtitle: 'View our privacy policy',
+              onTap: () async {
+                final Uri url = Uri.parse(
+                  'https://sites.google.com/view/cst-whitelabel-app/home',
+                );
+                if (!await launchUrl(url)) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not open privacy policy'),
+                      ),
+                    );
+                  }
                 }
-              }
-            },
-          ),
-        ],
+              },
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 24),
+            _buildSettingsTile(
+              icon: Icons.info_outline_rounded,
+              title: 'About Us',
+              subtitle: 'Learn more about eBicks',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AboutUsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSubscriptionSection(ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.stars_rounded, color: colorScheme.tertiary, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Subscription',
-                style: TextStyle(
-                  color: const Color(0xFF1E293B),
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.stars_rounded,
+                  color: colorScheme.tertiary,
+                  size: 24,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingsTile(
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'Manage Subscription',
-            subtitle: _isSubscriptionActive
-                ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
-                : 'Current: $_subscriptionPlan (Inactive)',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrganizationSubscriptionPage(),
+                const SizedBox(width: 12),
+                Text(
+                  'Subscription',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsTile(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Manage Subscription',
+              subtitle: _isSubscriptionActive
+                  ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
+                  : 'Current: $_subscriptionPlan (Inactive)',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrganizationSubscriptionPage(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -413,16 +480,16 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         label: const Text(
           'LOGOUT',
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
             color: Colors.white,
           ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red[600],
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -466,13 +533,11 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
 
     if (result == true) {
-      // Clear global auth state
       await AuthService().logout();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('org_isLoggedIn');
       await prefs.remove('org_username');
-      // We keep branding keys so the login screen stays branded for the org
 
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
@@ -491,27 +556,61 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: const Color(0xFF64748B)),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF1E293B),
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: theme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              trailing ??
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                    size: 20,
+                  ),
+            ],
+          ),
         ),
       ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-            )
-          : null,
-      trailing:
-          trailing ??
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
-      onTap: onTap,
     );
   }
 }

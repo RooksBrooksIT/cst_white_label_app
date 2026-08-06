@@ -321,36 +321,47 @@ class _MaterialScreenState extends State<MaterialScreen>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final theme = Theme.of(context);
     return GlassScaffold(
       title: 'Material Config',
+      onBack: () => Navigator.pop(context),
       appBarBackgroundColor: theme.colorScheme.primary,
-      appBarForegroundColor: theme.colorScheme.onPrimary,
-      body: Column(
-        children: [
-          Container(
-            color: theme.cardColor,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              tabs: const [
-                Tab(text: 'NEW MATERIAL'),
-                Tab(text: 'UPDATE MATERIAL'),
-              ],
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              indicatorColor: theme.colorScheme.primary,
-              indicatorWeight: 3,
+      appBarForegroundColor: Colors.white,
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Column(
+          children: [
+            Container(
+              color: theme.cardColor,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: const [
+                  Tab(text: 'NEW MATERIAL'),
+                  Tab(text: 'UPDATE MATERIAL'),
+                ],
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                indicatorColor: theme.colorScheme.primary,
+                indicatorWeight: 3,
+              ),
             ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildNewTab(), _buildUpdateTab()],
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [_buildNewTab(), _buildUpdateTab()],
+              ),
             ),
+          ],
+        ),
           ),
-        ],
+        ),
       ),
     );
   }

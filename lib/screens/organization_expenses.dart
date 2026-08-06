@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expense_service.dart';
 import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
+import '../widgets/glass_scaffold.dart';
 
 class OrganizationExpenses extends StatefulWidget {
   const OrganizationExpenses({super.key});
@@ -62,25 +63,17 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       isLoadingSites = true;
     });
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
+      final snapshot = await FirestoreService.getCollection('Site').get();
       siteIds = snapshot.docs
-          .map((doc) => doc.data()['site'] as String?)
-          .where((site) => site != null && site.isNotEmpty)
-          .toSet()
-          .cast<String>()
+          .map((doc) => doc.id)
+          .where((id) => id.isNotEmpty)
           .toList();
-
-      // If no site IDs found, add some test data
-      if (siteIds.isEmpty) {
-        siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
-      }
 
       setState(() {
         isLoadingSites = false;
       });
     } catch (e) {
-      // On error, use test data
-      siteIds = ['TEST_SITE_001', 'TEST_SITE_002', 'TEST_SITE_003'];
+      siteIds = [];
       setState(() {
         isLoadingSites = false;
       });
@@ -96,66 +89,132 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     String label,
     TextEditingController controller, {
     bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
+    IconData? prefixIcon,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: TextField(
+      padding: EdgeInsets.only(bottom: isDesktop ? 20.0 : 16.0),
+      child: TextFormField(
         controller: controller,
         enabled: enabled,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(),
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: primaryColor, size: isDesktop ? 24.0 : 20.0)
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: primaryColor, width: 2.0),
+          ),
+          filled: true,
+          fillColor: enabled ? Colors.white : Colors.grey.shade50,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 20.0 : 16.0,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildBillTable() {
+  Widget _buildBillTable(bool isDesktop, bool isTablet, bool isMobile) {
     if (bills.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'No bills added yet.',
-          style: TextStyle(color: Colors.grey[600]),
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: isDesktop ? 40.0 : 32.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.receipt_long_rounded,
+                size: isDesktop ? 80.0 : 64.0,
+                color: Colors.grey.shade300,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              Text(
+                'No bills added yet',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: isDesktop ? 18.0 : 16.0,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(primaryColor.withOpacity(0.1)),
-        columns: const [
-          DataColumn(label: Text('Bill No')),
-          DataColumn(label: Text('Bill Date')),
-          DataColumn(label: Text('Bill Vendor')),
-          DataColumn(label: Text('Bill Amount')),
-          DataColumn(label: Text('Delete')),
-        ],
-        rows: bills
-            .asMap()
-            .entries
-            .map(
-              (entry) => DataRow(
-                cells: [
-                  DataCell(Text(entry.value['billNo']!)),
-                  DataCell(Text(entry.value['billDate']!)),
-                  DataCell(Text(entry.value['billVendor']!)),
-                  DataCell(Text(entry.value['billAmount']!)),
-                  DataCell(
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          bills.removeAt(entry.key);
-                        });
-                      },
-                    ),
-                  ),
-                ],
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: bills.length,
+      separatorBuilder: (context, index) => SizedBox(height: isDesktop ? 16.0 : 12.0),
+      itemBuilder: (context, index) {
+        final bill = bills[index];
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.0),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8.0,
+                offset: const Offset(0, 2),
               ),
-            )
-            .toList(),
-      ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? 20.0 : 16.0,
+              vertical: isDesktop ? 12.0 : 8.0,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: primaryColor.withOpacity(0.1),
+              child: Icon(Icons.receipt_rounded, color: primaryColor, size: isDesktop ? 28.0 : 24.0),
+            ),
+            title: Text(
+              bill['billVendor']!,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isDesktop ? 18.0 : 16.0),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: isDesktop ? 6.0 : 4.0),
+                Text('Bill No: ${bill['billNo']} • ${bill['billDate']}', style: TextStyle(fontSize: isDesktop ? 14.0 : 12.0)),
+                SizedBox(height: isDesktop ? 6.0 : 4.0),
+                Text(
+                  bill['billAmount']!,
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 16.0 : 15.0,
+                  ),
+                ),
+              ],
+            ),
+            trailing: IconButton(
+              icon: Icon(Icons.delete_outline_rounded, color: Colors.red, size: isDesktop ? 28.0 : 24.0),
+              onPressed: () {
+                setState(() {
+                  bills.removeAt(index);
+                });
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -191,7 +250,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
           'billNo': billNoController.text,
           'billDate': DateFormat('dd/MM/yy').format(selectedDate),
           'billVendor': billVendorController.text,
-          'billAmount': '? ${billAmountController.text}',
+          'billAmount': '₹ ${billAmountController.text}',
         });
 
         billNoController.clear();
@@ -214,29 +273,30 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     });
   }
 
-  Future<void> _showConfirmationDialog() async {
+  Future<void> _showConfirmationDialog(bool isDesktop, bool isTablet, bool isMobile) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Submission'),
+          title: Text('Confirm Submission', style: TextStyle(fontSize: isDesktop ? 20.0 : 18.0)),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text('Site: ${selectedSiteId ?? 'Not selected'}'),
-                Text('Date: ${DateFormat('dd/MM/yy').format(selectedDate)}'),
-                Text('Total Bills: ${bills.length}'),
-                const SizedBox(height: 16),
-                const Text(
+                Text('Site: ${selectedSiteId ?? 'Not selected'}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                Text('Date: ${DateFormat('dd/MM/yy').format(selectedDate)}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                Text('Total Bills: ${bills.length}', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
+                SizedBox(height: isDesktop ? 20.0 : 16.0),
+                Text(
                   'Are you sure you want to submit this expense entry?',
+                  style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
                 ),
               ],
             ),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -245,11 +305,15 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 20.0 : 16.0,
+                  vertical: isDesktop ? 14.0 : 12.0,
+                ),
               ),
-              child: const Text('OK'),
+              child: Text('OK', style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0)),
               onPressed: () {
                 Navigator.of(context).pop();
-                _submitExpenseData();
+                _submitExpenseData(isDesktop, isTablet, isMobile);
               },
             ),
           ],
@@ -258,7 +322,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     );
   }
 
-  Future<void> _submitExpenseData() async {
+  Future<void> _submitExpenseData(bool isDesktop, bool isTablet, bool isMobile) async {
     if (isSubmitting) return;
     setState(() {
       isSubmitting = true;
@@ -297,9 +361,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       final newDocId = '${selectedSiteId}_$dateStr';
 
       // 1. Save/merge to organizationEntries
-      final entryRef = FirebaseFirestore.instance
-          .collection('organizationEntries')
-          .doc(newDocId);
+      final entryRef = FirestoreService.organizationEntries.doc(newDocId);
       final entrySnap = await entryRef.get();
 
       List<dynamic> existingBills = [];
@@ -364,8 +426,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         'siteId': selectedSiteId ?? '',
       };
 
-      await FirebaseFirestore.instance
-          .collection('organizationExpenseSummary')
+      await FirestoreService.organizationExpenseSummary
           .doc(newDocId)
           .set(summary);
 
@@ -381,17 +442,17 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(20.0),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 60),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.check_circle, color: Colors.green, size: isDesktop ? 80.0 : 60.0),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              Text(
                 'Your data was submitted successfully!',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: isDesktop ? 20.0 : 18.0, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -400,7 +461,7 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('OK', style: TextStyle(color: Colors.black)),
+              child: Text('OK', style: TextStyle(color: Colors.black, fontSize: isDesktop ? 15.0 : 13.0)),
             ),
           ],
         ),
@@ -442,10 +503,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         });
       } else {
         setState(() {
-          selectedSupervisorId = null;
-          selectedProjectPhase = null;
-          supervisorController.clear();
-          projectPhaseController.clear();
+          selectedSupervisorId = 'Not Assigned';
+          selectedProjectPhase = 'Not Assigned';
+          supervisorController.text = 'Not Assigned';
+          projectPhaseController.text = 'Not Assigned';
           isLoadingSiteDetails = false;
         });
       }
@@ -460,298 +521,349 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Organization Expenses',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
+    return GlassScaffold(
+      title: 'Company Expenses',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.refresh_rounded, color: Colors.white, size: isDesktop ? 28.0 : 24.0),
+          onPressed: _loadSiteIds,
+          tooltip: 'Refresh Site IDs',
         ),
-        backgroundColor: primaryColor,
-        toolbarHeight: 50,
-        elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadSiteIds,
-            tooltip: 'Refresh Site IDs',
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Site & Project Info',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    isLoadingSites
-                        ? const Center(child: CircularProgressIndicator())
-                        : DropdownButtonFormField<String>(
-                            value: selectedSiteId,
-                            decoration: const InputDecoration(
-                              labelText: 'Site ID',
-                              border: OutlineInputBorder(),
+        SizedBox(width: isDesktop ? 12.0 : 8.0),
+      ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0)),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isDesktop ? 900.0 : double.infinity),
+            child: Column(
+              children: [
+                _buildSectionCard(
+                  title: 'Site & Project Info',
+                  icon: Icons.location_on_rounded,
+                  child: Column(
+                    children: [
+                      isLoadingSites
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              value: selectedSiteId,
+                              decoration: InputDecoration(
+                                labelText: 'Site ID',
+                                prefixIcon: Icon(
+                                  Icons.business_rounded,
+                                  color: primaryColor,
+                                  size: isDesktop ? 24.0 : 20.0,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.0),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: isDesktop ? 20.0 : 16.0,
+                                  vertical: isDesktop ? 20.0 : 16.0,
+                                ),
+                              ),
+                              items: siteIds
+                                  .map(
+                                    (site) => DropdownMenuItem<String>(
+                                      value: site,
+                                      child: Text(
+                                        site,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedSiteId = value;
+                                });
+                                if (value != null) {
+                                  _loadSiteDetails(value);
+                                }
+                              },
                             ),
-                            items: siteIds
-                                .map(
-                                  (site) => DropdownMenuItem<String>(
-                                    value: site,
-                                    child: Text(site),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedSiteId = value;
-                              });
-                              if (value != null) {
-                                _loadSiteDetails(value);
-                              }
-                            },
-                          ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: supervisorController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Supervisor ID',
-                        border: OutlineInputBorder(),
+                      SizedBox(height: isDesktop ? 20.0 : 16.0),
+                      _buildLabeledTextField(
+                        'Supervisor ID',
+                        supervisorController,
+                        enabled: false,
+                        prefixIcon: Icons.person_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: projectPhaseController,
-                      enabled: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Project Phase',
-                        border: OutlineInputBorder(),
+                      _buildLabeledTextField(
+                        'Project Phase',
+                        projectPhaseController,
+                        enabled: false,
+                        prefixIcon: Icons.flag_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Date:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                      InkWell(
+                        onTap: () => _selectDate(context),
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isDesktop ? 20.0 : 16.0,
+                            vertical: isDesktop ? 20.0 : 16.0,
                           ),
-                          onPressed: () => _selectDate(context),
-                          label: Text(
-                            DateFormat('dd/MM/yy').format(selectedDate),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.receipt_long, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Add Bill',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLabeledTextField('Bill No', billNoController),
-                    _buildLabeledTextField(
-                      'Bill Date',
-                      TextEditingController(
-                        text: DateFormat('dd/MM/yy').format(selectedDate),
-                      ),
-                      enabled: false,
-                    ),
-                    _buildLabeledTextField('Bill Vendor', billVendorController),
-                    _buildLabeledTextField('Bill Amount', billAmountController),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _addBill,
-                          label: const Text(
-                            "Upload Bill",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: _addBill,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12.0),
+                            color: Colors.white,
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.add, color: Colors.white),
-                              SizedBox(width: 4),
-                              const Text(
-                                'Add',
-                                style: TextStyle(color: Colors.white),
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                color: primaryColor,
+                                size: isDesktop ? 24.0 : 20.0,
+                              ),
+                              SizedBox(width: isDesktop ? 16.0 : 12.0),
+                              Text(
+                                'Date',
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                DateFormat('dd/MM/yyyy').format(selectedDate),
+                                style: TextStyle(
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.list_alt, color: primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bills List',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                _buildSectionCard(
+                  title: 'Add Bill',
+                  icon: Icons.receipt_long_rounded,
+                  child: Column(
+                    children: [
+                      _buildLabeledTextField(
+                        'Bill No',
+                        billNoController,
+                        prefixIcon: Icons.numbers_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildLabeledTextField(
+                        'Bill Vendor',
+                        billVendorController,
+                        prefixIcon: Icons.store_rounded,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildLabeledTextField(
+                        'Bill Amount',
+                        billAmountController,
+                        prefixIcon: Icons.currency_rupee_rounded,
+                        keyboardType: TextInputType.number,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _addBill,
+                          icon: Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: Colors.white,
+                            size: isDesktop ? 24.0 : 20.0,
+                          ),
+                          label: Text(
+                            "Add Bill to List",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isDesktop ? 17.0 : 16.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            elevation: 2.0,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildBillTable(),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: isSubmitting ? null : _resetForm,
-                    child: const Text(
-                      'Reset',
-                      style: TextStyle(color: Colors.black),
-                    ),
+                    ],
                   ),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                SizedBox(height: isDesktop ? 24.0 : 16.0),
+                _buildSectionCard(
+                  title: 'Bills List',
+                  icon: Icons.list_alt_rounded,
+                  child: _buildBillTable(isDesktop, isTablet, isMobile),
+                  isDesktop: isDesktop,
+                  isTablet: isTablet,
+                  isMobile: isMobile,
+                ),
+                SizedBox(height: isDesktop ? 32.0 : 24.0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                          side: BorderSide(color: Colors.grey.shade400, width: 2.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                        onPressed: isSubmitting ? null : _resetForm,
+                        child: Text(
+                          'Reset',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: isDesktop ? 17.0 : 16.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    onPressed: isSubmitting
-                        ? null
-                        : () {
-                            if (selectedSiteId == null ||
-                                selectedSupervisorId == null ||
-                                selectedProjectPhase == null ||
-                                bills.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please fill all details and add at least one bill.',
+                    SizedBox(width: isDesktop ? 20.0 : 16.0),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          elevation: 4.0,
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () {
+                                if (selectedSiteId == null ||
+                                    selectedSupervisorId == null ||
+                                    selectedProjectPhase == null ||
+                                    bills.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please fill all details and add at least one bill.',
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _showConfirmationDialog(isDesktop, isTablet, isMobile);
+                              },
+                        child: isSubmitting
+                            ? SizedBox(
+                                width: isDesktop ? 28.0 : 24.0,
+                                height: isDesktop ? 28.0 : 24.0,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.0,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
                                   ),
                                 ),
-                              );
-                              return;
-                            }
-                            _showConfirmationDialog();
-                          },
-                    child: isSubmitting
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                              )
+                            : Text(
+                                'Submit Expenses',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isDesktop ? 17.0 : 16.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          )
-                        : const Text(
-                            'Submit',
-                            style: TextStyle(color: Colors.white),
-                          ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: isDesktop ? 40.0 : 32.0),
+              ],
+            ),
+          ),
+        ),
+      ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    required bool isDesktop,
+    required bool isTablet,
+    required bool isMobile,
+  }) {
+    return Card(
+      elevation: 4.0,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+      child: Padding(
+        padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isDesktop ? 14.0 : 10.0),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Icon(icon, color: primaryColor, size: isDesktop ? 32.0 : 24.0),
+                ),
+                SizedBox(width: isDesktop ? 20.0 : 16.0),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 20.0 : 18.0,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
+            SizedBox(height: isDesktop ? 24.0 : 20.0),
+            child,
           ],
         ),
       ),

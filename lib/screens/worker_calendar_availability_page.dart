@@ -123,6 +123,8 @@ class _WorkerCalendarAvailabilityPageState
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
     final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
     final dayDetails =
@@ -131,7 +133,10 @@ class _WorkerCalendarAvailabilityPageState
     return GlassScaffold(
       title: 'Worker Schedule',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           _buildWorkerHeader(colorScheme),
           Expanded(
@@ -148,6 +153,8 @@ class _WorkerCalendarAvailabilityPageState
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

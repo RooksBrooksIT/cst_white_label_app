@@ -37,9 +37,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
   Future<void> _fetchMaterialNames() async {
     try {
-      final snapshot = await FirestoreService.materials.get();
+      final snapshot = await FirestoreService.materialCategories.get();
       final names = snapshot.docs
-          .map((doc) => (doc.data()['materialName'] ?? '').toString().trim())
+          .map((doc) => (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '').toString().trim())
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();
@@ -103,34 +103,43 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
     return GlassScaffold(
       title: 'Material Report',
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: reportRows.isNotEmpty ? _generatePdf : null,
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
         ),
       ],
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildSelectionCard(theme),
-            const SizedBox(height: 24),
-            if (selectedMaterial != null) ...[
-              _buildReportHeader(theme),
-              const SizedBox(height: 16),
-              if (isReportLoading)
-                const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-              else if (reportRows.isEmpty)
-                _buildEmptyState(theme)
-              else
-                _buildReportTable(theme),
-            ],
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildSelectionCard(theme),
+                const SizedBox(height: 24),
+                if (selectedMaterial != null) ...[
+                  _buildReportHeader(theme),
+                  const SizedBox(height: 16),
+                  if (isReportLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                  else if (reportRows.isEmpty)
+                    _buildEmptyState(theme)
+                  else
+                    _buildReportTable(theme),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

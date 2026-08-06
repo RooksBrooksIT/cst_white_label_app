@@ -37,103 +37,125 @@ class SiteStatusReportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final statusColor = getStatusColor(context, status);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           '$status Sites',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: statusColor,
         elevation: 0,
-        iconTheme: const IconThemeData(),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+            icon: const Icon(
+              Icons.picture_as_pdf_outlined,
+              color: Colors.white,
+            ),
             onPressed: () => _generatePdf(context),
           ),
         ],
       ),
-      body: Container(
-        color: const Color(0xFFF8F9FA), // Light background
-        child: FutureBuilder<QuerySnapshot>(
-          future: FirestoreService.getCollection(
-            'projects',
-          ).where('currentStatus', isEqualTo: status).get(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: CircularProgressIndicator(color: statusColor),
-              );
-            }
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: Container(
+            color: const Color(0xFFF8F9FA), // Light background
+            child: FutureBuilder<QuerySnapshot>(
+              future: FirestoreService.getCollection(
+                'projects',
+              ).where('currentStatus', isEqualTo: status).get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: CircularProgressIndicator(color: statusColor),
+                  );
+                }
 
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_off,
-                      size: 64,
-                      color: statusColor.withOpacity(0.5),
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: statusColor.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No Sites Found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No sites with "$status" status',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF7f8c8d),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Sites Found',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: statusColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No sites with "$status" status',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF7f8c8d),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+                  );
+                }
 
-            final docs = snapshot.data!.docs;
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              itemCount: docs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final siteLocation = data['siteLocation']?.toString() ?? '-';
-                final ownerName = data['ownerName']?.toString() ?? '-';
-                final projectName = data['projectName']?.toString() ?? '-';
-                return _ExpandableSiteTile(
-                  siteLocation: siteLocation,
-                  ownerName: ownerName,
-                  siteDetails: data,
-                  statusColor: statusColor,
-                  projectName: projectName,
+                final docs = snapshot.data!.docs;
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 16,
+                  ),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final siteLocation =
+                        data['siteLocation']?.toString() ?? '-';
+                    final ownerName = data['ownerName']?.toString() ?? '-';
+                    final projectName = data['projectName']?.toString() ?? '-';
+                    return _ExpandableSiteTile(
+                      siteLocation: siteLocation,
+                      ownerName: ownerName,
+                      siteDetails: data,
+                      statusColor: statusColor,
+                      projectName: projectName,
+                    );
+                  },
                 );
               },
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 
   Future<void> _generatePdf(BuildContext context) async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(getStatusColor(context, status).value);
+    final pdfPrimaryColor = PdfColor.fromInt(
+      getStatusColor(context, status).value,
+    );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
-    final snapshot = await FirestoreService.getCollection('projects')
-        .where('currentStatus', isEqualTo: status)
-        .get();
-    
+    final snapshot = await FirestoreService.getCollection(
+      'projects',
+    ).where('currentStatus', isEqualTo: status).get();
+
     final docs = snapshot.docs;
 
     pdf.addPage(
@@ -150,31 +172,42 @@ class SiteStatusReportPage extends StatelessWidget {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               PdfTemplates.buildMetaBox('Status', status, pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Total Sites', '${docs.length}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Total Sites',
+                '${docs.length}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
           pw.Table.fromTextArray(
-            headers: ['Project', 'Site', 'Budget', 'Spent', 'Balance'],
+            headers: ['Project', 'Budget', 'Spent', 'Balance'],
             data: docs.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final projectName = data['projectName']?.toString() ?? '-';
-              final siteLocation = data['siteLocation']?.toString() ?? '-';
-              final budget = double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0;
-              final paid = double.tryParse(data['amountPaid']?.toString() ?? '0') ?? 0;
-              final spent = double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0;
+              final budget =
+                  double.tryParse(data['projectBudget']?.toString() ?? '0') ??
+                  0;
+              final paid =
+                  double.tryParse(data['amountPaid']?.toString() ?? '0') ?? 0;
+              final spent =
+                  double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0;
               final balance = paid - spent;
               return [
                 projectName,
-                siteLocation,
                 '₹${budget.toStringAsFixed(0)}',
                 '₹${spent.toStringAsFixed(0)}',
-                '₹${balance.toStringAsFixed(0)}'
+                '₹${balance.toStringAsFixed(0)}',
               ];
             }).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+              font: PdfTemplates.boldFont,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
         ],

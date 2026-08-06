@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/responsive.dart';
 import 'tools_inventory_details.dart';
 import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
@@ -115,19 +116,30 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isMobile = Responsive.isMobile(context);
 
     return GlassScaffold(
       title: 'Tools Inventory',
-      appBarBackgroundColor: colorScheme.primary,
-      appBarForegroundColor: colorScheme.onPrimary,
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: _loadInventoryData,
           tooltip: 'Refresh',
         ),
       ],
-      body: _buildBody(),
+      body: SafeArea(
+        bottom: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: _buildBody(),
+          ),
+        ),
+      ),
     );
   }
 
@@ -373,15 +385,19 @@ class _SummaryCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.primary,
-                  letterSpacing: 1,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.primary,
+                    letterSpacing: 1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Icon(icon, color: colorScheme.primary, size: 20),
             ],
           ),

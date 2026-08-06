@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:demo_cst/screens/site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
@@ -13,9 +14,7 @@ import 'manager_expenses.dart';
 import 'manager_site_entry_page.dart';
 import 'manager_material_approval_screen.dart';
 import 'material_report.dart';
-import 'org_notification_page.dart';
 import 'org_site_supervisor_dailyWeek_report.dart';
-import '../services/notification_service.dart';
 import 'organization_expenses.dart';
 import 'organization_site_entry.dart';
 import 'site_weekly_financial_report.dart';
@@ -23,6 +22,7 @@ import 'tools_inventory_report.dart';
 import 'manager_approval_screen.dart';
 import '../widgets/glass_scaffold.dart';
 import '../utils/app_theme.dart';
+import '../utils/responsive.dart';
 import 'org_sub_menu_screen.dart';
 import 'org_menu_screen.dart';
 import 'manager_config_screen.dart';
@@ -37,20 +37,24 @@ class OrganizationDashboard extends StatefulWidget {
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
-
-  DateTime? _lastBackPressTime;
+  String _userName = '';
+  String _userRole = 'Organization';
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _checkSubscription();
     _startSubscriptionListener();
-    _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset = _scrollController.offset;
-      });
+  }
+
+  Future<void> _loadUserData() async {
+    final userData = AuthService().userData;
+    setState(() {
+      _userName =
+          userData['org_name'] ?? userData['username'] ?? 'Organization';
+      _userRole = userData['role'] ?? 'Organization';
     });
   }
 
@@ -59,14 +63,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       (snapshot) {
         if (snapshot.exists && mounted) {
           final data = snapshot.data()!;
-          final isActive = data['isSubscriptionActive'] as bool? ?? false;
+          final isActive = data['isSubscriptionActive'] as bool? ?? true;
           final endDate = data['subscriptionEndDate'] as Timestamp?;
-
           bool isExpired = false;
-          if (endDate != null) {
-            isExpired = DateTime.now().isAfter(endDate.toDate());
-          }
-
+          if (endDate != null)
+            isExpired = DateTime.now().isAfter(
+              endDate.toDate().add(const Duration(hours: 1)),
+            );
           if (!isActive || isExpired) {
             Navigator.pushReplacement(
               context,
@@ -82,14 +85,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   Future<void> _checkSubscription() async {
     final isValid = await AuthService().checkSubscriptionStatus();
-    if (!isValid && mounted) {
+    if (!isValid && mounted)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const OrganizationSubscriptionPage(),
         ),
       );
-    }
   }
 
   @override
@@ -101,361 +103,302 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: AppTheme.appName,
-      builder: (context, appName, _) {
-        return GlassScaffold(
-          title: appName.isNotEmpty ? appName : 'Organization Dashboard',
-          actions: [
-            StreamBuilder<int>(
-              stream: NotificationService.unreadCountForOrganisation(),
-              builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      tooltip: 'Notifications',
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OrgNotificationPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    if (count > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.error,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        return Theme(
+          data: AppTheme.getTheme(primaryColor),
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              return ValueListenableBuilder<String>(
+                valueListenable: AppTheme.appName,
+                builder: (context, appName, _) {
+                  return GlassScaffold(
+                    title: appName.isNotEmpty
+                        ? "$appName's Dashboard"
+                        : 'Organization Dashboard',
+                    actions: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.menu_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'Menu',
+                        onPressed: () => _navigateToOrgMenu(context),
+                      ),
+                    ],
+                    body: SafeArea(
+                      bottom: true,
+                      child: Center(
+                        child: ConstrainedBox(
                           constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
+                            maxWidth: Responsive.maxContentWidth,
                           ),
-                          child: Text(
-                            count > 9 ? '9+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return CustomScrollView(
+                                controller: _scrollController,
+                                physics: const BouncingScrollPhysics(),
+                                slivers: [
+                                  ..._buildGridSections(
+                                    context,
+                                    theme,
+                                    constraints.maxWidth,
+                                  ),
+                                  SliverToBoxAdapter(
+                                    child: SizedBox(
+                                      height: Responsive.spacing(context, 100),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ),
-                  ],
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              tooltip: 'Menu',
-              color: Theme.of(context).colorScheme.onPrimary,
-              onPressed: () => _navigateToOrgMenu(context),
-            ),
-          ],
-          drawer: null,
-          body: _buildBody(context),
-        );
-      },
-    );
-  }
-
-  void _showLogoutConfirmation(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
-            const SizedBox(width: 12),
-            const Text(
-              'Confirm Logout',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to logout?',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      await AuthService().logout();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('org_isLoggedIn');
-      await prefs.remove('org_username');
-
-      if (context.mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/authSelection',
-          (route) => false,
-        );
-      }
-    }
-  }
-
-  Widget _buildWelcomeSection(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.primaryColor.withOpacity(0.1),
-                  theme.primaryColor.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.waving_hand_rounded,
-                  size: 18,
-                  color: theme.primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  "Welcome back,",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          ValueListenableBuilder<String>(
-            valueListenable: AppTheme.appName,
-            builder: (context, appName, _) {
-              return Text(
-                appName,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -1.0,
-                  fontSize: 34,
-                ),
+                    ),
+                  );
+                },
               );
             },
           ),
-          const SizedBox(height: 8),
-          Text(
-            "Manage your organization efficiently",
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    final theme = Theme.of(context);
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
-      slivers: [
+  List<Widget> _buildGridSections(
+    BuildContext context,
+    ThemeData theme,
+    double availableWidth,
+  ) {
+    final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
+    final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
+    final hPad = Responsive.horizontalPadding(context);
+    final categories = _getCategories(theme);
+    List<Widget> slivers = [];
+
+    for (var category in categories) {
+      if (category.items.isEmpty) continue;
+
+      // Section Header
+      slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeSection(theme),
-                const SizedBox(height: 32),
-                // _buildQuickStats(context, theme),
-                // const SizedBox(height: 32),
-                _buildDashboardSections(context, theme),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickStats(BuildContext context, ThemeData theme) {
-    final stats = [
-      {
-        'icon': Icons.payments_rounded,
-        'label': 'Pending',
-        'value': '12',
-        'color': Colors.orange,
-      },
-      {
-        'icon': Icons.check_circle_rounded,
-        'label': 'Approved',
-        'value': '45',
-        'color': Colors.green,
-      },
-      {
-        'icon': Icons.pending_actions_rounded,
-        'label': 'Requests',
-        'value': '8',
-        'color': Colors.blue,
-      },
-      {
-        'icon': Icons.trending_up_rounded,
-        'label': 'Revenue',
-        'value': '₹2.4L',
-        'color': Colors.purple,
-      },
-    ];
-
-    return Container(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: stats.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final stat = stats[index];
-          return Container(
-            width: (MediaQuery.of(context).size.width - 64) / 2.2,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            padding: EdgeInsets.fromLTRB(
+              hPad,
+              Responsive.spacing(context, 24),
+              hPad,
+              Responsive.spacing(context, 12),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: Responsive.scaleH(context, 4),
+                  height: Responsive.scaleV(context, 24),
                   decoration: BoxDecoration(
-                    color: (stat['color'] as Color).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    stat['icon'] as IconData,
-                    color: stat['color'] as Color,
-                    size: 24,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [category.color, category.color.withOpacity(0.5)],
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 4),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: Responsive.scaleH(context, 12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        stat['value'] as String,
-                        style: theme.textTheme.titleLarge?.copyWith(
+                        category.title,
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 16),
                           fontWeight: FontWeight.bold,
-                          fontSize: 20,
+                          letterSpacing: -0.3,
                         ),
                       ),
                       Text(
-                        stat['label'] as String,
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        category.subtitle,
+                        style: TextStyle(
+                          fontSize: Responsive.fontSize(context, 11),
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                 ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.scaleH(context, 8),
+                    vertical: Responsive.scaleV(context, 4),
+                  ),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 20),
+                    ),
+                  ),
+                  child: Text(
+                    '${category.items.length}',
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 11),
+                      fontWeight: FontWeight.w600,
+                      color: category.color,
+                    ),
+                  ),
+                ),
               ],
             ),
-          );
+          ),
+        ),
+      );
+
+      // Items Grid for this section
+      slivers.add(
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = category.items[index];
+              return _buildGridItem(context, item);
+            }, childCount: category.items.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: Responsive.spacing(context, 8),
+              mainAxisSpacing: Responsive.spacing(context, 8),
+              childAspectRatio: childAspectRatio,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
+      ),
+      color: theme.cardColor,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          item.onTap();
         },
+        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
+            color: theme.cardColor,
+            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: Responsive.scaleH(context, 12),
+                spreadRadius: Responsive.scaleH(context, 1),
+                offset: Offset(0, Responsive.scaleV(context, 4)),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(Responsive.spacing(context, 6)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(Responsive.spacing(context, 6)),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [item.color, item.color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      Responsive.scaleH(context, 10),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withOpacity(0.2),
+                        blurRadius: Responsive.scaleH(context, 3),
+                        offset: Offset(0, Responsive.scaleV(context, 1.5)),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    item.icon,
+                    color: Colors.white,
+                    size: Responsive.scaleH(context, 18),
+                  ),
+                ),
+                SizedBox(height: Responsive.spacing(context, 6)),
+                Flexible(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 10),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(height: Responsive.spacing(context, 1.5)),
+                Flexible(
+                  child: Text(
+                    item.subtitle,
+                    style: TextStyle(
+                      fontSize: Responsive.fontSize(context, 8),
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildDashboardSections(BuildContext context, ThemeData theme) {
-    final categories = [
+  List<_CategoryData> _getCategories(ThemeData theme) {
+    final primary = theme.primaryColor;
+    final secondary = theme.colorScheme.secondary;
+
+    return [
       _CategoryData(
         title: "Administrative & Config",
         subtitle: "Manage accounts and system settings",
         icon: Icons.admin_panel_settings_rounded,
-        color: theme.primaryColor,
-        gradientColors: [
-          theme.primaryColor,
-          theme.primaryColor.withOpacity(0.7),
-        ],
+        color: primary,
+        gradientColors: [primary, primary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: "Manager Account",
             subtitle: "Configure profiles and access permissions",
             icon: Icons.admin_panel_settings_rounded,
-            color: theme.primaryColor,
+            color: primary,
             onTap: () => _navigateToConfiguration(context),
           ),
           SubMenuItem(
             title: "Manager Config",
             subtitle: "Create and manage manager profiles",
             icon: Icons.manage_accounts_rounded,
-            color: theme.primaryColor,
+            color: primary,
             onTap: () => _navigateToManagerConfig(context),
           ),
         ],
@@ -464,28 +407,31 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Finance & Balance Sheets",
         subtitle: "Site payments, entries, and financial reports",
         icon: Icons.account_balance_wallet_rounded,
-        color: Colors.blueAccent,
-        gradientColors: [Colors.blueAccent, Colors.blueAccent.withOpacity(0.7)],
+        color: primary.withBlue(150),
+        gradientColors: [
+          primary.withBlue(150),
+          primary.withBlue(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: "Site Payment Entry",
             subtitle: "Record daily site transactions",
             icon: Icons.payments_rounded,
-            color: Colors.blueAccent,
+            color: primary.withBlue(150),
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
           SubMenuItem(
             title: "Site Payment Report",
             subtitle: "Daily site-level financial reports",
             icon: Icons.receipt_long_rounded,
-            color: Colors.indigoAccent,
+            color: primary.withBlue(180),
             onTap: () => _navigateToDailyReport(context),
           ),
           SubMenuItem(
             title: "Weekly Finance Report",
             subtitle: "Weekly financial health overview",
             icon: Icons.account_balance_rounded,
-            color: Colors.teal,
+            color: primary.withBlue(210),
             onTap: () => _navigateToSiteWeeklyFinancialReport(context),
           ),
         ],
@@ -494,35 +440,35 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Expense Management",
         subtitle: "Track organization and field expenses",
         icon: Icons.money_rounded,
-        color: Colors.orange,
-        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        color: secondary,
+        gradientColors: [secondary, secondary.withOpacity(0.7)],
         items: [
           SubMenuItem(
             title: "Organization Expenses",
             subtitle: "Central operational cost monitoring",
             icon: Icons.corporate_fare_rounded,
-            color: Colors.orange,
+            color: secondary,
             onTap: () => _navigateToOrganizationExpenses(context),
           ),
           SubMenuItem(
             title: "Manager Expenses",
             subtitle: "Project management expenditures",
             icon: Icons.person_search_rounded,
-            color: Colors.deepOrange,
+            color: secondary.withOpacity(0.9),
             onTap: () => _navigateToManagerExpenses(context),
           ),
           SubMenuItem(
-            title: "Manager Daily Entry",
+            title: "Organisation Daily Entry",
             subtitle: "Log daily project progress and expenses",
             icon: Icons.edit_note_rounded,
-            color: Colors.deepOrangeAccent,
+            color: secondary.withOpacity(0.8),
             onTap: () => _navigateToManagerDailyEntry(context),
           ),
           SubMenuItem(
-            title: "Supervisor Expenses",
+            title: "Supervisor Daily Entry",
             subtitle: "Daily field-level operational expenses",
             icon: Icons.engineering_rounded,
-            color: Colors.amber[800]!,
+            color: secondary.withOpacity(0.7),
             onTap: () => _navigateToSiteExpenses(context),
           ),
         ],
@@ -531,14 +477,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Review & Approvals",
         subtitle: "Approve schedules, materials, and incentives",
         icon: Icons.fact_check_rounded,
-        color: Colors.green,
-        gradientColors: [Colors.green, Colors.green.withOpacity(0.7)],
+        color: primary.withGreen(150),
+        gradientColors: [
+          primary.withGreen(150),
+          primary.withGreen(150).withOpacity(0.7),
+        ],
         items: [
           SubMenuItem(
             title: "Schedule Request Approval",
             subtitle: "Approve project work schedules",
             icon: Icons.event_available_rounded,
-            color: Colors.green,
+            color: primary.withGreen(150),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -550,7 +499,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Material Request Approval",
             subtitle: "Authorize material procurement",
             icon: Icons.inventory_2_rounded,
-            color: Colors.lightGreen[700]!,
+            color: primary.withGreen(180),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -562,7 +511,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Incentive Calculation",
             subtitle: "Process performance-based rewards",
             icon: Icons.calculate_rounded,
-            color: Colors.purple,
+            color: primary.withGreen(210),
             onTap: () => _navigateToIncentiveCaliculation(context),
           ),
         ],
@@ -571,246 +520,93 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Reports & Insights",
         subtitle: "Stock monitoring and tool analytics",
         icon: Icons.bar_chart_rounded,
-        color: Colors.blueGrey,
-        gradientColors: [Colors.blueGrey, Colors.blueGrey.withOpacity(0.7)],
+        color: primary.withOpacity(0.8),
+        gradientColors: [primary.withOpacity(0.8), primary.withOpacity(0.5)],
         items: [
           SubMenuItem(
             title: "Advanced Financial Analytics",
             subtitle: "Detailed performance insights",
             icon: Icons.query_stats_rounded,
-            color: Colors.blueGrey,
+            color: primary.withOpacity(0.8),
             onTap: () => _navigateToInsights(context),
           ),
           SubMenuItem(
             title: "Materials Inventory",
             subtitle: "Real-time stock monitoring",
             icon: Icons.inventory_rounded,
-            color: Colors.brown,
+            color: primary.withOpacity(0.7),
             onTap: () => _navigateToMaterialReport(context),
           ),
           SubMenuItem(
             title: "Tools Inventory",
             subtitle: "Track field equipment usage",
             icon: Icons.construction_rounded,
-            color: Colors.blue[900]!,
+            color: primary.withOpacity(0.6),
             onTap: () => _navigateToToolsInventory(context),
           ),
         ],
       ),
     ];
-
-    return Column(
-      children: categories.asMap().entries.map((entry) {
-        final index = entry.key;
-        final category = entry.value;
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300 + (index * 50)),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: _buildCategoryTile(context, category: category),
-        );
-      }).toList(),
-    );
   }
 
-  Widget _buildCategoryTile(
-    BuildContext context, {
-    required _CategoryData category,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrgSubMenuScreen(
-                title: category.title,
-                items: category.items,
-              ),
-            ),
-          ),
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: category.gradientColors,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: category.color.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(category.icon, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 17,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        category.subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 13,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: category.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${category.items.length} options',
-                          style: TextStyle(
-                            color: category.color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Navigation methods
+  void _navigateToConfiguration(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const ConfigAccountDashboard(showLogout: false),
+    ),
+  );
 
-  // Navigation methods remain the same
-  void _navigateToConfiguration(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ConfigAccountDashboard()),
-    );
-  }
+  void _navigateToManagerConfig(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
+  );
 
-  void _navigateToManagerConfig(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ManagerConfigScreen()),
-    );
-  }
+  void _navigateToDailyReport(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
+  );
 
-  void _navigateToDailyReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DailySitePaymentReportScreen()),
-    );
-  }
+  void _navigateToInsights(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => InsightsDashboard()),
+  );
 
-  void _navigateToInsights(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => InsightsDashboard()),
-    );
-  }
+  void _navigateToSitePaymentEntry(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => SitePaymentScreen()),
+  );
 
-  void _navigateToSitePaymentEntry(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SitePaymentScreen()),
-    );
-  }
+  void _navigateToSiteWeeklyFinancialReport(BuildContext context) =>
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SiteWeeklyFinancialReports()),
+      );
 
-  void _navigateToSiteWeeklyFinancialReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SiteWeeklyFinancialReports()),
-    );
-  }
+  void _navigateToIncentiveCaliculation(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => IncentiveCalculation()),
+  );
 
-  void _navigateToIncentiveCaliculation(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => IncentiveCalculation()),
-    );
-  }
+  void _navigateToOrganizationExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => OrganizationExpenses()),
+  );
 
-  void _navigateToOrganizationExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => OrganizationExpenses()),
-    );
-  }
+  void _navigateToManagerExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => ManagerExpenses()),
+  );
 
-  void _navigateToManagerExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ManagerExpenses()),
-    );
-  }
+  void _navigateToMaterialReport(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const MaterialReportPage()),
+  );
 
-  void _navigateToMaterialReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MaterialReportPage()),
-    );
-  }
-
-  void _navigateToToolsInventory(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
-    );
-  }
+  void _navigateToToolsInventory(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
+  );
 
   void _navigateToManagerDailyEntry(BuildContext context) {
     final userData = AuthService().userData;
@@ -818,32 +614,25 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ManagerSiteEntryPage(
-          userName: userName,
-          userDetails: userData,
-        ),
-      ),
-    );
-  }
-
-  void _navigateToSiteExpenses(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
         builder: (context) =>
-            const OrganizationSiteEntry(userName: '', userDetails: {}),
+            OrganizationSiteEntry(userName: userName, userDetails: userData),
       ),
     );
   }
 
-  void _navigateToOrgMenu(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OrgMenuScreen(standalone: true),
-      ),
-    );
-  }
+  void _navigateToSiteExpenses(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const SiteEntryPage(userName: '', userDetails: {}),
+    ),
+  );
+
+  void _navigateToOrgMenu(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const OrgMenuScreen(standalone: true),
+    ),
+  );
 }
 
 class _CategoryData {
@@ -861,5 +650,21 @@ class _CategoryData {
     required this.color,
     required this.gradientColors,
     required this.items,
+  });
+}
+
+class SubMenuItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  SubMenuItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
   });
 }

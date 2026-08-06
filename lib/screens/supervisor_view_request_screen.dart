@@ -36,10 +36,15 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
     return GlassScaffold(
       title: 'Work Schedule Approvals',
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           // Tab bar
           Container(
@@ -70,10 +75,12 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
               children: [
                 ApprovalList(
                   status: 'Pending',
+                  supervisorId: widget.supervisorId,
                   supervisorName: widget.supervisorName,
                 ),
                 ApprovalList(
                   status: 'Approved',
+                  supervisorId: widget.supervisorId,
                   supervisorName: widget.supervisorName,
                 ),
               ],
@@ -81,17 +88,21 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
           ),
         ],
       ),
+        ),
+      ),
     );
   }
 }
 
 class ApprovalList extends StatefulWidget {
   final String status;
+  final String supervisorId;
   final String supervisorName;
 
   const ApprovalList({
     super.key,
     required this.status,
+    required this.supervisorId,
     required this.supervisorName,
   });
 
@@ -112,8 +123,27 @@ class _ApprovalListState extends State<ApprovalList> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    debugPrint(
+      'ApprovalList: Querying for supervisorName="${widget.supervisorName}" with status="${widget.status}"',
+    );
+    debugPrint(
+      'ApprovalList: OrgID from FirestoreService is "${FirestoreService.currentOrgId}"',
+    );
+
     return Column(
       children: [
+        if (!FirestoreService.isReady)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            color: cs.errorContainer,
+            child: Text(
+              'Firestore is not initialized. Please re-login.',
+              style: TextStyle(color: cs.onErrorContainer),
+              textAlign: TextAlign.center,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
@@ -151,13 +181,9 @@ class _ApprovalListState extends State<ApprovalList> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream:
-                FirestoreService.getCollection(
-                      'siteSupervisorProjectStageSchedule',
-                    )
-                    .where('approvalStatus', isEqualTo: widget.status)
-                    .where('supervisorName', isEqualTo: widget.supervisorName)
-                    .snapshots(),
+            stream: FirestoreService.siteSupervisorProjectStageSchedule
+                .where('approvalStatus', isEqualTo: widget.status)
+                .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
@@ -174,7 +200,36 @@ class _ApprovalListState extends State<ApprovalList> {
                 );
               }
 
-              if (snapshot.data!.docs.isEmpty) {
+              // Filter by supervisorName or supervisorId in memory for robustness
+              final allDocs = snapshot.data!.docs;
+              debugPrint(
+                'ApprovalList: Found ${allDocs.length} total documents for status "${widget.status}" in this OrgID',
+              );
+
+              final docs = allDocs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final dbSupName = (data['supervisorName'] ?? '')
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+                final dbSupId = (data['supervisorId'] ?? '')
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+
+                final searchName = widget.supervisorName.trim().toLowerCase();
+                final searchId = widget.supervisorId.trim().toLowerCase();
+
+                final isMatch = dbSupName == searchName || dbSupId == searchId;
+                if (!isMatch && allDocs.length < 5) {
+                  debugPrint(
+                    'ApprovalList: No match for doc ${doc.id}. DB(Name: "$dbSupName", ID: "$dbSupId") vs Search(Name: "$searchName", ID: "$searchId")',
+                  );
+                }
+                return isMatch;
+              }).toList();
+
+              if (docs.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -197,7 +252,6 @@ class _ApprovalListState extends State<ApprovalList> {
                 );
               }
 
-              List<QueryDocumentSnapshot> docs = snapshot.data!.docs;
               if (_searchText.isNotEmpty) {
                 final idx = docs.indexWhere((doc) {
                   final data = doc.data() as Map<String, dynamic>;
@@ -329,21 +383,23 @@ class _ApprovalCardState extends State<ApprovalCard>
                             horizontal: 12,
                             vertical: 4,
                           ),
-                            decoration: BoxDecoration(
+                          decoration: BoxDecoration(
+                            color: widget.status == 'Pending'
+                                ? Colors.orange.withOpacity(0.2)
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            data['approvalStatus'],
+                            style: TextStyle(
                               color: widget.status == 'Pending'
-                                  ? Colors.orange.withOpacity(0.2)
-                                  : Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
+                                  ? Colors.orange
+                                  : Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Text(
-                              data['approvalStatus'],
-                              style: TextStyle(
-                                color: widget.status == 'Pending'
-                                    ? Colors.orange
-                                    : Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -402,57 +458,6 @@ class _ApprovalCardState extends State<ApprovalCard>
                           const SizedBox(height: 12),
                           _buildLabourTable(data['appLabours'], 'Approved', cs),
                         ],
-                      ),
-                    if (widget.status == 'Pending')
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                _updateStatus(
-                                  context,
-                                  widget.docId,
-                                  'Approved',
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: const Text('Approve'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                _updateStatus(
-                                  context,
-                                  widget.docId,
-                                  'Rejected',
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: cs.error,
-                                foregroundColor: cs.onError,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: const Text('Reject'),
-                            ),
-                          ],
-                        ),
                       ),
                   ],
                 ),
@@ -571,7 +576,7 @@ class _ApprovalCardState extends State<ApprovalCard>
               children: [
                 _buildTableHeaderCell('Designation', cs),
                 _buildTableHeaderCell('Count', cs),
-                _buildTableHeaderCell('Salary', cs),
+                // _buildTableHeaderCell('Salary', cs),
               ],
             ),
             ...labours.map((labour) {
@@ -579,7 +584,7 @@ class _ApprovalCardState extends State<ApprovalCard>
                 children: [
                   _buildTableCell(labour['labourDesignation'], cs),
                   _buildTableCell(labour['labourCount'].toString(), cs),
-                  _buildTableCell('₹${labour['salary']}', cs),
+                  // _buildTableCell('₹${labour['salary']}', cs),
                 ],
               );
             }),
@@ -604,26 +609,5 @@ class _ApprovalCardState extends State<ApprovalCard>
       padding: const EdgeInsets.all(8),
       child: Text(text, style: TextStyle(color: cs.onSurface)),
     );
-  }
-
-  void _updateStatus(
-    BuildContext context,
-    String docId,
-    String newStatus,
-  ) async {
-    try {
-      await FirestoreService.getCollection(
-        'siteSupervisorProjectStageSchedule',
-      ).doc(docId).update({'approvalStatus': newStatus});
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Status updated to $newStatus')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error updating status: $e')));
-    }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 import '../widgets/glass_scaffold.dart';
 import '../widgets/glass_card.dart';
 import '../utils/responsive.dart';
@@ -16,35 +17,64 @@ class CustomerWorkerDetails extends StatefulWidget {
 }
 
 class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  DateTime? _selectedDate;
-  String _selectedMonth = '';
-  String _selectedYear = '';
+  bool _isServiceReady = false;
 
   @override
   void initState() {
     super.initState();
+    _initService();
     // Initialize with current date
     final now = DateTime.now();
     _selectedMonth = DateFormat('MMMM').format(now);
     _selectedYear = now.year.toString();
   }
 
+  Future<void> _initService() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+    if (mounted) {
+      setState(() {
+        _isServiceReady = true;
+      });
+    }
+  }
+
+  DateTime? _selectedDate;
+  String _selectedMonth = '';
+  String _selectedYear = '';
+
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (!_isServiceReady && !FirestoreService.isReady) {
+      return GlassScaffold(
+        title: 'Worker Details',
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      );
+    }
+
     return GlassScaffold(
       title: 'Worker Details',
       onBack: () => Navigator.pop(context),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
         children: [
           // Filter Section
           _buildFilterSection(),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('workersAttendance')
-                  .where('site', isEqualTo: widget.siteId)
-                  .snapshots(),
+              stream: FirestoreService.getCollection(
+                'workersAttendance',
+              ).where('site', isEqualTo: widget.siteId).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
@@ -69,7 +99,9 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 final documents = snapshot.data!.docs;
 
                 // Filter documents based on selected date/month/year
-                final filteredDocs = _filterDocuments(documents);
+                final filteredDocs = _filterDocuments(
+                  documents.cast<QueryDocumentSnapshot>(),
+                );
 
                 if (filteredDocs.isEmpty) {
                   return Center(
@@ -99,6 +131,8 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -151,46 +185,95 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              // Month Dropdown
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Month',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 400) {
+                return Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Month',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getMonths(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedMonth = value!;
+                          _selectedDate =
+                              null; // Clear date when month is selected
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Year',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getYears(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedYear = value!;
+                          _selectedDate =
+                              null; // Clear date when year is selected
+                        });
+                      },
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  // Month Dropdown
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Month',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getMonths(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedMonth = value!;
+                          _selectedDate =
+                              null; // Clear date when month is selected
+                        });
+                      },
+                    ),
                   ),
-                  items: _getMonths(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedMonth = value!;
-                      _selectedDate = null; // Clear date when month is selected
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Year Dropdown
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedYear.isNotEmpty ? _selectedYear : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Year',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  const SizedBox(width: 12),
+                  // Year Dropdown
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Year',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _getYears(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedYear = value!;
+                          _selectedDate =
+                              null; // Clear date when year is selected
+                        });
+                      },
+                    ),
                   ),
-                  items: _getYears(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedYear = value!;
-                      _selectedDate = null; // Clear date when year is selected
-                    });
-                  },
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
           // Clear All Filters

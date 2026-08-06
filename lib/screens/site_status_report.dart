@@ -30,45 +30,59 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final statusSnapshot = await FirestoreService.getCollection(
-        'projectStatus',
+      final projectsSnapshot = await FirestoreService.getCollection(
+        'projects',
       ).get();
-      final financialSnapshot = await FirestoreService.getCollection(
-        'projectFinances',
-      ).doc('currentProject').get();
 
       Set<String> uniqueStatuses = {};
-      for (var doc in statusSnapshot.docs) {
-        final data = doc.data();
-        final stateField = data['projectState'];
-        if (stateField is String) {
-          uniqueStatuses.add(stateField);
-        } else if (stateField is List) {
-          for (var status in stateField) {
-            if (status is String) uniqueStatuses.add(status);
-          }
+      double totalBudget = 0.0;
+      double totalSpent = 0.0;
+
+      for (var doc in projectsSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        // Extract status
+        final statusVal = (data['currentStatus'] ?? data['status'])?.toString();
+        if (statusVal != null && statusVal.trim().isNotEmpty) {
+          uniqueStatuses.add(statusVal.trim());
         }
+
+        // Aggregate finances
+        final budget =
+            double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0.0;
+        final spent =
+            double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0.0;
+
+        totalBudget += budget;
+        totalSpent += spent;
       }
 
-      if (financialSnapshot.exists) {
-        final financeData = financialSnapshot.data();
-        _budgetAmount = (financeData?['budget'] as num?)?.toDouble() ?? 0.0;
-        _spentAmount = (financeData?['spent'] as num?)?.toDouble() ?? 0.0;
-        _spendingPercentage = _budgetAmount > 0
-            ? _spentAmount / _budgetAmount
-            : 0.0;
+      // Ensure there is always a fallback list of statuses to pick from if empty
+      if (uniqueStatuses.isEmpty) {
+        uniqueStatuses.addAll([
+          'In-Progress',
+          'Pending',
+          'Planning',
+          'On-Hold',
+          'Complete',
+        ]);
       }
 
       if (mounted) {
         setState(() {
-          _statusOptions = uniqueStatuses.isNotEmpty
-              ? uniqueStatuses.toList()
-              : ['No Status Found'];
+          _budgetAmount = totalBudget;
+          _spentAmount = totalSpent;
+          _spendingPercentage = _budgetAmount > 0
+              ? _spentAmount / _budgetAmount
+              : 0.0;
+          _statusOptions = uniqueStatuses.toList()..sort();
           _selectedStatus = _statusOptions.first;
           _isLoading = false;
+          _errorMessage = null;
         });
       }
     } catch (e) {
+      debugPrint('Error fetching projects status data: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to load data: $e';
@@ -112,35 +126,44 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
     return GlassScaffold(
       title: 'Site Status Report',
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView(theme)
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeaderCard(theme),
-                  const SizedBox(height: 24),
-                  _buildSelectorSection(theme),
-                  const SizedBox(height: 40),
-                  GlassButton(
-                    label: 'GENERATE REPORT',
-                    onPressed:
-                        (_selectedStatus == null || _statusOptions.isEmpty)
-                        ? null
-                        : _handleReport,
+      appBarForegroundColor: Colors.white,
+      onBack: () => Navigator.pop(context),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+              ? _buildErrorView(theme)
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeaderCard(theme),
+                      const SizedBox(height: 24),
+                      _buildSelectorSection(theme),
+                      const SizedBox(height: 40),
+                      GlassButton(
+                        label: 'GENERATE REPORT',
+                        onPressed:
+                            (_selectedStatus == null || _statusOptions.isEmpty)
+                            ? null
+                            : _handleReport,
+                      ),
+                      const SizedBox(height: 12),
+                      GlassButton(
+                        label: 'CANCEL',
+                        onPressed: () => Navigator.pop(context),
+                        isSecondary: true,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  GlassButton(
-                    label: 'CANCEL',
-                    onPressed: () => Navigator.pop(context),
-                    isSecondary: true,
-                  ),
-                ],
-              ),
-            ),
+                ),
+        ),
+      ),
     );
   }
 

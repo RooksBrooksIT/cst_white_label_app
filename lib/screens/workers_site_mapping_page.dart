@@ -19,7 +19,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   String? _selectedProjectName;
 
   // Selected worker for current selection
-  String? _selectedWorker;
+  String? _selectedWorkerId;
+  String? _selectedWorkerName;
   String? _selectedWorkerDesignation;
   String? _selectedWorkerSalary;
   String? _selectedWorkerPhone;
@@ -210,23 +211,25 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     }
   }
 
-  void _onWorkerSelected(String? workerName) {
+  void _onWorkerSelected(String? workerId) {
     setState(() {
-      _selectedWorker = workerName;
+      _selectedWorkerId = workerId;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
     });
 
-    if (workerName != null) {
+    if (workerId != null) {
       // Find the selected worker details
       final selectedWorkerData = _workers.firstWhere(
-        (worker) => worker['name'] == workerName,
+        (worker) => worker['id'] == workerId,
         orElse: () => {},
       );
 
       if (selectedWorkerData.isNotEmpty) {
         setState(() {
+          _selectedWorkerName = selectedWorkerData['name'];
           _selectedWorkerDesignation = selectedWorkerData['designation'];
           _selectedWorkerSalary = selectedWorkerData['salary'];
           _selectedWorkerPhone = selectedWorkerData['phoneNumber'];
@@ -236,7 +239,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   }
 
   void _addWorkerToList() {
-    if (_selectedWorker == null || _selectedWorkerDesignation == null) {
+    if (_selectedWorkerId == null || _selectedWorkerName == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Please select a worker first')));
@@ -245,7 +248,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Check if worker is already added in current session
     bool alreadyExists = _selectedWorkersList.any(
-      (worker) => worker['workerName'] == _selectedWorker,
+      (worker) => worker['workerName'] == _selectedWorkerName,
     );
 
     if (alreadyExists) {
@@ -257,7 +260,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     setState(() {
       _selectedWorkersList.add({
-        'workerName': _selectedWorker,
+        'workerId': _selectedWorkerId,
+        'workerName': _selectedWorkerName,
         'workerDesignation': _selectedWorkerDesignation,
         'workerSalary': _selectedWorkerSalary,
         'workerPhone': _selectedWorkerPhone,
@@ -267,7 +271,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     // Reset current selection
     setState(() {
-      _selectedWorker = null;
+      _selectedWorkerId = null;
+      _selectedWorkerName = null;
       _selectedWorkerDesignation = null;
       _selectedWorkerSalary = null;
       _selectedWorkerPhone = null;
@@ -303,6 +308,28 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
       return;
     }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Mapping'),
+        content: Text(
+          'Are you sure you want to save the worker mapping for $_selectedSite? This will update the existing records if any.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
 
     setState(() => _isSubmitting = true);
 
@@ -419,12 +446,18 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final colorScheme = Theme.of(context).colorScheme;
 
     return GlassScaffold(
       title: 'Worker Site Mapping',
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
@@ -451,6 +484,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
               _buildSubmitButton(),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );
@@ -493,6 +528,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           children: [
             // Site Dropdown
             DropdownButtonFormField<String>(
+              isExpanded: true,
               value: _selectedSite,
               decoration: InputDecoration(
                 labelText: 'Site *',
@@ -512,7 +548,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                           : site['site'] ?? '';
                       return DropdownMenuItem<String>(
                         value: site['site'] as String?,
-                        child: Text(displayName),
+                        child: Text(
+                          displayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
               onChanged: _onSiteSelected,
@@ -554,94 +593,107 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
     }).toList();
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Worker Dropdown and Add Button Row
-            Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedWorker,
-                    decoration: InputDecoration(
-                      labelText: 'Select Worker',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    items: _isLoadingWorkers
-                        ? [
-                            DropdownMenuItem(
-                              value: null,
-                              child: Text('Loading workers...'),
-                            ),
-                          ]
-                        : availableWorkers.map<DropdownMenuItem<String>>((
-                            worker,
-                          ) {
-                            return DropdownMenuItem<String>(
-                              value: worker['name'] as String?,
-                              child: Text(worker['name'] ?? ''),
-                            );
-                          }).toList(),
-                    onChanged: _onWorkerSelected,
-                  ),
-                ),
-                SizedBox(width: 12),
-                SizedBox(
-                  height: 56, // Match the dropdown height
-                  child: FilledButton.icon(
-                    onPressed: _addWorkerToList,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Add'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(
-                        0xFF22C55E,
-                      ), // Professional Emerald
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // Worker Dropdown and Add Button Section
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: _selectedWorkerId,
+                        decoration: InputDecoration(
+                          labelText: 'Select Worker',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        items: _isLoadingWorkers
+                            ? [
+                                DropdownMenuItem(
+                                  value: null,
+                                  child: Text('Loading workers...'),
+                                ),
+                              ]
+                            : availableWorkers.map<DropdownMenuItem<String>>((
+                                worker,
+                              ) {
+                                final String name =
+                                    worker['name']?.toString().trim() ?? '';
+                                final String displayName = name.isNotEmpty
+                                    ? name
+                                    : 'Unnamed (${worker['id']})';
+                                return DropdownMenuItem<String>(
+                                  value: worker['id'] as String?,
+                                  child: Text(
+                                    displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                        onChanged: _onWorkerSelected,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 56, // Match the dropdown height
+                      width: 70,
+                      child: FilledButton(
+                        onPressed: _addWorkerToList,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Icon(Icons.add_rounded),
+                      ),
+                    ),
+                  ],
                 ),
+
+                SizedBox(height: 16),
+
+                // Auto-filled Worker Details
+                if (_selectedWorkerDesignation != null ||
+                    _selectedWorkerSalary != null)
+                  Column(
+                    children: [
+                      _buildReadOnlyField(
+                        'Designation',
+                        _selectedWorkerDesignation ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      _buildReadOnlyField(
+                        'Salary',
+                        _selectedWorkerSalary ?? 'Not available',
+                      ),
+                      SizedBox(height: 12),
+                      if (_selectedWorkerPhone != null)
+                        _buildReadOnlyField(
+                          'Phone',
+                          _selectedWorkerPhone ?? 'Not available',
+                        ),
+                    ],
+                  )
+                else if (_selectedWorkerId != null)
+                  Text(
+                    'No details found for this worker',
+                    style: TextStyle(color: Colors.orange),
+                  ),
               ],
             ),
-
-            SizedBox(height: 16),
-
-            // Auto-filled Worker Details
-            if (_selectedWorkerDesignation != null ||
-                _selectedWorkerSalary != null)
-              Column(
-                children: [
-                  _buildReadOnlyField(
-                    'Designation',
-                    _selectedWorkerDesignation ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  _buildReadOnlyField(
-                    'Salary',
-                    _selectedWorkerSalary ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  if (_selectedWorkerPhone != null)
-                    _buildReadOnlyField(
-                      'Phone',
-                      _selectedWorkerPhone ?? 'Not available',
-                    ),
-                ],
-              )
-            else if (_selectedWorker != null)
-              Text(
-                'No details found for this worker',
-                style: TextStyle(color: Colors.orange),
-              ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -653,8 +705,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 Text(
                   'Selected Workers (${_selectedWorkersList.length})',

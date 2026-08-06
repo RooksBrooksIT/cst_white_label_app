@@ -1,20 +1,44 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../services/firestore_service.dart';
 import 'app_theme.dart';
 
 class PdfTemplates {
+  static pw.Font? _regularFont;
+  static pw.Font? _boldFont;
+
+  /// Loads fonts that support Indian Rupee symbol
+  static Future<void> loadFonts() async {
+    if (_regularFont == null || _boldFont == null) {
+      try {
+        _regularFont = await PdfGoogleFonts.robotoRegular();
+        _boldFont = await PdfGoogleFonts.robotoBold();
+      } catch (e) {
+        print('Error loading fonts, falling back to default: $e');
+        _regularFont = pw.Font.helvetica();
+        _boldFont = pw.Font.helveticaBold();
+      }
+    }
+  }
+
   /// Fetches organization data for PDF headers.
   static Future<Map<String, String>> fetchOrgDetails() async {
     try {
-      final doc = await FirestoreService.orgDataDoc.get();
+      var doc = await FirestoreService.orgDataDoc.get();
+      if (!doc.exists) {
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'orgName': data['orgName']?.toString() ?? AppTheme.appName.value,
           'address': data['address']?.toString() ?? 'N/A',
-          'orgPhone': data['orgPhone']?.toString() ?? 'N/A',
+          'orgPhone':
+              data['phone']?.toString() ??
+              data['orgPhone']?.toString() ??
+              'N/A',
         };
       }
     } catch (e) {
@@ -48,17 +72,26 @@ class PdfTemplates {
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
+                    font: _boldFont,
                     color: primaryColor,
                   ),
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
                   orgDetails['address']!,
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                    font: _regularFont,
+                  ),
                 ),
                 pw.Text(
                   'Phone: ${orgDetails['orgPhone']}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                    font: _regularFont,
+                  ),
                 ),
               ],
             ),
@@ -67,6 +100,7 @@ class PdfTemplates {
               style: pw.TextStyle(
                 fontSize: 14,
                 fontWeight: pw.FontWeight.bold,
+                font: _boldFont,
                 color: PdfColors.grey700,
               ),
             ),
@@ -80,13 +114,21 @@ class PdfTemplates {
   }
 
   /// Helper to build metadata boxes in rows
-  static pw.Widget buildMetaBox(String label, String value, PdfColor primaryColor) {
+  static pw.Widget buildMetaBox(
+    String label,
+    String value,
+    PdfColor primaryColor,
+  ) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
           label.toUpperCase(),
-          style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+          style: pw.TextStyle(
+            fontSize: 7,
+            color: PdfColors.grey600,
+            font: _regularFont,
+          ),
         ),
         pw.SizedBox(height: 2),
         pw.Text(
@@ -94,6 +136,7 @@ class PdfTemplates {
           style: pw.TextStyle(
             fontSize: 10,
             fontWeight: pw.FontWeight.bold,
+            font: _boldFont,
             color: primaryColor,
           ),
         ),
@@ -111,15 +154,29 @@ class PdfTemplates {
           children: [
             pw.Text(
               'Generated via ${AppTheme.appName.value} | Confidential',
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+              style: pw.TextStyle(
+                fontSize: 8,
+                color: PdfColors.grey500,
+                font: _regularFont,
+              ),
             ),
             pw.Text(
               'Page ${context.pageNumber} of ${context.pagesCount}',
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+              style: pw.TextStyle(
+                fontSize: 8,
+                color: PdfColors.grey500,
+                font: _regularFont,
+              ),
             ),
           ],
         ),
       ],
     );
   }
+
+  /// Getter for regular font
+  static pw.Font get regularFont => _regularFont ?? pw.Font.helvetica();
+
+  /// Getter for bold font
+  static pw.Font get boldFont => _boldFont ?? pw.Font.helveticaBold();
 }

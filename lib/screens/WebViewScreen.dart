@@ -57,6 +57,8 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -70,7 +72,10 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Container(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Container(
         color: backgroundColor,
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -311,6 +316,8 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
           ],
         ),
       ),
+        ),
+      ),
     );
   }
 }
@@ -353,16 +360,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: Color(0xFF772323),
       ),
-      body: Stack(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Stack(
         children: [
           WebViewWidget(controller: _controller),
           if (isLoading) const Center(child: CircularProgressIndicator()),
         ],
+      ),
+        ),
       ),
     );
   }

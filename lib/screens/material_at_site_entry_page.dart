@@ -164,16 +164,15 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   Future<void> fetchDropdownOptions() async {
     try {
-      final materialsSnapshot = await FirestoreService.materials.get();
+      final materialsSnapshot = await FirestoreService.materialCategories.get();
       final unitsSnapshot = await FirestoreService.materialUnits.get();
 
       setState(() {
         materialOptions = materialsSnapshot.docs
-            .map(
-              (doc) => doc.data().containsKey('materialName')
-                  ? doc['materialName'].toString()
-                  : '',
-            )
+            .map((doc) {
+              final data = doc.data();
+              return (data['matCategory'] ?? data['materialName'] ?? '').toString().trim();
+            })
             .where((e) => e.isNotEmpty)
             .toList();
         unitOptions = unitsSnapshot.docs
@@ -1315,12 +1314,17 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 600;
+
     final cs = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 2,
       child: GlassScaffold(
         title: 'Material at Site Entry',
-        body: Column(
+        body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: Column(
           children: [
             // Tab bar
             Container(
@@ -1388,6 +1392,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }

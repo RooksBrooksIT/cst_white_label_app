@@ -8,6 +8,7 @@ import '../services/firestore_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/pdf_templates.dart';
 import 'dart:async';
+import '../widgets/glass_scaffold.dart';
 
 class DailySitePaymentReportScreen extends StatefulWidget {
   const DailySitePaymentReportScreen({super.key});
@@ -65,14 +66,18 @@ class _DailySitePaymentReportScreenState
         final siteId = data['site']?.toString() ?? doc.id;
         if (siteId.isNotEmpty) {
           ids.add(siteId);
+
+          // Read projectName directly from the siteSupervisorMap document first
+          final docProjectName = data['projectName']?.toString() ?? '';
+
           details[siteId] = {
-            'project':
-                '', // Will be filled from siteId parsing or projects collection
+            'project': docProjectName,
             'supervisor': data['supervisor']?.toString() ?? '',
           };
 
-          // Try to extract project name from siteId if it follows the pattern siteName_projectName
-          if (siteId.contains('_')) {
+          // Fallback: try to extract project name from siteId pattern (siteName_projectName)
+          // Only use this if projectName wasn't found in the document
+          if (docProjectName.isEmpty && siteId.contains('_')) {
             final parts = siteId.split('_');
             if (parts.length > 1) {
               details[siteId]!['project'] = parts.sublist(1).join('_');
@@ -81,14 +86,17 @@ class _DailySitePaymentReportScreenState
         }
       }
 
-      // 2. Fetch Projects to possibly get better project names
+      // 2. Fetch Projects to enhance/override project names where available
       final projectsSnapshot = await FirestoreService.projects.get();
       for (var doc in projectsSnapshot.docs) {
         final data = doc.data();
         final siteId = data['siteId']?.toString();
-        if (siteId != null && details.containsKey(siteId)) {
-          details[siteId]!['project'] =
-              data['projectName']?.toString() ?? details[siteId]!['project']!;
+        final fetchedProjectName = data['projectName']?.toString() ?? '';
+        // Only override if we get a non-empty name from projects collection
+        if (siteId != null &&
+            details.containsKey(siteId) &&
+            fetchedProjectName.isNotEmpty) {
+          details[siteId]!['project'] = fetchedProjectName;
         }
       }
 
@@ -110,15 +118,22 @@ class _DailySitePaymentReportScreenState
 
   void _updateProjectAndSupervisor() {
     if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
-      selectedProject = siteDetails[selectedSiteId]!['project'];
-      selectedSupervisor = siteDetails[selectedSiteId]!['supervisor'];
-      projectController.text = selectedProject ?? '';
-      supervisorController.text = selectedSupervisor ?? '';
+      final project = siteDetails[selectedSiteId]!['project'] ?? '';
+      final supervisor = siteDetails[selectedSiteId]!['supervisor'] ?? '';
+      projectController.text = project;
+      supervisorController.text = supervisor;
+      // Also update state variables and trigger rebuild
+      setState(() {
+        selectedProject = project.isNotEmpty ? project : null;
+        selectedSupervisor = supervisor.isNotEmpty ? supervisor : null;
+      });
     } else {
-      selectedProject = null;
-      selectedSupervisor = null;
       projectController.text = '';
       supervisorController.text = '';
+      setState(() {
+        selectedProject = null;
+        selectedSupervisor = null;
+      });
     }
   }
 
@@ -234,7 +249,7 @@ class _DailySitePaymentReportScreenState
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
-    
+
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     final now = DateTime.now();
@@ -280,7 +295,11 @@ class _DailySitePaymentReportScreenState
                 DateFormat.MMMM().format(DateTime(0, selectedMonth)),
                 pdfPrimaryColor,
               ),
-              PdfTemplates.buildMetaBox('Year', selectedYear.toString(), pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Year',
+                selectedYear.toString(),
+                pdfPrimaryColor,
+              ),
               PdfTemplates.buildMetaBox(
                 'Week',
                 selectedWeekIndex != null
@@ -370,32 +389,17 @@ class _DailySitePaymentReportScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    bool isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Site Payment Report',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
+    return GlassScaffold(
+      title: 'Site Payment Report',
+      onBack: () => Navigator.pop(context),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          child: _buildBody(context),
         ),
       ),
-      body: _buildBody(context),
     );
   }
 
@@ -460,12 +464,13 @@ class _DailySitePaymentReportScreenState
           onChanged: (value) {
             setState(() {
               selectedSiteId = value;
-              _updateProjectAndSupervisor();
               selectedWeekIndex = null;
               weekDates = [];
               paymentRecords = [];
               totalAmount = 0.0;
             });
+            // Call AFTER setState so selectedSiteId is committed before auto-fill reads it
+            _updateProjectAndSupervisor();
           },
         ),
         SizedBox(height: fontSizeBase * 1.5),
@@ -481,12 +486,25 @@ class _DailySitePaymentReportScreenState
           fontSizeBase: fontSizeBase,
         ),
         SizedBox(height: fontSizeBase * 2),
-        Row(
-          children: [
-            Expanded(child: _buildMonthDropdown(fontSizeBase)),
-            SizedBox(width: fontSizeBase),
-            Expanded(child: _buildYearDropdown(fontSizeBase)),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 400) {
+              return Column(
+                children: [
+                  _buildMonthDropdown(fontSizeBase),
+                  SizedBox(height: fontSizeBase),
+                  _buildYearDropdown(fontSizeBase),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: _buildMonthDropdown(fontSizeBase)),
+                SizedBox(width: fontSizeBase),
+                Expanded(child: _buildYearDropdown(fontSizeBase)),
+              ],
+            );
+          },
         ),
         SizedBox(height: fontSizeBase * 2.5),
         const Text(
@@ -551,6 +569,7 @@ class _DailySitePaymentReportScreenState
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Month', fontSizeBase * 0.9),
       value: selectedMonth,
+      isExpanded: true,
       dropdownColor: theme.cardColor,
       items: List.generate(12, (i) => i + 1)
           .map(
@@ -580,6 +599,7 @@ class _DailySitePaymentReportScreenState
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Year', fontSizeBase * 0.9),
       value: selectedYear,
+      isExpanded: true,
       dropdownColor: theme.cardColor,
       items: years
           .map(

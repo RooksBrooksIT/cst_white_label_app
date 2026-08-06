@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import '../widgets/glass_scaffold.dart';
@@ -54,21 +55,132 @@ class _ProjectstageSiteSummaryReportState
   }
 
   Future<Map<String, dynamic>?> _fetchProjectInfo() async {
-    final snap = await FirestoreService.getCollection(
-      'projects',
-    ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
-    return snap.docs.isNotEmpty ? snap.docs.first.data() : null;
+    try {
+      // Try 1: query projects by siteId field
+      var snap = await FirestoreService.getCollection(
+        'projects',
+      ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+
+      // Try 2: query by site field
+      if (snap.docs.isEmpty) {
+        snap = await FirestoreService.getCollection(
+          'projects',
+        ).where('site', isEqualTo: widget.siteId).limit(1).get();
+      }
+
+      // Try 3: query by siteName from Site collection
+      if (snap.docs.isEmpty) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          final sName = siteData['siteName']?.toString();
+          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
+            snap = await FirestoreService.getCollection(
+              'projects',
+            ).where('siteName', isEqualTo: sName).limit(1).get();
+          }
+        }
+      }
+
+      Map<String, dynamic>? data = snap.docs.isNotEmpty
+          ? snap.docs.first.data()
+          : null;
+
+      // Fallback to fetch from 'Site' collection if project data is missing or has no location
+      if (data == null ||
+          (data['siteLocation'] == null && data['location'] == null)) {
+        final siteDoc = await FirestoreService.getCollection(
+          'Site',
+        ).doc(widget.siteId).get();
+        if (siteDoc.exists) {
+          final siteData = siteDoc.data()!;
+          if (data == null) {
+            data = siteData;
+          } else {
+            // Merge missing location info into project data
+            data['siteLocation'] =
+                siteData['location'] ?? siteData['siteLocation'];
+            data['siteName'] = data['siteName'] ?? siteData['siteName'];
+          }
+        }
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Error fetching project info: $e');
+      return null;
+    }
   }
 
   Future<Map<String, num>> _fetchExpenseTotals() async {
-    final query = await FirestoreService.getCollection('siteSupervisorEntries')
-        .where('siteId', isEqualTo: widget.siteId)
-        .where('projectStage', isEqualTo: widget.projectStage)
-        .get();
+    final collections = [
+      'siteSupervisorEntries',
+      'managerExpenses',
+      'organizationExpenses',
+      'contractorEntries',
+      'managerEntries',
+      'organizationEntries',
+    ];
+
+    final futures = collections.map((c) => _fetchCollectionBySite(c)).toList();
+    final results = await Future.wait(futures);
+
+    final supervisorDocs = results[0];
+    final managerDocs = results[1];
+    final orgDocs = results[2];
+    final contractorDocs = results[3];
+    final managerEntryDocs = results[4];
+    final orgEntryDocs = results[5];
+
+    final targetStage = widget.projectStage.trim();
 
     num food = 0, fuel = 0, transport = 0, labours = 0, materials = 0;
-    for (var doc in query.docs) {
-      final data = doc.data();
+    num managerTotal = 0, organizationTotal = 0, contractorTotal = 0;
+
+    num _getDocTotal(Map<String, dynamic> data) {
+      if (data.containsKey('bills') && data['bills'] is List) {
+        num total = 0;
+        for (var bill in data['bills']) {
+          if (bill is Map) {
+            total += _toNum(bill['billAmount'] ?? bill['amount']);
+          }
+        }
+        return total;
+      }
+      return _toNum(data['totalAmount'] ?? data['amount']);
+    }
+
+    void processManager(List<DocumentSnapshot> docs) {
+      for (var doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage != targetStage) continue;
+        managerTotal += _getDocTotal(data);
+      }
+    }
+
+    void processOrg(List<DocumentSnapshot> docs) {
+      for (var doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final docStage = (data['projectStage'] ?? data['projectField'])
+            ?.toString()
+            .trim();
+        if (docStage != targetStage) continue;
+        organizationTotal += _getDocTotal(data);
+      }
+    }
+
+    // 1. Supervisor
+    for (var doc in supervisorDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+
       food += _toNum(data['food']);
       fuel += _toNum(data['fuel']);
       transport += _toNum(data['transport']);
@@ -80,13 +192,49 @@ class _ProjectstageSiteSummaryReportState
         for (var m in data['materials']) materials += _toNum(m['amount']);
       }
     }
+
+    // 2. Manager
+    processManager(managerDocs);
+    processManager(managerEntryDocs);
+
+    // 3. Organization
+    processOrg(orgDocs);
+    processOrg(orgEntryDocs);
+
+    // 4. Contractor
+    for (var doc in contractorDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStage = (data['projectStage'] ?? data['projectField'])
+          ?.toString()
+          .trim();
+      if (docStage != targetStage) continue;
+      contractorTotal += _toNum(data['totalAmount']);
+    }
+
     return {
       'Food': food,
       'Fuel': fuel,
       'Transport': transport,
       'Labours': labours,
       'Materials': materials,
+      'Manager Expenses': managerTotal,
+      'Organization Expenses': organizationTotal,
+      'Contractor Expenses': contractorTotal,
     };
+  }
+
+  Future<List<DocumentSnapshot>> _fetchCollectionBySite(
+    String collection,
+  ) async {
+    final snapshots = await Future.wait([
+      FirestoreService.getCollection(
+        collection,
+      ).where('siteId', isEqualTo: widget.siteId).get(),
+      FirestoreService.getCollection(
+        collection,
+      ).where('site', isEqualTo: widget.siteId).get(),
+    ]);
+    return [...snapshots[0].docs, ...snapshots[1].docs];
   }
 
   num _toNum(dynamic v) {
@@ -102,27 +250,36 @@ class _ProjectstageSiteSummaryReportState
 
     return GlassScaffold(
       title: 'Site Summary Report',
+      onBack: () => Navigator.pop(context),
+      appBarForegroundColor: Colors.white,
       actions: [
         IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           onPressed: _generatePdf,
         ),
       ],
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildProjectCard(theme),
-                  const SizedBox(height: 24),
-                  _buildFinanceCard(theme),
-                  const SizedBox(height: 24),
-                  _buildBreakdownSection(theme),
-                ],
-              ),
-            ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildProjectCard(theme),
+                      const SizedBox(height: 24),
+                      _buildFinanceCard(theme),
+                      const SizedBox(height: 24),
+                      _buildBreakdownSection(theme),
+                    ],
+                  ),
+                ),
+        ),
+      ),
     );
   }
 
@@ -141,7 +298,10 @@ class _ProjectstageSiteSummaryReportState
             style: theme.textTheme.bodySmall,
           ),
           const Divider(height: 24),
-          _infoRow('Site Location', projectInfo?['siteLocation'] ?? 'N/A'),
+          _infoRow(
+            'Site Location',
+            projectInfo?['siteLocation'] ?? projectInfo?['location'] ?? 'N/A',
+          ),
           _infoRow('Owner Name', projectInfo?['ownerName'] ?? 'N/A'),
           _infoRow('Status', projectInfo?['status'] ?? 'Active'),
         ],

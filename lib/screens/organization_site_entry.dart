@@ -97,7 +97,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       final sitesSnapshot = await FirestoreService.sites.get();
       final Map<String, String> siteNames = {
         for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site'
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
 
       // 2. Fetch site mappings using FirestoreService
@@ -111,9 +111,12 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
               'siteId': sId,
               'siteName': siteNames[sId] ?? 'Unnamed Site',
               'supervisor': data['supervisor']?.toString() ?? 'Not Available',
-              'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
+              'supervisorId':
+                  (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
+                  'Not Available',
               'location': data['location']?.toString() ?? 'Not Available',
-              'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+              'projectStage':
+                  data['projectStage']?.toString() ?? 'Not Available',
             };
           })
           .where((site) => site['siteId']!.isNotEmpty)
@@ -375,6 +378,18 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     return total;
   }
 
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _fetchSites(),
+      _fetchMaterialOptions(),
+      _fetchLabourOptions(),
+    ]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Data refreshed successfully!')),
+    );
+  }
+
   void _resetForm() {
     setState(() {
       materials.clear();
@@ -465,7 +480,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       isSaving = true;
     });
     final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
-    final docId = '${siteCode}_$dateForId';
+    final docId = '${siteCode}_${dateForId}';
     final dateIso = selectedDate!.toIso8601String();
     final data = {
       "date": dateIso,
@@ -500,6 +515,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       "siteId": siteCode,
       "supervisorName": supervisorName,
       "projectStage": projectStage,
+      "isOrgEntry": true,
+      "createdBy": "manager_org",
     };
     try {
       final existing = await FirestoreService.siteSupervisorEntries
@@ -511,7 +528,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Duplicate Entry'),
-            content: const Text('This entry already exists in your records.'),
+            content: const Text(
+              'An entry for this site and date already exists.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -897,21 +916,8 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       onBack: () => Navigator.pop(context),
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (_) => SupervisorDashboard(
-                      username: widget.userName,
-                      supervisorId: supervisorId ?? '',
-                      supervisorName: supervisorName ?? '',
-                    ),
-              ),
-              (route) => false,
-            );
-          },
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: _refreshData,
         ),
       ],
       body: LayoutBuilder(
@@ -1005,7 +1011,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                               const SizedBox(width: 10),
                               Text(
                                 selectedDate != null
-                                    ? DateFormat('dd MMM yyyy').format(selectedDate!)
+                                    ? DateFormat(
+                                        'dd MMM yyyy',
+                                      ).format(selectedDate!)
                                     : 'No date chosen',
                                 style: const TextStyle(fontSize: 16),
                               ),
@@ -1052,17 +1060,18 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                               ),
-                              items: (_filteredMaterialOptions ?? materialOptions)
-                                  .map(
-                                    (item) => DropdownMenuItem(
-                                      value: item,
-                                      child: Text(
-                                        item,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                              items:
+                                  (_filteredMaterialOptions ?? materialOptions)
+                                      .map(
+                                        (item) => DropdownMenuItem(
+                                          value: item,
+                                          child: Text(
+                                            item,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
                               onChanged: (value) =>
                                   setState(() => selectedMaterial = value),
                             ),
@@ -1099,15 +1108,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: GlassButton(
-                                    label:
-                                        _showCustomMaterialFields
-                                            ? 'Hide Others'
-                                            : 'Others',
+                                    label: _showCustomMaterialFields
+                                        ? 'Hide Others'
+                                        : 'Others',
                                     icon: Icons.more_horiz,
                                     onPressed: () => setState(
-                                      () =>
-                                          _showCustomMaterialFields =
-                                              !_showCustomMaterialFields,
+                                      () => _showCustomMaterialFields =
+                                          !_showCustomMaterialFields,
                                     ),
                                     isSecondary: true,
                                   ),
@@ -1245,15 +1252,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: GlassButton(
-                                    label:
-                                        _showCustomLabourFields
-                                            ? 'Hide Others'
-                                            : 'Others',
+                                    label: _showCustomLabourFields
+                                        ? 'Hide Others'
+                                        : 'Others',
                                     icon: Icons.more_horiz,
                                     onPressed: () => setState(
-                                      () =>
-                                          _showCustomLabourFields =
-                                              !_showCustomLabourFields,
+                                      () => _showCustomLabourFields =
+                                          !_showCustomLabourFields,
                                     ),
                                     isSecondary: true,
                                   ),
