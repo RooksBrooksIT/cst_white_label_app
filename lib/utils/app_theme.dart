@@ -3,8 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AppTheme {
-  // Default primary color matching the current app theme
-  static const Color defaultColor = Color(0xFF003768);
+  // Vibrant Ocean Blue matching screenshot color palette
+  static const Color defaultColor = Color(0xFF1E88E5);
+  static const Color darkNavyColor = Color(0xFF0B1942);
+  static const Color iceBlueColor = Color(0xFFEBF3FA);
 
   // ValueNotifier to broadcast color changes to the entire app
   static final ValueNotifier<Color> primaryColor = ValueNotifier(defaultColor);
@@ -19,6 +21,96 @@ class AppTheme {
   static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(
     ThemeMode.light,
   );
+
+  /// Displays a modern floating error toast notification matching app theme
+  static void showErrorToast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+        backgroundColor: const Color(0xFF0B1942),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
+        elevation: 8,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Displays a modern floating success toast notification matching app theme
+  static void showSuccessToast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_outline_rounded,
+                color: Color(0xFF10B981),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+        backgroundColor: const Color(0xFF0B1942),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+        ),
+        elevation: 8,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   /// Initializes the theme by loading the stored brand color and app name from SharedPreferences.
   static Future<void> initialize() async {
@@ -106,7 +198,24 @@ class AppTheme {
     primaryColor.notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('brand_color_value', newColor.value);
+    await prefs.setInt('brand_color_value', newColor.toARGB32());
+  }
+
+  /// Generates a dynamic 4-stop light background gradient based on the selected brand color.
+  static List<Color> getBackgroundGradientColors(Color brandColor) {
+    final HSLColor hsl = HSLColor.fromColor(brandColor);
+    final Color c1 = hsl.withLightness(0.96).withSaturation((hsl.saturation * 0.4).clamp(0.0, 1.0)).toColor();
+    final Color c2 = hsl.withLightness(0.82).withSaturation((hsl.saturation * 0.6).clamp(0.0, 1.0)).toColor();
+    final Color c3 = hsl.withLightness(0.65).withSaturation((hsl.saturation * 0.75).clamp(0.0, 1.0)).toColor();
+    final Color c4 = brandColor;
+
+    return [c1, c2, c3, c4];
+  }
+
+  /// Generates a deep dark accent color (e.g. Dark Navy / Dark Forest Green) matching the brand color.
+  static Color getDarkAccent(Color brandColor) {
+    final HSLColor hsl = HSLColor.fromColor(brandColor);
+    return hsl.withLightness(0.12).withSaturation((hsl.saturation * 0.7).clamp(0.0, 1.0)).toColor();
   }
 
   /// Returns a color (Black or White) that contrasts well with the [background].
@@ -145,12 +254,13 @@ class AppTheme {
 
   /// Generates a ThemeData based on the current primary color.
   static ThemeData getTheme(Color primary) {
-    // Professional Slate and Navy palette for construction/enterprise
-    const Color background = Color(0xFFF8FAFC); // Slate 50
+    // Ice Blue, Vibrant Ocean Blue, and Deep Dark Navy palette matching screenshot
+    const Color background = Color(0xFFEBF3FA); // Light Ice Blue
     const Color surface = Colors.white;
-    const Color onSurface = Color(0xFF0F172A); // Slate 900
-    const Color onSurfaceVariant = Color(0xFF64748B); // Slate 500
-    const Color outline = Color(0xFFE2E8F0); // Slate 200
+    const Color onSurface = Color(0xFF0A183D); // Deep Dark Navy Title
+    const Color onSurfaceVariant = Color(0xFF5A759E); // Muted Slate Blue
+    const Color outline = Color(0xFFD4E3F4); // Soft Ice Blue Border
+    const Color darkNavy = Color(0xFF0B1942); // Dark Navy Accent
 
     return ThemeData(
       useMaterial3: true,
@@ -160,13 +270,13 @@ class AppTheme {
         seedColor: primary,
         primary: primary,
         onPrimary: getForegroundFor(primary),
-        secondary: const Color(0xFF334155), // Slate 700
+        secondary: darkNavy, // Deep Dark Navy
         onSecondary: Colors.white,
-        tertiary: primary.withOpacity(0.8), // Derived tertiary
-        onTertiary: getForegroundFor(primary),
+        tertiary: const Color(0xFF42A5F5), // Light Ocean Blue Accent
+        onTertiary: Colors.white,
         surface: surface,
         onSurface: onSurface,
-        surfaceContainerHighest: const Color(0xFFF1F5F9),
+        surfaceContainerHighest: const Color(0xFFE2EFFC),
         onSurfaceVariant: onSurfaceVariant,
         outline: outline,
         error: const Color(0xFFEF4444), // Red 500
@@ -200,7 +310,7 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: surface,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: onSurface, size: 20),
@@ -217,7 +327,7 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: outline, width: 1),
         ),
       ),

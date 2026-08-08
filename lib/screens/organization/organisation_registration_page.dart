@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/branding/branding_screen.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 
@@ -208,9 +208,7 @@ class _OrganisationRegistrationPageState
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
-    );
+    AppTheme.showErrorToast(context, message);
   }
 
   @override
@@ -298,7 +296,6 @@ class _OrganisationRegistrationPageState
   ) {
     const steps = ['Details', 'Branding', 'Pricing'];
     const activeStep = 0;
-    final colorScheme = theme.colorScheme;
 
     return Container(
       padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
@@ -327,11 +324,9 @@ class _OrganisationRegistrationPageState
                         height: isDesktop ? 44.0 : 36.0,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isDone
-                              ? colorScheme.primary
-                              : (isActive
-                                    ? colorScheme.primary
-                                    : colorScheme.surfaceVariant),
+                          color: isDone || isActive
+                              ? const Color(0xFF0B1942)
+                              : const Color(0xFFE2E8F0),
                         ),
                         child: Center(
                           child: isDone
@@ -345,7 +340,7 @@ class _OrganisationRegistrationPageState
                                   style: TextStyle(
                                     color: isActive
                                         ? Colors.white
-                                        : colorScheme.onSurfaceVariant,
+                                        : const Color(0xFF0A183D),
                                     fontSize: isDesktop ? 16.0 : 14.0,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -356,13 +351,9 @@ class _OrganisationRegistrationPageState
                       Text(
                         steps[index],
                         style: TextStyle(
-                          color: isActive
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
+                          color: const Color(0xFF0A183D),
                           fontSize: isDesktop ? 14.0 : 12.0,
-                          fontWeight: isActive
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                          fontWeight: FontWeight.w700,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -377,7 +368,7 @@ class _OrganisationRegistrationPageState
                         maxWidth: 60.0,
                         minWidth: 20.0,
                       ),
-                      height: 2.0,
+                      height: 2.5,
                       margin: EdgeInsets.only(
                         bottom: isDesktop ? 28.0 : 24.0,
                         left: isDesktop ? 16.0 : (isMobile ? 8.0 : 12.0),
@@ -385,8 +376,8 @@ class _OrganisationRegistrationPageState
                       ),
                       decoration: BoxDecoration(
                         color: activeStep > index
-                            ? colorScheme.primary
-                            : colorScheme.surfaceVariant,
+                            ? const Color(0xFF0B1942)
+                            : const Color(0xFFCBD5E1),
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ),
@@ -405,8 +396,6 @@ class _OrganisationRegistrationPageState
     bool isTablet,
     bool isDesktop,
   ) {
-    final colorScheme = theme.colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -415,7 +404,7 @@ class _OrganisationRegistrationPageState
           'Create Your Profile',
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
+            color: const Color(0xFF0A183D),
             letterSpacing: -0.5,
             fontSize: isDesktop ? 28.0 : 24.0,
           ),
@@ -424,7 +413,8 @@ class _OrganisationRegistrationPageState
         Text(
           'Please provide your organization details below.',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
+            color: const Color(0xFF0A183D),
+            fontWeight: FontWeight.w600,
             fontSize: isDesktop ? 17.0 : 15.0,
           ),
         ),
@@ -608,7 +598,7 @@ class _OrganisationRegistrationPageState
                         padding: EdgeInsets.symmetric(
                           vertical: isDesktop ? 20.0 : 16.0,
                         ),
-                        side: BorderSide(color: colorScheme.outline),
+                        side: const BorderSide(color: Color(0xFF0A183D), width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -616,7 +606,7 @@ class _OrganisationRegistrationPageState
                       child: Text(
                         'BACK',
                         style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
+                          color: const Color(0xFF0A183D),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
                           fontSize: isDesktop ? 16.0 : 14.0,
@@ -629,12 +619,13 @@ class _OrganisationRegistrationPageState
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _goToNextStep,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
+                        backgroundColor: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
                         foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(
                           vertical: isDesktop ? 20.0 : 16.0,
                         ),
-                        elevation: 0,
+                        elevation: 4,
+                        shadowColor: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.35),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -643,7 +634,7 @@ class _OrganisationRegistrationPageState
                           ? SizedBox(
                               height: isDesktop ? 28.0 : 20.0,
                               width: isDesktop ? 28.0 : 20.0,
-                              child: CircularProgressIndicator(
+                              child: const CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2,
                               ),
@@ -674,8 +665,8 @@ class _OrganisationRegistrationPageState
         label,
         style: TextStyle(
           fontSize: isDesktop ? 16.0 : 14.0,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF64748B),
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF0A183D),
         ),
       ),
     );
@@ -694,59 +685,69 @@ class _OrganisationRegistrationPageState
     void Function(String)? onChanged,
     required bool isDesktop,
   }) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword ? obscureText : false,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      onChanged: onChanged,
+      style: TextStyle(
+        fontSize: isDesktop ? 17.0 : 15.0,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF0A183D),
       ),
-      child: TextFormField(
-        controller: controller,
-        obscureText: isPassword ? obscureText : false,
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        validator: validator,
-        onChanged: onChanged,
-        style: TextStyle(
-          fontSize: isDesktop ? 17.0 : 15.0,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: const Color(0xFF64748B),
+          fontSize: isDesktop ? 16.0 : 14.0,
           fontWeight: FontWeight.w500,
         ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-            fontSize: isDesktop ? 16.0 : 14.0,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: theme.colorScheme.primary,
-            size: isDesktop ? 24.0 : 20.0,
-          ),
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    obscureText
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded,
-                    color: theme.colorScheme.primary,
-                    size: isDesktop ? 24.0 : 20.0,
-                  ),
-                  onPressed: onToggleVisibility,
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 20.0 : 16.0,
-            vertical: isDesktop ? 20.0 : 16.0,
-          ),
+        prefixIcon: Icon(
+          icon,
+          color: const Color(0xFF0B1942),
+          size: isDesktop ? 24.0 : 20.0,
+        ),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscureText
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                  color: const Color(0xFF0B1942),
+                  size: isDesktop ? 24.0 : 20.0,
+                ),
+                onPressed: onToggleVisibility,
+              )
+            : null,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 20.0 : 16.0,
+          vertical: isDesktop ? 18.0 : 16.0,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFD4E3F4), width: 1.2),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF0B1942), width: 1.8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2.0),
+        ),
+        errorStyle: const TextStyle(
+          color: Color(0xFFDC2626),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          height: 1.3,
         ),
       ),
     );

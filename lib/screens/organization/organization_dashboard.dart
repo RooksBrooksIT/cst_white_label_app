@@ -122,39 +122,39 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       IconButton(
                         icon: const Icon(
                           Icons.menu_rounded,
-                          color: Colors.white,
+                          color: Color(0xFF0A183D),
+                          size: 26,
                         ),
                         tooltip: 'Menu',
                         onPressed: () => _navigateToOrgMenu(context),
                       ),
                     ],
-                    body: SafeArea(
-                      bottom: true,
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: Responsive.maxContentWidth,
-                          ),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return CustomScrollView(
-                                controller: _scrollController,
-                                physics: const BouncingScrollPhysics(),
-                                slivers: [
-                                  ..._buildGridSections(
-                                    context,
-                                    theme,
-                                    constraints.maxWidth,
+                    body: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: Responsive.maxContentWidth,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return CustomScrollView(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              slivers: [
+                                ..._buildListSections(
+                                  context,
+                                  theme,
+                                  constraints.maxWidth,
+                                ),
+                                const SliverToBoxAdapter(
+                                  child: SizedBox(
+                                    height: 120,
                                   ),
-                                  SliverToBoxAdapter(
-                                    child: SizedBox(
-                                      height: Responsive.spacing(context, 100),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -168,15 +168,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  List<Widget> _buildGridSections(
+  List<Widget> _buildListSections(
     BuildContext context,
     ThemeData theme,
     double availableWidth,
   ) {
-    final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
-    final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
     final hPad = Responsive.horizontalPadding(context);
     final categories = _getCategories(theme);
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
     List<Widget> slivers = [];
 
     for (var category in categories) {
@@ -188,66 +187,57 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               hPad,
-              Responsive.spacing(context, 24),
+              Responsive.spacing(context, 20),
               hPad,
-              Responsive.spacing(context, 12),
+              Responsive.spacing(context, 10),
             ),
             child: Row(
               children: [
                 Container(
-                  width: Responsive.scaleH(context, 4),
-                  height: Responsive.scaleV(context, 24),
+                  width: 4,
+                  height: 24,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [category.color, category.color.withOpacity(0.5)],
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      Responsive.scaleH(context, 4),
-                    ),
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                SizedBox(width: Responsive.scaleH(context, 12)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         category.title,
-                        style: TextStyle(
-                          fontSize: Responsive.fontSize(context, 16),
-                          fontWeight: FontWeight.bold,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
                           letterSpacing: -0.3,
                         ),
                       ),
                       Text(
                         category.subtitle,
-                        style: TextStyle(
-                          fontSize: Responsive.fontSize(context, 11),
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF5A759E),
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: Responsive.scaleH(context, 8),
-                    vertical: Responsive.scaleV(context, 4),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: category.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(
-                      Responsive.scaleH(context, 20),
-                    ),
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     '${category.items.length}',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 11),
-                      fontWeight: FontWeight.w600,
-                      color: category.color,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -257,21 +247,18 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         ),
       );
 
-      // Items Grid for this section
+      // Items List for this section
       slivers.add(
         SliverPadding(
           padding: EdgeInsets.symmetric(horizontal: hPad),
-          sliver: SliverGrid(
+          sliver: SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
               final item = category.items[index];
-              return _buildGridItem(context, item);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: _buildListItem(context, item),
+              );
             }, childCount: category.items.length),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: Responsive.spacing(context, 8),
-              mainAxisSpacing: Responsive.spacing(context, 8),
-              childAspectRatio: childAspectRatio,
-            ),
           ),
         ),
       );
@@ -280,91 +267,98 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return slivers;
   }
 
-  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
+  Widget _buildListItem(BuildContext context, SubMenuItem item) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
-      ),
-      color: theme.cardColor,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          item.onTap();
-        },
-        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Responsive.scaleH(context, 16)),
-            color: theme.cardColor,
-            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: Responsive.scaleH(context, 12),
-                spreadRadius: Responsive.scaleH(context, 1),
-                offset: Offset(0, Responsive.scaleV(context, 4)),
-              ),
-            ],
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            item.onTap();
+          },
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: EdgeInsets.all(Responsive.spacing(context, 6)),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
               children: [
+                // Icon Badge
                 Container(
-                  padding: EdgeInsets.all(Responsive.spacing(context, 6)),
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [item.color, item.color.withOpacity(0.7)],
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      Responsive.scaleH(context, 10),
-                    ),
+                    shape: BoxShape.circle,
+                    color: item.color,
                     boxShadow: [
                       BoxShadow(
-                        color: item.color.withOpacity(0.2),
-                        blurRadius: Responsive.scaleH(context, 3),
-                        offset: Offset(0, Responsive.scaleV(context, 1.5)),
+                        color: item.color.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Icon(
                     item.icon,
                     color: Colors.white,
-                    size: Responsive.scaleH(context, 18),
+                    size: 22,
                   ),
                 ),
-                SizedBox(height: Responsive.spacing(context, 6)),
-                Flexible(
-                  child: Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 10),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.2,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 14),
+                // Title and Subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.subtitle,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFCBD5E1),
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: Responsive.spacing(context, 1.5)),
-                Flexible(
-                  child: Text(
-                    item.subtitle,
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 8),
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.2,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                // Trailing Arrow
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
               ],

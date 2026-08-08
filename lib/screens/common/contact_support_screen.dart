@@ -1,5 +1,5 @@
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,155 +30,177 @@ class ContactSupportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-    final isDesktop = screenWidth >= 1024;
-    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return GlassScaffold(
-      title: 'Contact Support',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              children: [
-                SizedBox(height: isMobile ? 24 : 32),
-                // Hero Section
-                _buildHero(theme, colorScheme, isMobile, isTablet, isDesktop),
+      padding: EdgeInsets.zero,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Header Row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1942),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  const Text(
+                    'Contact Support',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
+            ),
 
-                SizedBox(height: isMobile ? 32 : 48),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Hero Agent Header
+                        _buildHero(darkCardBg),
 
-                // Email Card
-                _buildContactCard(
-                  context,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  icon: Icons.alternate_email_rounded,
-                  title: 'Email Us',
-                  subtitle: 'Our support team will respond shortly',
-                  value: _email,
-                  iconBgColor: Colors.blue.withOpacity(0.1),
-                  iconColor: Colors.blue,
-                  onTap: _launchEmail,
-                  isMobile: isMobile,
-                  isTablet: isTablet,
-                  isDesktop: isDesktop,
-                ),
+                        const SizedBox(height: 24),
 
-                SizedBox(height: isMobile ? 12 : 16),
+                        // Email Card
+                        _buildContactCard(
+                          context,
+                          darkCardBg: darkCardBg,
+                          icon: Icons.alternate_email_rounded,
+                          iconColor: const Color(0xFF1E88E5),
+                          title: 'Email Us',
+                          subtitle: 'Our support team will respond shortly',
+                          value: _email,
+                          buttonLabel: 'SEND EMAIL',
+                          onTap: _launchEmail,
+                        ),
 
-                // Phone Card
-                _buildContactCard(
-                  context,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  icon: Icons.phone_iphone_rounded,
-                  title: 'Call Us',
-                  subtitle: 'Available for urgent inquiries',
-                  value: _phoneDisplay,
-                  iconBgColor: Colors.green.withOpacity(0.1),
-                  iconColor: Colors.green,
-                  onTap: _launchPhone,
-                  isMobile: isMobile,
-                  isTablet: isTablet,
-                  isDesktop: isDesktop,
-                ),
+                        const SizedBox(height: 16),
 
-                SizedBox(height: isMobile ? 32 : 40),
+                        // Phone Card
+                        _buildContactCard(
+                          context,
+                          darkCardBg: darkCardBg,
+                          icon: Icons.phone_iphone_rounded,
+                          iconColor: const Color(0xFF10B981),
+                          title: 'Call Us',
+                          subtitle: 'Available for urgent inquiries',
+                          value: _phoneDisplay,
+                          buttonLabel: 'CALL NOW',
+                          onTap: _launchPhone,
+                        ),
 
-                // Working Hours Section
-                _buildWorkingHours(theme, colorScheme, isMobile, isTablet, isDesktop),
+                        const SizedBox(height: 20),
 
-                SizedBox(height: isMobile ? 40 : 60),
+                        // Working Hours Section Card
+                        _buildWorkingHours(darkCardBg),
 
-                // Footer Info
-                Text(
-                  'Thank you for being with us!',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                    letterSpacing: 0.5,
+                        const SizedBox(height: 28),
+
+                        const Center(
+                          child: Text(
+                            'Thank you for being with us!',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF5A759E),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
-                SizedBox(height: isMobile ? 24 : 32),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHero(ThemeData theme, ColorScheme colorScheme, bool isMobile, bool isTablet, bool isDesktop) {
-    final heroSize = isMobile ? 100.0 : 120.0;
-    final iconSize = isMobile ? 48.0 : 56.0;
-
+  Widget _buildHero(Color darkCardBg) {
     return Column(
       children: [
         Container(
-          height: heroSize,
-          width: heroSize,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.08),
+            color: darkCardBg,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: colorScheme.primary.withOpacity(0.1),
-                blurRadius: isMobile ? 30 : 40,
-                spreadRadius: isMobile ? 3 : 5,
+                color: darkCardBg.withValues(alpha: 0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                height: isMobile ? 70 : 90,
-                width: isMobile ? 70 : 90,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Icon(
-                Icons.support_agent_rounded,
-                color: colorScheme.primary,
-                size: iconSize,
-              ),
-            ],
+          child: const Icon(
+            Icons.support_agent_rounded,
+            color: Colors.white,
+            size: 42,
           ),
         ),
-        SizedBox(height: isMobile ? 24 : 32),
-        Text(
+        const SizedBox(height: 16),
+        const Text(
           'How can we help you?',
-          style: theme.textTheme.headlineSmall?.copyWith(
+          style: TextStyle(
+            fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
-            letterSpacing: -0.5,
-            fontSize: isMobile ? 22 : null,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.4,
           ),
         ),
-        SizedBox(height: isMobile ? 8 : 12),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 20),
+        const SizedBox(height: 6),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'Get in touch with Rooks And Brooks Technologies. We are dedicated to providing you the best support.',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.5,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF5A759E),
+              height: 1.35,
             ),
           ),
         ),
@@ -188,57 +210,70 @@ class ContactSupportScreen extends StatelessWidget {
 
   Widget _buildContactCard(
     BuildContext context, {
-    required ThemeData theme,
-    required ColorScheme colorScheme,
+    required Color darkCardBg,
     required IconData icon,
+    required Color iconColor,
     required String title,
     required String subtitle,
     required String value,
-    required Color iconBgColor,
-    required Color iconColor,
+    required String buttonLabel,
     required VoidCallback onTap,
-    required bool isMobile,
-    required bool isTablet,
-    required bool isDesktop,
   }) {
-    final cardPadding = isMobile ? 16.0 : 20.0;
-    final iconPadding = isMobile ? 10.0 : 12.0;
-
-    return GlassCard(
-      padding: EdgeInsets.all(cardPadding),
-      margin: EdgeInsets.zero,
-      borderRadius: isMobile ? 20 : 24,
-      onTap: onTap,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(iconPadding),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
+                  shape: BoxShape.circle,
+                  color: iconColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: iconColor.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: iconColor, size: isMobile ? 22 : 24),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-              SizedBox(width: isMobile ? 12 : 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                    SizedBox(height: isMobile ? 2 : 2),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFCBD5E1),
                       ),
                     ),
                   ],
@@ -246,24 +281,55 @@ class ContactSupportScreen extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 16 : 20),
+          const SizedBox(height: 16),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 10 : 12),
-            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
-              border: Border.all(color: colorScheme.outline.withOpacity(0.05)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-                fontSize: isMobile ? 13 : 13,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B1942),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    buttonLabel,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -271,49 +337,66 @@ class ContactSupportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkingHours(ThemeData theme, ColorScheme colorScheme, bool isMobile, bool isTablet, bool isDesktop) {
+  Widget _buildWorkingHours(Color darkCardBg) {
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 20 : 24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(isMobile ? 20 : 24),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.08)),
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.schedule_rounded,
-                color: colorScheme.primary,
-                size: isMobile ? 18 : 20,
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
-              SizedBox(width: isMobile ? 10 : 12),
-              Text(
+              const SizedBox(width: 10),
+              const Text(
                 'WORKING HOURS',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: colorScheme.primary,
-                  letterSpacing: 1.5,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 12 : 16),
-          Text(
+          const SizedBox(height: 12),
+          const Text(
             'Monday – Saturday',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
           ),
-          SizedBox(height: isMobile ? 2 : 4),
-          Text(
+          const SizedBox(height: 4),
+          const Text(
             '9:00 AM – 6:00 PM IST',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFCBD5E1),
             ),
           ),
         ],

@@ -46,15 +46,15 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
       justify-content: center;
       height: 100vh;
       margin: 0;
-      background-color: #f8fafc;
-      color: #334155;
+      background-color: #ffffff;
+      color: #0a183d;
     }
     .spinner {
-      border: 4px solid rgba(0, 0, 0, 0.1);
-      width: 40px;
-      height: 40px;
+      border: 4px solid rgba(11, 25, 66, 0.1);
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      border-left-color: #2563eb;
+      border-left-color: #1e88e5;
       animation: spin 1s linear infinite;
     }
     @keyframes spin {
@@ -62,15 +62,22 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
       100% { transform: rotate(360deg); }
     }
     .text {
-      margin-top: 16px;
-      font-size: 16px;
-      font-weight: 500;
+      margin-top: 18px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0a183d;
+    }
+    .subtext {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #5a759e;
     }
   </style>
 </head>
 <body>
   <div class="spinner"></div>
-  <div class="text">Connecting securely to PayU Payment Gateway...</div>
+  <div class="text">Connecting securely to PayU Gateway...</div>
+  <div class="subtext">Please do not refresh or press back</div>
   <form id="payu_form" action="${widget.params.payUrl}" method="post">
     ${postDataMap.entries.map((e) => '<input type="hidden" name="${e.key}" value="${_escapeHtml(e.value)}" />').join('\n')}
   </form>
@@ -85,7 +92,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFFF8FAFC))
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -167,23 +174,99 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     final shouldPop = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Payment?'),
-        content: const Text('Are you sure you want to cancel the payment process?'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('NO, CONTINUE'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFDC2626),
+                size: 32,
+              ),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CANCEL'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            const Text(
+              'Cancel Payment?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Are you sure you want to cancel your payment transaction?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF5A759E),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'YES, CANCEL',
+                      style: TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B1942),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 4,
+                      shadowColor: const Color(0xFF0B1942).withValues(alpha: 0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'NO, CONTINUE',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
@@ -202,23 +285,136 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const Color darkNavy = Color(0xFF0B1942);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _onWillPop();
       },
       child: GlassScaffold(
-        title: 'PayU Secure Checkout',
-        onBack: () => _onWillPop(),
-        body: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_isLoading)
-              const LinearProgressIndicator(
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        padding: EdgeInsets.zero,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Custom Top Header Row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: darkNavy,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkNavy.withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        onPressed: () => _onWillPop(),
+                      ),
+                    ),
+                    const Text(
+                      'PayU Secure Checkout',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
               ),
-          ],
+
+              // SSL Encryption Badge
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: darkNavy,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkNavy.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.shield_rounded,
+                        color: Color(0xFF10B981),
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '256-bit SSL Encrypted • PayU Gateway',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Linear Progress Bar if Loading
+              if (_isLoading)
+                const LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E88E5)),
+                  minHeight: 3,
+                ),
+
+              // WebView Container Card
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: darkNavy.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: WebViewWidget(controller: _controller),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
