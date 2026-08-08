@@ -1,6 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/no_internet_screen.dart';
+import 'package:demo_cst/screens/common/no_internet_screen.dart';
 
 class ConnectivityWrapper extends StatefulWidget {
   final Widget child;
