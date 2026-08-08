@@ -18,17 +18,45 @@ class FirestoreService {
   /// Should be called after login or at app startup.
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _cachedDynamicPath =
+
+    // Prioritize the unified key first
+    String? path = prefs.getString('org_dynamic_path');
+
+    if (path == null || path.isEmpty) {
+      // If unified key is missing, check which role was last logged in
+      final roleStr = prefs.getString('auth_user_role');
+      if (roleStr != null) {
+        if (roleStr.contains('manager')) {
+          path = prefs.getString('config_org_path');
+        } else if (roleStr.contains('supervisor')) {
+          path = prefs.getString('sup_org_path');
+        } else if (roleStr.contains('customer')) {
+          path = prefs.getString('cust_org_path');
+        }
+      }
+    }
+
+    // Last resort fallbacks
+    path ??=
         prefs.getString('org_dynamic_path') ??
         prefs.getString('config_org_path') ??
         prefs.getString('sup_org_path') ??
         prefs.getString('cust_org_path');
+
+    _cachedDynamicPath = path;
+    debugPrint(
+      'FirestoreService: Initialized with OrgPath: $_cachedDynamicPath',
+    );
   }
 
   /// Explicitly sets the organization path, bypassing SharedPreferences.
   /// Useful for immediate initialization during login or registration.
   static void setOrgPath(String path) {
     _cachedDynamicPath = path;
+    // Persist to SharedPreferences so it's available after app restart
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('org_dynamic_path', path);
+    });
   }
 
   /// Gets a collection that is nested under the organization's data root.
@@ -38,6 +66,10 @@ class FirestoreService {
     String collectionName,
   ) {
     final orgId = _getOrgIdFromPath();
+
+    debugPrint(
+      'FirestoreService: Accessing collection "$collectionName" for OrgID: $orgId',
+    );
 
     if (orgId == 'uninitialized') {
       // Fallback if not initialized or logged out
@@ -84,8 +116,8 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
-        .doc('data');
+        .collection('data')
+        .doc('admin');
   }
 
   static DocumentReference<Map<String, dynamic>> get brandingDoc {
@@ -93,7 +125,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('branding');
   }
 
@@ -104,7 +136,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('branding');
   }
 
@@ -114,7 +146,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('referral');
   }
 
@@ -124,7 +156,7 @@ class FirestoreService {
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection('admin')
+        .collection('data')
         .doc('subscription');
   }
 
@@ -159,15 +191,14 @@ class FirestoreService {
   static Future<DocumentReference<Map<String, dynamic>>>
   getOrgDataRoot() async {
     if (_cachedDynamicPath == null) await initialize();
-    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
+    final orgId = _getOrgIdFromPath();
+    if (orgId == 'uninitialized') {
       return FirebaseFirestore.instance
           .collection('organisation')
           .doc('uninitialized')
           .collection('admin')
           .doc('data');
     }
-    final pathParts = _cachedDynamicPath!.split('/');
-    final String orgId = pathParts[0];
 
     return FirebaseFirestore.instance
         .collection('organisation')
@@ -280,18 +311,19 @@ class FirestoreService {
   }
 
   /// Finds the Organization ID (document ID in /organisation collection) by search across
-  /// all admin/referral documents for a matching referralCode.
+  /// all admin documents in the 'data' collection group for a matching referralCode.
   static Future<String?> findOrgIdByReferralCode(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('admin')
+          .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
           .limit(1)
           .get();
 
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
-        // The parent of the 'admin' document is the organization document
+        // The structure is /organisation/{orgId}/data/admin
+        // So doc.reference.parent is the 'data' collection, and .parent is the organization document
         return doc.reference.parent.parent?.id;
       }
       return null;
@@ -305,7 +337,7 @@ class FirestoreService {
   static Future<bool> isReferralCodeUnique(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('admin')
+          .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
           .limit(1)
           .get();
@@ -313,6 +345,54 @@ class FirestoreService {
       return snapshot.docs.isEmpty;
     } catch (e) {
       debugPrint('Error checking referral code uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if an email is unique across all organizations.
+  static Future<bool> isEmailUnique(String email) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking email uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if a phone number is unique across all organizations.
+  static Future<bool> isPhoneUnique(String phone) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('phone', isEqualTo: phone)
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking phone uniqueness: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if a username is unique across all organizations.
+  static Future<bool> isUsernameUnique(String username) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('username', isEqualTo: username.toLowerCase())
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking username uniqueness: $e');
       rethrow;
     }
   }

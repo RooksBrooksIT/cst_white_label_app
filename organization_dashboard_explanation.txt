@@ -1,0 +1,720 @@
+================================================================================
+                 CST CONSTRUCTION APP - COMPREHENSIVE SCREEN CATALOG
+================================================================================
+This document provides a detailed breakdown of all 115 screens in the CST White-Label App.
+It details classes, roles, Firestore collections, and key functionality for developers.
+
+1. LOGICAL MODULE BREAKDOWNS
+----------------------------
+- AUTHENTICATION & ONBOARDING: welcome_screen, splash_screen, landing_page, organisation_landing_page, Organisation_LoginPage, Organisation_RegistrationPage, customer_login_page, supervisor_login_page, reset_password_screen, org_reset_password_screen, supervisor_verification_page, join_by_referral_page
+- ROLE DASHBOARDS: Organization_Dashboard, supervisor_dashboard, customer_dashboard, config_account_dashboard, main_dashboard, customer_insight_dashboard, insights_dashboard, projectStage_insights_dashboard
+- SITE & PROJECT CONFIGURATION: Site_Supervisor_Config, project_setup_wizard, project_screen, project_category_screen, project_sub_category_screen, project_stage_config, project_contract_screen, project_indicator, site_screen, site_supervisor_map_screen, workers_site_mapping_page
+- MATERIALS & INVENTORY: config_materials, config_mat_sub_cat, config_material_information, config_materialavailability, Supervisor_material_information, material_at_site_entry_page, material_request_form, manager_material_approval_screen, material_report, supervisor_material_view_request_screen
+- LABOUR & ATTENDANCE: labour_screen, labour_config_page, workers_config_page, supervisor_worker_att_page, customer_worker_details, customer_workers_summary, worker_calendar_availability_page, worker_summary_report_page, workers_availability_report_page
+- TOOLS & VEHICLE MANAGEMENT: tools_master_page, tools_inventory_details, tools_movement_page, supervisor_tool_movement, tools_inventory_report, vehicle_config_page, vehicle_details_page, vehicle_driver_config_page, vehicle_inventory_page, vehicle_inventory_pdf
+- FINANCIALS & EXPENSES: organization_expenses, manager_expenses, manager_expenses_homescreen, org_site_payment_screen, projectStage_expenses_reportpage, site_expenses_reportpage, incentive_calculation, incentive_calculation_sheet, financial_status_report, customer_project_financial_statusreport
+- REPORTS & PDF GENERATION: daily_site_report, projectstage_daily_site_report, customer_site_status_report, site_status_report, site_status_reportPage, site_summary_page, projectStage_site_summary_report, site_weekly_financial_report, site_weekly_financial_report2, org_site_supervisor_dailyWeek_report, contractor_page, contractor_report_page, overall_report_pdf_helper, worker_report_pdf_helper, pdf_preview_page
+- CUSTOM BRANDING & SUBSCRIPTION: branding_screen, branding_edit_screen, org_subscription_page, pricing_screen
+- UTILITIES & DIALOGS: about_us_screen, contact_support_screen, notification_page, org_notification_page, WebViewScreen, org_information_screen, org_sub_menu_screen, org_menu_screen, supervisor_view_request_screen, supervisor_work_schedule_page, manager_approval_screen, ConstructionDocuments
+
+2. COMPLETE SCREEN-BY-SCREEN CATALOG
+-------------------------------------
+SCREEN #1: ConstructionDocuments.dart
+  - Widget Class(es): ConstructionDocuments
+  - Header/Title Context: Site Selection
+  - File Size: 19.07 KB
+  - Firestore Collections: siteDrawings
+  - Detailed Description: Allows users to select a site and view, browse, and manage construction documents, blueprints, and layouts mapped to that site.
+
+SCREEN #2: Organisation_LoginPage.dart
+  - Widget Class(es): Organisation_LoginPage
+  - Header/Title Context: Forgot Password?
+  - File Size: 15.86 KB
+  - Firestore Collections: organisation, organizationUser
+  - Detailed Description: Provides organization administrators with a secure portal to log in, recover password, and persist authentication sessions.
+
+SCREEN #3: Organisation_RegistrationPage.dart
+  - Widget Class(es): OrganisationRegistrationPage
+  - Header/Title Context: Link copied to clipboard!
+  - File Size: 25.47 KB
+  - Detailed Description: Guides new organizations through the registration process, capturing name, email, credentials, and establishing basic Firestore records.
+
+SCREEN #4: Organization_Dashboard.dart
+  - Widget Class(es): OrganizationDashboard
+  - Header/Title Context: N/A
+  - File Size: 21.79 KB
+  - Detailed Description: The primary control panel for organization owners, organizing administrative features, financial trackers, approvals, and insights into interactive visual grids.
+
+SCREEN #5: Site_Supervisor_Config.dart
+  - Widget Class(es): SiteSupervisorConfig
+  - Header/Title Context: Edit Supervisor
+  - File Size: 47.55 KB
+  - Detailed Description: Allows administrators and managers to configure site supervisor roles, credentials, project assignments, and check geolocation/geofencing profiles.
+
+SCREEN #6: Supervisor_material_information.dart
+  - Widget Class(es): SupervisorMaterialInfoScreen
+  - Header/Title Context: Quantity: ${material[
+  - File Size: 64.45 KB
+  - Detailed Description: Allows supervisors to view real-time site materials log, current quantities, and report missing or damaged inventory on site.
+
+SCREEN #7: WebViewScreen.dart
+  - Widget Class(es): ConstructionDocuments, WebViewScreen
+  - Header/Title Context: Construction Documents
+  - File Size: 14.96 KB
+  - Firestore Collections: siteDrawings
+  - Detailed Description: A reusable inline web browser interface used to load external links, documentation, and cloud-hosted PDF layout files.
+
+SCREEN #8: about_us_screen.dart
+  - Widget Class(es): AboutUsScreen
+  - Header/Title Context: eBicks App
+  - File Size: 10.98 KB
+  - Detailed Description: A clean information screen presenting app version info (v1.0.0), developer credits (eBicks), and application licensing text.
+
+SCREEN #9: account_settings_screen.dart
+  - Widget Class(es): AccountSettingsScreen
+  - Header/Title Context: Brand Color
+  - File Size: 6.75 KB
+  - Detailed Description: Allows organization owners to edit profiles, customize basic display properties, and configure branding colors.
+
+SCREEN #10: branding_edit_screen.dart
+  - Widget Class(es): BrandingEditScreen
+  - Header/Title Context: Pick a color
+  - File Size: 14.84 KB
+  - Detailed Description: Provides tools for Platinum tier users to edit the white-label custom primary theme color, application title, and logo.
+
+SCREEN #11: branding_screen.dart
+  - Widget Class(es): BrandingScreen
+  - Header/Title Context: Pick a color
+  - File Size: 32.37 KB
+  - Firestore Collections: organisation
+  - Detailed Description: Displays current white-label configuration settings and guides administrators during onboarding to customize their app branding.
+
+SCREEN #12: config_account_dashboard.dart
+  - Widget Class(es): ConfigAccountDashboard
+  - Header/Title Context: Logout
+  - File Size: 26.31 KB
+  - Detailed Description: The administrative control center for managers, grouping configurations for sites, categories, team lists, and sign-out controls.
+
+SCREEN #13: config_layout_and_drawing.dart
+  - Widget Class(es): LayoutAndDrawingsPage
+  - Header/Title Context: Document uploaded successfully!
+  - File Size: 35.19 KB
+  - Detailed Description: Enables administrators or managers to upload, rename, and link blueprints, layout PDFs, and drawings to specific construction sites.
+
+SCREEN #14: config_login.dart
+  - Widget Class(es): ConfigLoginPage
+  - Header/Title Context: Login Failed
+  - File Size: 12.12 KB
+  - Detailed Description: Dedicated login page for project managers (config users) to enter credentials and access the manager administrative dashboard.
+
+SCREEN #15: config_mat_sub_cat.dart
+  - Widget Class(es): MatlsSubCat, _ReferenceText
+  - Header/Title Context: Confirm Save
+  - File Size: 21.34 KB
+  - Detailed Description: Allows managers to customize material sub-categories (e.g. concrete grades, steel gauges) under main categories.
+
+SCREEN #16: config_material_information.dart
+  - Widget Class(es): MaterialInfoScreen
+  - Header/Title Context: Quantity: ${material[
+  - File Size: 86.96 KB
+  - Detailed Description: Enables managers to view, update, add, or delete global material listings, unit rates, and category assignments.
+
+SCREEN #17: config_materialavailability.dart
+  - Widget Class(es): MaterialAvailability
+  - Header/Title Context: Edit Count
+  - File Size: 41.12 KB
+  - Detailed Description: Allows managers to adjust inventory stock counts, track availability status, and modify threshold indicators.
+
+SCREEN #18: config_materials.dart
+  - Widget Class(es): ConfigMaterialsScreen
+  - Header/Title Context: ID: $id
+  - File Size: 20.78 KB
+  - Detailed Description: Administrative page for configuring the master list of construction materials available to the organization.
+
+SCREEN #19: contact_support_screen.dart
+  - Widget Class(es): ContactSupportScreen
+  - Header/Title Context: Thank you for being with us!
+  - File Size: 10.86 KB
+  - Detailed Description: Enables users to send support queries, view help center numbers, and submit support tickets directly to customer service.
+
+SCREEN #20: contractor_entry_page.dart
+  - Widget Class(es): ContractorEntryPage
+  - Header/Title Context: Select contractor, project field, date and site ID
+  - File Size: 57.61 KB
+  - Detailed Description: Allows managers to record contractor details, project field metrics, dates, and link performance to a specific site.
+
+SCREEN #21: contractor_page.dart
+  - Widget Class(es): ContractorPage
+  - Header/Title Context: Cancel
+  - File Size: 16.78 KB
+  - Firestore Collections: contractors
+  - Detailed Description: Manages contractor listing records, allowing addition of new contracting companies, contact info, and trade descriptions.
+
+SCREEN #22: contractor_report_page.dart
+  - Widget Class(es): ContractorReportPage
+  - Header/Title Context: Report Parameters
+  - File Size: 17.82 KB
+  - Detailed Description: Generates work and payment reports for individual contractors based on select date ranges and site codes.
+
+SCREEN #23: customer_dashboard.dart
+  - Widget Class(es): CustomerDashboardPage
+  - Header/Title Context: Confirm Logout
+  - File Size: 18.22 KB
+  - Detailed Description: An end-client portal giving clients clear insight into project phases, site photo uploads, and completed milestones.
+
+SCREEN #24: customer_insight_dashboard.dart
+  - Widget Class(es): CustomerWorkProgress
+  - Header/Title Context: Project Insights
+  - File Size: 8.30 KB
+  - Detailed Description: A customized dashboard showing the financial status, progress charts, and supervisor entries to the client.
+
+SCREEN #25: customer_insights_screen.dart
+  - Widget Class(es): CustomerInsightsScreen
+  - Header/Title Context: Please select a date
+  - File Size: 25.79 KB
+  - Detailed Description: Allows customer users to pick dates and view detailed progress reviews, site supervisor notes, and daily summaries.
+
+SCREEN #26: customer_login_page.dart
+  - Widget Class(es): CustomerLoginPage
+  - Header/Title Context: N/A
+  - File Size: 11.36 KB
+  - Detailed Description: Login page specifically tailored for customer accounts, linking them directly to their specific project tracking page.
+
+SCREEN #27: customer_project_details.dart
+  - Widget Class(es): ProjectDetailsPage, MyApp, ProjectListPage
+  - Header/Title Context: Error loading project
+  - File Size: 21.47 KB
+  - Detailed Description: Provides customers with detailed lists of works, contractor summaries, and contract specifications for their site.
+
+SCREEN #28: customer_project_financial_statusreport.dart
+  - Widget Class(es): customerProjectFinancialStatusReportPage
+  - Header/Title Context: N/A
+  - File Size: 9.03 KB
+  - Detailed Description: Displays high-level contract values, payments made, and outstanding billing status reports to the customer.
+
+SCREEN #29: customer_site_status_report.dart
+  - Widget Class(es): Customerprojectinsightscreen
+  - Header/Title Context: Please select a project stage.
+  - File Size: 19.75 KB
+  - Detailed Description: Enables customer accounts to view project phase completion summaries, pending work blocks, and notes from site inspections.
+
+SCREEN #30: customer_worker_details.dart
+  - Widget Class(es): CustomerWorkerDetails
+  - Header/Title Context: No worker data found
+  - File Size: 18.47 KB
+  - Detailed Description: Gives customer views of daily worker allocation summaries on their site without showing confidential payroll data.
+
+SCREEN #31: customer_workers_summary.dart
+  - Widget Class(es): CustomerWorkersSummary
+  - Header/Title Context: Filter Reports
+  - File Size: 21.87 KB
+  - Detailed Description: Displays a summary list of worker categories (skilled, unskilled, helpers) present on the customer's project site.
+
+SCREEN #32: daily_site_report.dart
+  - Widget Class(es): DailySiteExpensesReportPage
+  - Header/Title Context: Site Supervisor Entries
+  - File Size: 26.87 KB
+  - Detailed Description: Generates a detailed summary of all site supervisor daily entries, compiled into a printable/exportable layout.
+
+SCREEN #33: financial_status_report.dart
+  - Widget Class(es): FinancialStatusReportPage
+  - Header/Title Context: Client Name
+  - File Size: 18.30 KB
+  - Detailed Description: Generates detailed balance sheets, cashflow reports, and overall payout summaries of the organization's sites.
+
+SCREEN #34: incentive_calculation.dart
+  - Widget Class(es): IncentiveCalculation
+  - Header/Title Context: Calculate Incentives
+  - File Size: 12.74 KB
+  - Detailed Description: Enables managers to process worker performance incentives based on site attendance, tasks completed, and targets met.
+
+SCREEN #35: incentive_calculation_sheet.dart
+  - Widget Class(es): IncentiveCalculationSheet
+  - Header/Title Context: Unsaved Changes
+  - File Size: 33.19 KB
+  - Detailed Description: A spreadsheet-like layout showing incentive rates, target criteria, calculations, and confirmation buttons.
+
+SCREEN #36: insights_dashboard.dart
+  - Widget Class(es): InsightsDashboard
+  - Header/Title Context: Analytics & Reports
+  - File Size: 7.02 KB
+  - Detailed Description: Visual data charts representing financial status, expenses, and project timelines across all active organization sites.
+
+SCREEN #37: join_by_referral_page.dart
+  - Widget Class(es): JoinByReferralPage
+  - Header/Title Context: Join Organization
+  - File Size: 8.01 KB
+  - Detailed Description: Allows new staff to input organization referral keys and create linked manager or supervisor profile accounts.
+
+SCREEN #38: labour_config_page.dart
+  - Widget Class(es): LabourConfigPage
+  - Header/Title Context: Labour Config
+  - File Size: 4.70 KB
+  - Detailed Description: Administrative page to configure labor wage rates, roles (mason, helper, carpenter), and standard overtime rates.
+
+SCREEN #39: labour_screen.dart
+  - Widget Class(es): LabourScreen
+  - Header/Title Context: Confirm Update
+  - File Size: 34.26 KB
+  - Detailed Description: Master panel for managing the workers database, tracking worker credentials, verification details, and active status.
+
+SCREEN #40: landing_page.dart
+  - Widget Class(es): LandingPage
+  - Header/Title Context: Manage Your Projects\nLike a Pro
+  - File Size: 14.55 KB
+  - Detailed Description: The main visual landing page offering clean routes to login, registration, and referral code enrollment pathways.
+
+SCREEN #41: main_dashboard.dart
+  - Widget Class(es): MainDashboard
+  - Header/Title Context: Select your role to continue
+  - File Size: 16.10 KB
+  - Firestore Collections: admin, organisation
+  - Detailed Description: Initial role selector screen prompting users to select their log-in profile (Organization, Manager, Supervisor, Customer).
+
+SCREEN #42: manager_approval_screen.dart
+  - Widget Class(es): ManagerApprovalScreen, _RowInfo, _LabourRequirementCard
+  - Header/Title Context: Project Info
+  - File Size: 57.25 KB
+  - Detailed Description: Enables managers to approve or reject daily site schedule requests and labor allocation updates sent by supervisors.
+
+SCREEN #43: manager_config_screen.dart
+  - Widget Class(es): ManagerConfigScreen
+  - Header/Title Context: ${data[
+  - File Size: 24.95 KB
+  - Detailed Description: Allows organization owners to invite, configure, edit, or delete manager profiles and permissions.
+
+SCREEN #44: manager_expenses.dart
+  - Widget Class(es): ManagerExpenses
+  - Header/Title Context: Please fill all bill fields
+  - File Size: 33.44 KB
+  - Detailed Description: Allows managers to log their operational expenditures, upload receipts, and check reimbursement approval status.
+
+SCREEN #45: manager_expenses_homescreen.dart
+  - Widget Class(es): ManagerExpensesHomeScreen
+  - Header/Title Context: N/A
+  - File Size: 3.47 KB
+  - Detailed Description: Home dashboard for managers to oversee their claims history, pending vouchers, and approved amounts.
+
+SCREEN #46: manager_material_approval_screen.dart
+  - Widget Class(es): ManagerMaterialApprovalScreen
+  - Header/Title Context: ${materials[i][
+  - File Size: 15.00 KB
+  - Detailed Description: Allows project managers to view site supervisor material requisition requests and approve, edit, or reject them.
+
+SCREEN #47: manager_site_entry_page.dart
+  - Widget Class(es): ManagerSiteEntryPage
+  - Header/Title Context: Confirm Entry
+  - File Size: 66.64 KB
+  - Detailed Description: Dedicated manager panel to make manual corrections or initial entries for site records, work counts, and delays.
+
+SCREEN #48: material_at_site_entry_page.dart
+  - Widget Class(es): MaterialAtSiteEntryPage
+  - Header/Title Context: No dates available for update
+  - File Size: 49.99 KB
+  - Detailed Description: Enables site supervisors to log material deliveries, record challan details, upload receipt photos, and log material consumption.
+
+SCREEN #49: material_report.dart
+  - Widget Class(es): MaterialReportPage
+  - Header/Title Context: Inventory Insights
+  - File Size: 10.52 KB
+  - Detailed Description: Displays aggregated material consumption graphs, stock status alerts, and procurement costs across sites.
+
+SCREEN #50: material_request_form.dart
+  - Widget Class(es): MaterialRequestForm
+  - Header/Title Context: Request Submitted
+  - File Size: 34.18 KB
+  - Detailed Description: Interactive requisition form for supervisors to submit supply requests for concrete, steel, bricks, etc., to the manager.
+
+SCREEN #51: material_screen.dart
+  - Widget Class(es): MaterialScreen
+  - Header/Title Context: Name already exists
+  - File Size: 22.05 KB
+  - Detailed Description: Main inventory panel listing material inventory categories, sub-items, and central stock thresholds.
+
+SCREEN #52: notification_page.dart
+  - Widget Class(es): NotificationPage
+  - Header/Title Context: Request #${data[
+  - File Size: 14.92 KB
+  - Firestore Collections: siteMaterialsRequest
+  - Detailed Description: Displays push alerts, approvals feed, system alerts, and notification histories for standard staff roles.
+
+SCREEN #53: org_information_screen.dart
+  - Widget Class(es): OrgInformationScreen
+  - Header/Title Context: Failed to load organisation info
+  - File Size: 6.59 KB
+  - Detailed Description: Displays organization profile metrics, registration credentials, database IDs, and account details.
+
+SCREEN #54: org_menu_screen.dart
+  - Widget Class(es): OrgMenuScreen
+  - Header/Title Context: Referral Program
+  - File Size: 20.34 KB
+  - Detailed Description: Main navigation menu list for organizations, offering links to settings, branding, support, and subscription plans.
+
+SCREEN #55: org_notification_page.dart
+  - Widget Class(es): OrgNotificationPage
+  - Header/Title Context: All Caught Up!
+  - File Size: 8.69 KB
+  - Detailed Description: Consolidated notification and alerts management center for organization administrators.
+
+SCREEN #56: org_reset_password_screen.dart
+  - Widget Class(es): OrgResetPasswordScreen
+  - Header/Title Context: Change Your Password
+  - File Size: 6.93 KB
+  - Detailed Description: Allows logged-in organization owners to update their access password securely.
+
+SCREEN #57: org_site_payment_screen.dart
+  - Widget Class(es): SitePaymentScreen
+  - Header/Title Context: Failed to load project stages
+  - File Size: 37.37 KB
+  - Detailed Description: Provides organization owners with tools to process contractor payments, wage payouts, and log bank transaction receipts.
+
+SCREEN #58: org_site_supervisor_dailyWeek_report.dart
+  - Widget Class(es): DailySitePaymentReportScreen
+  - Header/Title Context: Failed to load site data
+  - File Size: 26.48 KB
+  - Detailed Description: Compiles supervisor field reports into daily and weekly visual tables for administrative overview.
+
+SCREEN #59: org_sub_menu_screen.dart
+  - Widget Class(es): OrgSubMenuScreen
+  - Header/Title Context: Tap to continue
+  - File Size: 6.49 KB
+  - Detailed Description: Sub-navigation grid providing quick access to helper functions, support, and system specifications.
+
+SCREEN #60: org_subscription_page.dart
+  - Widget Class(es): OrganizationSubscriptionPage
+  - Header/Title Context: Plan Features
+  - File Size: 8.43 KB
+  - Detailed Description: Shows current SaaS plan info, expiration dates, billing cycles, and options to upgrade or renew subscriptions.
+
+SCREEN #61: organisation_landing_page.dart
+  - Widget Class(es): OrganisationLandingPage
+  - Header/Title Context: Streamlining Construction Excellence
+  - File Size: 13.82 KB
+  - Detailed Description: Dynamic welcome splash presenting system capability highlights and registration hooks for new businesses.
+
+SCREEN #62: organization_expenses.dart
+  - Widget Class(es): OrganizationExpenses
+  - Header/Title Context: Confirm Submission
+  - File Size: 31.98 KB
+  - Detailed Description: Allows corporate administrators to record corporate overheads, office expenses, taxes, and software costs.
+
+SCREEN #63: organization_insights_screen.dart
+  - Widget Class(es): OrganizationInsightsScreen
+  - Header/Title Context: Please select a date
+  - File Size: 21.16 KB
+  - Detailed Description: Renders organizational analytics charts detailing cumulative spending, project counts, and team statistics.
+
+SCREEN #64: organization_site_entry.dart
+  - Widget Class(es): OrganizationSiteEntry
+  - Header/Title Context: Confirm Entry
+  - File Size: 51.32 KB
+  - Detailed Description: Enables organization owners to insert daily site operational entries, track progress logs, and register delays.
+
+SCREEN #65: overall_report_pdf_helper.dart
+  - Widget Class(es): None
+  - Header/Title Context: Grand Total Payout:
+  - File Size: 4.68 KB
+  - Detailed Description: Under-the-hood class rendering complete project summary reports, financial charts, and print assets to PDF.
+
+SCREEN #66: pdf_preview_page.dart
+  - Widget Class(es): PdfPreviewPage
+  - Header/Title Context: N/A
+  - File Size: 1.04 KB
+  - Detailed Description: A wrapper screen showing layout previews of generated PDF reports, enabling sharing, downloading, or physical printing.
+
+SCREEN #67: pricing_screen.dart
+  - Widget Class(es): PricingScreen
+  - Header/Title Context: Registration Successful!
+  - File Size: 29.35 KB
+  - Firestore Collections: data, organisation, organizationUser
+  - Detailed Description: Presents SaaS tier pricing matrices (Free, Silver, Gold, Platinum) with feature checklists, starting checkout flows.
+
+SCREEN #68: projectStage_expenses_reportpage.dart
+  - Widget Class(es): ProjectStageExpensesReportPage
+  - Header/Title Context: N/A
+  - File Size: 10.70 KB
+  - Detailed Description: Provides granular cost breakdowns grouped by specific project development stages (e.g. Foundation, Plinth, Slab).
+
+SCREEN #69: projectStage_insights_dashboard.dart
+  - Widget Class(es): ProjectstageInsightsDashboard
+  - Header/Title Context: No supervisor entries found.
+  - File Size: 38.81 KB
+  - Detailed Description: Analytical charts representing completion percentages, schedule variations, and labor usage by stage.
+
+SCREEN #70: projectStage_site_summary_report.dart
+  - Widget Class(es): ProjectstageSiteSummaryReport
+  - Header/Title Context: N/A
+  - File Size: 12.68 KB
+  - Detailed Description: Displays stage-level progress summaries, contractor lists, and timelines for selected sites.
+
+SCREEN #71: project_category_screen.dart
+  - Widget Class(es): ProjectCategoryScreen
+  - Header/Title Context: Add New Category
+  - File Size: 14.34 KB
+  - Detailed Description: Configures project category groups (e.g. Residential, Commercial, Infrastructure) to organize contracts.
+
+SCREEN #72: project_contract_screen.dart
+  - Widget Class(es): ProjectContractScreen
+  - Header/Title Context: Delete Contract Type
+  - File Size: 14.09 KB
+  - Detailed Description: Enables creation and editing of contract types, payment terms (item-rate, lumpsum, percentage), and agreements.
+
+SCREEN #73: project_financial_status_report_page.dart
+  - Widget Class(es): ProjectFinancialStatusReportPage
+  - Header/Title Context: Select a site to generate comprehensive financial and performance analytics.
+  - File Size: 7.35 KB
+  - Detailed Description: Provides comprehensive cost tracking, comparing estimated budgets against actual spend at the project level.
+
+SCREEN #74: project_indicator.dart
+  - Widget Class(es): ProjectIndicatorPage
+  - Header/Title Context: N/A
+  - File Size: 9.23 KB
+  - Detailed Description: Displays critical health status indicators (cost variance, schedule variance) for active projects.
+
+SCREEN #75: project_screen.dart
+  - Widget Class(es): ProjectScreen
+  - Header/Title Context: Is Contract Work
+  - File Size: 86.76 KB
+  - Detailed Description: Administrative dashboard to add, edit, or archive project master profiles, client details, and budgets.
+
+SCREEN #76: project_setup_wizard.dart
+  - Widget Class(es): ProjectSetupWizard
+  - Header/Title Context: Success!
+  - File Size: 62.36 KB
+  - Detailed Description: Multi-step setup flow guiding users through project initialization: project info, stages, materials, and supervisor assignment.
+
+SCREEN #77: project_stage_config.dart
+  - Widget Class(es): ProjectStageConfig
+  - Header/Title Context: Add New Stage
+  - File Size: 18.37 KB
+  - Detailed Description: Allows users to add, re-order, and define scope items for various construction stages.
+
+SCREEN #78: project_sub_category_screen.dart
+  - Widget Class(es): ProjectSubCategoryScreen
+  - Header/Title Context: Add New Sub Category
+  - File Size: 14.41 KB
+  - Detailed Description: Defines sub-categories under main project groups to facilitate precise task reporting.
+
+SCREEN #79: projectstage_daily_site_report.dart
+  - Widget Class(es): ProjectStageDailySiteExpensesReportPage
+  - Header/Title Context: No records found for this date
+  - File Size: 21.24 KB
+  - Detailed Description: Generates progress reports detailing daily accomplishments, workforce levels, and delay causes per project stage.
+
+SCREEN #80: reset_password_screen.dart
+  - Widget Class(es): ResetPasswordScreen
+  - Header/Title Context: Please wait a few seconds before trying again.
+  - File Size: 7.46 KB
+  - Detailed Description: Retrieves user email inputs to trigger a secure reset-password link from Firebase Auth.
+
+SCREEN #81: site_contractor_entry_page.dart
+  - Widget Class(es): SiteContractorEntryPage
+  - Header/Title Context: Select contractor, project field, date and site ID
+  - File Size: 34.50 KB
+  - Detailed Description: Allows supervisors to input work measurements completed by contractors on site for quantity billing.
+
+SCREEN #82: site_entry_page.dart
+  - Widget Class(es): SiteEntryPage
+  - Header/Title Context: Missing site code, date, or supervisor ID!
+  - File Size: 96.90 KB
+  - Firestore Collections: labours, materialCategories, materials, organisation, projectStages, siteSupervisorMap
+  - Detailed Description: Master field entry screen for supervisors to record daily labor headcounts, progress comments, and weather conditions.
+
+SCREEN #83: site_expenses_reportpage.dart
+  - Widget Class(es): SiteExpensesReportPage
+  - Header/Title Context: Site Expenses Report
+  - File Size: 37.47 KB
+  - Detailed Description: Displays localized financial logs compiling site-level material purchases, local transport costs, and petty cash logs.
+
+SCREEN #84: site_screen.dart
+  - Widget Class(es): SiteScreen
+  - Header/Title Context: Site Details
+  - File Size: 36.81 KB
+  - Detailed Description: Displays site profiles, site codes, supervisor tags, active stages, and geofencing coordinates.
+
+SCREEN #85: site_status_report.dart
+  - Widget Class(es): SiteStatusReportScreen
+  - Header/Title Context: Track project status and financial health. Select a status to generate a detailed analytics report.
+  - File Size: 7.38 KB
+  - Detailed Description: Main selection screen to filter sites by health status (on-track, delayed, critical) and launch status reports.
+
+SCREEN #86: site_status_reportPage.dart
+  - Widget Class(es): SiteStatusReportPage, _ExpandableSiteTile, _InfoRow, _FinancialInfoCard
+  - Header/Title Context: $status Sites
+  - File Size: 19.30 KB
+  - Detailed Description: Displays detailed cards for sites grouped by status, with links to project managers and stage progression metrics.
+
+SCREEN #87: site_summary_page.dart
+  - Widget Class(es): SiteSummaryPage
+  - Header/Title Context: Site Summary
+  - File Size: 43.57 KB
+  - Detailed Description: Summarizes current progress, materials stock, active workers, and recent supervisor entries for a specific site.
+
+SCREEN #88: site_supervisor_map_screen.dart
+  - Widget Class(es): SiteSupervisorMapScreen
+  - Header/Title Context: Confirm Save
+  - File Size: 44.18 KB
+  - Detailed Description: Renders supervisor locations using Google Maps, allowing visual confirmation of check-ins against site coordinates.
+
+SCREEN #89: site_weekly_financial_report.dart
+  - Widget Class(es): SiteWeeklyFinancialReports
+  - Header/Title Context: No Sites Found
+  - File Size: 14.03 KB
+  - Detailed Description: Compiles weekly spending logs, comparing budget forecasts against actual weekly layouts at each site.
+
+SCREEN #90: site_weekly_financial_report2.dart
+  - Widget Class(es): SiteWeeklyFinancialReport2
+  - Header/Title Context: Financial Report
+  - File Size: 25.03 KB
+  - Detailed Description: Alternative layouts/version of weekly spending summaries showing contractor payout breakdowns.
+
+SCREEN #91: splash_screen.dart
+  - Widget Class(es): SplashScreen
+  - Header/Title Context: Build smarter. Manage better.
+  - File Size: 11.03 KB
+  - Detailed Description: Initial boot page displaying brand animations and routing users based on stored credentials.
+
+SCREEN #92: supervisor_dashboard.dart
+  - Widget Class(es): SupervisorDashboard
+  - Header/Title Context: Confirm Logout
+  - File Size: 18.32 KB
+  - Detailed Description: Main interface for site supervisors, providing direct buttons for attendance, site log, material checks, and tool movements.
+
+SCREEN #93: supervisor_login_page.dart
+  - Widget Class(es): SupervisorLoginPage
+  - Header/Title Context: Login Failed
+  - File Size: 16.87 KB
+  - Detailed Description: Login page tailored to site supervisor credentials, linking them immediately to their assigned field projects.
+
+SCREEN #94: supervisor_material_view_request_screen.dart
+  - Widget Class(es): SupervisorMaterialViewRequestScreen, _FilterChip, _RequestCard, _InfoRow, _MaterialItem
+  - Header/Title Context: Firestore is not initialized. Please re-login.
+  - File Size: 25.93 KB
+  - Detailed Description: Enables supervisors to track their material requisition histories, approval statuses, and notes from managers.
+
+SCREEN #95: supervisor_tool_movement.dart
+  - Widget Class(es): SiteToCompanyReturn, _AvailableCountWithWarning
+  - Header/Title Context: Please select a tool
+  - File Size: 23.10 KB
+  - Detailed Description: Allows supervisors to transfer site tools and machinery back to the company storage or to other sites.
+
+SCREEN #96: supervisor_verification_page.dart
+  - Widget Class(es): SupervisorVerificationPage
+  - Header/Title Context: Verification Failed
+  - File Size: 18.47 KB
+  - Detailed Description: Verification screen validating supervisor active registration details and device keys.
+
+SCREEN #97: supervisor_view_request_screen.dart
+  - Widget Class(es): ViewApprovalScreen, ApprovalList, ApprovalCard
+  - Header/Title Context: Firestore is not initialized. Please re-login.
+  - File Size: 20.26 KB
+  - Detailed Description: Displays pending and historic schedule requests submitted by the supervisor for approval.
+
+SCREEN #98: supervisor_work_schedule_page.dart
+  - Widget Class(es): SupervisorWorkSchedulePage
+  - Header/Title Context: Submit for Approval
+  - File Size: 53.77 KB
+  - Detailed Description: Allows site supervisors to schedule labor plans, target stage milestones, and request work approvals for upcoming days.
+
+SCREEN #99: supervisor_worker_att_page.dart
+  - Widget Class(es): AttendanceManagementPage
+  - Header/Title Context: Error loading sites. Please check connection.
+  - File Size: 31.94 KB
+  - Detailed Description: Allows supervisors to log daily attendance (present, absent, half-day) and overtime hours for site workers.
+
+SCREEN #100: tools_inventory_details.dart
+  - Widget Class(es): ToolsInventoryDetailsPage
+  - Header/Title Context: Distribution by Site
+  - File Size: 16.94 KB
+  - Detailed Description: Lists details of company machinery, equipment distribution across different sites, and maintenance status.
+
+SCREEN #101: tools_inventory_report.dart
+  - Widget Class(es): ToolsInventoryPage, _SummaryCard, _ToolInventoryCard, _InventoryBadge
+  - Header/Title Context: No tools found for 
+  - File Size: 16.95 KB
+  - Detailed Description: Aggregates inventory reports showing available stocks, active site locations, and tool movements.
+
+SCREEN #102: tools_master_page.dart
+  - Widget Class(es): ToolMasterPage
+  - Header/Title Context: Add New Tool
+  - File Size: 22.09 KB
+  - Firestore Collections: tools
+  - Detailed Description: Administrative panel to register new company tools, equipment IDs, descriptions, and purchase rates.
+
+SCREEN #103: tools_movement_page.dart
+  - Widget Class(es): ToolsMovementPage, _AvailableCountWithWarning
+  - Header/Title Context: Please select a tool
+  - File Size: 46.62 KB
+  - Detailed Description: Allows managers to register equipment dispatch, track site assignments, and record returns.
+
+SCREEN #104: vehicle_config_page.dart
+  - Widget Class(es): AddVehicleLogPage
+  - Header/Title Context: Loading data...
+  - File Size: 42.02 KB
+  - Detailed Description: Enables configuration of company vehicle records, registering vehicle numbers, model types, and registration limits.
+
+SCREEN #105: vehicle_details_page.dart
+  - Widget Class(es): VehicleDetailsPage
+  - Header/Title Context: Delete Vehicle
+  - File Size: 25.07 KB
+  - Detailed Description: Detailed profile viewer for company vehicles, showing driver assignments, maintenance logs, and logs history.
+
+SCREEN #106: vehicle_driver_config_page.dart
+  - Widget Class(es): VehicleDriverConfigPage
+  - Header/Title Context: Delete Driver
+  - File Size: 19.78 KB
+  - Detailed Description: Allows administrators to configure vehicle drivers, license details, contact numbers, and assignments.
+
+SCREEN #107: vehicle_inventory_page.dart
+  - Widget Class(es): VehicleInventoryReportPage
+  - Header/Title Context: By Date
+  - File Size: 16.04 KB
+  - Detailed Description: Tracks company fleet locations, fuel consumption reports, logbook metrics, and driver tasks.
+
+SCREEN #108: vehicle_inventory_pdf.dart
+  - Widget Class(es): None
+  - Header/Title Context: N/A
+  - File Size: 4.98 KB
+  - Detailed Description: Generates print-ready PDF summaries of the vehicle fleet status, fuel logs, and active tasks.
+
+SCREEN #109: welcome_screen.dart
+  - Widget Class(es): WelcomeScreen
+  - Header/Title Context: Join Organization
+  - File Size: 8.44 KB
+  - Detailed Description: Core entry screen letting users login, start a new organization signup, or join via invite/referral codes.
+
+SCREEN #110: worker_calendar_availability_page.dart
+  - Widget Class(es): WorkerCalendarAvailabilityPage
+  - Header/Title Context: N/A
+  - File Size: 15.58 KB
+  - Detailed Description: Allows workers or supervisors to update worker availability on calendar blocks to plan weekly shifts.
+
+SCREEN #111: worker_report_pdf_helper.dart
+  - Widget Class(es): None
+  - Header/Title Context: Monthly Summary
+  - File Size: 6.30 KB
+  - Detailed Description: Generates PDF salary slips, attendance records, and wage sheets for site workers.
+
+SCREEN #112: worker_summary_report_page.dart
+  - Widget Class(es): WorkerAttendanceSalaryPage
+  - Header/Title Context: No workers found
+  - File Size: 23.57 KB
+  - Detailed Description: Aggregates monthly labor attendance sheets, total wages, advances paid, and net payouts due.
+
+SCREEN #113: workers_availability_report_page.dart
+  - Widget Class(es): WorkersAvailabilityReportPage
+  - Header/Title Context: Site
+  - File Size: 15.13 KB
+  - Detailed Description: Summarizes available labor counts grouped by skill tags and active sites for manager staffing plans.
+
+SCREEN #114: workers_config_page.dart
+  - Widget Class(es): WorkersConfigPage
+  - Header/Title Context: Please fill all required fields
+  - File Size: 26.12 KB
+  - Detailed Description: Allows managers to add workers, upload identity documents, verify bank info, and set standard wages.
+
+SCREEN #115: workers_site_mapping_page.dart
+  - Widget Class(es): WorkerMappingPage
+  - Header/Title Context: Please select a worker first
+  - File Size: 28.06 KB
+  - Detailed Description: Enables managers to map workers to specific construction sites and assign task managers.

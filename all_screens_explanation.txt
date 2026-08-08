@@ -1,0 +1,704 @@
+================================================================================
+                 CST WHITE-LABEL APP - ALL SCREENS EXPLANATION
+================================================================================
+Total Screens Identified: 115
+
+1. ConstructionDocuments.dart
+   - Class Name(s): ConstructionDocuments
+   - Screen Title / Header: Site Selection
+   - Size: 19.07 KB
+   - Firestore Collections: siteDrawings
+   - Description: Provides general application UI controls and content view pages.
+
+2. Organisation_LoginPage.dart
+   - Class Name(s): Organisation_LoginPage
+   - Screen Title / Header: Forgot Password?
+   - Size: 15.86 KB
+   - Firestore Collections: organisation, organizationUser
+   - Description: Handles user authentication, credentials validation, and role-based navigation after sign-in.
+
+3. Organisation_RegistrationPage.dart
+   - Class Name(s): OrganisationRegistrationPage
+   - Screen Title / Header: Link copied to clipboard!
+   - Size: 25.47 KB
+   - Description: Manages organization registration flow, setup steps, and saving tenant metadata to Firestore.
+
+4. Organization_Dashboard.dart
+   - Class Name(s): OrganizationDashboard
+   - Screen Title / Header: N/A
+   - Size: 21.79 KB
+   - Description: Main control panel showing quick access statistics, reports, settings, and navigation.
+
+5. Site_Supervisor_Config.dart
+   - Class Name(s): SiteSupervisorConfig
+   - Screen Title / Header: Edit Supervisor
+   - Size: 47.55 KB
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+6. Supervisor_material_information.dart
+   - Class Name(s): SupervisorMaterialInfoScreen
+   - Screen Title / Header: Quantity: ${material[
+   - Size: 64.45 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+7. WebViewScreen.dart
+   - Class Name(s): ConstructionDocuments, WebViewScreen
+   - Screen Title / Header: Construction Documents
+   - Size: 14.96 KB
+   - Firestore Collections: siteDrawings
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+8. about_us_screen.dart
+   - Class Name(s): AboutUsScreen
+   - Screen Title / Header: eBicks App
+   - Size: 10.98 KB
+   - Description: Displays details about the application version, developer credits, and company profile.
+
+9. account_settings_screen.dart
+   - Class Name(s): AccountSettingsScreen
+   - Screen Title / Header: Brand Color
+   - Size: 6.75 KB
+   - Description: Provides general application UI controls and content view pages.
+
+10. branding_edit_screen.dart
+   - Class Name(s): BrandingEditScreen
+   - Screen Title / Header: Pick a color
+   - Size: 14.84 KB
+   - Description: Configures custom app branding, color theme updates, app title, and custom logo upload.
+
+11. branding_screen.dart
+   - Class Name(s): BrandingScreen
+   - Screen Title / Header: Pick a color
+   - Size: 32.37 KB
+   - Firestore Collections: organisation
+   - Description: Configures custom app branding, color theme updates, app title, and custom logo upload.
+
+12. config_account_dashboard.dart
+   - Class Name(s): ConfigAccountDashboard
+   - Screen Title / Header: Logout
+   - Size: 26.31 KB
+   - Description: Main control panel showing quick access statistics, reports, settings, and navigation.
+
+13. config_layout_and_drawing.dart
+   - Class Name(s): LayoutAndDrawingsPage
+   - Screen Title / Header: Document uploaded successfully!
+   - Size: 35.19 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+14. config_login.dart
+   - Class Name(s): ConfigLoginPage
+   - Screen Title / Header: Login Failed
+   - Size: 12.12 KB
+   - Description: Handles user authentication, credentials validation, and role-based navigation after sign-in.
+
+15. config_mat_sub_cat.dart
+   - Class Name(s): MatlsSubCat, _ReferenceText
+   - Screen Title / Header: Confirm Save
+   - Size: 21.34 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+16. config_material_information.dart
+   - Class Name(s): MaterialInfoScreen
+   - Screen Title / Header: Quantity: ${material[
+   - Size: 86.96 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+17. config_materialavailability.dart
+   - Class Name(s): MaterialAvailability
+   - Screen Title / Header: Edit Count
+   - Size: 41.12 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+18. config_materials.dart
+   - Class Name(s): ConfigMaterialsScreen
+   - Screen Title / Header: ID: $id
+   - Size: 20.78 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+19. contact_support_screen.dart
+   - Class Name(s): ContactSupportScreen
+   - Screen Title / Header: Thank you for being with us!
+   - Size: 10.86 KB
+   - Description: Displays client support contact channels, help text, and submission forms.
+
+20. contractor_entry_page.dart
+   - Class Name(s): ContractorEntryPage
+   - Screen Title / Header: Select contractor, project field, date and site ID
+   - Size: 57.61 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+21. contractor_page.dart
+   - Class Name(s): ContractorPage
+   - Screen Title / Header: Cancel
+   - Size: 16.78 KB
+   - Firestore Collections: contractors
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+22. contractor_report_page.dart
+   - Class Name(s): ContractorReportPage
+   - Screen Title / Header: Report Parameters
+   - Size: 17.82 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+23. customer_dashboard.dart
+   - Class Name(s): CustomerDashboardPage
+   - Screen Title / Header: Confirm Logout
+   - Size: 18.22 KB
+   - Description: Dashboard for clients / customers to view progress, status updates, reports, and payments.
+
+24. customer_insight_dashboard.dart
+   - Class Name(s): CustomerWorkProgress
+   - Screen Title / Header: Project Insights
+   - Size: 8.30 KB
+   - Description: Dashboard for clients / customers to view progress, status updates, reports, and payments.
+
+25. customer_insights_screen.dart
+   - Class Name(s): CustomerInsightsScreen
+   - Screen Title / Header: Please select a date
+   - Size: 25.79 KB
+   - Description: Provides general application UI controls and content view pages.
+
+26. customer_login_page.dart
+   - Class Name(s): CustomerLoginPage
+   - Screen Title / Header: N/A
+   - Size: 11.36 KB
+   - Description: Handles user authentication, credentials validation, and role-based navigation after sign-in.
+
+27. customer_project_details.dart
+   - Class Name(s): ProjectDetailsPage, MyApp, ProjectListPage
+   - Screen Title / Header: Error loading project
+   - Size: 21.47 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+28. customer_project_financial_statusreport.dart
+   - Class Name(s): customerProjectFinancialStatusReportPage
+   - Screen Title / Header: N/A
+   - Size: 9.03 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+29. customer_site_status_report.dart
+   - Class Name(s): Customerprojectinsightscreen
+   - Screen Title / Header: Please select a project stage.
+   - Size: 19.75 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+30. customer_worker_details.dart
+   - Class Name(s): CustomerWorkerDetails
+   - Screen Title / Header: No worker data found
+   - Size: 18.47 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+31. customer_workers_summary.dart
+   - Class Name(s): CustomerWorkersSummary
+   - Screen Title / Header: Filter Reports
+   - Size: 21.87 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+32. daily_site_report.dart
+   - Class Name(s): DailySiteExpensesReportPage
+   - Screen Title / Header: Site Supervisor Entries
+   - Size: 26.87 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+33. financial_status_report.dart
+   - Class Name(s): FinancialStatusReportPage
+   - Screen Title / Header: Client Name
+   - Size: 18.30 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+34. incentive_calculation.dart
+   - Class Name(s): IncentiveCalculation
+   - Screen Title / Header: Calculate Incentives
+   - Size: 12.74 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+35. incentive_calculation_sheet.dart
+   - Class Name(s): IncentiveCalculationSheet
+   - Screen Title / Header: Unsaved Changes
+   - Size: 33.19 KB
+   - Description: Provides general application UI controls and content view pages.
+
+36. insights_dashboard.dart
+   - Class Name(s): InsightsDashboard
+   - Screen Title / Header: Analytics & Reports
+   - Size: 7.02 KB
+   - Description: Visual analytics dashboard representing project performance, costs, and timeline tracking.
+
+37. join_by_referral_page.dart
+   - Class Name(s): JoinByReferralPage
+   - Screen Title / Header: Join Organization
+   - Size: 8.01 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+38. labour_config_page.dart
+   - Class Name(s): LabourConfigPage
+   - Screen Title / Header: Labour Config
+   - Size: 4.70 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+39. labour_screen.dart
+   - Class Name(s): LabourScreen
+   - Screen Title / Header: Confirm Update
+   - Size: 34.26 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+40. landing_page.dart
+   - Class Name(s): LandingPage
+   - Screen Title / Header: Manage Your Projects\nLike a Pro
+   - Size: 14.55 KB
+   - Description: Provides general application UI controls and content view pages.
+
+41. main_dashboard.dart
+   - Class Name(s): MainDashboard
+   - Screen Title / Header: Select your role to continue
+   - Size: 16.10 KB
+   - Firestore Collections: admin, organisation
+   - Description: Main control panel showing quick access statistics, reports, settings, and navigation.
+
+42. manager_approval_screen.dart
+   - Class Name(s): ManagerApprovalScreen, _RowInfo, _LabourRequirementCard
+   - Screen Title / Header: Project Info
+   - Size: 57.25 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+43. manager_config_screen.dart
+   - Class Name(s): ManagerConfigScreen
+   - Screen Title / Header: ${data[
+   - Size: 24.95 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+44. manager_expenses.dart
+   - Class Name(s): ManagerExpenses
+   - Screen Title / Header: Please fill all bill fields
+   - Size: 33.44 KB
+   - Description: Manages logging, reviewing, and approving project expenditures, site costs, and supplier payments.
+
+45. manager_expenses_homescreen.dart
+   - Class Name(s): ManagerExpensesHomeScreen
+   - Screen Title / Header: N/A
+   - Size: 3.47 KB
+   - Description: Manages logging, reviewing, and approving project expenditures, site costs, and supplier payments.
+
+46. manager_material_approval_screen.dart
+   - Class Name(s): ManagerMaterialApprovalScreen
+   - Screen Title / Header: ${materials[i][
+   - Size: 15.00 KB
+   - Description: Allows managers or admins to approve or reject pending material requests from sites.
+
+47. manager_site_entry_page.dart
+   - Class Name(s): ManagerSiteEntryPage
+   - Screen Title / Header: Confirm Entry
+   - Size: 66.64 KB
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+48. material_at_site_entry_page.dart
+   - Class Name(s): MaterialAtSiteEntryPage
+   - Screen Title / Header: No dates available for update
+   - Size: 49.99 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+49. material_report.dart
+   - Class Name(s): MaterialReportPage
+   - Screen Title / Header: Inventory Insights
+   - Size: 10.52 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+50. material_request_form.dart
+   - Class Name(s): MaterialRequestForm
+   - Screen Title / Header: Request Submitted
+   - Size: 34.18 KB
+   - Description: Handles materials requests and requirements submissions from supervisors for approval.
+
+51. material_screen.dart
+   - Class Name(s): MaterialScreen
+   - Screen Title / Header: Name already exists
+   - Size: 22.05 KB
+   - Description: Manages material inventory, sub-categories, price tracking, and site usage statistics.
+
+52. notification_page.dart
+   - Class Name(s): NotificationPage
+   - Screen Title / Header: Request #${data[
+   - Size: 14.92 KB
+   - Firestore Collections: siteMaterialsRequest
+   - Description: Shows system alerts, approval requests, and operational notifications for the user.
+
+53. org_information_screen.dart
+   - Class Name(s): OrgInformationScreen
+   - Screen Title / Header: Failed to load organisation info
+   - Size: 6.59 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+54. org_menu_screen.dart
+   - Class Name(s): OrgMenuScreen
+   - Screen Title / Header: Referral Program
+   - Size: 20.34 KB
+   - Description: Provides general application UI controls and content view pages.
+
+55. org_notification_page.dart
+   - Class Name(s): OrgNotificationPage
+   - Screen Title / Header: All Caught Up!
+   - Size: 8.69 KB
+   - Description: Shows system alerts, approval requests, and operational notifications for the user.
+
+56. org_reset_password_screen.dart
+   - Class Name(s): OrgResetPasswordScreen
+   - Screen Title / Header: Change Your Password
+   - Size: 6.93 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+57. org_site_payment_screen.dart
+   - Class Name(s): SitePaymentScreen
+   - Screen Title / Header: Failed to load project stages
+   - Size: 37.37 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+58. org_site_supervisor_dailyWeek_report.dart
+   - Class Name(s): DailySitePaymentReportScreen
+   - Screen Title / Header: Failed to load site data
+   - Size: 26.48 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+59. org_sub_menu_screen.dart
+   - Class Name(s): OrgSubMenuScreen
+   - Screen Title / Header: Tap to continue
+   - Size: 6.49 KB
+   - Description: Provides general application UI controls and content view pages.
+
+60. org_subscription_page.dart
+   - Class Name(s): OrganizationSubscriptionPage
+   - Screen Title / Header: Plan Features
+   - Size: 8.43 KB
+   - Description: Provides general application UI controls and content view pages.
+
+61. organisation_landing_page.dart
+   - Class Name(s): OrganisationLandingPage
+   - Screen Title / Header: Streamlining Construction Excellence
+   - Size: 13.82 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+62. organization_expenses.dart
+   - Class Name(s): OrganizationExpenses
+   - Screen Title / Header: Confirm Submission
+   - Size: 31.98 KB
+   - Description: Manages logging, reviewing, and approving project expenditures, site costs, and supplier payments.
+
+63. organization_insights_screen.dart
+   - Class Name(s): OrganizationInsightsScreen
+   - Screen Title / Header: Please select a date
+   - Size: 21.16 KB
+   - Description: Provides general application UI controls and content view pages.
+
+64. organization_site_entry.dart
+   - Class Name(s): OrganizationSiteEntry
+   - Screen Title / Header: Confirm Entry
+   - Size: 51.32 KB
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+65. overall_report_pdf_helper.dart
+   - Class Name(s): None
+   - Screen Title / Header: Grand Total Payout:
+   - Size: 4.68 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+66. pdf_preview_page.dart
+   - Class Name(s): PdfPreviewPage
+   - Screen Title / Header: N/A
+   - Size: 1.04 KB
+   - Description: Provides preview and print tools for reports and tables exported to PDF format.
+
+67. pricing_screen.dart
+   - Class Name(s): PricingScreen
+   - Screen Title / Header: Registration Successful!
+   - Size: 29.35 KB
+   - Firestore Collections: data, organisation, organizationUser
+   - Description: Displays tiered subscription subscription packages (Free, Silver, Gold, Platinum) and starts billing.
+
+68. projectStage_expenses_reportpage.dart
+   - Class Name(s): ProjectStageExpensesReportPage
+   - Screen Title / Header: N/A
+   - Size: 10.70 KB
+   - Description: Manages logging, reviewing, and approving project expenditures, site costs, and supplier payments.
+
+69. projectStage_insights_dashboard.dart
+   - Class Name(s): ProjectstageInsightsDashboard
+   - Screen Title / Header: No supervisor entries found.
+   - Size: 38.81 KB
+   - Description: Visual analytics dashboard representing project performance, costs, and timeline tracking.
+
+70. projectStage_site_summary_report.dart
+   - Class Name(s): ProjectstageSiteSummaryReport
+   - Screen Title / Header: N/A
+   - Size: 12.68 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+71. project_category_screen.dart
+   - Class Name(s): ProjectCategoryScreen
+   - Screen Title / Header: Add New Category
+   - Size: 14.34 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+72. project_contract_screen.dart
+   - Class Name(s): ProjectContractScreen
+   - Screen Title / Header: Delete Contract Type
+   - Size: 14.09 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+73. project_financial_status_report_page.dart
+   - Class Name(s): ProjectFinancialStatusReportPage
+   - Screen Title / Header: Select a site to generate comprehensive financial and performance analytics.
+   - Size: 7.35 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+74. project_indicator.dart
+   - Class Name(s): ProjectIndicatorPage
+   - Screen Title / Header: N/A
+   - Size: 9.23 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+75. project_screen.dart
+   - Class Name(s): ProjectScreen
+   - Screen Title / Header: Is Contract Work
+   - Size: 86.76 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+76. project_setup_wizard.dart
+   - Class Name(s): ProjectSetupWizard
+   - Screen Title / Header: Success!
+   - Size: 62.36 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+77. project_stage_config.dart
+   - Class Name(s): ProjectStageConfig
+   - Screen Title / Header: Add New Stage
+   - Size: 18.37 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+78. project_sub_category_screen.dart
+   - Class Name(s): ProjectSubCategoryScreen
+   - Screen Title / Header: Add New Sub Category
+   - Size: 14.41 KB
+   - Description: Manages overall construction project data, setup wizard, category mappings, and contract files.
+
+79. projectstage_daily_site_report.dart
+   - Class Name(s): ProjectStageDailySiteExpensesReportPage
+   - Screen Title / Header: No records found for this date
+   - Size: 21.24 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+80. reset_password_screen.dart
+   - Class Name(s): ResetPasswordScreen
+   - Screen Title / Header: Please wait a few seconds before trying again.
+   - Size: 7.46 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+81. site_contractor_entry_page.dart
+   - Class Name(s): SiteContractorEntryPage
+   - Screen Title / Header: Select contractor, project field, date and site ID
+   - Size: 34.50 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+82. site_entry_page.dart
+   - Class Name(s): SiteEntryPage
+   - Screen Title / Header: Missing site code, date, or supervisor ID!
+   - Size: 96.90 KB
+   - Firestore Collections: labours, materialCategories, materials, organisation, projectStages, siteSupervisorMap
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+83. site_expenses_reportpage.dart
+   - Class Name(s): SiteExpensesReportPage
+   - Screen Title / Header: Site Expenses Report
+   - Size: 37.47 KB
+   - Description: Manages logging, reviewing, and approving project expenditures, site costs, and supplier payments.
+
+84. site_screen.dart
+   - Class Name(s): SiteScreen
+   - Screen Title / Header: Site Details
+   - Size: 36.81 KB
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+85. site_status_report.dart
+   - Class Name(s): SiteStatusReportScreen
+   - Screen Title / Header: Track project status and financial health. Select a status to generate a detailed analytics report.
+   - Size: 7.38 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+86. site_status_reportPage.dart
+   - Class Name(s): SiteStatusReportPage, _ExpandableSiteTile, _InfoRow, _FinancialInfoCard
+   - Screen Title / Header: $status Sites
+   - Size: 19.30 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+87. site_summary_page.dart
+   - Class Name(s): SiteSummaryPage
+   - Screen Title / Header: Site Summary
+   - Size: 43.57 KB
+   - Description: Provides general application UI controls and content view pages.
+
+88. site_supervisor_map_screen.dart
+   - Class Name(s): SiteSupervisorMapScreen
+   - Screen Title / Header: Confirm Save
+   - Size: 44.18 KB
+   - Description: Handles site creation, operational entries, supervisor assignments, and geofencing configurations.
+
+89. site_weekly_financial_report.dart
+   - Class Name(s): SiteWeeklyFinancialReports
+   - Screen Title / Header: No Sites Found
+   - Size: 14.03 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+90. site_weekly_financial_report2.dart
+   - Class Name(s): SiteWeeklyFinancialReport2
+   - Screen Title / Header: Financial Report
+   - Size: 25.03 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+91. splash_screen.dart
+   - Class Name(s): SplashScreen
+   - Screen Title / Header: Build smarter. Manage better.
+   - Size: 11.03 KB
+   - Description: Initial boot screen checking session token availability and routing to login or dashboard.
+
+92. supervisor_dashboard.dart
+   - Class Name(s): SupervisorDashboard
+   - Screen Title / Header: Confirm Logout
+   - Size: 18.32 KB
+   - Description: Field supervisor's dashboard for quick access to daily tasks, materials logging, and attendance.
+
+93. supervisor_login_page.dart
+   - Class Name(s): SupervisorLoginPage
+   - Screen Title / Header: Login Failed
+   - Size: 16.87 KB
+   - Description: Handles user authentication, credentials validation, and role-based navigation after sign-in.
+
+94. supervisor_material_view_request_screen.dart
+   - Class Name(s): SupervisorMaterialViewRequestScreen, _FilterChip, _RequestCard, _InfoRow, _MaterialItem
+   - Screen Title / Header: Firestore is not initialized. Please re-login.
+   - Size: 25.93 KB
+   - Description: Handles materials requests and requirements submissions from supervisors for approval.
+
+95. supervisor_tool_movement.dart
+   - Class Name(s): SiteToCompanyReturn, _AvailableCountWithWarning
+   - Screen Title / Header: Please select a tool
+   - Size: 23.10 KB
+   - Description: Tracks site machinery, tool movements between locations, and tool inventory status.
+
+96. supervisor_verification_page.dart
+   - Class Name(s): SupervisorVerificationPage
+   - Screen Title / Header: Verification Failed
+   - Size: 18.47 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+97. supervisor_view_request_screen.dart
+   - Class Name(s): ViewApprovalScreen, ApprovalList, ApprovalCard
+   - Screen Title / Header: Firestore is not initialized. Please re-login.
+   - Size: 20.26 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+98. supervisor_work_schedule_page.dart
+   - Class Name(s): SupervisorWorkSchedulePage
+   - Screen Title / Header: Submit for Approval
+   - Size: 53.77 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+99. supervisor_worker_att_page.dart
+   - Class Name(s): AttendanceManagementPage
+   - Screen Title / Header: Error loading sites. Please check connection.
+   - Size: 31.94 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+100. tools_inventory_details.dart
+   - Class Name(s): ToolsInventoryDetailsPage
+   - Screen Title / Header: Distribution by Site
+   - Size: 16.94 KB
+   - Description: Tracks site machinery, tool movements between locations, and tool inventory status.
+
+101. tools_inventory_report.dart
+   - Class Name(s): ToolsInventoryPage, _SummaryCard, _ToolInventoryCard, _InventoryBadge
+   - Screen Title / Header: No tools found for 
+   - Size: 16.95 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+102. tools_master_page.dart
+   - Class Name(s): ToolMasterPage
+   - Screen Title / Header: Add New Tool
+   - Size: 22.09 KB
+   - Firestore Collections: tools
+   - Description: Tracks site machinery, tool movements between locations, and tool inventory status.
+
+103. tools_movement_page.dart
+   - Class Name(s): ToolsMovementPage, _AvailableCountWithWarning
+   - Screen Title / Header: Please select a tool
+   - Size: 46.62 KB
+   - Description: Tracks site machinery, tool movements between locations, and tool inventory status.
+
+104. vehicle_config_page.dart
+   - Class Name(s): AddVehicleLogPage
+   - Screen Title / Header: Loading data...
+   - Size: 42.02 KB
+   - Description: Manages vehicle profiles, driver assignments, inventory updates, and log records.
+
+105. vehicle_details_page.dart
+   - Class Name(s): VehicleDetailsPage
+   - Screen Title / Header: Delete Vehicle
+   - Size: 25.07 KB
+   - Description: Manages vehicle profiles, driver assignments, inventory updates, and log records.
+
+106. vehicle_driver_config_page.dart
+   - Class Name(s): VehicleDriverConfigPage
+   - Screen Title / Header: Delete Driver
+   - Size: 19.78 KB
+   - Description: Manages vehicle profiles, driver assignments, inventory updates, and log records.
+
+107. vehicle_inventory_page.dart
+   - Class Name(s): VehicleInventoryReportPage
+   - Screen Title / Header: By Date
+   - Size: 16.04 KB
+   - Description: Manages vehicle profiles, driver assignments, inventory updates, and log records.
+
+108. vehicle_inventory_pdf.dart
+   - Class Name(s): None
+   - Screen Title / Header: N/A
+   - Size: 4.98 KB
+   - Description: Manages vehicle profiles, driver assignments, inventory updates, and log records.
+
+109. welcome_screen.dart
+   - Class Name(s): WelcomeScreen
+   - Screen Title / Header: Join Organization
+   - Size: 8.44 KB
+   - Description: State-managed screen handling interactive user actions and dynamic data rendering.
+
+110. worker_calendar_availability_page.dart
+   - Class Name(s): WorkerCalendarAvailabilityPage
+   - Screen Title / Header: N/A
+   - Size: 15.58 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+111. worker_report_pdf_helper.dart
+   - Class Name(s): None
+   - Screen Title / Header: Monthly Summary
+   - Size: 6.30 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+112. worker_summary_report_page.dart
+   - Class Name(s): WorkerAttendanceSalaryPage
+   - Screen Title / Header: No workers found
+   - Size: 23.57 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+113. workers_availability_report_page.dart
+   - Class Name(s): WorkersAvailabilityReportPage
+   - Screen Title / Header: Site
+   - Size: 15.13 KB
+   - Description: Generates summary documents and PDF exports for financial, site, labor, or material progress.
+
+114. workers_config_page.dart
+   - Class Name(s): WorkersConfigPage
+   - Screen Title / Header: Please fill all required fields
+   - Size: 26.12 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.
+
+115. workers_site_mapping_page.dart
+   - Class Name(s): WorkerMappingPage
+   - Screen Title / Header: Please select a worker first
+   - Size: 28.06 KB
+   - Description: Tracks labor attendance, wage calculations, schedules, calendar availability, and site mappings.

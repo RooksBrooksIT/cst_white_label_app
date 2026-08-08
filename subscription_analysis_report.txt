@@ -1,0 +1,234 @@
+================================================================================
+          SUBSCRIPTION PLAN SEGREGATION & ACCESS CONTROL RECOMMENDATIONS
+                     FOR CST CONSTRUCTION WHITE-LABEL APP
+================================================================================
+
+1. EXECUTIVE SUMMARY
+---------------------
+This report provides a comprehensive analysis of the existing subscription mechanism in the CST White-Label App codebase. It identifies key architecture gaps, maps out features and modules to separate under different plans (Free Trial, Silver, Gold, Platinum), and outlines a technical path for implementing robust role-based and tier-based access controls.
+
+Currently, the app implements a binary subscription status (Active / Inactive) via the 'isSubscriptionActive' boolean flag. There is no plan-based feature gating or constraint checks (e.g. limiting projects or team members). This document outlines a plan to turn the CST application into a true tiered Software-as-a-Service (SaaS) platform.
+
+
+2. CODE REVIEW & ARCHITECTURE ANALYSIS OF CURRENT IMPLEMENTATION
+------------------------------------------------------------------
+Our analysis of the Flutter application identified the following subscription-related code points:
+
+* lib/services/auth_service.dart:
+  - Implements 'checkSubscriptionStatus()' which queries 'FirestoreService.subscriptionDoc'.
+  - It only validates if 'isSubscriptionActive' is true and if the current time is before 'subscriptionEndDate'.
+  - Access is binary; it does not check or store the specific tier or plan user has purchased.
+
+* lib/services/firestore_service.dart:
+  - Defines 'subscriptionDoc' which points to '/organisation/{orgId}/data/subscription'.
+  - Exposes Firestore references for all modules (projects, sites, labours, materials, expenses, etc.) without any subscription-tier middleware or validation.
+
+* lib/screens/pricing_screen.dart:
+  - Defines UI cards for Free Trial, Silver, Gold, and Platinum plans.
+  - PROBLEM: When registering an organization, the transaction in '_register()' (line 112) writes a hardcoded 'subscriptionPlan': '30 days' to Firestore.
+  - The plan selected by the user ('Free Trial', 'Silver', 'Gold', or 'Platinum') is NOT saved to the database, preventing any downstream enforcement.
+
+* lib/screens/org_subscription_page.dart:
+  - Displays the organization's current plan name, status, and expiry date.
+  - It pulls 'subscriptionPlan' and formats it. However, because this defaults to '30 days' from registration, it does not correctly represent the tier.
+
+* lib/screens/org_menu_screen.dart:
+  - Fetches and displays the subscription plan string. Allows clicking 'Manage Subscription' to navigate to the subscription management page.
+
+* lib/screens/Organization_Dashboard.dart:
+  - Listens to 'FirestoreService.subscriptionDoc' streams in '_startSubscriptionListener()'.
+  - If the subscription is inactive or expired, it force-redirects the user to the subscription page.
+  - However, if active, it displays all dashboard items (Administrative, Finance, Expense, Review, Reports) uniformly, regardless of the plan.
+
+
+3. CRITICAL GAPS & VULNERABILITIES IDENTIFIED
+----------------------------------------------
+1. Hardcoded Plan Values on Registration:
+   Regardless of whether the user chooses a Silver, Gold, or Platinum plan in the UI during registration, Firestore is updated with 'subscriptionPlan': '30 days'. The selected plan and billing details are discarded.
+
+2. Access Control is Only Role-Based, Not Tier-Based:
+   Currently, access is restricted only by roles (Organization, Manager, Supervisor, Customer). Once a tenant has an active subscription, they get the full features of the app, regardless of what they paid.
+
+3. Branding Config is Permitted During Trial:
+   In 'branding_screen.dart' (onboarding step 2) and 'branding_edit_screen.dart', users can freely set custom App Names, primary colors, and logos. Since this is a white-label app, full branding customizability is a high-value enterprise feature that should be locked behind the Platinum tier, but it is currently free for everyone.
+
+4. No Resource Counting or Limits:
+   Tiers like Silver claim to limit "Team Members (3-5)", but there is no code checking user subcollections or restricting manager registrations ('ManagerConfigScreen'). Similarly, there is no code enforcing project or site limits.
+
+5. Client Portal is Accessible to All Tiers:
+   The Customer Dashboard ('customer_dashboard.dart') and its insights allow tenants to share real-time views with clients. This is an advanced workflow that should be restricted to higher plans.
+
+
+4. PROPOSED PLAN-BASED SEGREGATION MATRIX
+------------------------------------------
+Below is the proposed breakdown of feature access and usage limits across the four plans:
+
+Feature / Resource     | Free Trial         | Silver             | Gold                | Platinum
+-----------------------|--------------------|--------------------|---------------------|--------------------
+Monthly Cost           | Free (14 Days)     | Rs 199             | Rs 999              | Rs 1,799
+Max Projects           | 1 Project          | Up to 3 Projects   | Up to 10 Projects   | Unlimited
+Max Active Sites       | 1 Site             | Up to 3 Sites      | Up to 10 Sites      | Unlimited
+Max Managers           | 1 Manager          | Up to 2 Managers   | Up to 5 Managers    | Unlimited
+Max Supervisors        | 1 Supervisor       | Up to 2 Supervisors| Up to 10 Supervisors| Unlimited
+Custom Branding        | Default App Identity| Default App Identity| Default Color Theme | Full White-Label
+                       | (No Customizing)   | (No Customizing)   | (No Custom Logo)    | (Custom Name, Logo, Color)
+Collaborative Workflows| Basic Logging      | Basic Logging      | Request & Approval  | Full Request, Approval
+                       |                    |                    | (Materials, Work)   | & Incentives
+Client Portal Sharing  | Locked             | Locked             | Locked              | Shared Client Views
+Report Exports (PDF)   | Locked             | Locked             | Basic Views Only    | Full PDF Exports
+Advanced Analytics     | Locked             | Locked             | Financial Insights  | Predictive Insights & Maps
+
+
+5. DETAILED SEGREGATION RECOMMENDATIONS BY APP MODULE
+------------------------------------------------------
+To align the app's features with the proposed tiers, separate screens and services into the following boundaries:
+
+* MODULE A: Branding & Personalization
+  - Branding Screen (branding_screen.dart) and Branding Edit Screen (branding_edit_screen.dart):
+    - Restriction: Only allow Platinum subscribers to edit App Name, upload custom logos, and pick custom colors.
+    - Behavior for Free/Silver/Gold: Lock the screens and display a "Upgrade to Platinum to white-label your app" paywall. Force default branding assets.
+
+* MODULE B: Administrative & Team Setup
+  - Manager Configuration Screen (manager_config_screen.dart):
+    - Restriction: Enforce active manager counts. Free (1), Silver (2), Gold (5), Platinum (Unlimited).
+    - If a user tries to create a new manager, verify the current manager document count in Firestore. If the limit is reached, disable the "Add" button and display a limit warning.
+  - Project Setup Wizard (project_setup_wizard.dart) & Project Screen (project_screen.dart):
+    - Restriction: Cap active projects. Free (1), Silver (3), Gold (10), Platinum (Unlimited).
+
+* MODULE C: Field Operations & Approvals (Collaboration)
+  - Materials Request Form (material_request_form.dart) & Materials Approvals Screen (supervisor_material_view_request_screen.dart, manager_material_approval_screen.dart):
+    - Restriction: Move requests and approval screens into the Gold and Platinum tiers.
+    - Silver and Free Trial tiers should only log materials on site directly (material_at_site_entry_page.dart) without multi-role request workflows.
+  - Work Schedule Request Page (supervisor_work_schedule_page.dart) & Schedule Approval Screen (manager_approval_screen.dart):
+    - Restriction: Gold/Platinum only. Supervisors on Free/Silver tiers can view schedules but cannot trigger dynamic request/approval workflows.
+
+* MODULE D: Expense & Financial Reports
+  - Organization Expenses (organization_expenses.dart) & Insights Dashboard (insights_dashboard.dart):
+    - Restriction: Basic cost logging allowed on Silver. Advanced financial tracking, weekly summaries, and dashboard statistics require Gold or Platinum.
+  - PDF Generation & Exports (overall_report_pdf_helper.dart, worker_report_pdf_helper.dart):
+    - Restriction: Generate and share PDF reports (e.g. tools, worker summaries) restricted to Platinum. Gold gets basic view-only summaries.
+
+* MODULE E: Client Sharing / Portal
+  - Customer Dashboard (customer_dashboard.dart):
+    - Restriction: Access is completely disabled under Free Trial, Silver, and Gold.
+    - The client login page (customer_login_page.dart) will reject logins unless the parent organization is a Platinum subscriber.
+
+* MODULE F: Supervisor Mapping & Advanced Tools
+  - Site Supervisor Map Screen (site_supervisor_map_screen.dart):
+    - Restriction: Requires Gold or Platinum. Real-time supervisor location and mapping require high API costs (Google Maps API) and should not be offered on lower tiers.
+  - Incentive Calculation (incentive_calculation.dart):
+    - Restriction: Lock to Platinum tier.
+
+
+6. RECOMMENDED TECHNICAL IMPLEMENTATION PLAN
+---------------------------------------------
+
+STEP 1: DATABASE SCHEMA UPDATE
+Modify the Firestore subscription document schema to explicitly store the plan properties.
+Path: /organisation/{orgId}/data/subscription
+Fields:
+  {
+    "subscriptionPlan": "silver" | "gold" | "platinum" | "free_trial",
+    "subscriptionStartDate": Timestamp,
+    "subscriptionEndDate": Timestamp,
+    "isSubscriptionActive": boolean,
+    "maxProjects": int,
+    "maxUsers": int,
+    "featuresAllowed": ["white_labeling", "pdf_exports", "incentives", "client_portal"]
+  }
+
+STEP 2: UPDATE PRICING AND ONBOARDING REGISTRATION FLOW
+Update 'lib/screens/pricing_screen.dart' to save the selected plan properties dynamically:
+- Modify '_register()' to write 'subscriptionPlan': _selectedPlan.toLowerCase() instead of hardcoded '30 days'.
+- Save limits based on selection, e.g. for Silver: 'maxProjects': 3, 'maxUsers': 5.
+
+STEP 3: CENTRALIZED ACCESS CONTROLLER (SubscriptionAccessService)
+Create a new service 'lib/services/subscription_access_service.dart' to handle all plan validations:
+```dart
+enum Feature {
+  whiteLabeling,
+  clientPortal,
+  pdfExports,
+  advancedAnalytics,
+  supervisorMap,
+  collaborativeApprovals
+}
+
+class SubscriptionAccessService {
+  static String? _currentTier;
+  static int _projectLimit = 1;
+  static int _userLimit = 2;
+
+  static Future<void> loadSubscriptionDetails() async {
+    final doc = await FirestoreService.subscriptionDoc.get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      _currentTier = data['subscriptionPlan']?.toString().toLowerCase() ?? 'free_trial';
+      _projectLimit = data['maxProjects'] as int? ?? 1;
+      _userLimit = data['maxUsers'] as int? ?? 2;
+    }
+  }
+
+  static bool hasAccess(Feature feature) {
+    if (_currentTier == 'platinum') return true;
+    
+    switch (feature) {
+      case Feature.whiteLabeling:
+      case Feature.clientPortal:
+        return _currentTier == 'platinum';
+      case Feature.pdfExports:
+        return _currentTier == 'platinum';
+      case Feature.supervisorMap:
+      case Feature.advancedAnalytics:
+      case Feature.collaborativeApprovals:
+        return _currentTier == 'gold' || _currentTier == 'platinum';
+      default:
+        return false;
+    }
+  }
+
+  static Future<bool> canCreateProject() async {
+    final query = await FirestoreService.projects.get();
+    return query.docs.length < _projectLimit;
+  }
+
+  static Future<bool> canCreateUser() async {
+    final query = await FirestoreService.organizationUsers.get();
+    return query.docs.length < _userLimit;
+  }
+}
+```
+
+STEP 4: UI GATEKEEPER & PAYWALLS
+1. Menu Filter: In 'org_menu_screen.dart', check if branding option is clicked. If 'SubscriptionAccessService.hasAccess(Feature.whiteLabeling)' is false, redirect to a "Premium Upgrade" paywall dialog instead of navigating.
+2. Dashboard Filter: In 'OrganizationDashboard.dart', update '_getCategories()' to dynamically filter or flag cards based on access:
+   - For restricted cards, display a pad-lock icon and show a bottom sheet upgrade prompt when clicked.
+3. Onboarding Lock: Move the custom branding screen in the signup flow to be optional, or place it after payment verification so that only Platinum subscribers configure branding.
+
+STEP 5: FIRESTORE SECURITY RULES FOR ACCESS CONTROL
+Secure the backend by adding rule checks on the database. If a tenant modifies subscription fields or tries to create documents beyond their limit directly through client SDKs, block the request:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /organisation/{orgId} {
+      
+      // Helper to fetch active subscription plan
+      function getSubscription(org) {
+        return get(/databases/$(database)/documents/organisation/$(org)/data/subscription).data;
+      }
+      
+      match /projects/{projId} {
+        allow create: if request.auth != null && 
+                      getSubscription(orgId).isSubscriptionActive == true &&
+                      // Enforce limit of 3 projects for Silver, 10 for Gold
+                      (getSubscription(orgId).subscriptionPlan == 'platinum' ||
+                      (getSubscription(orgId).subscriptionPlan == 'gold' && getOrgProjectsCount(orgId) < 10) ||
+                      (getSubscription(orgId).subscriptionPlan == 'silver' && getOrgProjectsCount(orgId) < 3) ||
+                      (getSubscription(orgId).subscriptionPlan == 'free_trial' && getOrgProjectsCount(orgId) < 1));
+      }
+    }
+  }
+}
+```
+================================================================================

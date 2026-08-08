@@ -35,19 +35,27 @@ class GlassCard extends StatelessWidget {
     final isMobile = Responsive.isMobile(context);
     final defaultPadding = EdgeInsets.all(isMobile ? 16 : 24);
     final currentPadding = padding ?? defaultPadding;
-    
+
     return Container(
       width: width,
       margin: margin ?? const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: color ?? theme.cardColor,
         borderRadius: BorderRadius.circular(borderRadius ?? 20),
-        border: border ?? Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        border:
+            border ?? Border.all(color: theme.dividerColor.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 4,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
