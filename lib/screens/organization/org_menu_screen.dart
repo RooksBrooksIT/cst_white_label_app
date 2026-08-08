@@ -2,24 +2,19 @@ import 'package:demo_cst/screens/organization/org_reset_password_screen.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/utils/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/common/contact_support_screen.dart';
-import 'package:demo_cst/screens/common/reset_password_screen.dart';
 import 'package:demo_cst/screens/organization/org_subscription_page.dart';
 import 'package:demo_cst/screens/organization/org_information_screen.dart';
 import 'package:demo_cst/screens/common/about_us_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class OrgMenuScreen extends StatefulWidget {
-  /// When [standalone] is true (default), the screen is shown as a separate
   final bool standalone;
   const OrgMenuScreen({super.key, this.standalone = true});
 
@@ -42,12 +37,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
   Future<void> _fetchOrgData() async {
     try {
-      // Ensure FirestoreService has a valid org path before reading
       if (!FirestoreService.isReady) {
         await FirestoreService.initialize();
       }
 
-      // ── Referral code ────────────────────────────────────────────────────
       final referralDoc = await FirestoreService.referralDoc.get();
 
       String? code;
@@ -58,7 +51,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
             refData['referralCode'] as String?;
       }
 
-      // Fallback: some legacy orgs stored the code on the root org document
       if (code == null || code.isEmpty) {
         final rootDoc = await FirestoreService.rootOrgDoc.get();
         if (rootDoc.exists) {
@@ -75,7 +67,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         });
       }
 
-      // ── Subscription ─────────────────────────────────────────────────────
       final subDoc = await FirestoreService.subscriptionDoc.get();
 
       if (subDoc.exists && mounted) {
@@ -94,7 +85,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           }
         });
       } else if (mounted) {
-        // Fallback: check root org doc for legacy subscription data
         final rootDoc = await FirestoreService.rootOrgDoc.get();
         if (rootDoc.exists && mounted) {
           final rootData = rootDoc.data()!;
@@ -126,7 +116,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -136,19 +125,17 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           maxWidth: isMobile ? double.infinity : 600,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 24),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Column(
             children: [
-              _buildReferralSection(colorScheme),
-              const SizedBox(height: 16),
-              _buildSettingsSection(colorScheme),
-              const SizedBox(height: 16),
-              _buildSubscriptionSection(colorScheme),
-              const SizedBox(height: 32),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildLogoutSection(colorScheme),
-              ),
+              _buildReferralSection(theme),
+              const SizedBox(height: 20),
+              _buildSettingsSection(theme),
+              const SizedBox(height: 20),
+              _buildSubscriptionSection(theme),
+              const SizedBox(height: 28),
+              _buildLogoutSection(),
               const SizedBox(height: 24),
             ],
           ),
@@ -156,128 +143,155 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       ),
     );
 
-    // When embedded (standalone == false) just return the scrollable body.
     if (!widget.standalone) {
       return content;
     }
 
-    // Standalone: wrap in a GlassScaffold
     return GlassScaffold(
-      title: 'Menu',
-      onBack: () => Navigator.pop(context),
-      body: content,
-    );
-  }
-
-  Widget _buildProfileSection(ColorScheme colorScheme) {
-    return Column(
-      children: [
-        Container(
-          width: 70,
-          height: 70,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: colorScheme.primary.withOpacity(0.2),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: Image.asset(
-              'assets/images/logo_main.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ValueListenableBuilder<String>(
-          valueListenable: AppTheme.appName,
-          builder: (context, name, _) {
-            return Text(
-              _orgName.isNotEmpty ? _orgName : name,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: const Color(0xFF1E293B),
-                fontSize: Responsive.fontSize(context, 24),
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReferralSection(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GlassCard(
-        padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.zero,
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.share_rounded, color: colorScheme.primary, size: 24),
-                const SizedBox(width: 12),
-                Text(
-                  'Referral Program',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+            // Top Header Row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1942),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Share these codes with your team members to register them under your organization.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 13,
+                  const Text(
+                    'Menu',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            _buildCodeRow('Referral', _orgCode, colorScheme),
+
+            Expanded(child: content),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCodeRow(String label, String code, ColorScheme colorScheme) {
+  Widget _buildReferralSection(ThemeData theme) {
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.share_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Referral Program',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Share these codes with your team members to register them under your organization.',
+            style: TextStyle(
+              color: Color(0xFFCBD5E1),
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildCodeRow('REFERRAL', _orgCode, theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCodeRow(String label, String code, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label.toUpperCase(),
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w800,
             color: Color(0xFF94A3B8),
             letterSpacing: 1.0,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -285,23 +299,21 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               Text(
                 code,
                 style: TextStyle(
-                  color: colorScheme.primary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
+                  color: theme.primaryColor,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
                 ),
               ),
               IconButton(
                 icon: const Icon(
                   Icons.copy_rounded,
-                  color: Color(0xFF64748B),
+                  color: Color(0xFF0A183D),
                   size: 20,
                 ),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: code));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$label code copied!')),
-                  );
+                  AppTheme.showSuccessToast(context, '$label code copied!');
                 },
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
@@ -313,188 +325,166 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     );
   }
 
-  Widget _buildSettingsSection(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GlassCard(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.settings_suggest_rounded,
-                  color: colorScheme.secondary,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Settings',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+  Widget _buildSettingsSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4.0, bottom: 10.0),
+          child: Text(
+            'Settings & Customization',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.3,
             ),
-            const SizedBox(height: 16),
-            _buildSettingsTile(
-              icon: Icons.business_rounded,
-              title: 'Organisation Information',
-              subtitle: 'Update address and phone details',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrgInformationScreen(),
-                ),
-              ),
-            ),
-            const Divider(color: Color(0xFFF1F5F9), height: 24),
-            _buildSettingsTile(
-              icon: Icons.color_lens_outlined,
-              title: 'Brand Color',
-              subtitle: 'Change app theme color',
-              onTap: () => Navigator.pushNamed(context, '/branding'),
-            ),
-            const Divider(color: Color(0xFFF1F5F9), height: 24),
-            _buildSettingsTile(
-              icon: Icons.lock_reset_rounded,
-              title: 'Reset Password',
-              subtitle: 'Update your account password',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrgResetPasswordScreen(),
-                ),
-              ),
-            ),
-            const Divider(color: Color(0xFFF1F5F9), height: 24),
-            _buildSettingsTile(
-              icon: Icons.headset_mic_rounded,
-              title: 'Contact Support',
-              subtitle: 'Get help from our team',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ContactSupportScreen(),
-                ),
-              ),
-            ),
-            const Divider(color: Color(0xFFF1F5F9), height: 24),
-            _buildSettingsTile(
-              icon: Icons.privacy_tip_rounded,
-              title: 'Privacy Policy',
-              subtitle: 'View our privacy policy',
-              onTap: () async {
-                final Uri url = Uri.parse(
-                  'https://sites.google.com/view/cst-whitelabel-app/home',
-                );
-                if (!await launchUrl(url)) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not open privacy policy'),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-            const Divider(color: Color(0xFFF1F5F9), height: 24),
-            _buildSettingsTile(
-              icon: Icons.info_outline_rounded,
-              title: 'About Us',
-              subtitle: 'Learn more about eBicks',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AboutUsScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
+          ),
         ),
-      ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.business_rounded,
+          iconColor: const Color(0xFF1E88E5),
+          title: 'Organisation Information',
+          subtitle: 'Update address and phone details',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const OrgInformationScreen(),
+            ),
+          ),
+        ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.color_lens_outlined,
+          iconColor: const Color(0xFF10B981),
+          title: 'Brand Color',
+          subtitle: 'Change app theme color',
+          onTap: () => Navigator.pushNamed(context, '/branding'),
+        ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.lock_reset_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          title: 'Reset Password',
+          subtitle: 'Update your account password',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const OrgResetPasswordScreen(),
+            ),
+          ),
+        ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.headset_mic_rounded,
+          iconColor: const Color(0xFF8B5CF6),
+          title: 'Contact Support',
+          subtitle: 'Get help from our team',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ContactSupportScreen(),
+            ),
+          ),
+        ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.privacy_tip_rounded,
+          iconColor: const Color(0xFF06B6D4),
+          title: 'Privacy Policy',
+          subtitle: 'View our privacy policy',
+          onTap: () async {
+            final Uri url = Uri.parse(
+              'https://sites.google.com/view/cst-whitelabel-app/home',
+            );
+            if (!await launchUrl(url)) {
+              if (context.mounted) {
+                AppTheme.showErrorToast(context, 'Could not open privacy policy');
+              }
+            }
+          },
+        ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.info_outline_rounded,
+          iconColor: const Color(0xFFEC4899),
+          title: 'About Us',
+          subtitle: 'Learn more about eBricks',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AboutUsScreen(),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
-  Widget _buildSubscriptionSection(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GlassCard(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.stars_rounded,
-                  color: colorScheme.tertiary,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Subscription',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+  Widget _buildSubscriptionSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4.0, bottom: 10.0),
+          child: Text(
+            'Billing & Membership',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.3,
             ),
-            const SizedBox(height: 16),
-            _buildSettingsTile(
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Manage Subscription',
-              subtitle: _isSubscriptionActive
-                  ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
-                  : 'Current: $_subscriptionPlan (Inactive)',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OrganizationSubscriptionPage(),
-                  ),
-                );
-              },
-            ),
-          ],
+          ),
         ),
-      ),
+        _buildSettingsTile(
+          theme: theme,
+          icon: Icons.account_balance_wallet_outlined,
+          iconColor: const Color(0xFF10B981),
+          title: 'Manage Subscription',
+          subtitle: _isSubscriptionActive
+              ? 'Active: $_subscriptionPlan (Expires: $_subscriptionExpiry)'
+              : 'Current: $_subscriptionPlan (Inactive)',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizationSubscriptionPage(),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
-  Widget _buildLogoutSection(ColorScheme colorScheme) {
+  Widget _buildLogoutSection() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showLogoutConfirmation(context),
-        icon: const Icon(Icons.logout_rounded, color: Colors.white),
+        icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
         label: const Text(
           'LOGOUT',
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             letterSpacing: 1.0,
             color: Colors.white,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red[600],
+          backgroundColor: const Color(0xFFDC2626),
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          elevation: 4,
+          shadowColor: const Color(0xFFDC2626).withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
         ),
       ),
     );
@@ -505,31 +495,94 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Confirm Logout',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'No',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFDC2626),
+                size: 28,
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(
-              'Yes',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            const SizedBox(height: 16),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              'Are you sure you want to log out of your organization account?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF5A759E),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: Color(0xFF0A183D), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'CANCEL',
+                      style: TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 4,
+                      shadowColor: const Color(0xFFDC2626).withValues(alpha: 0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'YES, LOGOUT',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
@@ -551,64 +604,104 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildSettingsTile({
+    required ThemeData theme,
     required IconData icon,
+    required Color iconColor,
     required String title,
     String? subtitle,
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: theme.primaryColor, size: 20),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // Icon Badge
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: iconColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: iconColor.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
-                  ],
-                ),
-              ),
-              trailing ??
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
-                    size: 20,
                   ),
-            ],
+                  child: Icon(icon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                // Title and Subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFCBD5E1),
+                            height: 1.25,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                trailing ??
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+              ],
+            ),
           ),
         ),
       ),

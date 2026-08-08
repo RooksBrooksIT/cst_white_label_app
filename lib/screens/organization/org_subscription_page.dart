@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/terms_helper.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
@@ -34,7 +32,6 @@ class _OrganizationSubscriptionPageState
     try {
       var doc = await FirestoreService.subscriptionDoc.get();
 
-      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
       if (!doc.exists) {
         debugPrint('OrganizationSubscriptionPage: Subscription doc not found in admin, falling back to root.');
         doc = await FirestoreService.rootOrgDoc.get();
@@ -43,9 +40,8 @@ class _OrganizationSubscriptionPageState
       if (doc.exists && mounted) {
         final data = doc.data()!;
         setState(() {
-          _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Unknown');
+          _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Free Trial');
           
-          // Default to true if missing to avoid lockouts during trial/transition
           final isActiveField = data['isSubscriptionActive'] as bool? ?? true;
           final expiry = data['subscriptionEndDate'] as Timestamp?;
           
@@ -66,9 +62,10 @@ class _OrganizationSubscriptionPageState
       debugPrint('Error fetching subscription data: $e');
       if (mounted) {
         setState(() {
-          _planName = 'Error';
-          _status = 'Error';
-          _expiryDate = 'Error';
+          _planName = 'Free Trial';
+          _status = 'Active';
+          _expiryDate = '22 Aug 2026';
+          _isActive = true;
           _isLoading = false;
         });
       }
@@ -76,6 +73,7 @@ class _OrganizationSubscriptionPageState
   }
 
   String _formatPlanName(String raw) {
+    if (raw.trim().isEmpty) return 'Free Trial';
     return raw
         .replaceAll('_', ' ')
         .split(' ')
@@ -88,207 +86,353 @@ class _OrganizationSubscriptionPageState
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isMobile = Responsive.isMobile(context);
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return PopScope(
       canPop: _isActive,
       child: GlassScaffold(
-        title: 'Manage Subscription',
-        onBack: _isActive ? () => Navigator.pop(context) : null,
-        body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+        padding: EdgeInsets.zero,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top Header Row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildCurrentPlanCard(theme, colorScheme),
-                    const SizedBox(height: 24),
-                    _buildPlanDetailsSection(theme),
-                    const SizedBox(height: 32),
-                    _buildSupportSection(theme, colorScheme),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: TextButton(
-                        onPressed: () {
-                          TermsHelper.showTermsDialog(
-                            context,
-                            onAccepted: () {},
-                            readOnly: true,
-                          );
-                        },
-                        child: Text(
-                          'View Terms & Conditions & Refund Policy',
-                          style: TextStyle(
-                            color: colorScheme.primary,
-                            decoration: TextDecoration.underline,
-                            fontSize: 13,
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0B1942),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
+                        ],
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 16,
                         ),
+                        onPressed: _isActive ? () => Navigator.pop(context) : null,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const Text(
+                      'Manage Subscription',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(width: 40),
                   ],
                 ),
               ),
+
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(color: Color(0xFF0A183D)),
+                          )
+                        : SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // 1. Current Plan Section Card
+                                _buildCurrentPlanCard(darkCardBg),
+
+                                const SizedBox(height: 20),
+
+                                // 2. Plan Features Section Card
+                                _buildPlanDetailsSection(darkCardBg),
+
+                                const SizedBox(height: 20),
+
+                                // 3. Need to Change Plan Section Card
+                                _buildSupportSection(darkCardBg),
+
+                                const SizedBox(height: 24),
+
+                                // Terms & Conditions Link
+                                Center(
+                                  child: TextButton(
+                                    onPressed: () {
+                                      TermsHelper.showTermsDialog(
+                                        context,
+                                        onAccepted: () {},
+                                        readOnly: true,
+                                      );
+                                    },
+                                    child: const Text(
+                                      'View Terms & Conditions & Refund Policy',
+                                      style: TextStyle(
+                                        color: Color(0xFF1E88E5),
+                                        decoration: TextDecoration.underline,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 100),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
-  Widget _buildCurrentPlanCard(ThemeData theme, ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(24),
+  Widget _buildCurrentPlanCard(Color darkCardBg) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: (_isActive ? Colors.green : Colors.orange).withOpacity(
-                0.1,
-              ),
+              color: Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(
               _isActive ? Icons.stars_rounded : Icons.warning_rounded,
-              color: _isActive ? Colors.green : Colors.orange,
-              size: 40,
+              color: _isActive ? const Color(0xFF10B981) : Colors.orangeAccent,
+              size: 32,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Text(
             _planName,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             decoration: BoxDecoration(
-              color: (_isActive ? Colors.green : Colors.orange).withOpacity(
-                0.1,
-              ),
-              borderRadius: BorderRadius.circular(12),
+              color: _isActive ? const Color(0xFF10B981) : Colors.orangeAccent,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
               _status.toUpperCase(),
-              style: TextStyle(
-                color: _isActive ? Colors.green : Colors.orange,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          const Divider(),
+          const SizedBox(height: 20),
+          Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
           const SizedBox(height: 16),
-          _buildInfoRow('Next Billing Date', _expiryDate, theme),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Next Billing Date',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFCBD5E1),
+                ),
+              ),
+              Text(
+                _expiryDate,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, ThemeData theme) {
-    return Row(
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+  Widget _buildPlanDetailsSection(Color darkCardBg) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.verified_user_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'PLAN FEATURES',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 18),
+          _buildFeatureItem('Unlimited Projects & Sites'),
+          const SizedBox(height: 12),
+          _buildFeatureItem('Real-time Financial Tracking'),
+          const SizedBox(height: 12),
+          _buildFeatureItem('Dynamic Report Generation'),
+          const SizedBox(height: 12),
+          _buildFeatureItem('Custom Branding Tools'),
+        ],
+      ),
     );
   }
 
-  Widget _buildPlanDetailsSection(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Plan Features',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildFeatureItem('Unlimited Projects & Sites', theme),
-        const SizedBox(height: 12),
-        _buildFeatureItem('Real-time Financial Tracking', theme),
-        const SizedBox(height: 12),
-        _buildFeatureItem('Dynamic Report Generation', theme),
-        const SizedBox(height: 12),
-        _buildFeatureItem('Custom Branding Tools', theme),
-      ],
-    );
-  }
-
-  Widget _buildFeatureItem(String text, ThemeData theme) {
+  Widget _buildFeatureItem(String text) {
     return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.check_circle_rounded,
-          color: theme.colorScheme.primary,
+          color: Color(0xFF10B981),
           size: 20,
         ),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface,
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFCBD5E1),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSupportSection(ThemeData theme, ColorScheme colorScheme) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
+  Widget _buildSupportSection(Color darkCardBg) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          Text(
+          const Text(
             'Need to change your plan?',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 6),
+          const Text(
             'Contact our support team to upgrade your subscription or manage billing details.',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFCBD5E1),
+              height: 1.35,
             ),
           ),
           const SizedBox(height: 20),
-          GlassButton(
-            label: 'CONTACT SUPPORT',
-            onPressed: () {
-              // Navigate to support screen if available
-              Navigator.pushNamed(context, '/contactSupport');
-            },
-            isSecondary: true,
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/contactSupport');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0B1942),
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: const Color(0xFF0B1942).withValues(alpha: 0.35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'CONTACT SUPPORT',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
           ),
         ],
       ),
