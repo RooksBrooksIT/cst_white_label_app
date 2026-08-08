@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PayUParams {
   final String? merchantId;
@@ -26,14 +27,15 @@ class PayUParams {
     required this.firstName,
     required this.email,
     required this.phone,
-    this.surl = 'https://api.payu.in/public/#/success',
-    this.furl = 'https://api.payu.in/public/#/failure',
+    String? surl,
+    String? furl,
     this.isSandbox = true,
-  });
+  })  : surl = surl ?? dotenv.env['PAYU_SURL'] ?? 'https://api.payu.in/public/#/success',
+        furl = furl ?? dotenv.env['PAYU_FURL'] ?? 'https://api.payu.in/public/#/failure';
 
   String get payUrl => isSandbox
-      ? 'https://test.payu.in/_payment'
-      : 'https://secure.payu.in/_payment';
+      ? (dotenv.env['PAYU_TEST_PAY_URL'] ?? 'https://test.payu.in/_payment')
+      : (dotenv.env['PAYU_PROD_PAY_URL'] ?? 'https://secure.payu.in/_payment');
 }
 
 class PayUResult {
@@ -53,18 +55,23 @@ class PayUResult {
 }
 
 class PayUService {
-  // Set your PayU Merchant ID, Merchant Key and Merchant Salt here
-  // For Production Mode: Set isProduction = true and provide live credentials
-  // For Sandbox/Testing: Set isProduction = false (uses test merchant ID, key & salt)
-  static bool isProduction = false; 
+  // Check environment from .env file (PAYU_ENVIRONMENT=sandbox or production)
+  static bool get isProduction =>
+      (dotenv.env['PAYU_ENVIRONMENT'] ?? 'sandbox').trim().toLowerCase() == 'production';
 
-  static String productionMerchantId = 'YOUR_LIVE_MERCHANT_ID';
-  static String productionMerchantKey = 'YOUR_LIVE_MERCHANT_KEY';
-  static String productionMerchantSalt = 'YOUR_LIVE_MERCHANT_SALT';
+  static String get productionMerchantId =>
+      dotenv.env['PAYU_PROD_MERCHANT_ID'] ?? 'YOUR_LIVE_MERCHANT_ID';
+  static String get productionMerchantKey =>
+      dotenv.env['PAYU_PROD_KEY'] ?? 'YOUR_LIVE_MERCHANT_KEY';
+  static String get productionMerchantSalt =>
+      dotenv.env['PAYU_PROD_SALT'] ?? 'YOUR_LIVE_MERCHANT_SALT';
 
-  static String testMerchantId = '9193759'; // Merchant Test ID
-  static String testMerchantKey = 'GZrAha'; // Default Test Key
-  static String testMerchantSalt = 'xpfwrDGBXY4sR5Y8O4xU8OB0seurgJMi'; // Default Test Salt
+  static String get testMerchantId =>
+      dotenv.env['PAYU_TEST_MERCHANT_ID'] ?? '9193759'; // Merchant Test ID
+  static String get testMerchantKey =>
+      dotenv.env['PAYU_TEST_KEY'] ?? 'GZrAha'; // Test Key
+  static String get testMerchantSalt =>
+      dotenv.env['PAYU_TEST_SALT'] ?? 'xpfwrDGBXY4sR5Y8O4xU8OB0seurgJMi'; // Test Salt
 
   static String get activeMerchantId =>
       isProduction ? productionMerchantId : testMerchantId;

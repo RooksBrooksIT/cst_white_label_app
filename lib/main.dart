@@ -17,16 +17,22 @@ import 'package:demo_cst/screens/organization/organization_dashboard.dart';
 import 'package:demo_cst/screens/organization/organisation_registration_page.dart';
 import 'package:demo_cst/screens/common/landing_page.dart';
 import 'package:demo_cst/screens/common/join_by_referral_page.dart';
-import 'package:demo_cst/screens/common/landing_page.dart';
 import 'package:demo_cst/screens/organization/org_menu_screen.dart';
 import 'package:demo_cst/screens/branding/branding_edit_screen.dart';
 import 'package:demo_cst/screens/common/contact_support_screen.dart';
 import 'package:demo_cst/widgets/connectivity_wrapper.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Dotenv initialization warning: $e');
+  }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirestoreService.initialize();
   await AppTheme.initialize();
