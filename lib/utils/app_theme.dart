@@ -218,6 +218,13 @@ class AppTheme {
     return hsl.withLightness(0.12).withSaturation((hsl.saturation * 0.7).clamp(0.0, 1.0)).toColor();
   }
 
+  /// Generates a vibrant high-contrast accent color for icons and text on dark card backgrounds.
+  static Color getCardAccent(Color brandColor) {
+    final HSLColor hsl = HSLColor.fromColor(brandColor);
+    final double lightness = hsl.lightness < 0.65 ? 0.68 : hsl.lightness.clamp(0.65, 0.85);
+    return hsl.withLightness(lightness).toColor();
+  }
+
   /// Returns a color (Black or White) that contrasts well with the [background].
   static Color getForegroundFor(Color background) {
     return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
