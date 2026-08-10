@@ -338,7 +338,9 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
       ),
       child: Column(
         children: [
-          ListTile(
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
             leading: Container(
               width: 40,
               height: 40,
@@ -392,6 +394,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
               });
             },
           ),
+        ),
           if (expanded) ...[
             const Divider(height: 1, indent: 16, endIndent: 16),
             Padding(

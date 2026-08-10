@@ -815,11 +815,9 @@ class _ProjectScreenState extends State<ProjectScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
@@ -847,7 +845,6 @@ class _ProjectScreenState extends State<ProjectScreen>
                     controlAffinity: ListTileControlAffinity.leading,
                     contentPadding: EdgeInsets.zero,
                     activeColor: primaryColor,
-                    tileColor: Colors.white,
                   ),
                 ),
               ),
