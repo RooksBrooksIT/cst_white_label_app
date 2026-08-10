@@ -21,6 +21,7 @@ class GlassTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final VoidCallback? onTap;
   final String? prefixText;
+  final Color? labelColor;
 
   const GlassTextField({
     super.key,
@@ -43,6 +44,7 @@ class GlassTextField extends StatefulWidget {
     this.suffixIcon,
     this.onTap,
     this.prefixText,
+    this.labelColor,
   });
 
   @override
@@ -75,7 +77,9 @@ class _GlassTextFieldState extends State<GlassTextField> {
           child: Text(
             widget.label,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: widget.labelColor ?? const Color(0xFFCBD5E1),
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
             ),
           ),
         ),
@@ -91,16 +95,37 @@ class _GlassTextFieldState extends State<GlassTextField> {
           onTap: widget.onTap,
           inputFormatters: widget.inputFormatters?.cast<TextInputFormatter>(),
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: widget.enabled ? null : theme.disabledColor,
+            color: widget.enabled ? const Color(0xFF0A183D) : theme.disabledColor,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
           ),
           decoration: InputDecoration(
-            hintText: widget.hintText ?? 'Enter your ${widget.label}',
+            filled: true,
+            fillColor: Colors.white,
+            hintText: widget.hintText ?? 'Enter ${widget.label}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF5A759E),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
             prefixIcon: Icon(
               widget.icon,
               size: 20,
-              color: widget.enabled ? null : theme.disabledColor,
+              color: widget.enabled ? theme.primaryColor : theme.disabledColor,
             ),
             prefixText: widget.prefixText,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: theme.primaryColor, width: 1.8),
+            ),
             suffixIcon: widget.suffixIcon ?? (widget.isPassword
                 ? IconButton(
                     icon: Icon(
@@ -108,6 +133,7 @@ class _GlassTextFieldState extends State<GlassTextField> {
                           ? Icons.visibility_rounded
                           : Icons.visibility_off_rounded,
                       size: 20,
+                      color: const Color(0xFF5A759E),
                     ),
                     onPressed: widget.enabled
                         ? () {

@@ -66,9 +66,17 @@ class _ManagerMaterialApprovalScreenState
                     Tab(text: "PENDING"),
                     Tab(text: "APPROVED"),
                   ],
-                  labelColor: theme.colorScheme.primary,
-                  unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                  indicatorColor: theme.colorScheme.primary,
+                  labelColor: Colors.white,
+                  labelStyle: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: isDesktop ? 16 : 14,
+                  ),
+                  unselectedLabelColor: const Color(0xFFCBD5E1),
+                  unselectedLabelStyle: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: isDesktop ? 16 : 14,
+                  ),
+                  indicatorColor: const Color(0xFF10B981),
                   indicatorWeight: 3,
                 ),
               ),
@@ -82,7 +90,18 @@ class _ManagerMaterialApprovalScreenState
                 child: GlassTextField(
                   controller: _searchController,
                   label: 'Search Requests...',
+                  labelColor: const Color(0xFF0A183D),
+                  hintText: 'Search Requests...',
                   icon: Icons.search,
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Color(0xFF0A183D)),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
                   onChanged: (v) =>
                       setState(() => _searchQuery = v.trim().toLowerCase()),
                 ),
@@ -140,11 +159,24 @@ class _ManagerMaterialApprovalScreenState
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Center(
-            child: Text(
-              'No requests found.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.inbox,
+                  size: isDesktop ? 80 : 60,
+                  color: const Color(0xFF0A183D),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No requests found.',
+                  style: TextStyle(
+                    color: const Color(0xFF0A183D),
+                    fontSize: isDesktop ? 20 : 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -165,11 +197,24 @@ class _ManagerMaterialApprovalScreenState
 
         if (docs.isEmpty) {
           return Center(
-            child: Text(
-              'No $status requests found.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.inbox,
+                  size: isDesktop ? 80 : 60,
+                  color: const Color(0xFF0A183D),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No $status requests found.',
+                  style: TextStyle(
+                    color: const Color(0xFF0A183D),
+                    fontSize: isDesktop ? 20 : 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -202,7 +247,6 @@ class _ManagerMaterialApprovalScreenState
     bool isMobile,
     double maxModalWidth,
   ) {
-    final theme = Theme.of(context);
     final status = data['status'] ?? 'Processing';
 
     return GlassCard(
@@ -223,8 +267,10 @@ class _ManagerMaterialApprovalScreenState
             children: [
               Text(
                 data['matReqId'] ?? 'REQ-N/A',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 16,
                 ),
               ),
               _buildStatusBadge(status),
@@ -243,26 +289,37 @@ class _ManagerMaterialApprovalScreenState
             Icons.person_outline,
             data['supervisorName'] ?? 'No Supervisor',
           ),
-          const Divider(height: 24),
+          const Divider(height: 24, color: Colors.white24),
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.inventory_2_outlined,
                 size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
+                color: Color(0xFFCBD5E1),
               ),
               const SizedBox(width: 8),
               Text(
                 "${(data['materials'] as List?)?.length ?? 0} Items",
-                style: theme.textTheme.bodySmall,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
               ),
               const Spacer(),
-              Text(data['date'] ?? '', style: theme.textTheme.bodySmall),
+              Text(
+                data['date'] ?? '',
+                style: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(width: 8),
-              Icon(
+              const Icon(
                 Icons.chevron_right,
-                size: 16,
-                color: theme.colorScheme.primary,
+                size: 18,
+                color: Color(0xFF10B981),
               ),
             ],
           ),
@@ -272,20 +329,20 @@ class _ManagerMaterialApprovalScreenState
   }
 
   Widget _buildStatusBadge(String status) {
-    final isApproved = status == 'Approved';
-    final color = isApproved ? Colors.green : Colors.orange;
+    final isApproved = status.toLowerCase() == 'approved';
+    final color = isApproved ? const Color(0xFF10B981) : Colors.orange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color, width: 1.0),
       ),
       child: Text(
         status.toUpperCase(),
         style: TextStyle(
           color: color,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
         ),
@@ -302,11 +359,18 @@ class _ManagerMaterialApprovalScreenState
           Icon(
             icon,
             size: 16,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Colors.white,
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
@@ -353,19 +417,23 @@ class _ManagerMaterialApprovalScreenState
                   const SizedBox(height: 24),
                   Text(
                     data['matReqId'] ?? 'Request Details',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 20,
                     ),
                   ),
                   const SizedBox(height: 16),
                   _infoRow(Icons.calendar_today_outlined, data['date'] ?? ''),
                   _infoRow(Icons.person_outline, data['supervisorName'] ?? ''),
                   const SizedBox(height: 24),
-                  Text(
+                  const Text(
                     'REQUESTED MATERIALS',
-                    style: theme.textTheme.labelLarge?.copyWith(
+                    style: TextStyle(
                       letterSpacing: 1.2,
-                      color: theme.colorScheme.primary,
+                      color: Color(0xFF10B981),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -373,15 +441,24 @@ class _ManagerMaterialApprovalScreenState
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: materials.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white24),
                       itemBuilder: (c, i) => ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           materials[i]['materialName'] ?? 'Unknown',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            fontSize: 15,
+                          ),
                         ),
                         subtitle: Text(
                           '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
+                          style: const TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                         trailing: _buildPriorityChip(
                           materials[i]['priority'] ?? 'Normal',

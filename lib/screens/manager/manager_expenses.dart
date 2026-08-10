@@ -396,7 +396,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
@@ -408,9 +407,33 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
       actions: [
         if (!widget.hideAppBar)
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _refreshData,
+          Center(
+            child: Container(
+              width: 38,
+              height: 38,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1942),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: _refreshData,
+                tooltip: 'Refresh',
+              ),
+            ),
           ),
       ],
       body: Center(
@@ -470,9 +493,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         children: [
           Text(
             'Site & Project Details',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: isDesktop ? 18.0 : 16.0,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              fontSize: isDesktop ? 20.0 : 18.0,
+              letterSpacing: -0.4,
             ),
           ),
           SizedBox(height: isDesktop ? 24.0 : 20.0),
@@ -547,9 +572,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         children: [
           Text(
             'Add Bill',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: isDesktop ? 18.0 : 16.0,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              fontSize: isDesktop ? 20.0 : 18.0,
+              letterSpacing: -0.4,
             ),
           ),
           SizedBox(height: isDesktop ? 24.0 : 20.0),
@@ -680,9 +707,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         children: [
           Text(
             'Bills List',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: isDesktop ? 18.0 : 16.0,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              fontSize: isDesktop ? 20.0 : 18.0,
+              letterSpacing: -0.4,
             ),
           ),
           SizedBox(height: isDesktop ? 20.0 : 16.0),
@@ -692,10 +721,10 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
               horizontalMargin: 0,
               columnSpacing: isDesktop ? 32.0 : 24.0,
               columns: const [
-                DataColumn(label: Text('Bill No')),
-                DataColumn(label: Text('Vendor')),
-                DataColumn(label: Text('Amount')),
-                DataColumn(label: Text('Action')),
+                DataColumn(label: Text('Bill No', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Vendor', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Amount', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Action', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
               ],
               rows: bills.asMap().entries.map((entry) {
                 final bill = entry.value;
@@ -712,27 +741,26 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                     DataCell(
                       Text(
                         bill['billNo']?.toString() ?? '',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white),
                       ),
                     ),
                     DataCell(
                       Text(
                         bill['billVendor']?.toString() ?? '',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white),
                       ),
                     ),
                     DataCell(
                       Text(
                         '₹ $amountStr',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                     DataCell(
                       IconButton(
-                        icon: Icon(
+                        icon: const Icon(
                           Icons.delete_outline,
-                          color: theme.colorScheme.error,
-                          size: isDesktop ? 24.0 : 20.0,
+                          color: Color(0xFFEF4444),
                         ),
                         onPressed: () =>
                             setState(() => bills.removeAt(entry.key)),
@@ -758,38 +786,45 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
       isExpanded: true,
       value: value,
+      dropdownColor: Colors.white,
+      style: TextStyle(
+        color: const Color(0xFF0A183D),
+        fontSize: isDesktop ? 15.0 : 14.0,
+        fontWeight: FontWeight.w700,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        labelStyle: const TextStyle(
+          color: Color(0xFF5A759E),
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         prefixIcon: Icon(
           Icons.location_on_outlined,
-          size: isDesktop ? 24.0 : 20.0,
-          color: colorScheme.primary,
+          size: isDesktop ? 22.0 : 20.0,
+          color: theme.primaryColor,
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16.0),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: theme.dividerColor),
+          borderRadius: BorderRadius.circular(16.0),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
+          borderRadius: BorderRadius.circular(16.0),
+          borderSide: BorderSide(color: theme.primaryColor, width: 1.8),
         ),
         filled: true,
-        fillColor: theme.cardColor,
+        fillColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(
           horizontal: isDesktop ? 20.0 : 16.0,
-          vertical: isDesktop ? 20.0 : 16.0,
+          vertical: isDesktop ? 18.0 : 16.0,
         ),
-      ),
-      dropdownColor: theme.cardColor,
-      style: TextStyle(
-        color: colorScheme.onSurface,
-        fontSize: isDesktop ? 15.0 : 14.0,
       ),
       items: items.map((id) {
         final name = siteNameMap[id] ?? 'Unnamed Site';
@@ -798,7 +833,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           child: Text(
             '$id - $name',
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: isDesktop ? 15.0 : 14.0),
+            style: TextStyle(
+              fontSize: isDesktop ? 15.0 : 14.0,
+              color: const Color(0xFF0A183D),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         );
       }).toList(),
@@ -812,28 +851,35 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => _selectDate(context),
+      borderRadius: BorderRadius.circular(16.0),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Date',
-          labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+          labelStyle: const TextStyle(
+            color: Color(0xFF5A759E),
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
           prefixIcon: Icon(
             Icons.calendar_today_outlined,
-            size: isDesktop ? 24.0 : 20.0,
-            color: colorScheme.primary,
+            size: isDesktop ? 22.0 : 20.0,
+            color: theme.primaryColor,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide.none,
+          ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: theme.dividerColor),
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide.none,
           ),
           filled: true,
-          fillColor: theme.cardColor,
+          fillColor: Colors.white,
           contentPadding: EdgeInsets.symmetric(
             horizontal: isDesktop ? 20.0 : 16.0,
-            vertical: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 18.0 : 16.0,
           ),
         ),
         child: Row(
@@ -842,14 +888,15 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             Text(
               DateFormat('dd MMM yyyy').format(selectedDate),
               style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: isDesktop ? 15.0 : 13.0,
+                color: const Color(0xFF0A183D),
+                fontSize: isDesktop ? 16.0 : 15.0,
+                fontWeight: FontWeight.w700,
               ),
             ),
             Icon(
               Icons.edit_calendar_outlined,
-              size: isDesktop ? 24.0 : 18.0,
-              color: colorScheme.primary,
+              size: isDesktop ? 22.0 : 18.0,
+              color: theme.primaryColor,
             ),
           ],
         ),

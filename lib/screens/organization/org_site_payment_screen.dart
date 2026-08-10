@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
@@ -806,16 +807,23 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: isDesktop ? 15.0 : null,
+              color: const Color(0xFFCBD5E1),
+              fontWeight: FontWeight.w700,
+              fontSize: isDesktop ? 15.0 : 13.5,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: theme.dividerColor),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: child,
         ),
@@ -830,46 +838,59 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
-            onPressed: resetForm,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.onSurfaceVariant,
-              side: BorderSide(color: theme.dividerColor),
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 54,
+            child: OutlinedButton(
+              onPressed: resetForm,
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF0A183D),
+                side: const BorderSide(color: Colors.white, width: 1.5),
+                elevation: 4,
+                shadowColor: Colors.black.withValues(alpha: 0.15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
               ),
-            ),
-            child: Text(
-              'Reset',
-              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+              child: Text(
+                'Reset',
+                style: TextStyle(
+                  fontSize: isDesktop ? 16.0 : 15.0,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0A183D),
+                ),
+              ),
             ),
           ),
         ),
         SizedBox(width: isDesktop ? 20.0 : 16.0),
         Expanded(
           flex: 2,
-          child: ElevatedButton(
-            onPressed: _submitPayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _submitPayment,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: darkCardBg,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                shadowColor: darkCardBg.withValues(alpha: 0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
               ),
-              elevation: 0,
-            ),
-            child: Text(
-              'Submit Payment',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onPrimary,
-                fontSize: isDesktop ? 15.0 : 13.0,
+              child: Text(
+                'Submit Payment',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: isDesktop ? 16.0 : 15.0,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -885,16 +906,15 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isTablet,
     bool isMobile,
   ) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.only(left: 4.0),
+      padding: const EdgeInsets.only(left: 4.0),
       child: Text(
         title.toUpperCase(),
-        style: theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
           letterSpacing: 1.2,
-          fontSize: isDesktop ? 14.0 : null,
+          fontSize: isDesktop ? 14.0 : 12.5,
         ),
       ),
     );
@@ -907,8 +927,6 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,14 +944,14 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 padding: EdgeInsets.all(isDesktop ? 20.0 : 16.0),
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(color: theme.dividerColor),
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                 ),
                 child: Text(
                   'No weeks available for selected month',
                   style: TextStyle(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    color: const Color(0xFFCBD5E1),
                     fontSize: isDesktop ? 14.0 : 12.0,
                   ),
                 ),
@@ -958,32 +976,30 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             selectedDate = week.first;
                           });
                         },
-                        borderRadius: BorderRadius.circular(12.0),
-                        child: Container(
+                        borderRadius: BorderRadius.circular(16.0),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
                           width: width,
                           padding: EdgeInsets.symmetric(
-                            vertical: isDesktop ? 16.0 : 12.0,
+                            vertical: isDesktop ? 16.0 : 14.0,
                             horizontal: isDesktop ? 12.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? colorScheme.primary
-                                : theme.scaffoldBackgroundColor.withValues(
-                                    alpha: 0.5,
-                                  ),
-                            borderRadius: BorderRadius.circular(12.0),
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(16.0),
                             border: Border.all(
                               color: isSelected
-                                  ? colorScheme.primary
-                                  : theme.dividerColor,
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.25),
+                              width: isSelected ? 2.0 : 1.0,
                             ),
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: colorScheme.primary.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      blurRadius: 8.0,
+                                      color: Colors.black.withValues(alpha: 0.25),
+                                      blurRadius: 10.0,
                                       offset: const Offset(0, 4),
                                     ),
                                   ]
@@ -994,23 +1010,24 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                               Text(
                                 'Week ${i + 1}',
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 16.0 : 14.0,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: isDesktop ? 16.0 : 14.5,
+                                  fontWeight: FontWeight.w800,
                                   color: isSelected
-                                      ? colorScheme.onPrimary
-                                      : colorScheme.onSurface,
+                                      ? const Color(0xFF0A183D)
+                                      : Colors.white,
                                 ),
                               ),
                               SizedBox(height: isDesktop ? 6.0 : 4.0),
                               Text(
                                 '$startDate - $endDate',
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 13.0 : 11.0,
+                                  fontSize: isDesktop ? 13.0 : 11.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
                                   color: isSelected
-                                      ? colorScheme.onPrimary.withValues(
-                                          alpha: 0.9,
-                                        )
-                                      : colorScheme.onSurfaceVariant,
+                                      ? const Color(0xFF5A759E)
+                                      : const Color(0xFFCBD5E1),
                                 ),
                               ),
                             ],
@@ -1085,13 +1102,19 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           },
           child: Container(
             padding: EdgeInsets.symmetric(
-              vertical: isDesktop ? 20.0 : 16.0,
+              vertical: isDesktop ? 18.0 : 16.0,
               horizontal: isDesktop ? 20.0 : 16.0,
             ),
             decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-              border: Border.all(color: theme.dividerColor),
-              borderRadius: BorderRadius.circular(12.0),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1100,8 +1123,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   children: [
                     Icon(
                       Icons.calendar_today_rounded,
-                      color: colorScheme.primary,
-                      size: isDesktop ? 24.0 : 20.0,
+                      color: theme.primaryColor,
+                      size: isDesktop ? 22.0 : 20.0,
                     ),
                     SizedBox(width: isDesktop ? 16.0 : 12.0),
                     Text(
@@ -1111,17 +1134,17 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             ).format(selectedDate!)
                           : 'Select Date',
                       style: TextStyle(
-                        fontSize: isDesktop ? 17.0 : 16.0,
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
+                        fontSize: isDesktop ? 16.0 : 15.0,
+                        color: const Color(0xFF0A183D),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  size: isDesktop ? 20.0 : 16.0,
+                  color: Color(0xFF5A759E),
+                  size: 16,
                 ),
               ],
             ),

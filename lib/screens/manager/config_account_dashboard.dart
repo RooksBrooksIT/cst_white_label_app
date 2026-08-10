@@ -2,9 +2,10 @@ import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
+import 'package:demo_cst/screens/manager/labour_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/manager/config_material_information.dart';
 import 'package:demo_cst/screens/manager/site_supervisor_config.dart';
 import 'package:demo_cst/screens/manager/config_mat_sub_cat.dart';
@@ -13,10 +14,7 @@ import 'package:demo_cst/screens/manager/config_materials.dart';
 import 'package:demo_cst/screens/manager/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
 import 'package:demo_cst/screens/manager/contractor_page.dart';
-import 'package:demo_cst/screens/manager/labour_screen.dart';
-import 'package:demo_cst/screens/manager/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 import 'package:demo_cst/screens/manager/material_screen.dart';
 import 'package:demo_cst/screens/manager/project_category_screen.dart';
 import 'package:demo_cst/screens/manager/project_contract_screen.dart';
@@ -372,8 +370,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: theme.cardColor,
-        elevation: 8,
+        color: AppTheme.getDarkAccent(theme.primaryColor),
+        elevation: 12,
+        shadowColor: Colors.black.withValues(alpha: 0.3),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
@@ -488,8 +487,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   sectionTitle,
                   style: TextStyle(
                     fontSize: Responsive.fontSize(context, 16),
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
+                    color: const Color(0xFF0A183D),
                   ),
                 ),
                 const Spacer(),
@@ -540,10 +540,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Widget _buildGridItem(DashboardItem item) {
+    final darkCardBg = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Theme.of(context).cardColor,
+      color: darkCardBg,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -557,13 +558,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: Theme.of(context).cardColor,
+            color: darkCardBg,
             border: Border.all(
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+              color: Colors.white.withValues(alpha: 0.12),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: darkCardBg.withValues(alpha: 0.25),
                 blurRadius: 12,
                 spreadRadius: 1,
                 offset: const Offset(0, 4),
@@ -599,7 +600,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   item.title,
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                     letterSpacing: -0.2,
                   ),
                   textAlign: TextAlign.center,
@@ -609,9 +611,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 const SizedBox(height: 2),
                 Text(
                   item.subtitle,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 9,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Color(0xFFCBD5E1),
                     height: 1.2,
                   ),
                   textAlign: TextAlign.center,
@@ -721,8 +723,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     bool isActive,
     VoidCallback onTap,
   ) {
-    final theme = Theme.of(context);
-    final color = isActive ? theme.primaryColor : Colors.grey;
+    final activeColor = Colors.white;
+    final inactiveColor = Colors.white.withValues(alpha: 0.6);
+    final color = isActive ? activeColor : inactiveColor;
 
     return InkWell(
       onTap: onTap,
@@ -736,10 +739,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             const SizedBox(height: 4),
             Text(
               label,
-              style: theme.textTheme.labelSmall?.copyWith(
+              style: TextStyle(
                 color: color,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 10.5,
               ),
             ),
           ],

@@ -935,15 +935,15 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             Icon(
               Icons.inbox,
               size: isDesktop ? 80 : 60,
-              color: Colors.blueGrey[200],
+              color: const Color(0xFF0A183D),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               "No requests found",
               style: TextStyle(
-                color: Colors.blueGrey,
+                color: const Color(0xFF0A183D),
                 fontSize: isDesktop ? 20 : 18,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -976,17 +976,18 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
               children: [
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.location_on,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: isDesktop ? 20 : 16,
+                      color: Colors.white,
+                      size: 20,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
                       request['siteId'] ?? '',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: isDesktop ? 15 : 13,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const Spacer(),
@@ -997,18 +998,18 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                       ),
                       decoration: BoxDecoration(
                         color: isApproved
-                            ? Colors.green.withOpacity(0.2)
-                            : Colors.orange.withOpacity(0.2),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                            : Colors.orange.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isApproved ? Colors.green : Colors.orange,
-                          width: 0.5,
+                          color: isApproved ? const Color(0xFF10B981) : Colors.orange,
+                          width: 1.0,
                         ),
                       ),
                       child: Text(
                         status,
                         style: TextStyle(
-                          color: isApproved ? Colors.green : Colors.orange,
+                          color: isApproved ? const Color(0xFF10B981) : Colors.orange,
                           fontWeight: FontWeight.bold,
                           fontSize: isDesktop ? 13 : 11,
                         ),
@@ -1016,25 +1017,27 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Supervisor',
                           style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: isDesktop ? 13 : 11,
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
                           request['supervisorName'] ?? '-',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: isDesktop ? 16 : 14,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -1042,19 +1045,20 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
+                        const Text(
                           'Labours',
                           style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: isDesktop ? 13 : 11,
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
                           '${(request['reqLabours'] ?? []).length}',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: isDesktop ? 16 : 14,
-                            fontWeight: FontWeight.bold,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -1071,10 +1075,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
@@ -1088,75 +1089,98 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: Column(
-        children: [
-          Container(
-            color: theme.cardColor,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: "PENDING"),
-                    Tab(text: "APPROVED"),
-                  ],
-                  labelColor: colorScheme.primary,
-                  labelStyle: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isDesktop ? 16 : 14,
+            children: [
+              Container(
+                color: theme.cardColor,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: TabBar(
+                      controller: _tabController,
+                      tabs: const [
+                        Tab(text: "PENDING"),
+                        Tab(text: "APPROVED"),
+                      ],
+                      labelColor: Colors.white,
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: isDesktop ? 16 : 14,
+                      ),
+                      unselectedLabelColor: const Color(0xFFCBD5E1),
+                      unselectedLabelStyle: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: isDesktop ? 16 : 14,
+                      ),
+                      indicatorColor: const Color(0xFF10B981),
+                      indicatorWeight: 3,
+                    ),
                   ),
-                  unselectedLabelColor: Colors.black54,
-                  indicatorColor: colorScheme.primary,
-                  indicatorWeight: 3,
                 ),
               ),
-            ),
-          ),
 
-          Padding(
-            padding: EdgeInsets.all(isDesktop ? 24 : 16.0),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (text) {
-                    setState(() {
-                      _searchText = text.trim();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search Req ID...',
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: colorScheme.primary,
-                      size: isDesktop ? 24 : 20,
+              Padding(
+                padding: EdgeInsets.all(isDesktop ? 24 : 16.0),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (text) {
+                        setState(() {
+                          _searchText = text.trim();
+                        });
+                      },
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search Req ID...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFFCBD5E1),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Colors.white,
+                          size: isDesktop ? 24 : 20,
+                        ),
+                        suffixIcon: _searchText.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.white,
+                                  size: isDesktop ? 24 : 20,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchText = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.8),
+                        ),
+                        filled: true,
+                        fillColor: theme.cardColor,
+                      ),
                     ),
-                    suffixIcon: _searchText.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.clear,
-                              color: colorScheme.primary,
-                              size: isDesktop ? 24 : 20,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchText = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: theme.cardColor,
                   ),
                 ),
               ),
-            ),
-          ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -1220,7 +1244,7 @@ class _RowInfo extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: Theme.of(context).colorScheme.primary,
+            color: Colors.white,
             size: isDesktop ? 24 : 20,
           ),
           SizedBox(width: isDesktop ? 16 : 12),
@@ -1230,16 +1254,18 @@ class _RowInfo extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: const Color(0xFFCBD5E1),
                   fontSize: isDesktop ? 14 : 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 value,
                 style: TextStyle(
                   fontSize: isDesktop ? 16 : 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -1286,9 +1312,9 @@ class _LabourRequirementCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(isDesktop ? 18 : 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: const Color(0xFF0B1942).withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1296,28 +1322,30 @@ class _LabourRequirementCard extends StatelessWidget {
             Text(
               designation,
               style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
                 fontSize: isDesktop ? 18 : 16,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               'ID: $labourId',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.black54,
+              style: TextStyle(
+                color: const Color(0xFFCBD5E1),
                 fontSize: isDesktop ? 14 : 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Salary: ₹$salary',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black54,
+                  style: TextStyle(
+                    color: const Color(0xFFCBD5E1),
                     fontSize: isDesktop ? 14 : 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (editable)
@@ -1328,15 +1356,25 @@ class _LabourRequirementCard extends StatelessWidget {
                       ),
                       child: TextFormField(
                         controller: countController,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           hintText: 'Count',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF5A759E),
+                            fontWeight: FontWeight.w600,
+                          ),
                           contentPadding: EdgeInsets.symmetric(
                             vertical: isDesktop ? 14 : 10,
                             horizontal: isDesktop ? 16 : 12,
                           ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -1348,8 +1386,8 @@ class _LabourRequirementCard extends StatelessWidget {
                 Text(
                   'Total: ₹$total',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF10B981),
                     fontSize: isDesktop ? 18 : 16,
                   ),
                 ),
