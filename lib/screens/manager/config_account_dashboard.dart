@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -321,6 +322,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     final theme = Theme.of(context);
 
     return GlassScaffold(
+      extendBody: true,
       title: _currentIndex == 0
           ? 'Management Console'
           : _currentIndex == 1
@@ -346,72 +348,78 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ]
           : null,
       padding: EdgeInsets.zero,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProjectSetupWizard(),
-                  ),
-                );
-              },
-              backgroundColor: theme.primaryColor,
-              elevation: 4,
-              shape: const CircleBorder(),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 32,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Center(
+            heightFactor: 1.0,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: Responsive.maxContentWidth,
               ),
-            )
-          : null,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        color: AppTheme.getDarkAccent(theme.primaryColor),
-        elevation: 12,
-        shadowColor: Colors.black.withValues(alpha: 0.3),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: Responsive.maxContentWidth,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildNavItem(
-                  context,
-                  Icons.dashboard_rounded,
-                  'Dashboard',
-                  _currentIndex == 0,
-                  () => setState(() => _currentIndex = 0),
+              child: Container(
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTheme.getDarkAccent(theme.primaryColor),
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                _buildNavItem(
-                  context,
-                  Icons.work_rounded,
-                  'Projects',
-                  _currentIndex == 1,
-                  () => setState(() => _currentIndex = 1),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(34),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildNavItem(
+                            context,
+                            Icons.dashboard_rounded,
+                            'Dashboard',
+                            _currentIndex == 0,
+                            () => setState(() => _currentIndex = 0),
+                          ),
+                          _buildNavItem(
+                            context,
+                            Icons.work_rounded,
+                            'Projects',
+                            _currentIndex == 1,
+                            () => setState(() => _currentIndex = 1),
+                          ),
+                          _buildCenterActionButton(context),
+                          _buildNavItem(
+                            context,
+                            Icons.edit_note_rounded,
+                            'Daily Entry',
+                            _currentIndex == 2,
+                            () => setState(() => _currentIndex = 2),
+                          ),
+                          _buildNavItem(
+                            context,
+                            Icons.account_balance_wallet_rounded,
+                            'Expenses',
+                            _currentIndex == 3,
+                            () => setState(() => _currentIndex = 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 40), // Space for FAB
-                _buildNavItem(
-                  context,
-                  Icons.edit_note_rounded,
-                  'Daily Entry',
-                  _currentIndex == 2,
-                  () => setState(() => _currentIndex = 2),
-                ),
-                _buildNavItem(
-                  context,
-                  Icons.account_balance_wallet_rounded,
-                  'Expenses',
-                  _currentIndex == 3,
-                  () => setState(() => _currentIndex = 3),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -965,29 +973,86 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     bool isActive,
     VoidCallback onTap,
   ) {
-    final activeColor = Colors.white;
-    final inactiveColor = Colors.white.withValues(alpha: 0.6);
-    final color = isActive ? activeColor : inactiveColor;
+    final activeIconColor = Colors.white;
+    final activeBgColor = Colors.white.withValues(alpha: 0.22);
+    final inactiveColor = Colors.white.withValues(alpha: 0.65);
 
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(20),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: isActive ? activeBgColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                color: isActive ? activeIconColor : inactiveColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: color,
+                color: isActive ? activeIconColor : inactiveColor,
                 fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                 fontSize: 10.5,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCenterActionButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final brandColor = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ProjectSetupWizard(),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.add_rounded,
+          color: brandColor,
+          size: 28,
         ),
       ),
     );

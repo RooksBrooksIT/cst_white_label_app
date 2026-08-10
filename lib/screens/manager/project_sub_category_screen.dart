@@ -131,11 +131,11 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
-                            prefixIcon: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12.0),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
                               child: Icon(
                                 Icons.subtitles_rounded,
-                                color: Color(0xFF8B5CF6),
+                                color: AppTheme.getDarkAccent(theme.primaryColor),
                                 size: 22,
                               ),
                             ),
@@ -173,16 +173,25 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                                  backgroundColor: Colors.white,
+                                  side: BorderSide(color: theme.primaryColor, width: 1.8),
+                                  alignment: Alignment.center,
+                                  padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
+                                  elevation: 2,
                                 ),
-                                child: const Text(
-                                  'CANCEL',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
+                                child: const Center(
+                                  child: Text(
+                                    'CANCEL',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -215,18 +224,26 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                         }
                                       },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8B5CF6),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: theme.primaryColor,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  alignment: Alignment.center,
+                                  padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
+                                  elevation: 6,
+                                  shadowColor: theme.primaryColor.withValues(alpha: 0.4),
                                 ),
-                                child: const Text(
-                                  'SAVE',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.8,
+                                child: const Center(
+                                  child: Text(
+                                    'SAVE',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -449,6 +466,8 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
 
                                             return DropdownButtonFormField<String>(
                                               isExpanded: true,
+                                              dropdownColor: Colors.white,
+                                              borderRadius: BorderRadius.circular(16),
                                               value: (_selectedSubCategory != null && items.contains(_selectedSubCategory))
                                                   ? _selectedSubCategory
                                                   : null,
@@ -464,11 +483,11 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w500,
                                                 ),
-                                                prefixIcon: const Padding(
-                                                  padding: EdgeInsets.symmetric(horizontal: 12.0),
+                                                prefixIcon: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
                                                   child: Icon(
                                                     Icons.search_rounded,
-                                                    color: Color(0xFF8B5CF6),
+                                                    color: AppTheme.getDarkAccent(theme.primaryColor),
                                                     size: 20,
                                                   ),
                                                 ),
@@ -489,6 +508,11 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                                       child: Text(
                                                         item,
                                                         overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF0A183D),
+                                                          fontSize: 14.5,
+                                                          fontWeight: FontWeight.w700,
+                                                        ),
                                                       ),
                                                     ),
                                                   )
@@ -504,18 +528,18 @@ class _ProjectSubCategoryScreenState extends State<ProjectSubCategoryScreen> {
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF8B5CF6),
+                                        color: theme.primaryColor,
                                         borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                                            color: theme.primaryColor.withValues(alpha: 0.4),
                                             blurRadius: 8,
                                             offset: const Offset(0, 3),
                                           ),
                                         ],
                                       ),
                                       child: IconButton(
-                                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+                                        icon: const Icon(Icons.add_rounded, color: Color(0xFF0A183D), size: 26),
                                         onPressed: _showAddSubCategoryDialog,
                                         tooltip: 'Add Sub Category',
                                       ),
