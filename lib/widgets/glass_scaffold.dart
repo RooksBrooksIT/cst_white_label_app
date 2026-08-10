@@ -18,6 +18,7 @@ class GlassScaffold extends StatelessWidget {
   final Widget? endDrawer;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
   final double? toolbarHeight;
+  final bool extendBody;
 
   const GlassScaffold({
     super.key,
@@ -35,6 +36,7 @@ class GlassScaffold extends StatelessWidget {
     this.endDrawer,
     this.floatingActionButtonLocation,
     this.toolbarHeight = 70,
+    this.extendBody = false,
   });
 
   @override
@@ -131,9 +133,10 @@ class GlassScaffold extends StatelessWidget {
             floatingActionButtonLocation: floatingActionButtonLocation,
             drawer: drawer,
             endDrawer: endDrawer,
+            extendBody: extendBody,
             body: SafeArea(
               top: true,
-              bottom: true,
+              bottom: !extendBody,
               left: false,
               right: false,
               child: Padding(
