@@ -534,16 +534,27 @@ class _DailySitePaymentReportScreenState
     required double fontSizeBase,
     required ValueChanged<String?> onChanged,
   }) {
-    final theme = Theme.of(context);
     return DropdownButtonFormField<String>(
       decoration: _inputDecoration(label, fontSizeBase),
       value: value,
-      dropdownColor: theme.cardColor,
+      dropdownColor: Colors.white,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: const Color(0xFF0A183D),
+        fontWeight: FontWeight.w700,
+      ),
       items: items
           .map(
             (id) => DropdownMenuItem(
               value: id,
-              child: Text(id, style: TextStyle(fontSize: fontSizeBase)),
+              child: Text(
+                id,
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: const Color(0xFF0A183D),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           )
           .toList(),
@@ -559,25 +570,37 @@ class _DailySitePaymentReportScreenState
     return TextFormField(
       decoration: _inputDecoration(label, fontSizeBase),
       readOnly: true,
-      style: TextStyle(fontSize: fontSizeBase, color: const Color(0xFF1E293B)),
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: const Color(0xFF0A183D),
+        fontWeight: FontWeight.w700,
+      ),
       controller: controller,
     );
   }
 
   Widget _buildMonthDropdown(double fontSizeBase) {
-    final theme = Theme.of(context);
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Month', fontSizeBase * 0.9),
       value: selectedMonth,
       isExpanded: true,
-      dropdownColor: theme.cardColor,
+      dropdownColor: Colors.white,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: const Color(0xFF0A183D),
+        fontWeight: FontWeight.w700,
+      ),
       items: List.generate(12, (i) => i + 1)
           .map(
             (m) => DropdownMenuItem(
               value: m,
               child: Text(
                 DateFormat.MMMM().format(DateTime(0, m)),
-                style: TextStyle(fontSize: fontSizeBase),
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: const Color(0xFF0A183D),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           )
@@ -595,19 +618,27 @@ class _DailySitePaymentReportScreenState
   }
 
   Widget _buildYearDropdown(double fontSizeBase) {
-    final theme = Theme.of(context);
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Year', fontSizeBase * 0.9),
       value: selectedYear,
       isExpanded: true,
-      dropdownColor: theme.cardColor,
+      dropdownColor: Colors.white,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: const Color(0xFF0A183D),
+        fontWeight: FontWeight.w700,
+      ),
       items: years
           .map(
             (y) => DropdownMenuItem(
               value: y,
               child: Text(
                 y.toString(),
-                style: TextStyle(fontSize: fontSizeBase),
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: const Color(0xFF0A183D),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           )
@@ -639,17 +670,20 @@ class _DailySitePaymentReportScreenState
             'Week ${i + 1}',
             style: TextStyle(
               color: isSelected
-                  ? colorScheme.onPrimary
-                  : const Color(0xFF64748B),
+                  ? const Color(0xFF0A183D)
+                  : Colors.white,
               fontSize: 14,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
           selected: isSelected,
-          selectedColor: colorScheme.primary,
-          backgroundColor: const Color(0xFFF1F5F9),
+          selectedColor: Colors.white,
+          backgroundColor: Colors.white.withValues(alpha: 0.15),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.25),
+            ),
           ),
           onSelected: (_) => _onWeekSelected(i),
           showCheckmark: false,
@@ -665,7 +699,7 @@ class _DailySitePaymentReportScreenState
         Text(
           'Payments for Week ${selectedWeekIndex! + 1}:',
           style: const TextStyle(
-            color: Color(0xFF1E293B),
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
@@ -675,7 +709,7 @@ class _DailySitePaymentReportScreenState
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: Table(
             columnWidths: const {
@@ -685,7 +719,7 @@ class _DailySitePaymentReportScreenState
             children: [
               TableRow(
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.15),
                 ),
                 children: [
                   _buildTableCell('Date', isHeader: true),
@@ -711,7 +745,7 @@ class _DailySitePaymentReportScreenState
               }),
               TableRow(
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.02),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
                 children: [
                   _buildTableCell('Total', isTotal: true),
@@ -739,7 +773,7 @@ class _DailySitePaymentReportScreenState
         text,
         style: TextStyle(
           fontWeight: isHeader || isTotal ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? const Color(0xFF64748B) : const Color(0xFF1E293B),
+          color: Colors.white,
           fontSize: isHeader ? 12 : 14,
         ),
       ),
@@ -759,7 +793,7 @@ class _DailySitePaymentReportScreenState
         _buildActionButton(
           onTap: _onPrint,
           icon: Icons.print_rounded,
-          color: colorScheme.primary,
+          color: const Color(0xFF10B981), // Emerald Green
           label: 'Print',
         ),
       ],
@@ -799,9 +833,9 @@ class _DailySitePaymentReportScreenState
         Text(
           label,
           style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
       ],
@@ -811,22 +845,26 @@ class _DailySitePaymentReportScreenState
   InputDecoration _inputDecoration(String label, double fontSize) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      labelStyle: const TextStyle(
+        fontSize: 14,
+        color: Color(0xFF5A759E),
+        fontWeight: FontWeight.w600,
+      ),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: Colors.white,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(
           color: Theme.of(context).colorScheme.primary,
-          width: 2,
+          width: 1.8,
         ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

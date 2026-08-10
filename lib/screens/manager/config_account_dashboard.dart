@@ -2,6 +2,7 @@ import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:demo_cst/screens/manager/labour_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -13,7 +14,6 @@ import 'package:demo_cst/screens/manager/config_materials.dart';
 import 'package:demo_cst/screens/manager/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
 import 'package:demo_cst/screens/manager/contractor_page.dart';
-import 'package:demo_cst/screens/manager/labour_screen.dart';
 import 'package:demo_cst/screens/manager/manager_expenses.dart';
 import 'package:demo_cst/screens/manager/material_screen.dart';
 import 'package:demo_cst/screens/manager/project_category_screen.dart';
@@ -151,11 +151,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF9333EA),
       ),
       DashboardItem(
-        'Vehicle Configuration',
-        Icons.settings_rounded,
-        const Color(0xFFDC2626),
-        'Vehicle specifications and logs',
-        const Color(0xFFDC2626),
+        'Vehicle Driver Configuration',
+        Icons.person_rounded,
+        Colors.blue,
+        'Driver profiles',
+        Colors.blue,
       ),
     ],
     "Project Configuration": [
@@ -268,11 +268,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     ],
     "Vehicle Fleet": [
       DashboardItem(
-        'Vehicle Driver Configuration',
-        Icons.person_rounded,
-        const Color(0xFF2563EB),
-        'Driver profiles and licenses',
-        const Color(0xFF2563EB),
+        'Vehicle Fleet',
+        Icons.settings_rounded,
+        Colors.red,
+        'Vehicle specifications',
+        Colors.red,
       ),
       DashboardItem(
         'Vehicle Details',
@@ -346,97 +346,73 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ]
           : null,
       padding: EdgeInsets.zero,
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.topCenter,
-            children: [
-              // White Floating Notched Bar
-              CustomPaint(
-                painter: FloatingNotchedShadowPainter(
-                  shadowColor: Colors.black.withValues(alpha: 0.12),
-                  elevation: 12,
-                ),
-                child: SizedBox(
-                  height: 64,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildNavItem(
-                        context,
-                        Icons.grid_view_rounded,
-                        _currentIndex == 0,
-                        () => setState(() => _currentIndex = 0),
-                      ),
-                      _buildNavItem(
-                        context,
-                        Icons.work_outline_rounded,
-                        _currentIndex == 1,
-                        () => setState(() => _currentIndex = 1),
-                      ),
-                      const SizedBox(width: 52), // Gap for center notched button
-                      _buildNavItem(
-                        context,
-                        Icons.edit_note_rounded,
-                        _currentIndex == 2,
-                        () => setState(() => _currentIndex = 2),
-                      ),
-                      _buildNavItem(
-                        context,
-                        Icons.account_balance_wallet_outlined,
-                        _currentIndex == 3,
-                        () => setState(() => _currentIndex = 3),
-                      ),
-                    ],
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProjectSetupWizard(),
                   ),
-                ),
+                );
+              },
+              backgroundColor: theme.primaryColor,
+              elevation: 4,
+              shape: const CircleBorder(),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 32,
               ),
-
-              // Floating Center Gradient Plus Button
-              Positioned(
-                top: -24,
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProjectSetupWizard(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.primaryColor,
-                          AppTheme.getDarkAccent(theme.primaryColor),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.primaryColor.withValues(alpha: 0.45),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
+            )
+          : null,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        color: AppTheme.getDarkAccent(theme.primaryColor),
+        elevation: 12,
+        shadowColor: Colors.black.withValues(alpha: 0.3),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: Responsive.maxContentWidth,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildNavItem(
+                  context,
+                  Icons.dashboard_rounded,
+                  'Dashboard',
+                  _currentIndex == 0,
+                  () => setState(() => _currentIndex = 0),
                 ),
-              ),
-            ],
+                _buildNavItem(
+                  context,
+                  Icons.work_rounded,
+                  'Projects',
+                  _currentIndex == 1,
+                  () => setState(() => _currentIndex = 1),
+                ),
+                const SizedBox(width: 40), // Space for FAB
+                _buildNavItem(
+                  context,
+                  Icons.edit_note_rounded,
+                  'Daily Entry',
+                  _currentIndex == 2,
+                  () => setState(() => _currentIndex = 2),
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.account_balance_wallet_rounded,
+                  'Expenses',
+                  _currentIndex == 3,
+                  () => setState(() => _currentIndex = 3),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -651,20 +627,22 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    sectionTitle,
-                    style: const TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0A183D),
-                      letterSpacing: -0.3,
-                    ),
+                const SizedBox(width: 12),
+                Text(
+                  sectionTitle,
+                  style: TextStyle(
+                    fontSize: Responsive.fontSize(context, 16),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: const Color(0xFF0A183D),
                   ),
                 ),
+                const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: darkCardBg,
                     borderRadius: BorderRadius.circular(14),
@@ -703,31 +681,38 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return slivers;
   }
 
-  Widget _buildListItem(BuildContext context, DashboardItem item, Color darkCardBg) {
-    return Container(
-      decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+  Widget _buildGridItem(DashboardItem item) {
+    final darkCardBg = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: darkCardBg,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (item.title == 'Privacy Policy') {
+            _launchPrivacyPolicy(context);
+          } else {
+            _navigateToScreen(context, item.title);
+          }
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: darkCardBg,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: darkCardBg.withValues(alpha: 0.25),
+                blurRadius: 12,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            if (item.title == 'Privacy Policy') {
-              _launchPrivacyPolicy(context);
-            } else {
-              _navigateToScreen(context, item.title);
-            }
-          },
-          borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -752,50 +737,30 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFFCBD5E1),
-                          height: 1.25,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right_rounded,
+                const SizedBox(height: 8),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
-                    size: 20,
+                    letterSpacing: -0.2,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Color(0xFFCBD5E1),
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -895,22 +860,29 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     bool isActive,
     VoidCallback onTap,
   ) {
-    final theme = Theme.of(context);
-    final activeColor = theme.primaryColor;
+    final activeColor = Colors.white;
+    final inactiveColor = Colors.white.withValues(alpha: 0.6);
+    final color = isActive ? activeColor : inactiveColor;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(10),
-        child: Icon(
-          icon,
-          color: isActive ? activeColor : const Color(0xFF64748B),
-          size: 26,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 10.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -952,7 +924,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Workers Site Mapping': WorkerMappingPage(),
       'Workers Availability': const WorkersAvailabilityReportPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),
-      'Vehicle Configuration': AddVehicleLogPage(),
+      'Vehicle Fleet': AddVehicleLogPage(),
       'Vehicle Driver Configuration': VehicleDriverConfigPage(),
       "Vehicle Details": VehicleDetailsPage(),
       "Vehicle Inventory": VehicleInventoryReportPage(),

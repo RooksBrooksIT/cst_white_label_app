@@ -96,7 +96,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                             fontWeight: FontWeight.w700,
                           ),
                           onChanged: (value) async {
-                            final duplicate = await _isDuplicateStage(value.trim());
+                            final duplicate = await _isDuplicateStage(
+                              value.trim(),
+                            );
                             setDialogState(() => isDuplicate = duplicate);
                           },
                           decoration: InputDecoration(
@@ -148,7 +150,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -171,7 +175,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                 onPressed: isDuplicate
                                     ? null
                                     : () async {
-                                        final newStage = _newStageController.text.trim();
+                                        final newStage = _newStageController
+                                            .text
+                                            .trim();
                                         if (newStage.isEmpty) return;
 
                                         final nextId = await _getNextStageId();
@@ -184,10 +190,13 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
 
                                         if (mounted) {
                                           Navigator.pop(context);
-                                          setState(() => _selectedStage = newStage);
+                                          setState(
+                                            () => _selectedStage = newStage,
+                                          );
                                           await DialogUtils.showSuccessDialog(
                                             context,
-                                            message: 'Stage added successfully!',
+                                            message:
+                                                'Stage added successfully!',
                                           );
                                         }
                                       },
@@ -265,9 +274,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete stage: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to delete stage: $e')));
       }
     }
   }
@@ -303,7 +312,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                          color: const Color(
+                            0xFF0B1942,
+                          ).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -336,10 +347,15 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -370,7 +386,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                          color: const Color(
+                                            0xFFEF4444,
+                                          ).withValues(alpha: 0.4),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
@@ -385,7 +403,8 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                   const SizedBox(width: 14),
                                   const Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Project Stages',
@@ -430,29 +449,45 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                         borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.08),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
+                                            ),
                                             blurRadius: 8,
                                             offset: const Offset(0, 2),
                                           ),
                                         ],
                                       ),
                                       child: StreamBuilder<QuerySnapshot>(
-                                        stream: FirestoreService.getCollection('projectStages').snapshots(),
+                                        stream: FirestoreService.getCollection(
+                                          'projectStages',
+                                        ).snapshots(),
                                         builder: (context, snapshot) {
-                                          if (!snapshot.hasData || snapshot.data == null) {
+                                          if (!snapshot.hasData ||
+                                              snapshot.data == null) {
                                             return const Padding(
                                               padding: EdgeInsets.all(16.0),
                                               child: LinearProgressIndicator(),
                                             );
                                           }
                                           final stages = snapshot.data!.docs
-                                              .map((d) => d['projectStage']?.toString() ?? '')
+                                              .map(
+                                                (d) =>
+                                                    d['projectStage']
+                                                        ?.toString() ??
+                                                    '',
+                                              )
                                               .where((s) => s.isNotEmpty)
                                               .toList();
 
-                                          return DropdownButtonFormField<String>(
+                                          return DropdownButtonFormField<
+                                            String
+                                          >(
                                             isExpanded: true,
-                                            value: (_selectedStage != null && stages.contains(_selectedStage))
+                                            value:
+                                                (_selectedStage != null &&
+                                                    stages.contains(
+                                                      _selectedStage,
+                                                    ))
                                                 ? _selectedStage
                                                 : null,
                                             style: const TextStyle(
@@ -468,7 +503,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               prefixIcon: const Padding(
-                                                padding: EdgeInsets.symmetric(horizontal: 12.0),
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 12.0,
+                                                ),
                                                 child: Icon(
                                                   Icons.search_rounded,
                                                   color: Color(0xFFEF4444),
@@ -476,13 +513,15 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                                 ),
                                               ),
                                               border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(16),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                                 borderSide: BorderSide.none,
                                               ),
-                                              contentPadding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 14,
-                                              ),
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 14,
+                                                  ),
                                             ),
                                             items: stages
                                                 .toSet()
@@ -491,12 +530,15 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                                     value: stage,
                                                     child: Text(
                                                       stage,
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 )
                                                 .toList(),
-                                            onChanged: (val) => setState(() => _selectedStage = val),
+                                            onChanged: (val) => setState(
+                                              () => _selectedStage = val,
+                                            ),
                                           );
                                         },
                                       ),
@@ -511,14 +553,20 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                       borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                          color: const Color(
+                                            0xFFEF4444,
+                                          ).withValues(alpha: 0.4),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
                                     child: IconButton(
-                                      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+                                      icon: const Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.white,
+                                        size: 26,
+                                      ),
                                       onPressed: _showAddStageDialog,
                                       tooltip: 'Add Stage',
                                     ),
@@ -547,14 +595,18 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                                         ),
                                         actions: [
                                           TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
                                             child: const Text('CANCEL'),
                                           ),
                                           TextButton(
-                                            onPressed: () => Navigator.pop(context, true),
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
                                             child: const Text(
                                               'DELETE',
-                                              style: TextStyle(color: Colors.red),
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -568,7 +620,9 @@ class _ProjectStageConfigState extends State<ProjectStageConfig> {
                               backgroundColor: const Color(0xFFEF4444),
                               foregroundColor: Colors.white,
                               elevation: 4,
-                              shadowColor: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                              shadowColor: const Color(
+                                0xFFEF4444,
+                              ).withValues(alpha: 0.35),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),

@@ -35,27 +35,22 @@ class GlassCard extends StatelessWidget {
     final isMobile = Responsive.isMobile(context);
     final defaultPadding = EdgeInsets.all(isMobile ? 16 : 24);
     final currentPadding = padding ?? defaultPadding;
+    final Color cardBg = color ?? theme.cardColor;
 
     return Container(
       width: width,
       margin: margin ?? const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: color ?? theme.cardColor,
+        color: cardBg,
         borderRadius: BorderRadius.circular(borderRadius ?? 24),
         border:
-            border ?? Border.all(color: const Color(0xFFD4E3F4), width: 1.2),
+            border ?? Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B1942).withOpacity(0.06),
-            blurRadius: 20,
+            color: cardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
             spreadRadius: 1,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: const Color(0xFF0B1942).withOpacity(0.03),
-            blurRadius: 6,
-            spreadRadius: 0,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -81,9 +76,9 @@ class GlassCard extends StatelessWidget {
                             Text(
                               title!,
                               style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface,
-                                fontSize: isMobile ? 16 : 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                fontSize: isMobile ? 17 : 18,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -92,7 +87,7 @@ class GlassCard extends StatelessWidget {
                               Text(
                                 subtitle!,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: const Color(0xFFCBD5E1),
                                   fontSize: 12.5,
                                   height: 1.3,
                                 ),
@@ -102,9 +97,9 @@ class GlassCard extends StatelessWidget {
                         ),
                       ),
                       if (onTap != null)
-                        Icon(
+                        const Icon(
                           Icons.arrow_forward_ios_rounded,
-                          color: theme.colorScheme.primary,
+                          color: Colors.white70,
                           size: 16,
                         ),
                     ],

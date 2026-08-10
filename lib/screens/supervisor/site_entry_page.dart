@@ -7,6 +7,7 @@ import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/widgets/glass_button.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;
@@ -673,11 +674,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+    return Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.w800,
+        fontSize: 18,
+        color: Colors.white,
+        letterSpacing: -0.4,
       ),
     );
   }
@@ -687,31 +690,53 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     TextEditingController controller,
     IconData icon,
   ) {
-    final theme = Theme.of(context);
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: theme.primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 16,
-        ),
-        isDense: true,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Color(0xFF0A183D),
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1.8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 16,
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
       ),
-      keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
     );
   }
 
@@ -1087,13 +1112,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         builder: (context, constraints) {
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(
-              horizontal: 8.0,
-              vertical: 12.0,
+              horizontal: 16.0,
+              vertical: 16.0,
             ),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 600,
+                  maxWidth: 800,
                   minHeight: constraints.maxHeight,
                 ),
                 child: Column(
@@ -1116,17 +1141,37 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 child: DropdownButtonFormField<String>(
                                   value: selectedSiteId,
                                   isExpanded: true,
+                                  dropdownColor: Colors.white,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF0A183D),
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                   decoration: InputDecoration(
                                     labelText: 'Site Id (Supervisor Only)',
+                                    labelStyle: const TextStyle(
+                                      color: Color(0xFF5A759E),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: theme.primaryColor, width: 1.8),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey[50],
+                                    fillColor: Colors.white,
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                      horizontal: 12,
+                                      vertical: 12,
+                                      horizontal: 14,
                                     ),
                                   ),
                                   items: supervisorSites
@@ -1136,6 +1181,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           child: Text(
                                             site['siteId'] ?? '',
                                             overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Color(0xFF0A183D),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
                                       )
@@ -1181,102 +1231,44 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Supervisor: ${supervisorName ?? widget.userName}',
-                                      style: const TextStyle(fontSize: 16),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (supervisorId != null &&
-                                        supervisorId!.isNotEmpty)
-                                      Text(
-                                        'ID: $supervisorId',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          const SizedBox(height: 12),
+                          _buildModernSiteRow(
+                            Icons.person,
+                            'Supervisor',
+                            '${supervisorName ?? widget.userName}${supervisorId != null && supervisorId!.isNotEmpty ? ' (ID: $supervisorId)' : ''}',
+                          ),
+                          _buildModernSiteRow(
+                            Icons.business,
+                            'Project Name',
+                            projectName ?? 'Not found',
+                          ),
+                          _buildModernSiteRow(
+                            Icons.location_on,
+                            'Location',
+                            siteLocation ?? 'Unknown',
+                          ),
+                          _buildModernSiteRow(
+                            Icons.stairs_outlined,
+                            'Project Stage',
+                            selectedProjectPhase ?? 'Not assigned',
                           ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Project Name: $projectName',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Location: $siteLocation',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.stairs_outlined,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Project Stage: ${selectedProjectPhase ?? "Not assigned"}',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
+                              const Icon(
                                 Icons.calendar_today,
                                 size: 20,
-                                color: theme.primaryColor,
+                                color: Colors.white,
                               ),
                               const SizedBox(width: 8),
+                              const Text(
+                                'Date: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                              ),
                               Flexible(
                                 child: Text(
                                   selectedDate != null
@@ -1284,7 +1276,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           ' ',
                                         )[0]
                                       : 'No date chosen',
-                                  style: const TextStyle(fontSize: 16),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1292,9 +1288,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               TextButton.icon(
                                 onPressed: _pickDate,
                                 icon: const Icon(Icons.edit, size: 16),
-                                label: const Text('Change'),
+                                label: const Text(
+                                  'Change',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
                                 style: TextButton.styleFrom(
-                                  foregroundColor: theme.primaryColor,
+                                  foregroundColor: const Color(0xFF10B981),
                                   padding: EdgeInsets.zero,
                                   minimumSize: Size.zero,
                                 ),
@@ -1304,883 +1303,871 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
                     // Add Entry Text
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.0),
                       child: Text(
                         'Add Entry',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const Divider(height: 16),
+                    const SizedBox(height: 12),
 
                     // Material Details Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Material Details'),
-                            const SizedBox(height: 8),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingMaterials
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : materialError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Material Details'),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: isLoadingMaterials
+                                        ? const Center(
+                                            child:
+                                                CircularProgressIndicator(),
+                                          )
+                                        : materialError != null
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Text(
+                                              materialError!,
+                                              style: const TextStyle(
+                                                color: Colors.redAccent,
                                               ),
-                                              child: Text(
-                                                materialError!,
+                                            ),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Search & Select Material',
                                                 style: TextStyle(
-                                                  color:
-                                                      theme.colorScheme.error,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Material...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          materialOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .startsWith(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedMaterial =
-                                                            filtered.contains(
-                                                              selectedMaterial,
-                                                            )
-                                                            ? selectedMaterial
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedMaterial = null;
-                                                      }
-                                                      _filteredMaterialOptions =
-                                                          filtered;
-                                                    });
-                                                  },
+                                              const SizedBox(height: 4),
+                                              TextField(
+                                                style: const TextStyle(
+                                                  color: Color(0xFF0A183D),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedMaterial,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Material',
-                                                    prefixIcon: const Icon(
-                                                      Icons.category_outlined,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
+                                                decoration: InputDecoration(
+                                                  hintText:
+                                                      'Search Material...',
+                                                  hintStyle: const TextStyle(
+                                                    color: Color(0xFF5A759E),
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
                                                   ),
-                                                  items:
-                                                      (_filteredMaterialOptions ??
-                                                              materialOptions)
-                                                          .map(
-                                                            (
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide.none,
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                onChanged: (query) {
+                                                  setState(() {
+                                                    final q = query
+                                                        .toLowerCase();
+                                                    final filtered =
+                                                        materialOptions
+                                                            .where(
+                                                              (item) => item
+                                                                  .toLowerCase()
+                                                                  .startsWith(
+                                                                    q,
+                                                                  ),
+                                                            )
+                                                            .toList();
+                                                    filtered.sort(
+                                                      (a, b) => a
+                                                          .toLowerCase()
+                                                          .compareTo(
+                                                            b.toLowerCase(),
+                                                          ),
+                                                    );
+                                                    if (filtered.isNotEmpty) {
+                                                      selectedMaterial =
+                                                          filtered.contains(
+                                                            selectedMaterial,
+                                                          )
+                                                          ? selectedMaterial
+                                                          : filtered.first;
+                                                    } else {
+                                                      selectedMaterial = null;
+                                                    }
+                                                    _filteredMaterialOptions =
+                                                        filtered;
+                                                  });
+                                                },
+                                              ),
+                                              const SizedBox(height: 8),
+                                              DropdownButtonFormField<String>(
+                                                value: selectedMaterial,
+                                                isExpanded: true,
+                                                dropdownColor: Colors.white,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Color(0xFF0A183D),
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.category_outlined,
+                                                    color: theme.primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide.none,
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                items:
+                                                    (_filteredMaterialOptions ??
+                                                            materialOptions)
+                                                        .map(
+                                                          (
+                                                            item,
+                                                          ) => DropdownMenuItem(
+                                                            value: item,
+                                                            child: Text(
                                                               item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: const TextStyle(
+                                                                fontSize: 14,
+                                                                color: Color(0xFF0A183D),
+                                                                fontWeight: FontWeight.w700,
                                                               ),
                                                             ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedMaterial =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextField(
-                                            controller: materialQtyController,
-                                            decoration: InputDecoration(
-                                              labelText: 'Qty',
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                onChanged: (value) =>
+                                                    setState(
+                                                      () => selectedMaterial =
+                                                          value,
+                                                    ),
                                               ),
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 8,
-                                                    horizontal: 12,
-                                                  ),
+                                            ],
+                                          ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Qty',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        TextField(
+                                          controller: materialQtyController,
+                                          style: const TextStyle(
+                                            color: Color(0xFF0A183D),
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide.none,
                                             ),
-                                            keyboardType: TextInputType.number,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                materialQty =
-                                                    int.tryParse(value) ?? 0;
-                                              });
-                                            },
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Builder(
-                                            builder: (context) {
-                                              final price =
-                                                  materialPrices[selectedMaterial ??
-                                                      ''] ??
-                                                  0;
-                                              final qty = materialQty;
-                                              final total = price * qty;
-                                              return Text(
-                                                '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: total > 0
-                                                      ? theme.primaryColor
-                                                      : Colors.grey[500],
-                                                  fontWeight: total > 0
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                  horizontal: 14,
                                                 ),
-                                              );
-                                            },
                                           ),
-                                        ],
-                                      ),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              materialQty =
+                                                  int.tryParse(value) ?? 0;
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Builder(
+                                          builder: (context) {
+                                            final price =
+                                                materialPrices[selectedMaterial ??
+                                                    ''] ??
+                                                0;
+                                            final qty = materialQty;
+                                            final total = price * qty;
+                                            return Text(
+                                              '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: total > 0
+                                                    ? const Color(0xFF10B981)
+                                                    : const Color(0xFFCBD5E1),
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                );
-                              },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassButton(
+                                  label: 'Add Material',
+                                  icon: Icons.add,
+                                  onPressed: isLoadingMaterials || materialOptions.isEmpty
+                                      ? null
+                                      : _addMaterial,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GlassButton(
+                                  label: _showCustomMaterialFields ? 'Hide Others' : 'Others',
+                                  icon: Icons.more_horiz,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showCustomMaterialFields = !_showCustomMaterialFields;
+                                    });
+                                  },
+                                  isSecondary: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_showCustomMaterialFields) ...[
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Material Name',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: _customMaterialNameController,
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Qty',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      TextField(
+                                        controller: _customMaterialQtyController,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Unit Price (₹)',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      TextField(
+                                        controller: _customMaterialPriceController,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingMaterials ||
-                                        materialOptions.isEmpty
-                                    ? null
-                                    : _addMaterial,
-                                label: const Text(
-                                  'Add Material',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
+                            GlassButton(
+                              label: 'Add Custom Material',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomMaterial,
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomMaterialFields =
-                                      !_showCustomMaterialFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_showCustomMaterialFields) ...[
-                              TextField(
-                                controller: _customMaterialNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Material Name',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customMaterialQtyController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Qty',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller:
-                                          _customMaterialPriceController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Unit Price (₹)',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Builder(
-                                builder: (context) {
-                                  final qty =
-                                      int.tryParse(
-                                        _customMaterialQtyController.text,
-                                      ) ??
-                                      0;
-                                  final price =
-                                      int.tryParse(
-                                        _customMaterialPriceController.text,
-                                      ) ??
-                                      0;
-                                  final total = qty * price;
-                                  return Text(
-                                    'Total Amount: $qty × ₹$price = ₹$total',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: total > 0
-                                          ? theme.primaryColor
-                                          : Colors.grey[500],
-                                      fontWeight: total > 0
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomMaterial,
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: theme.primaryColor,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Material'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomMaterialFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.grey[200],
-                                        foregroundColor: Colors.black87,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
 
                     // Labour Details Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Labour Details'),
-                            const SizedBox(height: 8),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingLabours
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : labourError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Labour Details'),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: isLoadingLabours
+                                        ? const Center(
+                                            child:
+                                                CircularProgressIndicator(),
+                                          )
+                                        : labourError != null
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Text(
+                                              labourError!,
+                                              style: const TextStyle(
+                                                color: Colors.redAccent,
                                               ),
-                                              child: Text(
-                                                labourError!,
+                                            ),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Search & Select Labour',
                                                 style: TextStyle(
-                                                  color:
-                                                      theme.colorScheme.error,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Labour...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          labourOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .startsWith(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedLabour =
-                                                            filtered.contains(
-                                                              selectedLabour,
-                                                            )
-                                                            ? selectedLabour
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedLabour = null;
-                                                      }
-                                                      _filteredLabourOptions =
-                                                          filtered;
-                                                    });
-                                                  },
+                                              const SizedBox(height: 4),
+                                              TextField(
+                                                style: const TextStyle(
+                                                  color: Color(0xFF0A183D),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedLabour,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Labour',
-                                                    prefixIcon: const Icon(
-                                                      Icons.group,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
+                                                decoration: InputDecoration(
+                                                  hintText:
+                                                      'Search Labour...',
+                                                  hintStyle: const TextStyle(
+                                                    color: Color(0xFF5A759E),
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
                                                   ),
-                                                  items:
-                                                      (_filteredLabourOptions ??
-                                                              labourOptions)
-                                                          .map(
-                                                            (
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide.none,
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                onChanged: (query) {
+                                                  setState(() {
+                                                    final q = query
+                                                        .toLowerCase();
+                                                    final filtered =
+                                                        labourOptions
+                                                            .where(
+                                                              (item) => item
+                                                                  .toLowerCase()
+                                                                  .startsWith(
+                                                                    q,
+                                                                  ),
+                                                            )
+                                                            .toList();
+                                                    filtered.sort(
+                                                      (a, b) => a
+                                                          .toLowerCase()
+                                                          .compareTo(
+                                                            b.toLowerCase(),
+                                                          ),
+                                                    );
+                                                    if (filtered.isNotEmpty) {
+                                                      selectedLabour =
+                                                          filtered.contains(
+                                                            selectedLabour,
+                                                          )
+                                                          ? selectedLabour
+                                                          : filtered.first;
+                                                    } else {
+                                                      selectedLabour = null;
+                                                    }
+                                                    _filteredLabourOptions =
+                                                        filtered;
+                                                  });
+                                                },
+                                              ),
+                                              const SizedBox(height: 8),
+                                              DropdownButtonFormField<String>(
+                                                value: selectedLabour,
+                                                isExpanded: true,
+                                                dropdownColor: Colors.white,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Color(0xFF0A183D),
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.group,
+                                                    color: theme.primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide.none,
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                items:
+                                                    (_filteredLabourOptions ??
+                                                            labourOptions)
+                                                        .map(
+                                                          (
+                                                            item,
+                                                          ) => DropdownMenuItem(
+                                                            value: item,
+                                                            child: Text(
                                                               item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: const TextStyle(
+                                                                fontSize: 14,
+                                                                color: Color(0xFF0A183D),
+                                                                fontWeight: FontWeight.w700,
                                                               ),
                                                             ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedLabour =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextField(
-                                            controller: labourQtyController,
-                                            decoration: InputDecoration(
-                                              labelText: 'Count',
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                onChanged: (value) =>
+                                                    setState(
+                                                      () => selectedLabour =
+                                                          value,
+                                                    ),
                                               ),
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 8,
-                                                    horizontal: 12,
-                                                  ),
+                                            ],
+                                          ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Count',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        TextField(
+                                          controller: labourQtyController,
+                                          style: const TextStyle(
+                                            color: Color(0xFF0A183D),
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide.none,
                                             ),
-                                            keyboardType: TextInputType.number,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                labourQty =
-                                                    int.tryParse(value) ?? 0;
-                                              });
-                                            },
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Builder(
-                                            builder: (context) {
-                                              final salary =
-                                                  labourSalaries[selectedLabour ??
-                                                      ''] ??
-                                                  0;
-                                              final count = labourQty;
-                                              final total = salary * count;
-                                              return Text(
-                                                '$count × ₹${salary.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: total > 0
-                                                      ? theme.primaryColor
-                                                      : Colors.grey[500],
-                                                  fontWeight: total > 0
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                  horizontal: 14,
                                                 ),
-                                              );
-                                            },
                                           ),
-                                        ],
-                                      ),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              labourQty =
+                                                  int.tryParse(value) ?? 0;
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Builder(
+                                          builder: (context) {
+                                            final salary =
+                                                labourSalaries[selectedLabour ??
+                                                    ''] ??
+                                                0;
+                                            final count = labourQty;
+                                            final total = salary * count;
+                                            return Text(
+                                              '$count × ₹${salary.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: total > 0
+                                                    ? const Color(0xFF10B981)
+                                                    : const Color(0xFFCBD5E1),
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                );
-                              },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassButton(
+                                  label: 'Add Labour',
+                                  icon: Icons.person_add,
+                                  onPressed: isLoadingLabours || labourOptions.isEmpty
+                                      ? null
+                                      : _addLabour,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GlassButton(
+                                  label: _showCustomLabourFields ? 'Hide Others' : 'Others',
+                                  icon: Icons.more_horiz,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showCustomLabourFields = !_showCustomLabourFields;
+                                    });
+                                  },
+                                  isSecondary: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_showCustomLabourFields) ...[
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _customLabourNameController,
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: 'Labour Type',
+                                labelStyle: const TextStyle(
+                                  color: Color(0xFF5A759E),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customLabourCountController,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Count',
+                                      labelStyle: const TextStyle(
+                                        color: Color(0xFF5A759E),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customLabourSalaryController,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Salary (₹)',
+                                      labelStyle: const TextStyle(
+                                        color: Color(0xFF5A759E),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingLabours || labourOptions.isEmpty
-                                    ? null
-                                    : _addLabour,
-                                label: const Text(
-                                  'Add Labour',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
+                            GlassButton(
+                              label: 'Add Custom Labour',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomLabour,
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomLabourFields =
-                                      !_showCustomLabourFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_showCustomLabourFields) ...[
-                              TextField(
-                                controller: _customLabourNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Labour Type',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customLabourCountController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Count',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customLabourSalaryController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Salary (₹)',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Builder(
-                                builder: (context) {
-                                  final count =
-                                      int.tryParse(
-                                        _customLabourCountController.text,
-                                      ) ??
-                                      0;
-                                  final salary =
-                                      int.tryParse(
-                                        _customLabourSalaryController.text,
-                                      ) ??
-                                      0;
-                                  final total = count * salary;
-                                  return Text(
-                                    'Total Amount: $count × ₹$salary = ₹$total',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: total > 0
-                                          ? theme.primaryColor
-                                          : Colors.grey[500],
-                                      fontWeight: total > 0
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomLabour,
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: theme.primaryColor,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Labour'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomLabourFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.grey[200],
-                                        foregroundColor: Colors.black87,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
 
                     // Additional Costs Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Additional Costs'),
-                            const SizedBox(height: 12),
-                            _buildCostInput(
-                              'Food Cost',
-                              foodCost,
-                              Icons.fastfood,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Transport Cost',
-                              transportCost,
-                              Icons.directions_car,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Fuel Cost',
-                              fuelCost,
-                              Icons.local_gas_station,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Today's Summary Header & Table
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: _buildSectionHeader('Today\'s Summary'),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSummaryTable(),
-
-                    const SizedBox(height: 16),
-
-                    // Action Buttons
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setState(() {
-                                  materials.clear();
-                                  labours.clear();
-                                  selectedMaterial = materialOptions.isNotEmpty
-                                      ? materialOptions.first
-                                      : null;
-                                  selectedLabour = labourOptions.isNotEmpty
-                                      ? labourOptions.first
-                                      : null;
-                                  materialQty = 0;
-                                  materialQtyController.text = '0';
-                                  labourQty = 0;
-                                  labourQtyController.text = '0';
-                                  foodCost.text = '0';
-                                  transportCost.text = '0';
-                                  fuelCost.text = '0';
-                                });
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: const Text('Reset'),
-                            ),
+                          _buildSectionHeader('Additional Costs'),
+                          const SizedBox(height: 16),
+                          _buildCostInput(
+                            'Food Cost',
+                            foodCost,
+                            Icons.fastfood,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isSaving ? null : _saveToFirestore,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: isSaving
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Save Entry'),
-                            ),
+                          _buildCostInput(
+                            'Transport Cost',
+                            transportCost,
+                            Icons.directions_car,
+                          ),
+                          _buildCostInput(
+                            'Fuel Cost',
+                            fuelCost,
+                            Icons.local_gas_station,
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // Today's Summary Header & Table
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Today\'s Summary'),
+                          const SizedBox(height: 12),
+                          _buildSummaryTable(),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Reset',
+                            icon: Icons.refresh,
+                            onPressed: () {
+                              setState(() {
+                                materials.clear();
+                                labours.clear();
+                                selectedMaterial = materialOptions.isNotEmpty
+                                    ? materialOptions.first
+                                    : null;
+                                selectedLabour = labourOptions.isNotEmpty
+                                    ? labourOptions.first
+                                    : null;
+                                materialQty = 0;
+                                materialQtyController.text = '0';
+                                labourQty = 0;
+                                labourQtyController.text = '0';
+                                foodCost.text = '0';
+                                transportCost.text = '0';
+                                fuelCost.text = '0';
+                              });
+                            },
+                            isSecondary: true,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Save Entry',
+                            icon: Icons.save,
+                            onPressed: isSaving ? null : _saveToFirestore,
+                            isLoading: isSaving,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildModernSiteRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.white),
+          const SizedBox(width: 10),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFCBD5E1),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

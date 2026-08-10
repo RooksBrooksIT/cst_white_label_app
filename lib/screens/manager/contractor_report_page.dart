@@ -505,6 +505,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
   }
 
   Future<void> _generatePdf() async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
       Theme.of(context).primaryColor.value,
@@ -554,9 +555,11 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
         ],

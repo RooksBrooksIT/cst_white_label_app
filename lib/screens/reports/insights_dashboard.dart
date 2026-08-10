@@ -2,19 +2,16 @@ import 'package:demo_cst/screens/reports/project_stage_insights_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:demo_cst/screens/manager/contractor_report_page.dart';
 import 'package:demo_cst/screens/organization/organization_insights_screen.dart';
-import 'package:demo_cst/screens/reports/insights_dashboard.dart';
 import 'package:demo_cst/screens/reports/project_financial_status_report_page.dart';
 import 'package:demo_cst/screens/reports/site_status_report.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/utils/responsive.dart';
 
 class InsightsDashboard extends StatelessWidget {
   const InsightsDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isDesktop = screenWidth >= 1024;
@@ -38,17 +35,21 @@ class InsightsDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Analytics & Reports',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0A183D),
+                    fontSize: 22,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 6),
+                const Text(
                   'Access detailed reports and insights for your projects and sites',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  style: TextStyle(
+                    color: Color(0xFF5A759E),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -135,7 +136,6 @@ class InsightsDashboard extends StatelessWidget {
     required String description,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
     return GlassCard(
       onTap: onTap,
       child: Row(
@@ -143,10 +143,14 @@ class InsightsDashboard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.primaryColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFF0B1942).withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                width: 1,
+              ),
             ),
-            child: Icon(icon, color: theme.primaryColor, size: 28),
+            child: Icon(icon, color: const Color(0xFF10B981), size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -155,34 +159,38 @@ class InsightsDashboard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   description,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  style: const TextStyle(
+                    color: Color(0xFFCBD5E1),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
+                const SizedBox(height: 10),
+                const Row(
                   children: [
                     Text(
                       'View Report',
                       style: TextStyle(
-                        color: theme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        color: Color(0xFF10B981),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward,
-                      color: theme.primaryColor,
-                      size: 14,
+                      color: Color(0xFF10B981),
+                      size: 15,
                     ),
                   ],
                 ),

@@ -24,7 +24,6 @@ import 'package:demo_cst/screens/common/contact_support_screen.dart';
 import 'package:demo_cst/widgets/connectivity_wrapper.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

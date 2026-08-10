@@ -101,28 +101,42 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
+        style: const TextStyle(
+          fontSize: 15,
+          color: Color(0xFF0A183D),
+          fontWeight: FontWeight.w700,
+        ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(
+            color: Color(0xFF5A759E),
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon, color: primaryColor, size: isDesktop ? 24.0 : 20.0)
+              ? Icon(prefixIcon, color: primaryColor, size: isDesktop ? 22.0 : 20.0)
               : null,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide.none,
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: primaryColor, width: 2.0),
+            borderRadius: BorderRadius.circular(16.0),
+            borderSide: BorderSide(color: primaryColor, width: 1.8),
           ),
           filled: true,
-          fillColor: enabled ? Colors.white : Colors.grey.shade50,
+          fillColor: Colors.white,
           contentPadding: EdgeInsets.symmetric(
             horizontal: isDesktop ? 20.0 : 16.0,
-            vertical: isDesktop ? 20.0 : 16.0,
+            vertical: isDesktop ? 18.0 : 16.0,
           ),
         ),
       ),
@@ -138,16 +152,16 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
             children: [
               Icon(
                 Icons.receipt_long_rounded,
-                size: isDesktop ? 80.0 : 64.0,
-                color: Colors.grey.shade300,
+                size: isDesktop ? 72.0 : 56.0,
+                color: Colors.white.withValues(alpha: 0.5),
               ),
-              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              SizedBox(height: isDesktop ? 16.0 : 12.0),
               Text(
                 'No bills added yet',
                 style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: isDesktop ? 18.0 : 16.0,
-                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFFCBD5E1),
+                  fontSize: isDesktop ? 17.0 : 15.0,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -165,11 +179,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(16.0),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 8.0,
                 offset: const Offset(0, 2),
               ),
@@ -181,24 +194,34 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
               vertical: isDesktop ? 12.0 : 8.0,
             ),
             leading: CircleAvatar(
-              backgroundColor: primaryColor.withOpacity(0.1),
+              backgroundColor: primaryColor.withValues(alpha: 0.1),
               child: Icon(Icons.receipt_rounded, color: primaryColor, size: isDesktop ? 28.0 : 24.0),
             ),
             title: Text(
               bill['billVendor']!,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isDesktop ? 18.0 : 16.0),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0A183D),
+                fontSize: isDesktop ? 18.0 : 16.0,
+              ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: isDesktop ? 6.0 : 4.0),
-                Text('Bill No: ${bill['billNo']} • ${bill['billDate']}', style: TextStyle(fontSize: isDesktop ? 14.0 : 12.0)),
+                Text(
+                  'Bill No: ${bill['billNo']} • ${bill['billDate']}',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 14.0 : 12.0,
+                    color: const Color(0xFF5A759E),
+                  ),
+                ),
                 SizedBox(height: isDesktop ? 6.0 : 4.0),
                 Text(
                   bill['billAmount']!,
                   style: TextStyle(
                     color: primaryColor,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     fontSize: isDesktop ? 16.0 : 15.0,
                   ),
                 ),
@@ -532,12 +555,34 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
       title: 'Company Expenses',
       onBack: () => Navigator.pop(context),
       actions: [
-        IconButton(
-          icon: Icon(Icons.refresh_rounded, color: Colors.white, size: isDesktop ? 28.0 : 24.0),
-          onPressed: _loadSiteIds,
-          tooltip: 'Refresh Site IDs',
+        Center(
+          child: Container(
+            width: 38,
+            height: 38,
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B1942),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: _loadSiteIds,
+              tooltip: 'Refresh Site IDs',
+            ),
+          ),
         ),
-        SizedBox(width: isDesktop ? 12.0 : 8.0),
       ],
       body: Center(
         child: ConstrainedBox(
@@ -560,21 +605,41 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                           : DropdownButtonFormField<String>(
                               isExpanded: true,
                               value: selectedSiteId,
+                              dropdownColor: Colors.white,
+                              style: TextStyle(
+                                fontSize: isDesktop ? 15.0 : 14.0,
+                                color: const Color(0xFF0A183D),
+                                fontWeight: FontWeight.w700,
+                              ),
                               decoration: InputDecoration(
                                 labelText: 'Site ID',
+                                labelStyle: const TextStyle(
+                                  color: Color(0xFF5A759E),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                                 prefixIcon: Icon(
                                   Icons.business_rounded,
                                   color: primaryColor,
-                                  size: isDesktop ? 24.0 : 20.0,
+                                  size: isDesktop ? 22.0 : 20.0,
                                 ),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12.0),
+                                  borderRadius: BorderRadius.circular(16.0),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16.0),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16.0),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white,
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: isDesktop ? 20.0 : 16.0,
-                                  vertical: isDesktop ? 20.0 : 16.0,
+                                  vertical: isDesktop ? 18.0 : 16.0,
                                 ),
                               ),
                               items: siteIds
@@ -584,7 +649,10 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                                       child: Text(
                                         site,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   )
@@ -619,38 +687,46 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                       ),
                       InkWell(
                         onTap: () => _selectDate(context),
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: BorderRadius.circular(16.0),
                         child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: isDesktop ? 20.0 : 16.0,
-                            vertical: isDesktop ? 20.0 : 16.0,
+                            vertical: isDesktop ? 18.0 : 16.0,
                           ),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12.0),
+                            borderRadius: BorderRadius.circular(16.0),
                             color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.calendar_today_rounded,
                                 color: primaryColor,
-                                size: isDesktop ? 24.0 : 20.0,
+                                size: isDesktop ? 22.0 : 20.0,
                               ),
                               SizedBox(width: isDesktop ? 16.0 : 12.0),
                               Text(
                                 'Date',
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 17.0 : 16.0,
-                                  color: Colors.black54,
+                                  fontSize: isDesktop ? 16.0 : 15.0,
+                                  color: const Color(0xFF5A759E),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               const Spacer(),
                               Text(
                                 DateFormat('dd/MM/yyyy').format(selectedDate),
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 17.0 : 16.0,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: isDesktop ? 16.0 : 15.0,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0A183D),
                                 ),
                               ),
                             ],
@@ -696,28 +772,28 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                       ),
                       SizedBox(
                         width: double.infinity,
+                        height: 52,
                         child: ElevatedButton.icon(
                           onPressed: _addBill,
                           icon: Icon(
                             Icons.add_circle_outline_rounded,
                             color: Colors.white,
-                            size: isDesktop ? 24.0 : 20.0,
+                            size: isDesktop ? 22.0 : 20.0,
                           ),
                           label: Text(
                             "Add Bill to List",
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isDesktop ? 17.0 : 16.0,
-                              fontWeight: FontWeight.bold,
+                              fontSize: isDesktop ? 16.0 : 15.0,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+                            backgroundColor: AppTheme.getDarkAccent(primaryColor),
+                            elevation: 4.0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: BorderRadius.circular(16.0),
                             ),
-                            elevation: 2.0,
                           ),
                         ),
                       ),
@@ -740,21 +816,27 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-                          side: BorderSide(color: Colors.grey.shade400, width: 2.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
+                      child: SizedBox(
+                        height: 54,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF0A183D),
+                            side: const BorderSide(color: Colors.white, width: 1.5),
+                            elevation: 4,
+                            shadowColor: Colors.black.withValues(alpha: 0.15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.0),
+                            ),
                           ),
-                        ),
-                        onPressed: isSubmitting ? null : _resetForm,
-                        child: Text(
-                          'Reset',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: isDesktop ? 17.0 : 16.0,
-                            fontWeight: FontWeight.bold,
+                          onPressed: isSubmitting ? null : _resetForm,
+                          child: Text(
+                            'Reset',
+                            style: TextStyle(
+                              color: const Color(0xFF0A183D),
+                              fontSize: isDesktop ? 16.0 : 15.0,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -762,53 +844,58 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
                     SizedBox(width: isDesktop ? 20.0 : 16.0),
                     Expanded(
                       flex: 2,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
+                      child: SizedBox(
+                        height: 54,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.getDarkAccent(primaryColor),
+                            foregroundColor: Colors.white,
+                            elevation: 6.0,
+                            shadowColor: AppTheme.getDarkAccent(primaryColor).withValues(alpha: 0.4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.0),
+                            ),
                           ),
-                          elevation: 4.0,
-                        ),
-                        onPressed: isSubmitting
-                            ? null
-                            : () {
-                                if (selectedSiteId == null ||
-                                    selectedSupervisorId == null ||
-                                    selectedProjectPhase == null ||
-                                    bills.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please fill all details and add at least one bill.',
+                          onPressed: isSubmitting
+                              ? null
+                              : () {
+                                  if (selectedSiteId == null ||
+                                      selectedSupervisorId == null ||
+                                      selectedProjectPhase == null ||
+                                      bills.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please fill all details and add at least one bill.',
+                                        ),
+                                        backgroundColor: Colors.redAccent,
                                       ),
-                                      backgroundColor: Colors.redAccent,
+                                    );
+                                    return;
+                                  }
+                                  _showConfirmationDialog(isDesktop, isTablet, isMobile);
+                                },
+                          child: isSubmitting
+                              ? SizedBox(
+                                  width: isDesktop ? 28.0 : 24.0,
+                                  height: isDesktop ? 28.0 : 24.0,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
                                     ),
-                                  );
-                                  return;
-                                }
-                                _showConfirmationDialog(isDesktop, isTablet, isMobile);
-                              },
-                        child: isSubmitting
-                            ? SizedBox(
-                                width: isDesktop ? 28.0 : 24.0,
-                                height: isDesktop ? 28.0 : 24.0,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.0,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Submit Expenses',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isDesktop ? 16.0 : 15.0,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
-                              )
-                            : Text(
-                                'Submit Expenses',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: isDesktop ? 17.0 : 16.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        ),
                       ),
                     ),
                   ],
@@ -832,10 +919,18 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
     required bool isTablet,
     required bool isMobile,
   }) {
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
     return Card(
       elevation: 4.0,
-      shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+      color: darkCardBg,
+      shadowColor: darkCardBg.withValues(alpha: 0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24.0),
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+      ),
       child: Padding(
         padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
         child: Column(
@@ -844,20 +939,25 @@ class _OrganizationExpensesState extends State<OrganizationExpenses> {
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(isDesktop ? 14.0 : 10.0),
+                  padding: EdgeInsets.all(isDesktop ? 12.0 : 10.0),
                   decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12.0),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14.0),
                   ),
-                  child: Icon(icon, color: primaryColor, size: isDesktop ? 32.0 : 24.0),
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: isDesktop ? 26.0 : 22.0,
+                  ),
                 ),
-                SizedBox(width: isDesktop ? 20.0 : 16.0),
+                SizedBox(width: isDesktop ? 16.0 : 12.0),
                 Text(
                   title,
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     fontSize: isDesktop ? 20.0 : 18.0,
                     letterSpacing: -0.5,
+                    color: Colors.white,
                   ),
                 ),
               ],
