@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 
 class LayoutAndDrawingsPage extends StatefulWidget {
@@ -234,6 +235,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
 
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     return GlassScaffold(
       title: 'Layout and Drawings',
       onBack: () => Navigator.pop(context),
@@ -241,494 +244,605 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 4,
-              shadowColor: primaryColor.withOpacity(0.25),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    FutureBuilder<List<Map<String, String>>>(
-                      future: fetchAllSites(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        } else if (snapshot.hasError) {
-                          return Text(
-                            'Error: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red),
-                          );
-                        }
-
-                        allSites = snapshot.data ?? [];
-                        final sites = allSites
-                            .map((site) => site['site']!)
-                            .toList();
-                        return DropdownButtonFormField<String>(
-                          value: selectedSiteId,
-                          decoration: InputDecoration(
-                            labelText: 'Site ID',
-                            labelStyle: TextStyle(
-                              color: primaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: primaryColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: primaryColor,
-                                width: 2,
-                              ),
-                            ),
-                            filled: true,
-
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 16,
-                            ),
-                          ),
-                          items: sites
-                              .map(
-                                (site) => DropdownMenuItem(
-                                  value: site,
-                                  child: Text(
-                                    site,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedSiteId = value;
-                              uploadedDocuments.clear();
-                              docNameController.clear();
-                              purposeController.clear();
-                              supervisorNameController.clear();
-                              projectNameController.clear();
-                              projectPhaseController.clear();
-                              existingConfigDocs = [];
-                              selectedConfigId = null;
-                            });
-                            setSupervisorAndProject(value);
-                            if (value != null) {
-                              _fetchExistingConfigs(value);
-                            }
-                          },
-                          hint: const Text('Select Site ID'),
-                          borderRadius: BorderRadius.circular(14),
-                          icon: Icon(
-                            Icons.arrow_drop_down,
-                            color: primaryColor,
-                          ),
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        );
-                      },
-                    ),
-                    if (existingConfigDocs.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      DropdownButtonFormField<String>(
-                        value: selectedConfigId,
-                        decoration: InputDecoration(
-                          labelText: 'Load Previous Configuration',
-                          labelStyle: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(color: primaryColor),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 16,
-                          ),
-                        ),
-                        items: existingConfigDocs.map((doc) {
-                          return DropdownMenuItem<String>(
-                            value: doc.id,
-                            child: Text(
-                              doc.id.split('_').last, // Display the date part
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.black,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            _loadConfiguration(value);
-                          }
-                        },
-                        hint: const Text('Select a saved drawing set'),
-                        borderRadius: BorderRadius.circular(14),
-                        icon: Icon(Icons.history, color: primaryColor),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Site & Project Details Card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkCardBg.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    _readonlyTextField(
-                      controller: supervisorNameController,
-                      label: 'Supervisor Name',
-                      fillColor: Colors.grey.shade200,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 24),
-                    _readonlyTextField(
-                      controller: projectNameController,
-                      label: 'Project Name',
-                      fillColor: Colors.grey.shade200,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 24),
-                    _readonlyTextField(
-                      controller: projectPhaseController,
-                      label: 'Project Phase',
-                      fillColor: Colors.grey.shade200,
-                      primaryColor: primaryColor,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            Card(
-              elevation: 4,
-              shadowColor: primaryColor.withOpacity(0.25),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Document Details',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Select Site ID *',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    _editableTextField(
-                      controller: docNameController,
-                      label: 'Doc Name',
-                      enabled:
-                          selectedSiteId != null && selectedSiteId!.isNotEmpty,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 20),
-                    _editableTextField(
-                      controller: purposeController,
-                      label: 'Purpose',
-                      maxLines: 3,
-                      enabled:
-                          selectedSiteId != null && selectedSiteId!.isNotEmpty,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 26),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed:
-                                (selectedSiteId == null ||
-                                    selectedSiteId!.isEmpty)
-                                ? null
-                                : _uploadDocument,
-                            icon: const Icon(Icons.upload_file_outlined),
-                            label: const Text('Browse'),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 52),
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 5,
-                              shadowColor: primaryColor.withOpacity(0.7),
+                      const SizedBox(height: 6),
+                      FutureBuilder<List<Map<String, String>>>(
+                        future: fetchAllSites(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasError) {
+                            return Text(
+                              'Error: ${snapshot.error}',
+                              style: const TextStyle(color: Color(0xFFF87171)),
+                            );
+                          }
+
+                          allSites = snapshot.data ?? [];
+                          final sites = allSites
+                              .map((site) => site['site']!)
+                              .toList();
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
+                            child: DropdownButtonFormField<String>(
+                              value: selectedSiteId,
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              decoration: InputDecoration(
+                                hintText: 'Select Site ID',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.location_on_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              items: sites
+                                  .map(
+                                    (site) => DropdownMenuItem(
+                                      value: site,
+                                      child: Text(
+                                        site,
+                                        style: const TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0A183D),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedSiteId = value;
+                                  uploadedDocuments.clear();
+                                  docNameController.clear();
+                                  purposeController.clear();
+                                  supervisorNameController.clear();
+                                  projectNameController.clear();
+                                  projectPhaseController.clear();
+                                  existingConfigDocs = [];
+                                  selectedConfigId = null;
+                                });
+                                setSupervisorAndProject(value);
+                                if (value != null) {
+                                  _fetchExistingConfigs(value);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                      if (existingConfigDocs.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Load Previous Configuration',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                (selectedSiteId == null ||
-                                    selectedSiteId!.isEmpty)
-                                ? null
-                                : _addDocument,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 52),
-                              backgroundColor: accentColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        const SizedBox(height: 6),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                              elevation: 5,
-                              shadowColor: accentColor.withOpacity(0.7),
+                            ],
+                          ),
+                          child: DropdownButtonFormField<String>(
+                            value: selectedConfigId,
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            decoration: InputDecoration(
+                              hintText: 'Select a saved drawing set',
+                              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.history_rounded,
+                                color: Color(0xFF0A183D),
+                              ),
                             ),
-                            child: const Text('Add'),
+                            style: const TextStyle(
+                              color: Color(0xFF0A183D),
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            items: existingConfigDocs.map((doc) {
+                              return DropdownMenuItem<String>(
+                                value: doc.id,
+                                child: Text(
+                                  doc.id.split('_').last,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                _loadConfiguration(value);
+                              }
+                            },
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        'Note: Only DOC and PDF files are allowed for upload.',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                          fontSize: 13,
-                        ),
+                      const SizedBox(height: 16),
+                      _readonlyTextField(
+                        controller: supervisorNameController,
+                        label: 'Supervisor Name',
+                        fillColor: Colors.white,
+                        primaryColor: primaryColor,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      _readonlyTextField(
+                        controller: projectNameController,
+                        label: 'Project Name',
+                        fillColor: Colors.white,
+                        primaryColor: primaryColor,
+                      ),
+                      const SizedBox(height: 16),
+                      _readonlyTextField(
+                        controller: projectPhaseController,
+                        label: 'Project Phase',
+                        fillColor: Colors.white,
+                        primaryColor: primaryColor,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            Card(
-              elevation: 4,
-              shadowColor: primaryColor.withOpacity(0.25),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Uploaded Documents',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor,
+
+                // Document Details Card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkCardBg.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columnSpacing: 24,
-                        headingRowColor: WidgetStateProperty.all(
-                          primaryColor.withOpacity(0.12),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Document Details',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
-                        headingTextStyle: TextStyle(
-                          color: primaryColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                        dataRowHeight: 54,
-                        columns: [
-                          const DataColumn(label: Text('Doc Name')),
-                          const DataColumn(label: Text('Purpose')),
-                          const DataColumn(label: Text('Uploaded')),
-                          DataColumn(
-                            label: Icon(
-                              Icons.delete_outline,
-                              color: Colors.red.shade700,
-                              size: 20,
+                      ),
+                      const SizedBox(height: 16),
+                      _editableTextField(
+                        controller: docNameController,
+                        label: 'Doc Name',
+                        enabled:
+                            selectedSiteId != null && selectedSiteId!.isNotEmpty,
+                        primaryColor: primaryColor,
+                      ),
+                      const SizedBox(height: 16),
+                      _editableTextField(
+                        controller: purposeController,
+                        label: 'Purpose',
+                        maxLines: 3,
+                        enabled:
+                            selectedSiteId != null && selectedSiteId!.isNotEmpty,
+                        primaryColor: primaryColor,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    (selectedSiteId == null ||
+                                        selectedSiteId!.isEmpty)
+                                    ? null
+                                    : _uploadDocument,
+                                icon: const Icon(Icons.upload_file_rounded, size: 18),
+                                label: const Text(
+                                  'Browse',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryColor,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  disabledBackgroundColor: const Color(0xFF1E293B),
+                                  disabledForegroundColor: const Color(0xFF94A3B8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: BorderSide(
+                                      color: (selectedSiteId == null ||
+                                              selectedSiteId!.isEmpty)
+                                          ? const Color(0xFF334155)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  elevation: 4,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed:
+                                    (selectedSiteId == null ||
+                                        selectedSiteId!.isEmpty)
+                                    ? null
+                                    : _addDocument,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryColor,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  disabledBackgroundColor: const Color(0xFF1E293B),
+                                  disabledForegroundColor: const Color(0xFF94A3B8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: BorderSide(
+                                      color: (selectedSiteId == null ||
+                                              selectedSiteId!.isEmpty)
+                                          ? const Color(0xFF334155)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  elevation: 4,
+                                ),
+                                child: const Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
-                        rows: uploadedDocuments.isEmpty
-                            ? [
-                                DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        'No documents added',
-                                        style: TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ),
-                                    const DataCell(Text('')),
-                                    const DataCell(Text('')),
-                                    const DataCell(SizedBox()),
-                                  ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Note: Only DOC and PDF files are allowed for upload.',
+                          style: TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontStyle: FontStyle.italic,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Uploaded Documents Card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkCardBg.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Uploaded Documents',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A183D),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: DataTable(
+                              columnSpacing: 24,
+                              headingRowColor: WidgetStateProperty.all(
+                                const Color(0xFF05112E),
+                              ),
+                              headingTextStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                              dataTextStyle: const TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 13.5,
+                              ),
+                              dataRowMinHeight: 48,
+                              dataRowMaxHeight: 54,
+                              columns: const [
+                                DataColumn(label: Text('Doc Name')),
+                                DataColumn(label: Text('Purpose')),
+                                DataColumn(label: Text('Uploaded')),
+                                DataColumn(
+                                  label: Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Color(0xFFF87171),
+                                    size: 20,
+                                  ),
                                 ),
-                              ]
-                            : List.generate(uploadedDocuments.length, (index) {
-                                final doc = uploadedDocuments[index];
-                                final uploaded =
-                                    doc['Upload Flag'] == 'Uploaded';
-                                return DataRow(
-                                  color:
-                                      WidgetStateProperty.resolveWith<Color?>(
-                                        (states) => index.isEven
-                                            ? Colors.grey.shade50
-                                            : Colors.white,
-                                      ),
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        doc['Doc Name'] ?? '',
-                                        style: const TextStyle(fontSize: 15),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        doc['Purpose'] ?? '',
-                                        style: const TextStyle(fontSize: 15),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: uploaded
-                                              ? Colors.green.shade50
-                                              : Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                              ],
+                              rows: uploadedDocuments.isEmpty
+                                  ? [
+                                      const DataRow(
+                                        cells: [
+                                          DataCell(
+                                            Text(
+                                              'No documents added',
+                                              style: TextStyle(
+                                                fontStyle: FontStyle.italic,
+                                                color: Color(0xFF94A3B8),
+                                              ),
+                                            ),
                                           ),
-                                          border: Border.all(
-                                            color: uploaded
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
-                                            width: 1.2,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          uploaded ? 'Uploaded' : 'Pending',
-                                          style: TextStyle(
-                                            color: uploaded
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
-                                        ),
+                                          DataCell(Text('')),
+                                          DataCell(Text('')),
+                                          DataCell(SizedBox()),
+                                        ],
                                       ),
-                                    ),
-                                    DataCell(
-                                      IconButton(
-                                        splashRadius: 21,
-                                        icon: Icon(
-                                          Icons.delete_forever,
-                                          color: Colors.red.shade700,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            uploadedDocuments.removeAt(index);
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }),
+                                    ]
+                                  : List.generate(uploadedDocuments.length, (index) {
+                                      final doc = uploadedDocuments[index];
+                                      final uploaded =
+                                          doc['Upload Flag'] == 'Uploaded';
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            Text(
+                                              doc['Doc Name'] ?? '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              doc['Purpose'] ?? '',
+                                              style: const TextStyle(
+                                                color: Color(0xFFCBD5E1),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: uploaded
+                                                    ? const Color(0xFF22C55E).withValues(alpha: 0.2)
+                                                    : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                                                borderRadius: BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: uploaded
+                                                      ? const Color(0xFF22C55E)
+                                                      : const Color(0xFFEF4444),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                uploaded ? 'Uploaded' : 'Pending',
+                                                style: TextStyle(
+                                                  color: uploaded
+                                                      ? const Color(0xFF22C55E)
+                                                      : const Color(0xFFEF4444),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            IconButton(
+                                              splashRadius: 20,
+                                              icon: const Icon(
+                                                Icons.delete_outline_rounded,
+                                                color: Color(0xFFF87171),
+                                                size: 20,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  uploadedDocuments.removeAt(index);
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _canSave ? _saveDocuments : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      disabledBackgroundColor: const Color(0xFF0B1942),
+                      disabledForegroundColor: const Color(0xFF94A3B8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: const Text(
+                      'Save',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _canSave ? _saveDocuments : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
                   ),
-                  elevation: 6,
-                  shadowColor: primaryColor.withOpacity(0.8),
-                ),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _cancelDocuments,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _cancelDocuments,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF334155),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                  elevation: 6,
-                  shadowColor: Colors.black45,
-                ),
-                child: const Text(
-                  'Reset',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                  elevation: 6,
-                  shadowColor: Colors.red.shade900,
-                ),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -740,32 +854,53 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
     required Color fillColor,
     required Color primaryColor,
   }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: true,
-      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
-        filled: true,
-        fillColor: fillColor,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor, width: 1),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            readOnly: true,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+              color: Color(0xFF0A183D),
+            ),
+            decoration: InputDecoration(
+              hintText: label,
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.6)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor, width: 2),
-        ),
-      ),
+      ],
     );
   }
 
@@ -776,37 +911,54 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage> {
     required bool enabled,
     required Color primaryColor,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      enabled: enabled,
-      style: TextStyle(
-        fontWeight: FontWeight.w600,
-        fontSize: 16,
-        color: enabled ? Colors.black87 : Colors.grey.shade600,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
-        filled: true,
-
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            enabled: enabled,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+              color: Color(0xFF0A183D),
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor, width: 2.3),
-        ),
-      ),
+      ],
     );
   }
 

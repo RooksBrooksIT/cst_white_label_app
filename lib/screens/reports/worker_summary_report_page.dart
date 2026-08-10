@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
@@ -252,15 +253,30 @@ class _WorkerAttendanceSalaryPageState
                 _buildFilterBar(theme, isMobile),
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
+                    horizontal: 20.0,
                     vertical: 8.0,
                   ),
-                  child: Text(
-                    'Workers (${_filteredWorkers.length})',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A183D),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Workers (${_filteredWorkers.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -269,26 +285,27 @@ class _WorkerAttendanceSalaryPageState
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 80,
-                                color: Colors.grey.shade400,
+                              const Icon(
+                                Icons.people_outline_rounded,
+                                size: 72,
+                                color: Color(0xFF0A183D),
                               ),
                               const SizedBox(height: 16),
-                              Text(
+                              const Text(
                                 'No workers found',
                                 style: TextStyle(
-                                  color: Colors.grey.shade600,
+                                  color: Color(0xFF0A183D),
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
+                              const SizedBox(height: 6),
+                              const Text(
                                 'Try adjusting your filters',
                                 style: TextStyle(
-                                  color: Colors.grey.shade500,
+                                  color: Color(0xFF334155),
                                   fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -325,39 +342,40 @@ class _WorkerAttendanceSalaryPageState
   }
 
   Widget _buildFilterBar(ThemeData theme, bool isMobile) {
+    final darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: darkCardBg,
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
+              color: darkCardBg.withValues(alpha: 0.25),
+              blurRadius: 16,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
+            const Center(
               child: Text(
                 'Filters',
                 style: TextStyle(
-                  color: theme.primaryColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             const SizedBox(height: 16),
             _buildDropdownField(
               label: 'Site',
-              icon: Icons.handyman_outlined,
+              icon: Icons.handyman_rounded,
               value: _selectedSite,
               items: [null, ..._sites],
               hint: 'All Sites',
@@ -369,7 +387,7 @@ class _WorkerAttendanceSalaryPageState
             const SizedBox(height: 12),
             _buildDropdownField(
               label: 'Month',
-              icon: Icons.calendar_today_outlined,
+              icon: Icons.calendar_today_rounded,
               value: _selectedMonth,
               items: _months,
               hint: 'Select Month',
@@ -381,12 +399,12 @@ class _WorkerAttendanceSalaryPageState
             if (_selectedMonth != null) ...[
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: theme.primaryColor.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Column(
@@ -394,59 +412,75 @@ class _WorkerAttendanceSalaryPageState
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'Overall Attendance',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: theme.primaryColor,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFCBD5E1),
                           ),
                         ),
                         Text(
                           '${_overallAttendancePercentage.toStringAsFixed(1)}%',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryColor,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
                         value: _overallAttendancePercentage / 100,
-                        minHeight: 8,
-                        backgroundColor: theme.primaryColor.withOpacity(0.1),
+                        minHeight: 10,
+                        backgroundColor: Colors.white.withValues(alpha: 0.15),
                         valueColor: AlwaysStoppedAnimation<Color>(
                           _overallAttendancePercentage > 80
-                              ? Colors.green
+                              ? const Color(0xFF22C55E)
                               : _overallAttendancePercentage > 50
-                              ? Colors.orange
-                              : Colors.red,
+                              ? Colors.orangeAccent
+                              : const Color(0xFFF87171),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
-                      child: GlassButton(
+                      height: 48,
+                      child: ElevatedButton.icon(
                         onPressed: _onGenerateOverallReport,
-                        label: 'Download Overall Report',
-                        icon: Icons.summarize_outlined,
+                        icon: const Icon(Icons.summarize_rounded, size: 20),
+                        label: const Text(
+                          'Download Overall Report',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: const Color(0xFF0A183D),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 4,
+                          shadowColor: theme.primaryColor.withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Center(
                 child: Text(
                   'Month: $_selectedMonth',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 12,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12.5,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -466,28 +500,65 @@ class _WorkerAttendanceSalaryPageState
     required String hint,
     required ValueChanged<String?> onChanged,
   }) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(hint),
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down),
-          items: items.map((item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item ?? hint),
-            );
-          }).toList(),
-          onChanged: onChanged,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                hint: Text(
+                  hint,
+                  style: const TextStyle(color: Color(0xFF94A3B8)),
+                ),
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                icon: const Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: Color(0xFF0A183D),
+                ),
+                items: items.map((item) {
+                  return DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(
+                      item ?? hint,
+                      style: const TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

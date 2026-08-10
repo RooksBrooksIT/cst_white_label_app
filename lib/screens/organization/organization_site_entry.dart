@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
+import '/utils/app_theme.dart';
 
 class OrganizationSiteEntry extends StatefulWidget {
   final String userName;
@@ -954,11 +955,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             height: 38,
             margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFF0B1942),
+              color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                  color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

@@ -45,6 +45,7 @@ class GlassScaffold extends StatelessWidget {
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
         final theme = Theme.of(context);
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
         final hasAppBar =
             title != null ||
             onBack != null ||
@@ -52,7 +53,7 @@ class GlassScaffold extends StatelessWidget {
             bottom != null;
 
         final effectiveBgColor = appBarBackgroundColor ?? Colors.transparent;
-        final effectiveFgColor = appBarForegroundColor ?? const Color(0xFF0A183D);
+        final effectiveFgColor = appBarForegroundColor ?? darkAccent;
 
         final dynamicGradientColors = AppTheme.getBackgroundGradientColors(primaryColor);
 
@@ -87,7 +88,7 @@ class GlassScaffold extends StatelessWidget {
                               fontSize: Responsive.fontSize(context, 20),
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.4,
-                              color: const Color(0xFF0A183D),
+                              color: effectiveFgColor,
                             ),
                           )
                         : null,
@@ -98,11 +99,11 @@ class GlassScaffold extends StatelessWidget {
                               height: 38,
                               margin: const EdgeInsets.only(left: 16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0B1942),
+                                color: darkAccent,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                                    color: darkAccent.withValues(alpha: 0.25),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),

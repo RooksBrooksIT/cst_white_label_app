@@ -8,6 +8,8 @@ import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/manager/project_screen.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({super.key});
@@ -28,16 +30,15 @@ class _SiteScreenState extends State<SiteScreen>
   String? _projectCategory;
   String _status = 'In-Progress';
   bool _isGettingLocation = false;
-  bool _isSaving = false; // disables Save button for 3 seconds when true
+  bool _isSaving = false;
 
   TabController? _tabController;
-
-  // Theme colors will be derived from context
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController!.addListener(() => setState(() {}));
     _initializeDefaults();
   }
 
@@ -79,7 +80,6 @@ class _SiteScreenState extends State<SiteScreen>
           .toSet()
           .toList();
 
-      // Add default status options if they are not already present
       final defaultStatuses = [
         'Planning',
         'Started',
@@ -188,11 +188,8 @@ class _SiteScreenState extends State<SiteScreen>
         );
       } catch (e) {
         debugPrint('High accuracy getCurrentPosition failed/timed out: $e');
-        // Fallback 1: Try retrieving the last known position
         tempPosition = await Geolocator.getLastKnownPosition();
         if (tempPosition == null) {
-          debugPrint('Last known position is null, attempting low accuracy...');
-          // Fallback 2: Try low accuracy with a short timeout as a final attempt
           tempPosition = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.low,
             timeLimit: const Duration(seconds: 5),
@@ -201,12 +198,11 @@ class _SiteScreenState extends State<SiteScreen>
       }
 
       if (tempPosition == null) {
-        throw 'Failed to acquire location. Please check your GPS signal and ensure location services are enabled.';
+        throw 'Failed to acquire location. Please check GPS signal.';
       }
       position = tempPosition;
 
       String address = '';
-
       if (kIsWeb) {
         address = 'Web Location';
       } else {
@@ -225,9 +221,6 @@ class _SiteScreenState extends State<SiteScreen>
             ].where((part) => part?.isNotEmpty ?? false).join(', ');
           }
         } catch (geocodingError) {
-          debugPrint(
-            'Geocoding error (falling back to coordinates only): $geocodingError',
-          );
           address =
               'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
         }
@@ -267,309 +260,621 @@ class _SiteScreenState extends State<SiteScreen>
 
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final backgroundColor = theme.scaffoldBackgroundColor;
+    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Site Details',
-          style: TextStyle(color: Colors.white),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withOpacity(0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-          tabs: const [
-            Tab(text: 'New Site'),
-            Tab(text: 'All Site'),
-          ],
-        ),
-      ),
+    return GlassScaffold(
+      padding: EdgeInsets.zero,
       body: SafeArea(
-        bottom: true,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isMobile ? double.infinity : 600,
+        child: Column(
+          children: [
+            // ── Header Row ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Text(
+                    'Site Details',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
             ),
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildNewSiteTab(), _buildAllSiteTab()],
+
+            // ── Dark Pill Tab Switcher ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: AnimatedBuilder(
+                animation: _tabController!,
+                builder: (context, _) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _tabController!.animateTo(0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController!.index == 0
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_location_alt_rounded,
+                                  size: 16,
+                                  color: _tabController!.index == 0
+                                      ? Colors.white
+                                      : const Color(0xFFCBD5E1),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'NEW SITE',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: _tabController!.index == 0
+                                        ? Colors.white
+                                        : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _tabController!.animateTo(1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController!.index == 1
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.location_city_rounded,
+                                  size: 16,
+                                  color: _tabController!.index == 1
+                                      ? Colors.white
+                                      : const Color(0xFFCBD5E1),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'ALL SITES',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: _tabController!.index == 1
+                                        ? Colors.white
+                                        : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
+
+            // ── Tab Bar View Body ───────────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildNewSiteTab(darkCardBg, primaryColor),
+                      _buildAllSiteTab(darkCardBg, primaryColor),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildNewSiteTab() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
+  // ── NEW SITE TAB ──────────────────────────────────────────────────────────
+  Widget _buildNewSiteTab(Color darkCardBg, Color primaryColor) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Form(
         key: _formKey,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildSectionTitle('Site Information'),
-            _buildTextField(
-              controller: _siteNameController,
-              label: 'Site Name',
-              hintText: 'Enter site name',
-              validator: (value) =>
-                  value?.isEmpty ?? true ? 'Please enter site name' : null,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _locationController,
-                    label: 'Location',
-                    hintText: 'Enter location or get current location',
+            // ── Site Information Card ─────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('Site Information'),
+                  const SizedBox(height: 18),
+                  _buildTextField(
+                    controller: _siteNameController,
+                    label: 'Site Name',
+                    hintText: 'Enter site name',
+                    icon: Icons.business_rounded,
                     validator: (value) =>
-                        value?.isEmpty ?? true ? 'Please enter location' : null,
+                        value?.isEmpty ?? true ? 'Please enter site name' : null,
                   ),
-                ),
-                const SizedBox(width: 10),
-                Padding(
-                  padding: const EdgeInsets.only(top: 25),
-                  child: IconButton(
-                    iconSize: 28,
-                    tooltip: 'Get Current Location',
-                    icon: _isGettingLocation
-                        ? SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: primaryColor,
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _locationController,
+                          label: 'Location',
+                          hintText: 'Enter location or get GPS',
+                          icon: Icons.location_on_rounded,
+                          validator: (value) =>
+                              value?.isEmpty ?? true
+                                  ? 'Please enter location'
+                                  : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
-                          )
-                        : Icon(Icons.gps_fixed, color: primaryColor),
-                    onPressed: _isGettingLocation ? null : _getCurrentLocation,
+                          ],
+                        ),
+                        child: IconButton(
+                          tooltip: 'Get Current Location',
+                          icon: _isGettingLocation
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.my_location_rounded,
+                                  color: Color(0xFF0A183D),
+                                  size: 22,
+                                ),
+                          onPressed: _isGettingLocation
+                              ? null
+                              : _getCurrentLocation,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _latitudeController,
+                          label: 'Latitude',
+                          hintText: 'Latitude coordinates',
+                          keyboardType: TextInputType.number,
+                          readOnly: true,
+                          icon: Icons.explore_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _longitudeController,
+                          label: 'Longitude',
+                          hintText: 'Longitude coordinates',
+                          keyboardType: TextInputType.number,
+                          readOnly: true,
+                          icon: Icons.explore_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _latitudeController,
-                    label: 'Latitude',
-                    hintText: 'Latitude coordinates',
-                    keyboardType: TextInputType.number,
-                    readOnly: true,
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _longitudeController,
-                    label: 'Longitude',
-                    hintText: 'Longitude coordinates',
-                    keyboardType: TextInputType.number,
-                    readOnly: true,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            _buildSectionTitle('Project Details'),
-            FutureBuilder<List<String>>(
-              future: fetchProjectCategories(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoadingIndicator();
-                }
-                if (snapshot.hasError) {
-                  return _buildErrorWidget(snapshot.error.toString());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return _buildErrorWidget('No project categories available');
-                }
-                final categories = snapshot.data!;
-                // Ensure _projectCategory is valid for the current categories list
-                String currentValue = _projectCategory ?? categories.first;
-                if (!categories.contains(currentValue)) {
-                  currentValue = categories.first;
-                  // Use addPostFrameCallback to update state safely after build
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted)
-                      setState(() => _projectCategory = categories.first);
-                  });
-                }
 
-                return _buildDropdown(
-                  value: currentValue,
-                  items: categories,
-                  label: 'Project Category',
-                  onChanged: (value) =>
-                      setState(() => _projectCategory = value),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildDateField(
-                  label: 'Start Date',
-                  date: _startDate,
-                  onTap: () => _selectDate(context, true),
-                ),
-                const SizedBox(height: 20),
-                _buildDateField(
-                  label: 'End Date',
-                  date: _endDate,
-                  onTap: () => _selectDate(context, false),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            FutureBuilder<List<String>>(
-              future: fetchProjectStatus(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoadingIndicator();
-                }
-                if (snapshot.hasError) {
-                  return _buildErrorWidget(snapshot.error.toString());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return _buildErrorWidget('No status options available');
-                }
-                final statusList = snapshot.data!;
-                // Ensure _status is valid for the current statusList
-                String currentStatus = _status;
-                if (!statusList.contains(currentStatus)) {
-                  currentStatus = statusList.first;
-                  // Use addPostFrameCallback to update state safely after build
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() => _status = statusList.first);
-                  });
-                }
+            // ── Project Details Card ──────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('Project Details'),
+                  const SizedBox(height: 18),
+                  FutureBuilder<List<String>>(
+                    future: fetchProjectCategories(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return _buildLoadingIndicator();
+                      }
+                      if (snapshot.hasError) {
+                        return _buildErrorWidget(snapshot.error.toString());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return _buildErrorWidget('No project categories available');
+                      }
+                      final categories = snapshot.data!;
+                      String currentValue = _projectCategory ?? categories.first;
+                      if (!categories.contains(currentValue)) {
+                        currentValue = categories.first;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted)
+                            setState(() => _projectCategory = categories.first);
+                        });
+                      }
 
-                return _buildDropdown(
-                  value: currentStatus,
-                  items: statusList,
-                  label: 'Project Status',
-                  onChanged: (value) => setState(() => _status = value!),
-                );
-              },
+                      return _buildDropdown(
+                        value: currentValue,
+                        items: categories,
+                        label: 'Project Category',
+                        icon: Icons.category_rounded,
+                        onChanged: (value) =>
+                            setState(() => _projectCategory = value),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  _buildDateField(
+                    label: 'Start Date',
+                    date: _startDate,
+                    onTap: () => _selectDate(context, true),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildDateField(
+                    label: 'End Date',
+                    date: _endDate,
+                    onTap: () => _selectDate(context, false),
+                  ),
+                  const SizedBox(height: 14),
+                  FutureBuilder<List<String>>(
+                    future: fetchProjectStatus(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return _buildLoadingIndicator();
+                      }
+                      if (snapshot.hasError) {
+                        return _buildErrorWidget(snapshot.error.toString());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return _buildErrorWidget('No status options available');
+                      }
+                      final statusList = snapshot.data!;
+                      String currentStatus = _status;
+                      if (!statusList.contains(currentStatus)) {
+                        currentStatus = statusList.first;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _status = statusList.first);
+                        });
+                      }
+
+                      return _buildDropdown(
+                        value: currentStatus,
+                        items: statusList,
+                        label: 'Project Status',
+                        icon: Icons.timeline_rounded,
+                        onChanged: (value) => setState(() => _status = value!),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 35),
-            _buildActionButtons(context),
+            const SizedBox(height: 24),
+
+            // ── Action Buttons ────────────────────────────────────────────
+            _buildActionButtons(context, primaryColor),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  // Replace the existing _buildAllSiteTab() with this implementation
-  Widget _buildAllSiteTab() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
+  // ── ALL SITES TAB ─────────────────────────────────────────────────────────
+  Widget _buildAllSiteTab(Color darkCardBg, Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('Site').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+            ),
+          );
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Color(0xFF0A183D)),
+            ),
+          );
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No sites available.'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_off_rounded,
+                  size: 64,
+                  color: primaryColor.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No sites available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Create a new site in the "NEW SITE" tab',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         final sites = snapshot.data!.docs;
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 26,
-            headingRowColor: MaterialStateProperty.all(
-              primaryColor.withOpacity(0.1),
-            ),
-            headingTextStyle: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: primaryColor,
-            ),
-            columns: const [
-              DataColumn(label: Text('Site ID')),
-              DataColumn(label: Text('Site Name')),
-              DataColumn(label: Text('Location')),
-              DataColumn(label: Text('Category')),
-              DataColumn(label: Text('Status')),
-            ],
-            rows: List<DataRow>.generate(sites.length, (index) {
-              final site = sites[index];
-              final data = (site.data() as Map<String, dynamic>?) ?? const {};
-              final siteId = (data['siteId'] as String?) ?? site.id;
-              final siteName = (data['siteName'] as String?) ?? '';
-              final location = (data['location'] as String?) ?? '';
-              final projectCategory =
-                  (data['projectCategory'] as String?) ?? '';
-              final status = (data['status'] as String?) ?? '';
+        return ListView.builder(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          itemCount: sites.length,
+          itemBuilder: (context, index) {
+            final site = sites[index];
+            final data = (site.data() as Map<String, dynamic>?) ?? const {};
+            final siteId = (data['siteId'] as String?) ?? site.id;
+            final siteName = (data['siteName'] as String?) ?? '';
+            final location = (data['location'] as String?) ?? '';
+            final projectCategory = (data['projectCategory'] as String?) ?? '';
+            final status = (data['status'] as String?) ?? 'In Progress';
 
-              return DataRow(
-                color: MaterialStateProperty.resolveWith<Color?>(
-                  (states) => index % 2 == 0 ? Colors.white : Colors.grey[50],
-                ),
-                cells: [
-                  DataCell(Text(siteId)),
-                  DataCell(Text(siteName)),
-                  DataCell(Text(location)),
-                  DataCell(Text(projectCategory)),
-                  DataCell(Text(status)),
+            final isDone = status.toLowerCase() == 'completed';
+            final isHold = status.toLowerCase() == 'on hold' ||
+                status.toLowerCase() == 'cancelled';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
-              );
-            }),
-          ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.location_city_rounded,
+                          color: primaryColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              siteName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'ID: $siteId',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDone
+                              ? Colors.green.withValues(alpha: 0.2)
+                              : isHold
+                                  ? Colors.orange.withValues(alpha: 0.2)
+                                  : primaryColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: isDone
+                                ? const Color(0xFF4ADE80)
+                                : isHold
+                                    ? Colors.orange[300]
+                                    : primaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (location.isNotEmpty || projectCategory.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Divider(
+                      height: 1,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                    const SizedBox(height: 10),
+                    if (location.isNotEmpty)
+                      _siteInfoRow(Icons.location_on_rounded, location),
+                    if (projectCategory.isNotEmpty)
+                      _siteInfoRow(Icons.category_rounded, projectCategory),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
+  Widget _siteInfoRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: primaryColor,
-        ),
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFFCBD5E1)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFFE2E8F0),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        color: Colors.white,
+        letterSpacing: -0.3,
       ),
     );
   }
@@ -581,48 +886,67 @@ class _SiteScreenState extends State<SiteScreen>
     String? Function(String?)? validator,
     TextInputType? keyboardType,
     bool readOnly = false,
+    IconData? icon,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        const SizedBox(height: 7),
-        TextFormField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hintText,
-            filled: true,
-            fillColor: readOnly ? Colors.grey.shade100 : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor.withOpacity(0.7)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor, width: 2.5),
-            ),
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
-          validator: validator,
-          keyboardType: keyboardType,
-          readOnly: readOnly,
-          style: TextStyle(
-            color: readOnly ? Colors.grey.shade700 : Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            readOnly: readOnly,
+            validator: validator,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
           ),
         ),
       ],
@@ -634,59 +958,78 @@ class _SiteScreenState extends State<SiteScreen>
     required List<String> items,
     required String label,
     required Function(String?) onChanged,
+    IconData? icon,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        const SizedBox(height: 7),
-        DropdownButtonFormField<String>(
-          value: value,
-          items: items
-              .map(
-                (item) => DropdownMenuItem(
-                  value: item,
-                  child: Text(
-                    item,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor.withOpacity(0.6)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor.withOpacity(0.4)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor, width: 2.5),
-            ),
-          ),
           style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            color: Colors.black87,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
-          dropdownColor: Colors.white,
-          validator: (value) => value == null ? 'Please select $label' : null,
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            value: value,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Select $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: items
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  ),
+                )
+                .toList(),
+            onChanged: onChanged,
+            validator: (val) => val == null ? 'Please select $label' : null,
+          ),
         ),
       ],
     );
@@ -698,42 +1041,41 @@ class _SiteScreenState extends State<SiteScreen>
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: InputDecorator(
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: primaryColor.withOpacity(0.6)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: primaryColor.withOpacity(0.4)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: primaryColor, width: 2.5),
-              ),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: brandIconColor, size: 20),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     date == null
@@ -741,15 +1083,13 @@ class _SiteScreenState extends State<SiteScreen>
                         : DateFormat('MMM d, yyyy').format(date),
                     style: TextStyle(
                       color: date == null
-                          ? Colors.grey.shade600
-                          : Colors.black87,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(Icons.calendar_today, color: primaryColor, size: 22),
               ],
             ),
           ),
@@ -776,63 +1116,83 @@ class _SiteScreenState extends State<SiteScreen>
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Text(
         message,
-        style: TextStyle(color: Colors.red.shade700, fontSize: 15),
+        style: const TextStyle(color: Colors.orange, fontSize: 13),
       ),
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
+  Widget _buildActionButtons(BuildContext context, Color primaryColor) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildActionButton(
-          context,
-          icon: Icons.save,
-          label: _isSaving ? 'Saving...' : 'Save',
-          color: primaryColor,
-          onPressed: _isSaving ? () {} : _saveSiteDetails,
-        ),
-        _buildActionButton(
-          context,
-          icon: Icons.refresh,
-          label: 'Reset',
-          color: Colors.orange.shade700,
-          onPressed: _resetForm,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Column(
-      children: [
-        Material(
-          shape: const CircleBorder(),
-          color: color.withOpacity(0.15),
-          child: IconButton(
-            iconSize: 28,
-            icon: Icon(icon),
-            color: color,
-            onPressed: onPressed,
-            splashRadius: 26,
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _saveSiteDetails,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: const Color(0xFF0A183D),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 6,
+                shadowColor: primaryColor.withValues(alpha: 0.4),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isSaving ? Icons.hourglass_top_rounded : Icons.save_rounded,
+                    size: 20,
+                    color: const Color(0xFF0A183D),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isSaving ? 'SAVING...' : 'SAVE SITE',
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+        const SizedBox(width: 12),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _resetForm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              elevation: 0,
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
+                  'RESET',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -844,7 +1204,6 @@ class _SiteScreenState extends State<SiteScreen>
 
     setState(() => _isSaving = true);
 
-    // Disable button for 3 seconds before saving
     await Future.delayed(const Duration(seconds: 3));
 
     final siteName = _siteNameController.text.trim();
@@ -861,7 +1220,6 @@ class _SiteScreenState extends State<SiteScreen>
     final status = _status.isNotEmpty ? _status : 'In-Progress';
 
     try {
-      // Deduplication: check if a Site with same siteName and location already exists
       final dupQuery = await FirestoreService.getCollection('Site')
           .where('siteName', isEqualTo: siteName)
           .where('location', isEqualTo: location)
@@ -900,7 +1258,6 @@ class _SiteScreenState extends State<SiteScreen>
       final siteDocId = nextId + '_' + siteName.replaceAll(' ', '');
       await FirestoreService.getCollection('Site').doc(siteDocId).set(siteData);
 
-      // Create project with dedupe on name+siteId combination as well
       final projectsSnapshot = await FirestoreService.getCollection(
         'projects',
       ).get();
@@ -938,9 +1295,7 @@ class _SiteScreenState extends State<SiteScreen>
         'projects',
       ).doc(nextPrDocId).set(projectData);
 
-      // Success message then navigate to ProjectScreen
       _showSuccessDialog(nextId, nextPrDocId);
-
       _resetForm();
     } catch (e, stack) {
       print('Error saving site/project: $e');
@@ -1044,7 +1399,7 @@ class _SiteScreenState extends State<SiteScreen>
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF0A183D),
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(

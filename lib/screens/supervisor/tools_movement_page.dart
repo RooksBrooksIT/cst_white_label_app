@@ -2,10 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
-import '/widgets/glass_text_field.dart';
-import '/widgets/glass_button.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class ToolsMovementPage extends StatefulWidget {
   const ToolsMovementPage({super.key});
@@ -18,11 +16,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Color get _primaryColor => Theme.of(context).colorScheme.primary;
-  final Color _accentColor = const Color(0xFF4d79c2);
-  final Color _cardColor = Colors.white;
-  final Color _textColor = const Color(0xFF2c3e50);
-  Color get _successColor => Theme.of(context).colorScheme.primary;
-  final Color _warningColor = const Color(0xFFe67e22);
   Color get _errorColor => Theme.of(context).colorScheme.error;
 
   // Company to Site variables
@@ -63,6 +56,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     _fetchSiteIds();
     _fetchTools();
   }
@@ -122,21 +116,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: _primaryColor,
-              onPrimary: Colors.white,
-              onSurface: _textColor,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(foregroundColor: _primaryColor),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
@@ -171,7 +150,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       return;
     }
 
-    // Check if count exceeds available
     final availableCount = isReturn
         ? _returnSelectedToolAvailableCount
         : _selectedToolAvailableCount;
@@ -248,29 +226,34 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final now = DateTime.now();
     final isoString = now.toIso8601String();
 
-    final docSnap = await docRef.get();
-    List<dynamic> sites = [];
-    if (docSnap.exists) {
-      final data = docSnap.data() as Map<String, dynamic>;
-      sites = data['sites'] ?? [];
-      bool siteExists = false;
-      for (var site in sites) {
-        if (site['siteId'] == siteId) {
-          site['count'] = (site['count'] ?? 0) + count;
-          siteExists = true;
-          break;
+    await FirestoreService.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+
+      if (!snapshot.exists) {
+        transaction.set(docRef, {
+          'toolCode': toolCode,
+          'availableCountAtSites': {siteId: count},
+          'lastUpdated': isoString,
+        });
+      } else {
+        final data = snapshot.data() as Map<String, dynamic>;
+        final Map<String, dynamic> availableCountAtSites =
+            Map<String, dynamic>.from(data['availableCountAtSites'] ?? {});
+
+        final currentSiteCount = (availableCountAtSites[siteId] as int?) ?? 0;
+        final newSiteCount = currentSiteCount + count;
+
+        if (newSiteCount <= 0) {
+          availableCountAtSites.remove(siteId);
+        } else {
+          availableCountAtSites[siteId] = newSiteCount;
         }
+
+        transaction.update(docRef, {
+          'availableCountAtSites': availableCountAtSites,
+          'lastUpdated': isoString,
+        });
       }
-      if (!siteExists) {
-        sites.add({'count': count, 'siteId': siteId});
-      }
-    } else {
-      sites.add({'count': count, 'siteId': siteId});
-    }
-    await docRef.set({
-      'lastUpdatedOn': isoString,
-      'sites': sites,
-      'toolCode': toolCode,
     });
   }
 
@@ -281,23 +264,26 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       });
       return;
     }
-    final toolObj = _tools.firstWhere(
+    final tool = _tools.firstWhere(
       (t) => t['toolId'] == toolId,
-      orElse: () => {'toolCode': null},
+      orElse: () => {},
     );
-    final toolCode = toolObj['toolCode'] as String?;
-    if (toolCode == null) {
+    final toolCode = tool['toolCode'] ?? '';
+    if (toolCode.isEmpty) {
       setState(() {
-        _selectedToolAvailableCount = null;
+        _selectedToolAvailableCount = 0;
       });
       return;
     }
-    final snapshot = await FirestoreService.getCollection(
+
+    final querySnapshot = await FirestoreService.getCollection(
       'toolsAtCompany',
     ).where('toolCode', isEqualTo: toolCode).limit(1).get();
-    int? count;
-    if (snapshot.docs.isNotEmpty) {
-      count = snapshot.docs.first['availableCount'] as int?;
+
+    int count = 0;
+    if (querySnapshot.docs.isNotEmpty) {
+      final docData = querySnapshot.docs.first.data();
+      count = docData['availableCount'] ?? 0;
     }
     setState(() {
       _selectedToolAvailableCount = count;
@@ -305,39 +291,36 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   }
 
   Future<void> _fetchAvailableCountForReturnSelectedTool(String? toolId) async {
-    if (toolId == null || _returnSelectedSiteId == null) {
+    if (toolId == null ||
+        _returnSelectedSiteId == null ||
+        _returnSelectedSiteId!.isEmpty) {
       setState(() {
         _returnSelectedToolAvailableCount = null;
       });
       return;
     }
-    final toolObj = _tools.firstWhere(
+    final tool = _tools.firstWhere(
       (t) => t['toolId'] == toolId,
-      orElse: () => {'toolCode': null},
+      orElse: () => {},
     );
-    final toolCode = toolObj['toolCode'] as String?;
-    if (toolCode == null) {
+    final toolCode = tool['toolCode'] ?? '';
+    if (toolCode.isEmpty) {
       setState(() {
-        _returnSelectedToolAvailableCount = null;
+        _returnSelectedToolAvailableCount = 0;
       });
       return;
     }
-    final docSnap = await FirestoreService.getCollection(
+
+    final querySnapshot = await FirestoreService.getCollection(
       'toolsInventory',
     ).doc(toolCode).get();
-    int? count;
-    if (docSnap.exists) {
-      final data = docSnap.data() as Map<String, dynamic>;
-      final sites = data['sites'] as List<dynamic>? ?? [];
-      final siteEntry = sites.firstWhere(
-        (site) => site['siteId'] == _returnSelectedSiteId,
-        orElse: () => null,
-      );
-      if (siteEntry != null && siteEntry['count'] is int) {
-        count = siteEntry['count'] as int;
-      } else {
-        count = 0;
-      }
+
+    int count = 0;
+    if (querySnapshot.exists) {
+      final data = querySnapshot.data() as Map<String, dynamic>;
+      final Map<String, dynamic> availableCountAtSites =
+          Map<String, dynamic>.from(data['availableCountAtSites'] ?? {});
+      count = (availableCountAtSites[_returnSelectedSiteId] as int?) ?? 0;
     }
     setState(() {
       _returnSelectedToolAvailableCount = count;
@@ -346,38 +329,182 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return GlassScaffold(
-      title: 'Tools Movement',
-      onBack: () => Navigator.pop(context),
-      bottom: TabBar(
-        controller: _tabController,
-        indicatorColor: Colors.white,
-        indicatorWeight: 4,
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
-        tabs: const [
-          Tab(text: 'Company to Site'),
-          Tab(text: 'Site to Company'),
-        ],
-      ),
+      padding: EdgeInsets.zero,
       body: SafeArea(
-        bottom: true,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCompanyToSiteTab(_tools),
-                _buildSiteToCompanyTab(_tools),
-              ],
+        child: Column(
+          children: [
+            // ── Header Row ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Text(
+                    'Tools Movement',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
             ),
-          ),
+
+            // ── Dark Pill Mode Switcher ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _tabController.animateTo(0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController.index == 0
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.send_rounded,
+                                  size: 16,
+                                  color: _tabController.index == 0
+                                      ? Colors.white
+                                      : const Color(0xFFCBD5E1),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'COMPANY TO SITE',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.4,
+                                    color: _tabController.index == 0
+                                        ? Colors.white
+                                        : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _tabController.animateTo(1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tabController.index == 1
+                                  ? primaryColor
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.keyboard_return_rounded,
+                                  size: 16,
+                                  color: _tabController.index == 1
+                                      ? Colors.white
+                                      : const Color(0xFFCBD5E1),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'SITE TO COMPANY',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.4,
+                                    color: _tabController.index == 1
+                                        ? Colors.white
+                                        : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+
+            // ── Tab View Body ───────────────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildCompanyToSiteTab(darkCardBg, primaryColor),
+                      _buildSiteToCompanyTab(darkCardBg, primaryColor),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -407,45 +534,47 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     });
   }
 
-  Widget _buildCompanyToSiteTab(List<Map<String, dynamic>> filteredTools) {
+  // ── COMPANY TO SITE TAB ──────────────────────────────────────────────────
+  Widget _buildCompanyToSiteTab(Color darkCardBg, Color primaryColor) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GlassCard(
+          // Transfer Details Card
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: darkCardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: darkCardBg.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.send, color: _primaryColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Transfer Details',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                GlassTextField(
-                  controller: _managerNameController,
+                _buildSectionHeader('Transfer Details', Icons.send_rounded),
+                const SizedBox(height: 18),
+                _buildTextField(
                   label: 'Manager Name',
-                  icon: Icons.person,
+                  controller: _managerNameController,
+                  hint: 'Enter Manager Name',
+                  icon: Icons.person_rounded,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildDatePicker(false),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildDropdownField(
                   value: _selectedSiteId,
                   label: 'Site ID',
                   items: _siteIds,
+                  icon: Icons.location_on_rounded,
                   onChanged: (newValue) {
                     setState(() {
                       _selectedSiteId = newValue;
@@ -453,53 +582,52 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     _fetchAndSetProjectName(newValue, false);
                   },
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _projectNameController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Project Name',
-                  icon: Icons.work,
+                  controller: _projectNameController,
+                  hint: 'Auto-filled from selection',
                   readOnly: true,
+                  icon: Icons.business_rounded,
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _supervisorNameController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Supervisor Name',
-                  icon: Icons.supervisor_account,
+                  controller: _supervisorNameController,
+                  hint: 'Enter Supervisor Name',
+                  icon: Icons.supervisor_account_rounded,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          GlassCard(
+
+          // Tools Selection Card
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: darkCardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: darkCardBg.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.build, color: _primaryColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Tools Selection',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                _buildSectionHeader('Tools Selection', Icons.build_rounded),
+                const SizedBox(height: 18),
                 _buildDropdownField(
                   value: _selectedTool,
                   label: 'Select Tool',
-                  items: filteredTools
-                      .map((t) => t['toolId'] as String)
-                      .toList(),
-                  displayItems: filteredTools
-                      .map((t) => t['toolCode'] as String)
-                      .toList(),
+                  items: _tools.map((t) => t['toolId'] as String).toList(),
+                  displayItems:
+                      _tools.map((t) => t['toolCode'] as String).toList(),
+                  icon: Icons.inventory_2_rounded,
                   onChanged: (newValue) {
                     setState(() {
                       _selectedTool = newValue;
@@ -511,56 +639,76 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 const SizedBox(height: 8),
                 _AvailableCountWithWarning(
                   availableCount: _selectedToolAvailableCount,
-                  primaryColor: _primaryColor,
-                  successColor: _successColor,
-                  warningColor: _warningColor,
-                  errorColor: _errorColor,
+                  primaryColor: primaryColor,
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _toolCountController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Count',
-                  icon: Icons.onetwothree,
+                  controller: _toolCountController,
+                  hint: 'Enter count',
                   keyboardType: TextInputType.number,
+                  icon: Icons.tag_rounded,
+                  enabled: _selectedToolAvailableCount != 0 &&
+                      _selectedToolAvailableCount != null,
                   onChanged: (value) {
                     setState(() {
                       _toolCount = int.tryParse(value);
                     });
                   },
-                  enabled:
-                      _selectedToolAvailableCount != 0 &&
-                      _selectedToolAvailableCount != null,
                 ),
-                const SizedBox(height: 20),
-                GlassButton(
-                  label: 'Add Tool',
-                  onPressed: () => _addTool(false),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 48,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 20,
+                      color: Color(0xFF0A183D),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 4,
+                      shadowColor: primaryColor.withValues(alpha: 0.4),
+                    ),
+                    onPressed: () => _addTool(false),
+                    label: const Text(
+                      'Add Tool',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+
           if (_addedTools.isNotEmpty) ...[
             const SizedBox(height: 20),
-            GlassCard(
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.list, color: _primaryColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Selected Tools',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: _textColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildSectionHeader('Selected Tools', Icons.list_alt_rounded),
                   const SizedBox(height: 16),
                   _buildToolsTable(_addedTools),
                 ],
@@ -568,88 +716,147 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             ),
           ],
           const SizedBox(height: 24),
+
+          // Actions Row
           Row(
             children: [
               Expanded(
-                child: GlassButton(
-                  label: 'Move Tools',
-                  onPressed: () async {
-                    if (_addedTools.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Please add tools to move'),
-                          backgroundColor: _errorColor,
+                flex: 2,
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (_addedTools.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Please add tools to move'),
+                            backgroundColor: _errorColor,
+                          ),
+                        );
+                        return;
+                      }
+                      await _saveCompanyToSiteMovement();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 6,
+                      shadowColor: primaryColor.withValues(alpha: 0.4),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.swap_horiz_rounded,
+                          size: 22,
+                          color: Color(0xFF0A183D),
                         ),
-                      );
-                      return;
-                    }
-                    await _saveCompanyToSiteMovement();
-                  },
+                        SizedBox(width: 8),
+                        Text(
+                          'MOVE TOOLS',
+                          style: TextStyle(
+                            color: Color(0xFF0A183D),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: GlassButton(
-                  label: 'Reset',
-                  isSecondary: true,
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
                   onPressed: () => _resetForm(false),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GlassButton(
-                  label: 'Cancel',
-                  isSecondary: true,
-                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.refresh_rounded,
+                          size: 18, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'RESET',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildSiteToCompanyTab(List<Map<String, dynamic>> filteredTools) {
+  // ── SITE TO COMPANY TAB ──────────────────────────────────────────────────
+  Widget _buildSiteToCompanyTab(Color darkCardBg, Color primaryColor) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GlassCard(
+          // Return Details Card
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: darkCardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: darkCardBg.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.keyboard_return, color: _primaryColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Return Details',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                    ),
-                  ],
+                _buildSectionHeader(
+                  'Return Details',
+                  Icons.keyboard_return_rounded,
                 ),
-                const SizedBox(height: 20),
-                GlassTextField(
-                  controller: _returnManagerNameController,
+                const SizedBox(height: 18),
+                _buildTextField(
                   label: 'Manager Name',
-                  icon: Icons.person,
+                  controller: _returnManagerNameController,
+                  hint: 'Enter Manager Name',
+                  icon: Icons.person_rounded,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildDatePicker(true),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildDropdownField(
                   value: _returnSelectedSiteId,
                   label: 'Site ID',
                   items: _siteIds,
+                  icon: Icons.location_on_rounded,
                   onChanged: (newValue) {
                     setState(() {
                       _returnSelectedSiteId = newValue;
@@ -666,53 +873,52 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     }
                   },
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _returnProjectNameController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Project Name',
-                  icon: Icons.work,
+                  controller: _returnProjectNameController,
+                  hint: 'Auto-filled from selection',
                   readOnly: true,
+                  icon: Icons.business_rounded,
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _returnSupervisorNameController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Supervisor Name',
-                  icon: Icons.supervisor_account,
+                  controller: _returnSupervisorNameController,
+                  hint: 'Enter Supervisor Name',
+                  icon: Icons.supervisor_account_rounded,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          GlassCard(
+
+          // Tools Selection Card
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: darkCardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: darkCardBg.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.build, color: _primaryColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Tools Selection',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                _buildSectionHeader('Tools Selection', Icons.build_rounded),
+                const SizedBox(height: 18),
                 _buildDropdownField(
                   value: _returnSelectedTool,
                   label: 'Select Tool',
-                  items: filteredTools
-                      .map((t) => t['toolId'] as String)
-                      .toList(),
-                  displayItems: filteredTools
-                      .map((t) => t['toolCode'] as String)
-                      .toList(),
+                  items: _tools.map((t) => t['toolId'] as String).toList(),
+                  displayItems:
+                      _tools.map((t) => t['toolCode'] as String).toList(),
+                  icon: Icons.inventory_2_rounded,
                   onChanged: (newValue) {
                     setState(() {
                       _returnSelectedTool = newValue;
@@ -724,53 +930,76 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 const SizedBox(height: 8),
                 _AvailableCountWithWarning(
                   availableCount: _returnSelectedToolAvailableCount,
-                  primaryColor: _primaryColor,
-                  successColor: _successColor,
-                  warningColor: _warningColor,
-                  errorColor: _errorColor,
+                  primaryColor: primaryColor,
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _returnToolCountController,
+                const SizedBox(height: 14),
+                _buildTextField(
                   label: 'Count',
-                  icon: Icons.onetwothree,
+                  controller: _returnToolCountController,
+                  hint: 'Enter count to return',
                   keyboardType: TextInputType.number,
+                  icon: Icons.tag_rounded,
+                  enabled: _returnSelectedToolAvailableCount != 0 &&
+                      _returnSelectedToolAvailableCount != null,
                   onChanged: (value) {
                     setState(() {
                       _returnToolCount = int.tryParse(value);
                     });
                   },
-                  enabled:
-                      _returnSelectedToolAvailableCount != 0 &&
-                      _returnSelectedToolAvailableCount != null,
                 ),
-                const SizedBox(height: 20),
-                GlassButton(label: 'Add Tool', onPressed: () => _addTool(true)),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 48,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 20,
+                      color: Color(0xFF0A183D),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 4,
+                      shadowColor: primaryColor.withValues(alpha: 0.4),
+                    ),
+                    onPressed: () => _addTool(true),
+                    label: const Text(
+                      'Add Tool',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+
           if (_returnAddedTools.isNotEmpty) ...[
             const SizedBox(height: 20),
-            GlassCard(
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.list, color: _primaryColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Selected Tools',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: _textColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildSectionHeader('Selected Tools', Icons.list_alt_rounded),
                   const SizedBox(height: 16),
                   _buildToolsTable(_returnAddedTools, isReturn: true),
                 ],
@@ -778,44 +1007,487 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             ),
           ],
           const SizedBox(height: 24),
+
+          // Actions Row
           Row(
             children: [
               Expanded(
-                child: GlassButton(
-                  label: 'Return Tools',
-                  onPressed: () async {
-                    if (_returnAddedTools.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Please add tools to return'),
-                          backgroundColor: _errorColor,
+                flex: 2,
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (_returnAddedTools.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Please add tools to return'),
+                            backgroundColor: _errorColor,
+                          ),
+                        );
+                        return;
+                      }
+                      await _saveSiteToCompanyReturn();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 6,
+                      shadowColor: primaryColor.withValues(alpha: 0.4),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.keyboard_return_rounded,
+                          size: 22,
+                          color: Color(0xFF0A183D),
                         ),
-                      );
-                      return;
-                    }
-                    await _saveSiteToCompanyReturn();
-                  },
+                        SizedBox(width: 8),
+                        Text(
+                          'RETURN TOOLS',
+                          style: TextStyle(
+                            color: Color(0xFF0A183D),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: GlassButton(
-                  label: 'Reset',
-                  isSecondary: true,
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
                   onPressed: () => _resetForm(true),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GlassButton(
-                  label: 'Cancel',
-                  isSecondary: true,
-                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.refresh_rounded,
+                          size: 18, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'RESET',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── HELPER BUILDERS ───────────────────────────────────────────────────────
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white, size: 22),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    bool readOnly = false,
+    bool enabled = true,
+    TextInputType? keyboardType,
+    IconData? icon,
+    ValueChanged<String>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: (!enabled || readOnly) ? const Color(0xFFF1F5F9) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: controller,
+            readOnly: readOnly,
+            enabled: enabled,
+            keyboardType: keyboardType,
+            onChanged: onChanged,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String? value,
+    required String label,
+    required List<String?> items,
+    List<String>? displayItems,
+    required void Function(String?) onChanged,
+    IconData? icon,
+  }) {
+    final safeValue = items.contains(value) ? value : null;
+    final theme = Theme.of(context);
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            value: safeValue,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Select $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              return DropdownMenuItem<String>(
+                value: item,
+                child: Text(
+                  displayItems != null && displayItems.length > index
+                      ? displayItems[index]
+                      : item ?? '',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker(bool isReturn) {
+    final theme = Theme.of(context);
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final date = isReturn ? _returnSelectedDate : _selectedDate;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Date *',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _selectDate(context, isReturn),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: brandIconColor, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    date == null
+                        ? 'Select date'
+                        : DateFormat('MMM d, yyyy').format(date),
+                    style: TextStyle(
+                      color: date == null
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildToolsTable(
+    List<Map<String, dynamic>> tools, {
+    bool isReturn = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: const Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Tool ID',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Tool Code',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'Count',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 36),
+              ],
+            ),
+          ),
+          ...tools.asMap().entries.map((entry) {
+            final i = entry.key;
+            final tool = entry.value;
+            String toolCode = '';
+            if (tool['tool'] != null) {
+              final toolObj = _tools.firstWhere(
+                (t) => t['toolId'] == tool['tool'],
+                orElse: () => {'toolCode': ''},
+              );
+              toolCode = toolObj['toolCode'] ?? '';
+            }
+            final isLast = i == tools.length - 1;
+            return Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          tool['tool'] ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          toolCode,
+                          style: const TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          tool['count'].toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 36,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.delete_rounded,
+                            color: Color(0xFFF87171),
+                            size: 18,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (isReturn) {
+                                _returnAddedTools.removeAt(i);
+                              } else {
+                                _addedTools.removeAt(i);
+                              }
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+              ],
+            );
+          }).toList(),
         ],
       ),
     );
@@ -876,7 +1548,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final toolCode = toolObj['toolCode'] ?? tool['tool'];
         final enteredCount = tool['count'] as int;
 
-        // Site: DECREMENT
         final siteQuery = await FirestoreService.getCollection(
           'toolsAtSite',
         ).where('toolCode', isEqualTo: toolCode).limit(1).get();
@@ -887,7 +1558,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           });
         }
 
-        // Company: INCREMENT
         final companyQuery = await FirestoreService.getCollection(
           'toolsAtCompany',
         ).where('toolCode', isEqualTo: toolCode).limit(1).get();
@@ -905,9 +1575,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       }
       await FirestoreService.getCollection('toolsReturn').doc(docId).set(data);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tools returned successfully'),
-          backgroundColor: _successColor,
+        const SnackBar(
+          content: Text('Tools returned successfully'),
+          backgroundColor: Colors.green,
         ),
       );
       _resetForm(true);
@@ -976,7 +1646,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final toolCode = toolObj['toolCode'] ?? tool['tool'];
         final enteredCount = tool['count'] as int;
 
-        // Company: DECREMENT
         final companyQuery = await FirestoreService.getCollection(
           'toolsAtCompany',
         ).where('toolCode', isEqualTo: toolCode).limit(1).get();
@@ -987,7 +1656,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           });
         }
 
-        // Site: INCREMENT, create if not exist
         final siteDocRef = FirestoreService.getCollection(
           'toolsAtSite',
         ).doc(toolCode);
@@ -1007,9 +1675,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         'toolsMovement',
       ).doc(docId).set(data);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tools moved successfully'),
-          backgroundColor: _successColor,
+        const SnackBar(
+          content: Text('Tools moved successfully'),
+          backgroundColor: Colors.green,
         ),
       );
       _resetForm(false);
@@ -1022,343 +1690,38 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       );
     }
   }
-
-  Widget _buildDropdownField({
-    required String? value,
-    required String label,
-    required List<String?> items,
-    List<String>? displayItems,
-    required void Function(String?) onChanged,
-  }) {
-    // Prevent dropdown crash if value is no longer in items list
-    final safeValue = items.contains(value) ? value : null;
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          value: safeValue,
-          decoration: InputDecoration(
-            hintText: 'Select $label',
-            prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, size: 20),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 8,
-            ),
-          ),
-          items: items.asMap().entries.map((entry) {
-            final index = entry.key;
-            final item = entry.value;
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                displayItems != null && displayItems.length > index
-                    ? displayItems[index]
-                    : item ?? '',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            );
-          }).toList(),
-          selectedItemBuilder: (BuildContext context) {
-            return items.map((String? item) {
-              final index = items.indexOf(item);
-              return Text(
-                displayItems != null && displayItems.length > index
-                    ? displayItems[index]
-                    : item ?? '',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              );
-            }).toList();
-          },
-          onChanged: onChanged,
-          borderRadius: BorderRadius.circular(10),
-          icon: Icon(Icons.arrow_drop_down, color: _primaryColor),
-          dropdownColor: Colors.white,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePicker(bool isReturn) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'Date',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        InkWell(
-          onTap: () => _selectDate(context, isReturn),
-          child: InputDecorator(
-            decoration: InputDecoration(
-              hintText: 'Select date',
-              prefixIcon: Icon(Icons.calendar_today, size: 20),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    isReturn
-                        ? _returnSelectedDate == null
-                              ? 'Select date'
-                              : DateFormat(
-                                  'yyyy-MM-dd',
-                                ).format(_returnSelectedDate!)
-                        : _selectedDate == null
-                        ? 'Select date'
-                        : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-                    style: theme.textTheme.bodyLarge,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildToolsTable(
-    List<Map<String, dynamic>> tools, {
-    bool isReturn = false,
-  }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: _primaryColor.withOpacity(0.2)),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: _primaryColor.withOpacity(0.1),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(10),
-                ),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 120,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(
-                        'Tool Id',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 120,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(
-                        'Tool Code',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(
-                        'Count',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 50,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 8,
-                      ),
-                      child: Text(''),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ...tools.asMap().entries.map((entry) {
-              final i = entry.key;
-              final tool = entry.value;
-              // Find toolCode for this toolId
-              String toolCode = '';
-              if (tool['tool'] != null) {
-                final toolObj = _tools.firstWhere(
-                  (t) => t['toolId'] == tool['tool'],
-                  orElse: () => {'toolCode': ''},
-                );
-                toolCode = toolObj['toolCode'] ?? '';
-              }
-              return Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: _primaryColor.withOpacity(0.1)),
-                  ),
-                  color: i.isEven
-                      ? _primaryColor.withOpacity(0.03)
-                      : Colors.transparent,
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
-                        ),
-                        child: Text(
-                          tool['tool'] ?? '',
-                          style: TextStyle(color: _textColor),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 120,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
-                        ),
-                        child: Text(
-                          toolCode,
-                          style: TextStyle(color: _textColor),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 80,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
-                        ),
-                        child: Text(
-                          tool['count'].toString(),
-                          style: TextStyle(color: _textColor),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 50,
-                      child: IconButton(
-                        icon: Icon(Icons.delete, color: _errorColor),
-                        onPressed: () {
-                          setState(() {
-                            if (isReturn) {
-                              _returnAddedTools.removeAt(i);
-                            } else {
-                              _addedTools.removeAt(i);
-                            }
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-/// Widget to show available count and warning, and highlight if needed
 class _AvailableCountWithWarning extends StatelessWidget {
   final int? availableCount;
   final Color primaryColor;
-  final Color successColor;
-  final Color warningColor;
-  final Color errorColor;
 
   const _AvailableCountWithWarning({
     super.key,
     this.availableCount,
     required this.primaryColor,
-    required this.successColor,
-    required this.warningColor,
-    required this.errorColor,
   });
 
   @override
   Widget build(BuildContext context) {
     if (availableCount == null) {
-      return Text(
+      return const Text(
         'Available: N/A',
-        style: TextStyle(fontSize: 12, color: primaryColor.withOpacity(0.7)),
+        style: TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
       );
     }
     if (availableCount == 0) {
-      return Row(
+      return const Row(
         children: [
-          Icon(Icons.warning, color: errorColor, size: 16),
-          const SizedBox(width: 4),
+          Icon(Icons.warning_amber_rounded, color: Color(0xFFF87171), size: 16),
+          SizedBox(width: 4),
           Expanded(
             child: Text(
               'Available: 0 (Not available)',
               style: TextStyle(
                 fontSize: 12,
-                color: errorColor,
-                fontWeight: FontWeight.bold,
+                color: Color(0xFFF87171),
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -1368,15 +1731,16 @@ class _AvailableCountWithWarning extends StatelessWidget {
     if (availableCount! < 5) {
       return Row(
         children: [
-          Icon(Icons.warning, color: warningColor, size: 16),
+          const Icon(Icons.warning_amber_rounded,
+              color: Colors.orangeAccent, size: 16),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               'Available: $availableCount (Low stock!)',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                color: warningColor,
-                fontWeight: FontWeight.bold,
+                color: Colors.orangeAccent,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -1385,7 +1749,11 @@ class _AvailableCountWithWarning extends StatelessWidget {
     }
     return Text(
       'Available: $availableCount',
-      style: TextStyle(fontSize: 12, color: successColor),
+      style: const TextStyle(
+        fontSize: 12,
+        color: Color(0xFF4ADE80),
+        fontWeight: FontWeight.w800,
+      ),
     );
   }
 }

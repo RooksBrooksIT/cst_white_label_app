@@ -8,10 +8,8 @@ import 'dart:io';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/expense_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_text_field.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
 
 class ManagerExpenses extends StatefulWidget {
   final bool hideAppBar;
@@ -413,11 +411,11 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
               height: 38,
               margin: const EdgeInsets.only(right: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1942),
+                color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                    color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -464,12 +462,40 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                       isMobile,
                     ),
                     SizedBox(height: isDesktop ? 40.0 : 32.0),
-                    GlassButton(
-                      label: 'SUBMIT EXPENSES',
-                      onPressed: isSubmitting || bills.isEmpty
-                          ? null
-                          : _handleSubmit,
-                      isLoading: isSubmitting,
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isSubmitting || bills.isEmpty
+                            ? null
+                            : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: const Color(0xFF0A183D),
+                          disabledBackgroundColor: const Color(0xFF0B1942),
+                          disabledForegroundColor: const Color(0xFF94A3B8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 6,
+                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              )
+                            : const Text(
+                                'SUBMIT EXPENSES',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                      ),
                     ),
                   ],
                 ),
@@ -487,7 +513,21 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    return GlassCard(
+    final darkCardBg = AppTheme.getDarkAccent(theme.colorScheme.primary);
+
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -510,53 +550,114 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                   (v) {
                     setState(() {
                       selectedSiteId = v;
-                      // Clear site detail fields immediately
                       selectedSupervisorId = null;
                       selectedProjectPhase = null;
                       selectedProjectName = null;
                       supervisorIdController.clear();
                       projectPhaseController.clear();
                       projectNameController.clear();
-                      // Reset bill list — start fresh for new site
                       bills = [];
                       initialBills = [];
                       existingDailyTotal = 0.0;
                     });
                     if (v != null) {
                       _loadSiteDetails(v);
-                      // Don't auto-load existing expenses;
-                      // bill list starts empty for new entry session
                     }
                   },
                   isDesktop,
                   isTablet,
                   isMobile,
                 ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: supervisorIdController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Supervisor',
-            icon: Icons.person_outline,
+            controller: supervisorIdController,
+            icon: Icons.person_rounded,
             readOnly: true,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: projectPhaseController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Project Phase',
-            icon: Icons.timeline_outlined,
+            controller: projectPhaseController,
+            icon: Icons.timeline_rounded,
             readOnly: true,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: projectNameController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Project Name',
-            icon: Icons.assignment_outlined,
+            controller: projectNameController,
+            icon: Icons.assignment_rounded,
             readOnly: true,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
           _buildDatePicker(theme, isDesktop, isTablet, isMobile),
         ],
       ),
+    );
+  }
+
+  Widget _buildCustomField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    bool readOnly = false,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            readOnly: readOnly,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: const Color(0xFF0A183D),
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -566,7 +667,22 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    return GlassCard(
+    final primaryColor = theme.colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -581,41 +697,65 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
           ),
           SizedBox(height: isDesktop ? 24.0 : 20.0),
           _buildImagePicker(theme, isDesktop, isTablet, isMobile),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: billNoController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Bill Number',
-            icon: Icons.receipt_long_outlined,
+            controller: billNoController,
+            icon: Icons.receipt_long_rounded,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: billDateController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Bill Date',
-            icon: Icons.calendar_today_outlined,
+            controller: billDateController,
+            icon: Icons.calendar_today_rounded,
             readOnly: true,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: billVendorController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Vendor Name',
-            icon: Icons.storefront_outlined,
+            controller: billVendorController,
+            icon: Icons.storefront_rounded,
           ),
-          SizedBox(height: isDesktop ? 16.0 : 12.0),
-          GlassTextField(
-            controller: billAmountController,
+          SizedBox(height: isDesktop ? 16.0 : 14.0),
+          _buildCustomField(
             label: 'Amount (₹)',
-            icon: Icons.currency_rupee_outlined,
+            controller: billAmountController,
+            icon: Icons.currency_rupee_rounded,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           SizedBox(height: isDesktop ? 24.0 : 20.0),
           Align(
             alignment: Alignment.centerRight,
-            child: GlassButton(
-              label: 'ADD BILL',
-              onPressed: isUploadingImage ? null : _addBill,
-              isLoading: isUploadingImage,
-              isSecondary: true,
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: isUploadingImage ? null : _addBill,
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text(
+                  'ADD BILL',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: const Color(0xFF0A183D),
+                  disabledBackgroundColor: const Color(0xFF1E293B),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: isUploadingImage
+                          ? const Color(0xFF334155)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  elevation: 4,
+                ),
+              ),
             ),
           ),
         ],
@@ -629,20 +769,24 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    final colorScheme = theme.colorScheme;
+    final primaryColor = theme.colorScheme.primary;
     return InkWell(
       onTap: _pickBillImage,
+      borderRadius: BorderRadius.circular(16.0),
       child: Container(
         height: isDesktop ? 180.0 : 150.0,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: theme.dividerColor),
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16.0),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
         ),
         child: _selectedBillImage != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
+                borderRadius: BorderRadius.circular(16.0),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -651,9 +795,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                       top: isDesktop ? 12.0 : 8.0,
                       right: isDesktop ? 12.0 : 8.0,
                       child: CircleAvatar(
-                        backgroundColor: Colors.black54,
+                        backgroundColor: const Color(0xFF0B1942),
                         child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white),
                           onPressed: () =>
                               setState(() => _selectedBillImage = null),
                         ),
@@ -666,16 +810,17 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.add_a_photo_outlined,
-                    size: isDesktop ? 50.0 : 40.0,
-                    color: colorScheme.primary,
+                    Icons.add_a_photo_rounded,
+                    size: isDesktop ? 48.0 : 38.0,
+                    color: primaryColor,
                   ),
                   SizedBox(height: isDesktop ? 12.0 : 8.0),
-                  Text(
+                  const Text(
                     'Upload Bill Copy (Optional)',
                     style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: isDesktop ? 15.0 : 13.0,
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -690,18 +835,35 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
+    final primaryColor = theme.colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     if (isLoadingBills) {
-      return const GlassCard(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: CircularProgressIndicator(),
-          ),
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: darkCardBg,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(),
         ),
       );
     }
     if (bills.isEmpty) return const SizedBox.shrink();
-    return GlassCard(
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -715,60 +877,91 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
             ),
           ),
           SizedBox(height: isDesktop ? 20.0 : 16.0),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              horizontalMargin: 0,
-              columnSpacing: isDesktop ? 32.0 : 24.0,
-              columns: const [
-                DataColumn(label: Text('Bill No', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Vendor', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Amount', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Action', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-              ],
-              rows: bills.asMap().entries.map((entry) {
-                final bill = entry.value;
-                final amount = bill['billAmount'];
-                String amountStr = '0.00';
-                if (amount is num) {
-                  amountStr = amount.toStringAsFixed(2);
-                } else if (amount is String) {
-                  amountStr = amount.replaceAll(RegExp(r'[^\d.]'), '');
-                }
-
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Text(
-                        bill['billNo']?.toString() ?? '',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        bill['billVendor']?.toString() ?? '',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '₹ $amountStr',
-                        style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    DataCell(
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Color(0xFFEF4444),
-                        ),
-                        onPressed: () =>
-                            setState(() => bills.removeAt(entry.key)),
-                      ),
-                    ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A183D),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(const Color(0xFF05112E)),
+                  headingTextStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontSize: 13.5,
+                  ),
+                  dataTextStyle: const TextStyle(
+                    color: Color(0xFFE2E8F0),
+                    fontSize: 13,
+                  ),
+                  horizontalMargin: 16,
+                  columnSpacing: isDesktop ? 32.0 : 24.0,
+                  columns: const [
+                    DataColumn(label: Text('Bill No')),
+                    DataColumn(label: Text('Vendor')),
+                    DataColumn(label: Text('Amount')),
+                    DataColumn(label: Text('Action')),
                   ],
-                );
-              }).toList(),
+                  rows: bills.asMap().entries.map((entry) {
+                    final bill = entry.value;
+                    final amount = bill['billAmount'];
+                    String amountStr = '0.00';
+                    if (amount is num) {
+                      amountStr = amount.toStringAsFixed(2);
+                    } else if (amount is String) {
+                      amountStr = amount.replaceAll(RegExp(r'[^\d.]'), '');
+                    }
+
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Text(
+                            bill['billNo']?.toString() ?? '',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            bill['billVendor']?.toString() ?? '',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '₹ $amountStr',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFF87171),
+                              size: 20,
+                            ),
+                            onPressed: () =>
+                                setState(() => bills.removeAt(entry.key)),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ),
         ],
@@ -785,63 +978,75 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    final theme = Theme.of(context);
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      value: value,
-      dropdownColor: Colors.white,
-      style: TextStyle(
-        color: const Color(0xFF0A183D),
-        fontSize: isDesktop ? 15.0 : 14.0,
-        fontWeight: FontWeight.w700,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(
-          color: Color(0xFF5A759E),
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        prefixIcon: Icon(
-          Icons.location_on_outlined,
-          size: isDesktop ? 22.0 : 20.0,
-          color: theme.primaryColor,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          borderSide: BorderSide(color: theme.primaryColor, width: 1.8),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: isDesktop ? 20.0 : 16.0,
-          vertical: isDesktop ? 18.0 : 16.0,
-        ),
-      ),
-      items: items.map((id) {
-        final name = siteNameMap[id] ?? 'Unnamed Site';
-        return DropdownMenuItem(
-          value: id,
-          child: Text(
-            '$id - $name',
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: isDesktop ? 15.0 : 14.0,
-              color: const Color(0xFF0A183D),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: value,
+            dropdownColor: Colors.white,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
               fontWeight: FontWeight.w700,
             ),
+            decoration: InputDecoration(
+              hintText: label,
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFF0A183D),
+                size: 20,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16.0),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: items.map((id) {
+              final name = siteNameMap[id] ?? 'Unnamed Site';
+              return DropdownMenuItem(
+                value: id,
+                child: Text(
+                  '$id - $name',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    color: Color(0xFF0A183D),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: onChanged,
           ),
-        );
-      }).toList(),
-      onChanged: onChanged,
+        ),
+      ],
     );
   }
 
@@ -851,56 +1056,62 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     bool isTablet,
     bool isMobile,
   ) {
-    return InkWell(
-      onTap: () => _selectDate(context),
-      borderRadius: BorderRadius.circular(16.0),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Date',
-          labelStyle: const TextStyle(
-            color: Color(0xFF5A759E),
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.calendar_today_outlined,
-            size: isDesktop ? 22.0 : 20.0,
-            color: theme.primaryColor,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 20.0 : 16.0,
-            vertical: isDesktop ? 18.0 : 16.0,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Date *',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              DateFormat('dd MMM yyyy').format(selectedDate),
-              style: TextStyle(
-                color: const Color(0xFF0A183D),
-                fontSize: isDesktop ? 16.0 : 15.0,
-                fontWeight: FontWeight.w700,
-              ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () => _selectDate(context),
+          borderRadius: BorderRadius.circular(16.0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            Icon(
-              Icons.edit_calendar_outlined,
-              size: isDesktop ? 22.0 : 18.0,
-              color: theme.primaryColor,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  size: 20,
+                  color: Color(0xFF0A183D),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    DateFormat('dd MMM yyyy').format(selectedDate),
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.edit_calendar_rounded,
+                  size: 18,
+                  color: Color(0xFF0A183D),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
@@ -61,8 +62,6 @@ class _ProjectScreenState extends State<ProjectScreen>
   Map<String, dynamic>? selectedProjectData;
   String? selectedProjectId;
 
-  // Color scheme will be derived from theme in build method
-
   @override
   void initState() {
     super.initState();
@@ -73,14 +72,12 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   Future<void> _fetchUnassignedSiteIds() async {
-    // Fetch site IDs from Site collection under the current organisation
     final sitesSnapshot = await FirestoreService.getCollection('Site').get();
     final allSiteIds = sitesSnapshot.docs
         .map((doc) => doc.id)
         .where((id) => id.isNotEmpty)
         .toSet();
 
-    // Fetch assigned site IDs from siteSupervisorMap
     final siteSupervisorSnapshot = await FirestoreService.getCollection(
       'siteSupervisorMap',
     ).get();
@@ -204,6 +201,7 @@ class _ProjectScreenState extends State<ProjectScreen>
     _amountSpentController.clear();
     _balanceAmountController.clear();
     _projectBudgetController.clear();
+    _updateSiteIdController.clear();
     _contractorNameController.clear();
     _contractorBudgetController.clear();
     setState(() {
@@ -218,232 +216,21 @@ class _ProjectScreenState extends State<ProjectScreen>
       actualEndDate = null;
       contractStartDate = null;
       contractEndDate = null;
+
       _isContractWork = false;
-      selectedProjectData = null;
+
       selectedProjectId = null;
+      selectedProjectData = null;
+      _updateAppBarSiteId = null;
     });
   }
 
-  Future<String> _generateNextProjectId() async {
-    final snapshot = await FirestoreService.getCollection(
-      'projects',
-    ).orderBy(FieldPath.documentId).get();
-    int maxNumber = 0;
-    for (var doc in snapshot.docs) {
-      final id = doc.id;
-      if (id.startsWith('PR')) {
-        final number = int.tryParse(id.substring(2));
-        if (number != null && number > maxNumber) {
-          maxNumber = number;
-        }
-      }
-    }
-    final nextNumber = maxNumber + 1;
-    return 'PR${nextNumber.toString().padLeft(3, '0')}';
-  }
-
-  Future<void> _updateProjectStageInSiteSupervisorMap({
-    required String? siteId,
-    required String? projectStage,
-  }) async {
-    final sid = siteId?.trim() ?? '';
-    final stage = projectStage?.trim() ?? '';
-    if (sid.isEmpty || stage.isEmpty) return;
-
-    try {
-      final qs = await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).where('site', isEqualTo: sid).get();
-
-      if (qs.docs.isEmpty) return;
-
-      final batch = FirebaseFirestore.instance.batch();
-      for (final doc in qs.docs) {
-        batch.update(doc.reference, {
-          'projectStage': stage,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-      await batch.commit();
-    } catch (e) {
-      debugPrint(
-        'Failed to sync projectStage to siteSupervisorMap for site=$sid: $e',
-      );
-    }
-  }
-
-  Future<void> _saveForm() async {
-    final validMain = _mainFormKey.currentState?.validate() == true;
-    if (!validMain) return;
-
-    try {
-      if (!isUpdateMode) {
-        final query = await FirestoreService.getCollection(
-          'projects',
-        ).where('siteId', isEqualTo: _selectedSiteId).limit(1).get();
-
-        final data = _getProjectDataMap(isNew: query.docs.isEmpty);
-
-        if (query.docs.isNotEmpty) {
-          await FirestoreService.getCollection(
-            'projects',
-          ).doc(query.docs.first.id).update(data);
-        } else {
-          final projectId = await _generateNextProjectId();
-          await FirestoreService.getCollection(
-            'projects',
-          ).doc(projectId).set(data);
-        }
-
-        await _ensureTotalSiteExpensesDoc(_selectedSiteId);
-
-        final stageToSet = (projectStage ?? '').trim();
-        if ((_selectedSiteId?.isNotEmpty ?? false) && stageToSet.isNotEmpty) {
-          await _updateProjectStageInSiteSupervisorMap(
-            siteId: _selectedSiteId,
-            projectStage: stageToSet,
-          );
-        }
-
-        await DialogUtils.showSuccessDialog(
-          context,
-          message: 'Project created successfully!',
-        );
-        _resetForm();
-        await _fetchUnassignedSiteIds();
-      } else {
-        if (selectedProjectId != null) {
-          final Map<String, dynamic> updateData = {};
-
-          final String stage = (projectStage ?? '').trim();
-          if (stage.isNotEmpty) {
-            updateData['projectStage'] = stage;
-          }
-
-          updateData['amountPaid'] =
-              double.tryParse(_amountPaidController.text) ?? 0;
-
-          updateData['amountBalance'] =
-              double.tryParse(_balanceAmountController.text) ?? 0;
-
-          final String cs = (currentStatus ?? '').trim();
-          if (cs.isNotEmpty) {
-            updateData['currentStatus'] = cs;
-            updateData['status'] = cs;
-          }
-
-          updateData['actualStateDate'] = actualStartDate != null
-              ? Timestamp.fromDate(actualStartDate!)
-              : null;
-          updateData['actualEndDate'] = actualEndDate != null
-              ? Timestamp.fromDate(actualEndDate!)
-              : null;
-
-          // Add contract start/end dates to updateData
-          updateData['contractStartDate'] = contractStartDate != null
-              ? Timestamp.fromDate(contractStartDate!)
-              : null;
-          updateData['contractEndDate'] = contractEndDate != null
-              ? Timestamp.fromDate(contractEndDate!)
-              : null;
-
-          if (_isContractWork) {
-            updateData['isContractWork'] = true;
-            updateData['contractorName'] = _contractorNameController.text;
-            updateData['contractorBudget'] =
-                double.tryParse(_contractorBudgetController.text) ?? 0;
-          }
-
-          await FirestoreService.getCollection(
-            'projects',
-          ).doc(selectedProjectId).update(updateData);
-
-          final String siteIdForTotals =
-              _updateSiteIdController.text.trim().isNotEmpty
-              ? _updateSiteIdController.text.trim()
-              : (selectedProjectData?['siteId']?.toString() ?? '');
-          await _ensureTotalSiteExpensesDoc(siteIdForTotals);
-
-          final String stageToSet =
-              (updateData['projectStage'] as String?) ?? (projectStage ?? '');
-          await _updateProjectStageInSiteSupervisorMap(
-            siteId: siteIdForTotals,
-            projectStage: stageToSet,
-          );
-
-          await DialogUtils.showSuccessDialog(
-            context,
-            message: 'Project updated successfully!',
-          );
-          _resetForm();
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
-  }
-
-  Map<String, dynamic> _getProjectDataMap({bool isNew = true}) {
-    final now = Timestamp.now();
-    return {
-      'projectName': _projectNameController.text,
-      'ownerName': _ownerNameController.text,
-      'ownerPhoneNumber': _ownerPhoneController.text,
-      'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
-      'amountSpent': isNew
-          ? 0
-          : double.tryParse(_amountSpentController.text) ?? 0,
-      'amountBalance': isNew
-          ? double.tryParse(_amountPaidController.text) ?? 0
-          : double.tryParse(_balanceAmountController.text) ?? 0,
-      'projectBudget': double.tryParse(_projectBudgetController.text) ?? 0,
-      'projectCategory': projectCategory ?? '',
-      'projectSubCategory': projectSubCategory ?? '',
-      'projectContract': projectContract ?? '',
-      'projectStage': projectStage ?? '',
-      'currentStatus': currentStatus ?? 'Planning',
-      'plannedStartDate': plannedStartDate != null
-          ? Timestamp.fromDate(plannedStartDate!)
-          : now,
-      'plannedEndDate': plannedEndDate != null
-          ? Timestamp.fromDate(plannedEndDate!)
-          : null,
-      'actualStateDate': actualStartDate != null
-          ? Timestamp.fromDate(actualStartDate!)
-          : null,
-      'actualEndDate': actualEndDate != null
-          ? Timestamp.fromDate(actualEndDate!)
-          : null,
-      // Add contractStartDate and contractEndDate here
-      'contractStartDate': contractStartDate != null
-          ? Timestamp.fromDate(contractStartDate!)
-          : null,
-      'contractEndDate': contractEndDate != null
-          ? Timestamp.fromDate(contractEndDate!)
-          : null,
-      'isContractWork': _isContractWork,
-      'contractorName': _isContractWork ? _contractorNameController.text : null,
-      'contractorBudget': _isContractWork
-          ? double.tryParse(_contractorBudgetController.text) ?? 0
-          : null,
-      'siteId': _selectedSiteId ?? '',
-      'createdAt': isNew ? now : FieldValue.serverTimestamp(),
-      'projectType': projectCategory ?? '',
-      'status': currentStatus ?? 'Planning',
-    };
-  }
-
   void _setupAmountListeners() {
-    _amountPaidController.addListener(_updateBalanceAmount);
-    _amountSpentController.addListener(_updateBalanceAmount);
+    _amountPaidController.addListener(_calculateBalance);
+    _amountSpentController.addListener(_calculateBalance);
   }
 
-  void _updateBalanceAmount() {
+  void _calculateBalance() {
     final paid = double.tryParse(_amountPaidController.text) ?? 0;
     final spent = double.tryParse(_amountSpentController.text) ?? 0;
     final balance = paid - spent;
@@ -451,48 +238,166 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   bool _projectHasAllDetails(Map<String, dynamic> data) {
-    bool nonEmpty(String? s) => s != null && s.trim().isNotEmpty;
-    bool hasDates =
-        data['plannedStartDate'] != null && data['plannedEndDate'] != null;
-    final budget =
-        double.tryParse((data['projectBudget'] ?? 0).toString()) ?? 0;
-
-    final isContract = data['isContractWork'] == true;
-    final contractorOk =
-        !isContract ||
-        (nonEmpty(data['contractorName']?.toString()) &&
-            (double.tryParse((data['contractorBudget'] ?? 0).toString()) ?? 0) >
-                0);
-
-    return nonEmpty(data['projectName']?.toString()) &&
-        nonEmpty(data['ownerName']?.toString()) &&
-        nonEmpty(data['projectCategory']?.toString()) &&
-        nonEmpty(data['projectSubCategory']?.toString()) &&
-        nonEmpty(data['projectContract']?.toString()) &&
-        nonEmpty(data['projectStage']?.toString()) &&
-        nonEmpty((data['currentStatus'] ?? data['status'])?.toString()) &&
-        hasDates &&
-        budget > 0 &&
-        contractorOk;
+    return (data['projectName'] != null &&
+            data['projectName'].toString().isNotEmpty) &&
+        (data['ownerName'] != null &&
+            data['ownerName'].toString().isNotEmpty) &&
+        (data['ownerPhoneNumber'] != null &&
+            data['ownerPhoneNumber'].toString().isNotEmpty) &&
+        (data['projectCategory'] != null &&
+            data['projectCategory'].toString().isNotEmpty) &&
+        (data['projectSubCategory'] != null &&
+            data['projectSubCategory'].toString().isNotEmpty) &&
+        (data['projectContract'] != null &&
+            data['projectContract'].toString().isNotEmpty) &&
+        (data['projectStage'] != null &&
+            data['projectStage'].toString().isNotEmpty) &&
+        (data['currentStatus'] != null || data['status'] != null) &&
+        data['plannedStartDate'] != null &&
+        data['plannedEndDate'] != null &&
+        data['actualStateDate'] != null &&
+        data['actualEndDate'] != null &&
+        (data['projectBudget'] != null) &&
+        (data['amountPaid'] != null);
   }
 
-  Future<void> _ensureTotalSiteExpensesDoc(String? siteId) async {
-    if (siteId == null || siteId.isEmpty) return;
+  @override
+  void dispose() {
+    _projectNameController.dispose();
+    _ownerNameController.dispose();
+    _ownerPhoneController.dispose();
+    _amountPaidController.dispose();
+    _amountSpentController.dispose();
+    _balanceAmountController.dispose();
+    _projectBudgetController.dispose();
+    _updateSiteIdController.dispose();
+    _contractorNameController.dispose();
+    _contractorBudgetController.dispose();
+    _tabController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveForm() async {
+    if (!_mainFormKey.currentState!.validate()) {
+      return;
+    }
+    if (plannedStartDate == null ||
+        plannedEndDate == null ||
+        actualStartDate == null ||
+        actualEndDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select all timeline dates'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_isContractWork &&
+        (contractStartDate == null || contractEndDate == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Contract Start and End dates'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     try {
-      final docRef = FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).doc(siteId);
-      final snap = await docRef.get();
-      if (!snap.exists) {
-        await docRef.set({
-          'siteId': siteId,
-          'totalMgrExpense': 0.0,
-          'totalOrgExpense': 0.0,
-          'totalSiteExpense': 0.0,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      final double budget =
+          double.tryParse(_projectBudgetController.text) ?? 0.0;
+      final double paid = double.tryParse(_amountPaidController.text) ?? 0.0;
+      final double spent = double.tryParse(_amountSpentController.text) ?? 0.0;
+      final double balance = paid - spent;
+
+      final Map<String, dynamic> projectData = {
+        'projectName': _projectNameController.text.trim(),
+        'ownerName': _ownerNameController.text.trim(),
+        'ownerPhoneNumber': _ownerPhoneController.text.trim(),
+        'projectCategory': projectCategory,
+        'projectSubCategory': projectSubCategory,
+        'projectContract': projectContract,
+        'projectStage': projectStage,
+        'currentStatus': currentStatus,
+        'status': currentStatus,
+        'plannedStartDate': plannedStartDate,
+        'plannedEndDate': plannedEndDate,
+        'actualStateDate': actualStartDate,
+        'actualEndDate': actualEndDate,
+        'projectBudget': budget,
+        'amountPaid': paid,
+        'amountSpent': spent,
+        'amountBalance': balance,
+        'isContractWork': _isContractWork,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (_isContractWork) {
+        projectData['contractorName'] = _contractorNameController.text.trim();
+        projectData['contractorBudget'] =
+            double.tryParse(_contractorBudgetController.text) ?? 0.0;
+        projectData['contractStartDate'] = contractStartDate;
+        projectData['contractEndDate'] = contractEndDate;
       }
-    } catch (_) {}
+
+      if (!isUpdateMode) {
+        if (_selectedSiteId == null || _selectedSiteId!.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a Site ID'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        projectData['siteId'] = _selectedSiteId;
+        projectData['createdAt'] = FieldValue.serverTimestamp();
+
+        final query = await FirestoreService.getCollection('projects')
+            .where('siteId', isEqualTo: _selectedSiteId)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          final docId = query.docs.first.id;
+          await FirestoreService.getCollection('projects').doc(docId).update(
+                projectData,
+              );
+        } else {
+          await FirestoreService.getCollection('projects').add(projectData);
+        }
+      } else {
+        if (selectedProjectId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a project to update'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        await FirestoreService.getCollection('projects').doc(selectedProjectId).update(
+              projectData,
+            );
+      }
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => _buildSuccessModal(context),
+      );
+      _resetForm();
+      await _fetchUnassignedSiteIds();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving project: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _loadPlannedDatesForSite(String? siteId) async {
@@ -518,7 +423,6 @@ class _ProjectScreenState extends State<ProjectScreen>
           plannedEndDate = data['plannedEndDate'] != null
               ? (data['plannedEndDate'] as Timestamp).toDate()
               : null;
-          // Auto-fill Project Category and Status from existing project data
           final cat = data['projectCategory']?.toString().trim();
           projectCategory = (cat != null && cat.isNotEmpty) ? cat : null;
           final status = (data['currentStatus'] ?? data['status'])
@@ -541,34 +445,79 @@ class _ProjectScreenState extends State<ProjectScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final secondaryColor = theme.scaffoldBackgroundColor;
-    final textColor =
-        theme.textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
-    final errorColor = theme.colorScheme.error;
+    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
 
     return GlassScaffold(
-      title: widget.hideAppBar ? null : "Project Configuration",
-      appBarForegroundColor: Colors.white,
-      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final hPad = Responsive.horizontalPadding(context);
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 40),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: Column(
+      padding: EdgeInsets.zero,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header Row ──────────────────────────────────────────────────
+            if (!widget.hideAppBar)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-            // Toggle buttons for New/Update mode
-            GlassCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                    Text(
+                      'Project Configuration',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
+              ),
+
+            // ── Dark Pill Tab Switcher ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: GestureDetector(
+                      onTap: () {
                         if (isUpdateMode) {
                           setState(() {
                             isUpdateMode = false;
@@ -576,33 +525,33 @@ class _ProjectScreenState extends State<ProjectScreen>
                           });
                         }
                       },
-                      style: ButtonStyle(
-                        backgroundColor: MaterialStateProperty.all(
-                          !isUpdateMode ? primaryColor : Colors.grey[200],
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: !isUpdateMode
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        padding: MaterialStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        shape: MaterialStateProperty.all(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        child: Text(
+                          'NEW PROJECT',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: !isUpdateMode
+                                ? Colors.white
+                                : const Color(0xFFCBD5E1),
                           ),
-                        ),
-                        elevation: MaterialStateProperty.all(0),
-                      ),
-                      child: Text(
-                        'New Project',
-                        style: TextStyle(
-                          color: !isUpdateMode ? Colors.white : textColor,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: GestureDetector(
+                      onTap: () {
                         if (!isUpdateMode) {
                           setState(() {
                             isUpdateMode = true;
@@ -610,25 +559,26 @@ class _ProjectScreenState extends State<ProjectScreen>
                           });
                         }
                       },
-                      style: ButtonStyle(
-                        backgroundColor: MaterialStateProperty.all(
-                          isUpdateMode ? primaryColor : Colors.grey[200],
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isUpdateMode
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        padding: MaterialStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        shape: MaterialStateProperty.all(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        child: Text(
+                          'UPDATE PROJECT',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: isUpdateMode
+                                ? Colors.white
+                                : const Color(0xFFCBD5E1),
                           ),
-                        ),
-                        elevation: MaterialStateProperty.all(0),
-                      ),
-                      child: Text(
-                        'Update Project',
-                        style: TextStyle(
-                          color: isUpdateMode ? Colors.white : textColor,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -636,1032 +586,1145 @@ class _ProjectScreenState extends State<ProjectScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 24),
 
-            if (!isUpdateMode)
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white, secondaryColor],
+            // ── Scrollable Form Body ───────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
                     ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'New Project',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: primaryColor,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextFormField(
-                          context,
-                          controller: _projectNameController,
-                          label: 'Project Name',
-                          icon: Icons.title,
-                          validator: (val) => val == null || val.trim().isEmpty
-                              ? 'Required'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextFormField(
-                          context,
-                          controller: _ownerNameController,
-                          label: 'Owner Name',
-                          icon: Icons.person_outline,
-                          validator: (val) => val == null || val.trim().isEmpty
-                              ? 'Required'
-                              : null,
-                        ),
-
-                        const SizedBox(height: 16),
-                        _buildTextFormField(
-                          context,
-                          controller: _ownerPhoneController,
-                          label: 'Owner Phone Number',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          maxLength: 10,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty)
-                              return 'Required';
-                            if (val.trim().length != 10)
-                              return 'Must be 10 digits';
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 16),
-                        // Customer Login Info Note
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                primaryColor.withOpacity(0.1),
-                                primaryColor.withOpacity(0.05),
+                        // ── NEW PROJECT BASIC CARD ────────────────────────
+                        if (!isUpdateMode) ...[
+                          Container(
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              color: darkCardBg,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: darkCardBg.withValues(alpha: 0.25),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: primaryColor.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: primaryColor.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.lock_person_outlined,
-                                  color: primaryColor,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Text(
-                                      'Customer Login Info',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: primaryColor,
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1E88E5),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF1E88E5)
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_business_rounded,
+                                        color: Colors.white,
+                                        size: 22,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'The Owner Name and Phone Number will be used as the username and password for the Customer Login.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: textColor.withOpacity(0.8),
-                                        height: 1.3,
+                                    const SizedBox(width: 14),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'New Project',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Enter project details & owner information',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFFCBD5E1),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 22),
+                                _buildTextFormField(
+                                  context,
+                                  controller: _projectNameController,
+                                  label: 'Project Name',
+                                  icon: Icons.title_rounded,
+                                  validator: (val) =>
+                                      val == null || val.trim().isEmpty
+                                          ? 'Required'
+                                          : null,
+                                ),
+                                const SizedBox(height: 14),
+                                _buildTextFormField(
+                                  context,
+                                  controller: _ownerNameController,
+                                  label: 'Owner Name',
+                                  icon: Icons.person_outline_rounded,
+                                  validator: (val) =>
+                                      val == null || val.trim().isEmpty
+                                          ? 'Required'
+                                          : null,
+                                ),
+                                const SizedBox(height: 14),
+                                _buildTextFormField(
+                                  context,
+                                  controller: _ownerPhoneController,
+                                  label: 'Owner Phone Number',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
+                                  maxLength: 10,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (val) {
+                                    if (val == null || val.trim().isEmpty)
+                                      return 'Required';
+                                    if (val.trim().length != 10)
+                                      return 'Must be 10 digits';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                // Customer Login Info Note
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: primaryColor
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lock_person_outlined,
+                                        color: primaryColor,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Customer Login Info',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: primaryColor,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 3),
+                                            const Text(
+                                              'The Owner Name and Phone Number will be used as the username and password for Customer Login.',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFFCBD5E1),
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDropdownField(
+                                  context,
+                                  value: _selectedSiteId,
+                                  label: 'Site Id',
+                                  items: _unassignedSiteIds,
+                                  icon: Icons.location_on_rounded,
+                                  onChanged: (val) async {
+                                    setState(() {
+                                      _selectedSiteId = val;
+                                    });
+                                    await _loadPlannedDatesForSite(val);
+                                  },
+                                  validator: (val) =>
+                                      val == null || val.isEmpty
+                                          ? 'Required'
+                                          : null,
+                                ),
+                                if (_unassignedSiteIds.isEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'No sites found in the organisation.',
+                                    style: TextStyle(
+                                      color: Colors.orange[300],
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── IS CONTRACT WORK CHECKBOX ─────────────────────
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: darkCardBg,
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: darkCardBg.withValues(alpha: 0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                        ),
-
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: _selectedSiteId,
-                          items: _unassignedSiteIds.map((siteId) {
-                            return DropdownMenuItem<String>(
-                              value: siteId,
-                              child: Text(siteId),
-                            );
-                          }).toList(),
-                          onChanged: (val) async {
-                            setState(() {
-                              _selectedSiteId = val;
-                            });
-                            await _loadPlannedDatesForSite(val);
-                          },
-                          decoration: InputDecoration(
-                            labelText: 'Site Id',
-                            prefixIcon: const Icon(Icons.location_on_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                          ),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          borderRadius: BorderRadius.circular(10),
-                          dropdownColor: Colors.white,
-                          validator: (val) =>
-                              val == null || val.isEmpty ? 'Required' : null,
-                        ),
-                        if (_unassignedSiteIds.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'No sites found in the organisation.',
-                              style: TextStyle(color: errorColor),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8,
-                  ),
-                  child: CheckboxListTile(
-                    value: _isContractWork,
-                    onChanged: (val) {
-                      setState(() {
-                        _isContractWork = val ?? false;
-                        if (!_isContractWork) {
-                          // Clear contract dates when unchecked
-                          contractStartDate = null;
-                          contractEndDate = null;
-                        }
-                      });
-                    },
-                    title: Text(
-                      'Is Contract Work',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: primaryColor,
-                      ),
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    activeColor: primaryColor,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Form(
-              key: _mainFormKey,
-              child: Column(
-                children: [
-                  if (isUpdateMode)
-                    Column(
-                      children: [
-                        Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Select Project',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: primaryColor,
-                                  ),
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(18),
+                            child: CheckboxListTile(
+                              value: _isContractWork,
+                              onChanged: (val) {
+                                setState(() {
+                                  _isContractWork = val ?? false;
+                                  if (!_isContractWork) {
+                                    contractStartDate = null;
+                                    contractEndDate = null;
+                                  }
+                                });
+                              },
+                              title: const Text(
+                                'Is Contract Work',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  fontSize: 15,
                                 ),
-                                const SizedBox(height: 12),
-                                StreamBuilder<QuerySnapshot>(
-                                  stream: FirestoreService.getCollection(
-                                    'projects',
-                                  ).snapshots(),
-                                  builder: (context, snapshot) {
-                                    if (!snapshot.hasData)
-                                      return const Center(
-                                        child: CircularProgressIndicator(),
-                                      );
-                                    final projects = snapshot.data!.docs;
-                                    if (projects.isEmpty)
-                                      return Text(
-                                        'No projects found',
-                                        style: TextStyle(color: textColor),
-                                      );
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        DropdownButtonFormField<String>(
-                                          decoration: InputDecoration(
-                                            labelText:
-                                                'Select Project to Update',
-                                            prefixIcon: const Icon(
-                                              Icons.location_city,
-                                            ),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            filled: true,
-                                            fillColor: Colors.grey[50],
-                                          ),
-                                          value: selectedProjectId,
-                                          items: projects
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: primaryColor,
+                              checkColor: const Color(0xFF0A183D),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // ── MAIN FORM ──────────────────────────────────────
+                        Form(
+                          key: _mainFormKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // ── SELECT PROJECT (Update Mode) ───────────
+                              if (isUpdateMode) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(22),
+                                  decoration: BoxDecoration(
+                                    color: darkCardBg,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: darkCardBg
+                                            .withValues(alpha: 0.25),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Select Project',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      StreamBuilder<QuerySnapshot>(
+                                        stream: FirestoreService.getCollection(
+                                          'projects',
+                                        ).snapshots(),
+                                        builder: (context, snapshot) {
+                                          if (!snapshot.hasData) {
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                        Color>(primaryColor),
+                                              ),
+                                            );
+                                          }
+                                          final projects = snapshot.data!.docs;
+                                          if (projects.isEmpty) {
+                                            return const Text(
+                                              'No projects found',
+                                              style: TextStyle(
+                                                  color: Color(0xFFCBD5E1)),
+                                            );
+                                          }
+
+                                          final projectItems = projects
                                               .where((doc) {
-                                                final data =
-                                                    doc.data()
-                                                        as Map<String, dynamic>;
+                                                final data = doc.data()
+                                                    as Map<String, dynamic>;
                                                 final name =
                                                     (data['projectName'] ?? '')
                                                         .toString();
                                                 return name.trim().isNotEmpty;
                                               })
                                               .map((doc) {
-                                                final data =
-                                                    doc.data()
-                                                        as Map<String, dynamic>;
+                                                final data = doc.data()
+                                                    as Map<String, dynamic>;
                                                 final name =
                                                     data['projectName'] ?? '';
                                                 final location =
                                                     data['ownerName'] ?? '';
-                                                return DropdownMenuItem<String>(
-                                                  value: doc.id,
-                                                  child: Text(
-                                                    '$name (${location.toString()})',
-                                                  ),
-                                                );
+                                                return {
+                                                  'id': doc.id,
+                                                  'label':
+                                                      '$name (${location.toString()})',
+                                                };
                                               })
-                                              .toList(),
-                                          onChanged: (value) async {
-                                            final selectedDoc = projects
-                                                .firstWhere(
-                                                  (doc) => doc.id == value,
-                                                );
-                                            final data =
-                                                selectedDoc.data()
-                                                    as Map<String, dynamic>;
-                                            setState(() {
-                                              selectedProjectId =
-                                                  selectedDoc.id;
-                                              selectedProjectData =
-                                                  Map<String, dynamic>.from(
-                                                    data,
-                                                  );
-                                              _projectNameController.text =
-                                                  data['projectName'] ?? '';
-                                              _ownerNameController.text =
-                                                  data['ownerName'] ?? '';
-                                              _ownerPhoneController.text =
-                                                  data['ownerPhoneNumber'] ??
-                                                  '';
-                                              _amountPaidController.text =
-                                                  (data['amountPaid'] ?? '')
-                                                      .toString();
-                                              _projectBudgetController.text =
-                                                  (data['projectBudget'] ?? '')
-                                                      .toString();
-                                              projectCategory =
-                                                  data.containsKey(
-                                                    'projectCategory',
-                                                  )
-                                                  ? data['projectCategory']
-                                                  : null;
-                                              projectSubCategory =
-                                                  data.containsKey(
-                                                    'projectSubCategory',
-                                                  )
-                                                  ? data['projectSubCategory']
-                                                  : null;
-                                              projectContract =
-                                                  data.containsKey(
-                                                    'projectContract',
-                                                  )
-                                                  ? data['projectContract']
-                                                  : null;
-                                              projectStage =
-                                                  data.containsKey(
-                                                    'projectStage',
-                                                  )
-                                                  ? data['projectStage']
-                                                  : null;
-                                              _isContractWork =
-                                                  data.containsKey(
-                                                    'isContractWork',
-                                                  )
-                                                  ? (data['isContractWork'] ==
-                                                        true)
-                                                  : false;
-                                              _contractorNameController.text =
-                                                  data.containsKey(
-                                                        'contractorName',
-                                                      ) &&
-                                                      data['contractorName'] !=
-                                                          null
-                                                  ? data['contractorName']
-                                                        .toString()
-                                                  : '';
-                                              _contractorBudgetController.text =
-                                                  data.containsKey(
-                                                        'contractorBudget',
-                                                      ) &&
-                                                      data['contractorBudget'] !=
-                                                          null
-                                                  ? data['contractorBudget']
-                                                        .toString()
-                                                  : '';
-                                              currentStatus =
-                                                  data['currentStatus'] ??
-                                                  data['status'] ??
-                                                  null;
-                                              plannedStartDate =
-                                                  data['plannedStartDate'] !=
-                                                      null
-                                                  ? (data['plannedStartDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              plannedEndDate =
-                                                  data['plannedEndDate'] != null
-                                                  ? (data['plannedEndDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              actualStartDate =
-                                                  data['actualStateDate'] !=
-                                                      null
-                                                  ? (data['actualStateDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              actualEndDate =
-                                                  data['actualEndDate'] != null
-                                                  ? (data['actualEndDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              // Load contract start and end dates
-                                              contractStartDate =
-                                                  data['contractStartDate'] !=
-                                                      null
-                                                  ? (data['contractStartDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              contractEndDate =
-                                                  data['contractEndDate'] !=
-                                                      null
-                                                  ? (data['contractEndDate']
-                                                            as Timestamp)
-                                                        .toDate()
-                                                  : null;
-                                              _updateSiteIdController.text =
-                                                  data.containsKey('siteId') &&
-                                                      data['siteId'] != null
-                                                  ? data['siteId'].toString()
-                                                  : '';
-                                              _updateAppBarSiteId =
-                                                  data.containsKey('siteId') &&
-                                                      data['siteId'] != null
-                                                  ? data['siteId'].toString()
-                                                  : '';
-                                            });
-                                            await _fetchAndSetAmountSpentAndBalance(
-                                              data['siteId'],
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        if (selectedProjectId != null)
-                                          _buildTextFormField(
-                                            context,
-                                            controller: _updateSiteIdController,
-                                            label: 'Site ID',
-                                            icon: Icons.location_on_outlined,
-                                            readOnly: true,
-                                          ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Project Details',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectCategories',
-                              ).orderBy('projectCategoryId').snapshots(),
-                              builder: (context, snapshot) {
-                                List<String> fetchedCategories = [];
-                                if (snapshot.hasData) {
-                                  fetchedCategories = snapshot.data!.docs
-                                      .map(
-                                        (doc) =>
-                                            doc['projectCategory'] as String,
-                                      )
-                                      .toList();
-                                }
-                                String? dropdownValue =
-                                    fetchedCategories.contains(projectCategory)
-                                    ? projectCategory
-                                    : null;
-                                return _buildDropdownField(
-                                  context,
-                                  value: dropdownValue,
-                                  label: 'Project Category',
-                                  items: fetchedCategories,
-                                  icon: Icons.category_outlined,
-                                  onChanged: (value) =>
-                                      setState(() => projectCategory = value!),
-                                  validator: (val) => val == null || val.isEmpty
-                                      ? 'Required'
-                                      : null,
-                                  enabled: !isUpdateMode,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectSubCategories',
-                              ).snapshots(),
-                              builder: (context, snapshot) {
-                                List<String> fetchedSubCategories = [];
-                                if (snapshot.hasData) {
-                                  fetchedSubCategories = snapshot.data!.docs
-                                      .map(
-                                        (doc) =>
-                                            doc['projectSubCategory'] as String,
-                                      )
-                                      .toSet()
-                                      .toList();
-                                }
-                                String? dropdownValue =
-                                    fetchedSubCategories.contains(
-                                      projectSubCategory,
-                                    )
-                                    ? projectSubCategory
-                                    : null;
-                                return _buildDropdownField(
-                                  context,
-                                  value: dropdownValue,
-                                  label: 'Project Sub Category',
-                                  items: fetchedSubCategories,
-                                  icon: Icons.category_outlined,
-                                  onChanged: (value) => setState(
-                                    () => projectSubCategory = value!,
-                                  ),
-                                  validator: (val) => val == null || val.isEmpty
-                                      ? 'Required'
-                                      : null,
-                                  enabled: !isUpdateMode,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectContracts',
-                              ).snapshots(),
-                              builder: (context, snapshot) {
-                                List<String> fetchedContracts = [];
-                                if (snapshot.hasData) {
-                                  fetchedContracts = snapshot.data!.docs
-                                      .map(
-                                        (doc) =>
-                                            doc['projectContract'] as String,
-                                      )
-                                      .toSet()
-                                      .toList();
-                                }
-                                String? dropdownValue =
-                                    fetchedContracts.contains(projectContract)
-                                    ? projectContract
-                                    : null;
-                                return _buildDropdownField(
-                                  context,
-                                  value: dropdownValue,
-                                  label: 'Project Contract',
-                                  items: fetchedContracts,
-                                  icon: Icons.category_outlined,
-                                  onChanged: (value) =>
-                                      setState(() => projectContract = value!),
-                                  validator: (val) => val == null || val.isEmpty
-                                      ? 'Required'
-                                      : null,
-                                  enabled: !isUpdateMode,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectStages',
-                              ).snapshots(),
-                              builder: (context, snapshot) {
-                                List<String> fetchedStages = [];
-                                if (snapshot.hasData) {
-                                  final docs = List<QueryDocumentSnapshot>.from(
-                                    snapshot.data!.docs,
-                                  );
-                                  docs.sort((a, b) {
-                                    final idA = a.id;
-                                    final idB = b.id;
-                                    return idA.compareTo(idB);
-                                  });
-                                  fetchedStages = docs
-                                      .map(
-                                        (doc) => doc['projectStage'] as String,
-                                      )
-                                      .toList();
-                                }
-                                String? dropdownValue =
-                                    fetchedStages.contains(projectStage)
-                                    ? projectStage
-                                    : null;
-                                return _buildDropdownField(
-                                  context,
-                                  value: dropdownValue,
-                                  label: 'Project Stage',
-                                  items: fetchedStages,
-                                  icon: Icons.flag_outlined,
-                                  onChanged: (value) =>
-                                      setState(() => projectStage = value!),
-                                  validator: (val) => val == null || val.isEmpty
-                                      ? 'Required'
-                                      : null,
-                                  enabled: true,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirestoreService.getCollection(
-                                'projectStatus',
-                              ).snapshots(),
-                              builder: (context, snapshot) {
-                                List<String> fetchedStates = [];
-                                if (snapshot.hasData) {
-                                  fetchedStates = snapshot.data!.docs
-                                      .map(
-                                        (doc) => doc['projectState'] as String,
-                                      )
-                                      .toList();
-                                }
+                                              .toList();
 
-                                // Add default status options if they are not already present
-                                final defaultStatuses = [
-                                  'Not Started',
-                                  'Ongoing',
-                                  'On Hold',
-                                  'Completed',
-                                  'Cancelled',
-                                ];
-                                for (var status in defaultStatuses) {
-                                  if (!fetchedStates.contains(status)) {
-                                    fetchedStates.add(status);
-                                  }
-                                }
-                                String? dropdownValue =
-                                    fetchedStates.contains(currentStatus)
-                                    ? currentStatus
-                                    : null;
-                                return _buildDropdownField(
-                                  context,
-                                  value: dropdownValue,
-                                  label: 'Current Status',
-                                  items: fetchedStates,
-                                  icon: Icons.timeline_outlined,
-                                  onChanged: (val) =>
-                                      setState(() => currentStatus = val),
-                                  validator: (val) => val == null || val.isEmpty
-                                      ? 'Required'
-                                      : null,
-                                  enabled: true,
-                                );
-                              },
-                            ),
-
-                            if (_isContractWork) const SizedBox(height: 16),
-                            if (_isContractWork)
-                              StreamBuilder<QuerySnapshot>(
-                                stream: FirestoreService.getCollection(
-                                  'contractors',
-                                ).snapshots(),
-                                builder: (context, snapshot) {
-                                  final docs = snapshot.hasData
-                                      ? snapshot.data!.docs
-                                      : <QueryDocumentSnapshot>[];
-                                  final names = docs
-                                      .map((d) {
-                                        final data =
-                                            d.data() as Map<String, dynamic>;
-                                        final n = data['contractorName'];
-                                        return n == null
-                                            ? ''
-                                            : n.toString().trim();
-                                      })
-                                      .where((e) => e.isNotEmpty)
-                                      .toSet()
-                                      .toList();
-                                  final String? dropdownValue =
-                                      names.contains(
-                                        _contractorNameController.text,
-                                      )
-                                      ? _contractorNameController.text
-                                      : null;
-                                  return Row(
-                                    children: [
-                                      Expanded(
-                                        child: DropdownButtonFormField<String>(
-                                          value: dropdownValue,
-                                          items: names
-                                              .map(
-                                                (name) =>
-                                                    DropdownMenuItem<String>(
-                                                      value: name,
-                                                      child: Text(name),
-                                                    ),
-                                              )
-                                              .toList(),
-                                          onChanged: (val) {
-                                            setState(() {
-                                              _contractorNameController.text =
-                                                  val ?? '';
-                                            });
-                                          },
-                                          decoration: InputDecoration(
-                                            labelText: 'Contractor Name',
-                                            prefixIcon: const Icon(
-                                              Icons.engineering_outlined,
-                                            ),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            filled: true,
-                                            fillColor: Colors.grey[50],
-                                          ),
-                                          validator: (val) =>
-                                              _isContractWork &&
-                                                  (val == null || val.isEmpty)
-                                              ? 'Required'
-                                              : null,
-                                          isExpanded: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: Icon(
-                                          Icons.edit,
-                                          color: primaryColor,
-                                        ),
-                                        tooltip: 'Edit Contractor Name',
-                                        onPressed: () async {
-                                          final controller =
-                                              TextEditingController(
-                                                text: _contractorNameController
-                                                    .text,
-                                              );
-                                          final result = await showDialog<String>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Edit Contractor Name',
-                                              ),
-                                              content: TextField(
-                                                controller: controller,
-                                                decoration: const InputDecoration(
-                                                  hintText:
-                                                      'Enter contractor name',
-                                                ),
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(context),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        controller.text,
-                                                      ),
-                                                  child: const Text('OK'),
-                                                ),
-                                              ],
-                                            ),
+                                          final itemLabels = projectItems
+                                              .map((e) => e['label'] as String)
+                                              .toList();
+                                          final selectedItem =
+                                              projectItems.firstWhere(
+                                            (e) => e['id'] == selectedProjectId,
+                                            orElse: () => {'label': ''},
                                           );
-                                          if (result != null &&
-                                              result.trim().isNotEmpty) {
-                                            setState(() {
-                                              _contractorNameController.text =
-                                                  result.trim();
-                                            });
-                                          }
+                                          final selectedLabel =
+                                              selectedItem['label'] as String;
+
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              _buildDropdownField(
+                                                context,
+                                                value: selectedLabel.isNotEmpty
+                                                    ? selectedLabel
+                                                    : null,
+                                                label: 'Select Project to Update',
+                                                items: itemLabels,
+                                                icon: Icons.location_city_rounded,
+                                                onChanged: (val) async {
+                                                  final match =
+                                                      projectItems.firstWhere(
+                                                    (e) => e['label'] == val,
+                                                    orElse: () => {'id': ''},
+                                                  );
+                                                  final value =
+                                                      match['id'] as String;
+                                                  if (value.isEmpty) return;
+
+                                                  final selectedDoc = projects
+                                                      .firstWhere(
+                                                    (doc) => doc.id == value,
+                                                  );
+                                                  final data = selectedDoc.data()
+                                                      as Map<String, dynamic>;
+                                                  setState(() {
+                                                    selectedProjectId =
+                                                        selectedDoc.id;
+                                                    selectedProjectData =
+                                                        Map<String, dynamic>.from(
+                                                      data,
+                                                    );
+                                                    _projectNameController.text =
+                                                        data['projectName'] ??
+                                                            '';
+                                                    _ownerNameController.text =
+                                                        data['ownerName'] ?? '';
+                                                    _ownerPhoneController.text =
+                                                        data['ownerPhoneNumber'] ??
+                                                            '';
+                                                    _amountPaidController.text =
+                                                        (data['amountPaid'] ??
+                                                                '')
+                                                            .toString();
+                                                    _projectBudgetController
+                                                        .text = (data[
+                                                                'projectBudget'] ??
+                                                            '')
+                                                        .toString();
+                                                    projectCategory =
+                                                        data.containsKey(
+                                                      'projectCategory',
+                                                    )
+                                                            ? data[
+                                                                'projectCategory']
+                                                            : null;
+                                                    projectSubCategory =
+                                                        data.containsKey(
+                                                      'projectSubCategory',
+                                                    )
+                                                            ? data[
+                                                                'projectSubCategory']
+                                                            : null;
+                                                    projectContract =
+                                                        data.containsKey(
+                                                      'projectContract',
+                                                    )
+                                                            ? data[
+                                                                'projectContract']
+                                                            : null;
+                                                    projectStage =
+                                                        data.containsKey(
+                                                      'projectStage',
+                                                    )
+                                                            ? data[
+                                                                'projectStage']
+                                                            : null;
+                                                    _isContractWork =
+                                                        data.containsKey(
+                                                      'isContractWork',
+                                                    )
+                                                            ? (data['isContractWork'] ==
+                                                                true)
+                                                            : false;
+                                                    _contractorNameController
+                                                            .text =
+                                                        data.containsKey(
+                                                                    'contractorName') &&
+                                                                data['contractorName'] !=
+                                                                    null
+                                                            ? data[
+                                                                    'contractorName']
+                                                                .toString()
+                                                            : '';
+                                                    _contractorBudgetController
+                                                            .text =
+                                                        data.containsKey(
+                                                                    'contractorBudget') &&
+                                                                data['contractorBudget'] !=
+                                                                    null
+                                                            ? data[
+                                                                    'contractorBudget']
+                                                                .toString()
+                                                            : '';
+                                                    currentStatus =
+                                                        data['currentStatus'] ??
+                                                            data['status'] ??
+                                                            null;
+                                                    plannedStartDate =
+                                                        data['plannedStartDate'] !=
+                                                                null
+                                                            ? (data['plannedStartDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    plannedEndDate =
+                                                        data['plannedEndDate'] !=
+                                                                null
+                                                            ? (data['plannedEndDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    actualStartDate =
+                                                        data['actualStateDate'] !=
+                                                                null
+                                                            ? (data['actualStateDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    actualEndDate =
+                                                        data['actualEndDate'] !=
+                                                                null
+                                                            ? (data['actualEndDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    contractStartDate =
+                                                        data['contractStartDate'] !=
+                                                                null
+                                                            ? (data['contractStartDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    contractEndDate =
+                                                        data['contractEndDate'] !=
+                                                                null
+                                                            ? (data['contractEndDate']
+                                                                    as Timestamp)
+                                                                .toDate()
+                                                            : null;
+                                                    _updateSiteIdController
+                                                        .text = data.containsKey(
+                                                                'siteId') &&
+                                                            data['siteId'] !=
+                                                                null
+                                                        ? data['siteId']
+                                                            .toString()
+                                                        : '';
+                                                    _updateAppBarSiteId =
+                                                        data.containsKey(
+                                                                    'siteId') &&
+                                                                data['siteId'] !=
+                                                                    null
+                                                            ? data['siteId']
+                                                                .toString()
+                                                            : '';
+                                                  });
+                                                  await _fetchAndSetAmountSpentAndBalance(
+                                                    data['siteId'],
+                                                  );
+                                                },
+                                              ),
+                                              const SizedBox(height: 12),
+                                              if (selectedProjectId != null)
+                                                _buildTextFormField(
+                                                  context,
+                                                  controller:
+                                                      _updateSiteIdController,
+                                                  label: 'Site ID',
+                                                  icon: Icons
+                                                      .location_on_outlined,
+                                                  readOnly: true,
+                                                ),
+                                            ],
+                                          );
                                         },
                                       ),
                                     ],
-                                  );
-                                },
-                              ),
-                            if (_isContractWork) const SizedBox(height: 16),
-                            if (_isContractWork)
-                              TextFormField(
-                                controller: _contractorBudgetController,
-                                decoration: InputDecoration(
-                                  labelText: 'Contractor Budget',
-                                  prefixIcon: const Icon(
-                                    Icons.currency_rupee_rounded,
                                   ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.grey[50],
                                 ),
-                                keyboardType: TextInputType.number,
-                                validator: (val) {
-                                  if (!_isContractWork) return null;
-                                  if (val == null || val.trim().isEmpty)
-                                    return 'Required';
-                                  final budget = double.tryParse(val);
-                                  if (budget == null) return 'Invalid number';
-                                  return null;
-                                },
-                                readOnly: false,
-                              ),
+                                const SizedBox(height: 20),
+                              ],
 
-                            // Added Contract Start Date and End Date pickers here
-                            if (_isContractWork) const SizedBox(height: 16),
-                            if (_isContractWork)
-                              _buildDatePicker(
-                                context,
-                                "Contract Start Date",
-                                contractStartDate,
-                                (date) =>
-                                    setState(() => contractStartDate = date),
-                                validator: (val) => contractStartDate == null
-                                    ? 'Required'
-                                    : null,
-                                enabled: true,
+                              // ── PROJECT DETAILS CARD ────────────────────
+                              Container(
+                                padding: const EdgeInsets.all(22),
+                                decoration: BoxDecoration(
+                                  color: darkCardBg,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: darkCardBg.withValues(alpha: 0.25),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Project Details',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirestoreService.getCollection(
+                                        'projectCategories',
+                                      ).orderBy('projectCategoryId').snapshots(),
+                                      builder: (context, snapshot) {
+                                        List<String> fetchedCategories = [];
+                                        if (snapshot.hasData) {
+                                          fetchedCategories = snapshot.data!.docs
+                                              .map(
+                                                (doc) => doc['projectCategory']
+                                                    as String,
+                                              )
+                                              .toList();
+                                        }
+                                        String? dropdownValue =
+                                            fetchedCategories.contains(
+                                                    projectCategory)
+                                                ? projectCategory
+                                                : null;
+                                        return _buildDropdownField(
+                                          context,
+                                          value: dropdownValue,
+                                          label: 'Project Category',
+                                          items: fetchedCategories,
+                                          icon: Icons.category_rounded,
+                                          onChanged: (value) => setState(
+                                              () => projectCategory = value!),
+                                          validator: (val) =>
+                                              val == null || val.isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                          enabled: !isUpdateMode,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 14),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirestoreService.getCollection(
+                                        'projectSubCategories',
+                                      ).snapshots(),
+                                      builder: (context, snapshot) {
+                                        List<String> fetchedSubCategories = [];
+                                        if (snapshot.hasData) {
+                                          fetchedSubCategories = snapshot
+                                              .data!.docs
+                                              .map(
+                                                (doc) =>
+                                                    doc['projectSubCategory']
+                                                        as String,
+                                              )
+                                              .toSet()
+                                              .toList();
+                                        }
+                                        String? dropdownValue =
+                                            fetchedSubCategories.contains(
+                                                    projectSubCategory)
+                                                ? projectSubCategory
+                                                : null;
+                                        return _buildDropdownField(
+                                          context,
+                                          value: dropdownValue,
+                                          label: 'Project Sub Category',
+                                          items: fetchedSubCategories,
+                                          icon: Icons.account_tree_rounded,
+                                          onChanged: (value) => setState(
+                                            () => projectSubCategory = value!,
+                                          ),
+                                          validator: (val) =>
+                                              val == null || val.isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                          enabled: !isUpdateMode,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 14),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirestoreService.getCollection(
+                                        'projectContracts',
+                                      ).snapshots(),
+                                      builder: (context, snapshot) {
+                                        List<String> fetchedContracts = [];
+                                        if (snapshot.hasData) {
+                                          fetchedContracts = snapshot.data!.docs
+                                              .map(
+                                                (doc) => doc['projectContract']
+                                                    as String,
+                                              )
+                                              .toSet()
+                                              .toList();
+                                        }
+                                        String? dropdownValue =
+                                            fetchedContracts.contains(
+                                                    projectContract)
+                                                ? projectContract
+                                                : null;
+                                        return _buildDropdownField(
+                                          context,
+                                          value: dropdownValue,
+                                          label: 'Project Contract',
+                                          items: fetchedContracts,
+                                          icon: Icons.description_rounded,
+                                          onChanged: (value) => setState(
+                                              () => projectContract = value!),
+                                          validator: (val) =>
+                                              val == null || val.isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                          enabled: !isUpdateMode,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 14),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirestoreService.getCollection(
+                                        'projectStages',
+                                      ).snapshots(),
+                                      builder: (context, snapshot) {
+                                        List<String> fetchedStages = [];
+                                        if (snapshot.hasData) {
+                                          final docs =
+                                              List<QueryDocumentSnapshot>.from(
+                                            snapshot.data!.docs,
+                                          );
+                                          docs.sort((a, b) =>
+                                              a.id.compareTo(b.id));
+                                          fetchedStages = docs
+                                              .map(
+                                                (doc) => doc['projectStage']
+                                                    as String,
+                                              )
+                                              .toList();
+                                        }
+                                        String? dropdownValue =
+                                            fetchedStages.contains(projectStage)
+                                                ? projectStage
+                                                : null;
+                                        return _buildDropdownField(
+                                          context,
+                                          value: dropdownValue,
+                                          label: 'Project Stage',
+                                          items: fetchedStages,
+                                          icon: Icons.flag_rounded,
+                                          onChanged: (value) => setState(
+                                              () => projectStage = value!),
+                                          validator: (val) =>
+                                              val == null || val.isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                          enabled: true,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 14),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirestoreService.getCollection(
+                                        'projectStatus',
+                                      ).snapshots(),
+                                      builder: (context, snapshot) {
+                                        List<String> fetchedStates = [];
+                                        if (snapshot.hasData) {
+                                          fetchedStates = snapshot.data!.docs
+                                              .map(
+                                                (doc) => doc['projectState']
+                                                    as String,
+                                              )
+                                              .toList();
+                                        }
+                                        final defaultStatuses = [
+                                          'Not Started',
+                                          'Ongoing',
+                                          'On Hold',
+                                          'Completed',
+                                          'Cancelled',
+                                        ];
+                                        for (var status in defaultStatuses) {
+                                          if (!fetchedStates.contains(status)) {
+                                            fetchedStates.add(status);
+                                          }
+                                        }
+                                        String? dropdownValue =
+                                            fetchedStates.contains(
+                                                    currentStatus)
+                                                ? currentStatus
+                                                : null;
+                                        return _buildDropdownField(
+                                          context,
+                                          value: dropdownValue,
+                                          label: 'Current Status',
+                                          items: fetchedStates,
+                                          icon: Icons.timeline_rounded,
+                                          onChanged: (val) => setState(
+                                              () => currentStatus = val),
+                                          validator: (val) =>
+                                              val == null || val.isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                          enabled: true,
+                                        );
+                                      },
+                                    ),
+
+                                    if (_isContractWork) ...[
+                                      const SizedBox(height: 14),
+                                      StreamBuilder<QuerySnapshot>(
+                                        stream: FirestoreService.getCollection(
+                                          'contractors',
+                                        ).snapshots(),
+                                        builder: (context, snapshot) {
+                                          final docs = snapshot.hasData
+                                              ? snapshot.data!.docs
+                                              : <QueryDocumentSnapshot>[];
+                                          final names = docs
+                                              .map((d) {
+                                                final data = d.data()
+                                                    as Map<String, dynamic>;
+                                                final n =
+                                                    data['contractorName'];
+                                                return n == null
+                                                    ? ''
+                                                    : n.toString().trim();
+                                              })
+                                              .where((e) => e.isNotEmpty)
+                                              .toSet()
+                                              .toList();
+                                          final String? dropdownValue =
+                                              names.contains(
+                                            _contractorNameController.text,
+                                          )
+                                                  ? _contractorNameController.text
+                                                  : null;
+
+                                          return Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildDropdownField(
+                                                  context,
+                                                  value: dropdownValue,
+                                                  label: 'Contractor Name',
+                                                  items: names,
+                                                  icon: Icons
+                                                      .engineering_rounded,
+                                                  onChanged: (val) {
+                                                    setState(() {
+                                                      _contractorNameController
+                                                          .text = val ?? '';
+                                                    });
+                                                  },
+                                                  validator: (val) =>
+                                                      _isContractWork &&
+                                                              (val == null ||
+                                                                  val.isEmpty)
+                                                          ? 'Required'
+                                                          : null,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.only(
+                                                        top: 24.0),
+                                                child: Container(
+                                                  width: 46,
+                                                  height: 46,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                        0xFF1E88E5),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            14),
+                                                  ),
+                                                  child: IconButton(
+                                                    icon: const Icon(
+                                                      Icons.edit_rounded,
+                                                      color: Colors.white,
+                                                      size: 20,
+                                                    ),
+                                                    tooltip:
+                                                        'Edit Contractor Name',
+                                                    onPressed: () async {
+                                                      final controller =
+                                                          TextEditingController(
+                                                        text:
+                                                            _contractorNameController
+                                                                .text,
+                                                      );
+                                                      final result =
+                                                          await showDialog<
+                                                              String>(
+                                                        context: context,
+                                                        builder: (context) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                            'Edit Contractor Name',
+                                                          ),
+                                                          content: TextField(
+                                                            controller:
+                                                                controller,
+                                                            decoration:
+                                                                const InputDecoration(
+                                                              hintText:
+                                                                  'Enter contractor name',
+                                                            ),
+                                                          ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      context),
+                                                              child: const Text(
+                                                                  'Cancel'),
+                                                            ),
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                context,
+                                                                controller.text,
+                                                              ),
+                                                              child: const Text(
+                                                                  'OK'),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                      if (result != null &&
+                                                          result
+                                                              .trim()
+                                                              .isNotEmpty) {
+                                                        setState(() {
+                                                          _contractorNameController
+                                                                  .text =
+                                                              result.trim();
+                                                        });
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildTextFormField(
+                                        context,
+                                        controller:
+                                            _contractorBudgetController,
+                                        label: 'Contractor Budget',
+                                        icon: Icons.currency_rupee_rounded,
+                                        keyboardType: TextInputType.number,
+                                        validator: (val) {
+                                          if (!_isContractWork) return null;
+                                          if (val == null || val.trim().isEmpty)
+                                            return 'Required';
+                                          final budget = double.tryParse(val);
+                                          if (budget == null)
+                                            return 'Invalid number';
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildDatePicker(
+                                        context,
+                                        "Contract Start Date",
+                                        contractStartDate,
+                                        (date) => setState(
+                                            () => contractStartDate = date),
+                                        validator: (val) =>
+                                            contractStartDate == null
+                                                ? 'Required'
+                                                : null,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildDatePicker(
+                                        context,
+                                        "Contract End Date",
+                                        contractEndDate,
+                                        (date) => setState(
+                                            () => contractEndDate = date),
+                                        validator: (val) =>
+                                            contractEndDate == null
+                                                ? 'Required'
+                                                : null,
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
-                            if (_isContractWork) const SizedBox(height: 16),
-                            if (_isContractWork)
-                              _buildDatePicker(
-                                context,
-                                "Contract End Date",
-                                contractEndDate,
-                                (date) =>
-                                    setState(() => contractEndDate = date),
-                                validator: (val) =>
-                                    contractEndDate == null ? 'Required' : null,
-                                enabled: true,
+                              const SizedBox(height: 20),
+
+                              // ── PROJECT TIMELINE CARD ──────────────────
+                              Container(
+                                padding: const EdgeInsets.all(22),
+                                decoration: BoxDecoration(
+                                  color: darkCardBg,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: darkCardBg.withValues(alpha: 0.25),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Project Timeline',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    _buildDatePicker(
+                                      context,
+                                      "Planned Start Date",
+                                      plannedStartDate,
+                                      (date) => setState(
+                                          () => plannedStartDate = date),
+                                      validator: (val) =>
+                                          plannedStartDate == null
+                                              ? 'Required'
+                                              : null,
+                                      enabled: isUpdateMode,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildDatePicker(
+                                      context,
+                                      "Planned End Date",
+                                      plannedEndDate,
+                                      (date) =>
+                                          setState(() => plannedEndDate = date),
+                                      validator: (val) => plannedEndDate == null
+                                          ? 'Required'
+                                          : null,
+                                      enabled: isUpdateMode,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildDatePicker(
+                                      context,
+                                      "Actual Start Date",
+                                      actualStartDate,
+                                      (date) => setState(
+                                          () => actualStartDate = date),
+                                      validator: (val) =>
+                                          actualStartDate == null
+                                              ? 'Required'
+                                              : null,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildDatePicker(
+                                      context,
+                                      "Actual End Date",
+                                      actualEndDate,
+                                      (date) =>
+                                          setState(() => actualEndDate = date),
+                                      validator: (val) => actualEndDate == null
+                                          ? 'Required'
+                                          : null,
+                                    ),
+                                  ],
+                                ),
                               ),
-                          ],
+                              const SizedBox(height: 20),
+
+                              // ── FINANCIAL DETAILS CARD ─────────────────
+                              Container(
+                                padding: const EdgeInsets.all(22),
+                                decoration: BoxDecoration(
+                                  color: darkCardBg,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: darkCardBg.withValues(alpha: 0.25),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Financial Details',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    _buildTextFormField(
+                                      context,
+                                      controller: _projectBudgetController,
+                                      label: 'Project Budget',
+                                      icon: Icons.currency_rupee_rounded,
+                                      keyboardType: TextInputType.number,
+                                      validator: (val) {
+                                        if (val == null || val.trim().isEmpty)
+                                          return 'Required';
+                                        final budget = double.tryParse(val);
+                                        final paid = double.tryParse(
+                                          _amountPaidController.text,
+                                        );
+                                        if (budget == null)
+                                          return 'Invalid number';
+                                        if (paid != null && budget < paid)
+                                          return 'Budget must be greater than Amount Received';
+                                        return null;
+                                      },
+                                      readOnly: isUpdateMode,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildTextFormField(
+                                      context,
+                                      controller: _amountPaidController,
+                                      label: 'Amount Received',
+                                      icon: Icons.currency_rupee_rounded,
+                                      keyboardType: TextInputType.number,
+                                      validator: (val) =>
+                                          val == null || val.trim().isEmpty
+                                              ? 'Required'
+                                              : null,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildTextFormField(
+                                      context,
+                                      controller: _amountSpentController,
+                                      label: 'Amount Spent',
+                                      icon: Icons.currency_rupee_rounded,
+                                      keyboardType: TextInputType.number,
+                                      readOnly: true,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    _buildTextFormField(
+                                      context,
+                                      controller: _balanceAmountController,
+                                      label: 'Balance Amount',
+                                      icon: Icons.account_balance_wallet_rounded,
+                                      keyboardType: TextInputType.number,
+                                      validator: (val) =>
+                                          val == null || val.trim().isEmpty
+                                              ? 'Required'
+                                              : null,
+                                      readOnly: true,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // ── ACTION BUTTONS ─────────────────────────
+                              _buildActionButtons(context),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Project Timeline',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _buildDatePicker(
-                              context,
-                              "Planned Start Date",
-                              plannedStartDate,
-                              (date) => setState(() => plannedStartDate = date),
-                              validator: (val) =>
-                                  plannedStartDate == null ? 'Required' : null,
-                              enabled: isUpdateMode,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildDatePicker(
-                              context,
-                              "Planned End Date",
-                              plannedEndDate,
-                              (date) => setState(() => plannedEndDate = date),
-                              validator: (val) =>
-                                  plannedEndDate == null ? 'Required' : null,
-                              enabled: isUpdateMode,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildDatePicker(
-                              context,
-                              "Actual Start Date",
-                              actualStartDate,
-                              (date) => setState(() => actualStartDate = date),
-                              validator: (val) =>
-                                  actualStartDate == null ? 'Required' : null,
-                              enabled: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildDatePicker(
-                              context,
-                              "Actual End Date",
-                              actualEndDate,
-                              (date) => setState(() => actualEndDate = date),
-                              validator: (val) =>
-                                  actualEndDate == null ? 'Required' : null,
-                              enabled: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Financial Details',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildTextFormField(
-                              context,
-                              controller: _projectBudgetController,
-                              label: 'Project Budget',
-                              icon: Icons.currency_rupee_rounded,
-                              keyboardType: TextInputType.number,
-                              validator: (val) {
-                                if (val == null || val.trim().isEmpty)
-                                  return 'Required';
-                                final budget = double.tryParse(val);
-                                final paid = double.tryParse(
-                                  _amountPaidController.text,
-                                );
-                                if (budget == null) return 'Invalid number';
-                                if (paid != null && budget < paid)
-                                  return 'Budget must be greater than Amount Received';
-                                return null;
-                              },
-                              readOnly: isUpdateMode,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildTextFormField(
-                              context,
-                              controller: _amountPaidController,
-                              label: 'Amount Received',
-                              icon: Icons.currency_rupee_sharp,
-                              keyboardType: TextInputType.number,
-                              validator: (val) =>
-                                  val == null || val.trim().isEmpty
-                                  ? 'Required'
-                                  : null,
-                              readOnly: false,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildTextFormField(
-                              context,
-                              controller: _amountSpentController,
-                              label: 'Amount Spent',
-                              icon: Icons.currency_rupee_sharp,
-                              keyboardType: TextInputType.number,
-                              readOnly: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildTextFormField(
-                              context,
-                              controller: _balanceAmountController,
-                              label: 'Balance Amount',
-                              icon: Icons.currency_rupee_outlined,
-                              keyboardType: TextInputType.number,
-                              validator: (val) =>
-                                  val == null || val.trim().isEmpty
-                                  ? 'Required'
-                                  : null,
-                              readOnly: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 30),
-            _buildActionButtons(context),
           ],
         ),
-      ),
-    ),
-  );
-        },
       ),
     );
   }
@@ -1713,36 +1776,68 @@ class _ProjectScreenState extends State<ProjectScreen>
     int? maxLength,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-    final textColor =
-        theme.textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryColor),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor, width: 2),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            validator: validator,
+            readOnly: readOnly,
+            inputFormatters: inputFormatters,
+            maxLength: maxLength,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Icon(icon, color: brandIconColor, size: 22),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              counterText: "",
+            ),
+          ),
         ),
-        filled: true,
-        fillColor: readOnly ? Colors.grey[100] : Colors.grey[50],
-        counterText: "", // Hide character counter
-      ),
-      style: TextStyle(color: textColor),
-      cursorColor: primaryColor,
-      keyboardType: keyboardType,
-      validator: validator,
-      readOnly: readOnly,
-      inputFormatters: inputFormatters,
-      maxLength: maxLength,
+      ],
     );
   }
 
@@ -1757,9 +1852,7 @@ class _ProjectScreenState extends State<ProjectScreen>
     bool enabled = true,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-    final textColor =
-        theme.textTheme.bodyLarge?.color ?? const Color(0xFF2c3e50);
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
     final uniqueItems = items
         .map((item) => item.trim())
@@ -1767,37 +1860,73 @@ class _ProjectScreenState extends State<ProjectScreen>
         .toSet()
         .toList();
 
-    return DropdownButtonFormField<String>(
-      value: (value != null && uniqueItems.contains(value.trim()))
-          ? value.trim()
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryColor),
-        prefixIcon: Icon(icon, color: primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: primaryColor, width: 2),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: enabled ? Colors.white : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            value: (value != null && uniqueItems.contains(value.trim()))
+                ? value.trim()
+                : null,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Select $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Icon(icon, color: brandIconColor, size: 22),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: uniqueItems.map((item) {
+              return DropdownMenuItem<String>(
+                value: item,
+                child: Text(item),
+              );
+            }).toList(),
+            onChanged: enabled ? onChanged : null,
+            validator: validator,
+          ),
         ),
-        filled: true,
-        fillColor: Colors.grey[50],
-      ),
-      style: TextStyle(color: textColor, fontSize: 16),
-      icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-      dropdownColor: Colors.white,
-      items: uniqueItems.map((item) {
-        return DropdownMenuItem<String>(
-          value: item,
-          child: Text(item, style: TextStyle(color: textColor)),
-        );
-      }).toList(),
-      onChanged: enabled ? onChanged : null,
-      validator: validator,
+      ],
     );
   }
 
@@ -1810,92 +1939,138 @@ class _ProjectScreenState extends State<ProjectScreen>
     bool enabled = true,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
+    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
 
-    return InkWell(
-      onTap: enabled
-          ? () => _selectDate(context, initialDate, onSelected)
-          : null,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: primaryColor),
-          prefixIcon: Icon(Icons.calendar_today, color: primaryColor),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(10)),
-            borderSide: BorderSide(color: primaryColor.withOpacity(0.5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(10)),
-            borderSide: BorderSide(color: primaryColor, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.grey[50],
-        ),
-        child: Text(
-          formatDate(initialDate),
-          style: TextStyle(
-            color: initialDate == null ? Colors.grey[600] : Colors.black87,
-            fontSize: 16,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    final theme = Theme.of(context);
-    const successColor = Color(0xFF28a745);
-    const warningColor = Color(0xFFffc107);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildActionButton(
-          context,
-          icon: Icons.save,
-          label: isUpdateMode ? 'Update' : 'Save',
-          color: successColor,
-          onPressed: _saveForm,
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        _buildActionButton(
-          context,
-          icon: Icons.refresh,
-          label: 'Reset',
-          color: warningColor,
-          onPressed: _resetForm,
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: enabled
+              ? () => _selectDate(context, initialDate, onSelected)
+              : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: enabled ? Colors.white : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: brandIconColor, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    formatDate(initialDate),
+                    style: TextStyle(
+                      color: initialDate == null
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Column(
+  Widget _buildActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
+    return Row(
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: color),
-            onPressed: onPressed,
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _saveForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: const Color(0xFF0A183D),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 6,
+                shadowColor: primaryColor.withValues(alpha: 0.4),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isUpdateMode ? Icons.check_rounded : Icons.save_rounded,
+                    size: 20,
+                    color: const Color(0xFF0A183D),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isUpdateMode ? 'UPDATE PROJECT' : 'SAVE PROJECT',
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: 12),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _resetForm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              elevation: 0,
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
+                  'RESET',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -1903,8 +2078,7 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   Widget _buildSuccessModal(BuildContext context) {
-    final theme = Theme.of(context);
-    final successColor = const Color(0xFF28a745);
+    const successColor = Color(0xFF28a745);
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
@@ -1915,10 +2089,11 @@ class _ProjectScreenState extends State<ProjectScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: successColor.withOpacity(0.1),
+                color: successColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_circle, color: successColor, size: 60),
+              child:
+                  const Icon(Icons.check_circle, color: successColor, size: 60),
             ),
             const SizedBox(height: 24),
             const Text(

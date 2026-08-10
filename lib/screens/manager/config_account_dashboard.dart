@@ -336,9 +336,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       actions: widget.showLogout
           ? [
               IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.logout_rounded,
-                  color: Color(0xFF0A183D),
+                  color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
                   size: 26,
                 ),
                 onPressed: () => _showLogoutConfirmation(context),

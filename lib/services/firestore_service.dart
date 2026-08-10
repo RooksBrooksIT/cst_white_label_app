@@ -187,6 +187,18 @@ class FirestoreService {
     return getCollection(collectionName).doc(docId);
   }
 
+  /// Runs a Firestore transaction.
+  static Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return FirebaseFirestore.instance.runTransaction<T>(
+      transactionHandler,
+      timeout: timeout,
+    );
+  }
+
+
   // Legacy async support wrappers
   static Future<DocumentReference<Map<String, dynamic>>>
   getOrgDataRoot() async {

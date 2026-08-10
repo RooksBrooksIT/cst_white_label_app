@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class ContractorPage extends StatefulWidget {
@@ -38,6 +39,7 @@ class _ContractorPageState extends State<ContractorPage> {
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
 
     return GlassScaffold(
       title: 'New Contractor',
@@ -46,228 +48,267 @@ class _ContractorPageState extends State<ContractorPage> {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section 1: Input form and buttons
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // Contractor illustration / avatar
-                    CircleAvatar(
-                      radius: 44,
-                      backgroundColor: primaryColor.withOpacity(0.15),
-                      child: Icon(
-                        Icons.engineering,
-                        color: primaryColor,
-                        size: 44,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Section 1: Input form and buttons
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkCardBg.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildProjectFieldDropdown(),
-                    const SizedBox(height: 20),
-                    _textField(
-                      controller: _nameController,
-                      label: "Contractor Name",
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? "Please enter name"
-                          : null,
-                    ),
-                    const SizedBox(height: 20),
-                    _textField(
-                      controller: _numberController,
-                      label: "Contact Number",
-                      maxLength: 10,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Please enter contractor number";
-                        }
-                        if (value.length != 10) {
-                          return "Contact number must be 10 digits";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    _textField(
-                      controller: _addressController,
-                      label: "Address",
-                      maxLines: 3,
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? "Please enter address"
-                          : null,
-                    ),
-                    const SizedBox(height: 28),
-                    Row(
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _isSaving
-                                ? null
-                                : () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryColor,
-                              side: BorderSide(color: primaryColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              "Cancel",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
+                        // Contractor illustration / avatar
+                        CircleAvatar(
+                          radius: 44,
+                          backgroundColor: primaryColor.withValues(alpha: 0.18),
+                          child: Icon(
+                            Icons.engineering_rounded,
+                            color: primaryColor,
+                            size: 44,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _onSavePressed,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                        const SizedBox(height: 24),
+                        _buildProjectFieldDropdown(),
+                        const SizedBox(height: 20),
+                        _textField(
+                          controller: _nameController,
+                          label: "Contractor Name",
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? "Please enter name"
+                              : null,
+                        ),
+                        const SizedBox(height: 20),
+                        _textField(
+                          controller: _numberController,
+                          label: "Contact Number",
+                          maxLength: 10,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Please enter contractor number";
+                            }
+                            if (value.length != 10) {
+                              return "Contact number must be 10 digits";
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _textField(
+                          controller: _addressController,
+                          label: "Address",
+                          maxLines: 3,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? "Please enter address"
+                              : null,
+                        ),
+                        const SizedBox(height: 28),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _isSaving
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text(
+                                  "Cancel",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 6,
-                              shadowColor: primaryColor.withOpacity(0.6),
                             ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                      ),
-                                    )
-                                  : const Text(
-                                      "Save",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isSaving ? null : _onSavePressed,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryColor,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 6,
+                                  shadowColor: primaryColor.withValues(alpha: 0.4),
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Color(0xFF0A183D),
+                                                ),
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Save",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Section 2: Contractors table
+                Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A183D),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "All Contractors",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        color: Color(0xFF0A183D),
+                        letterSpacing: -0.4,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 36),
-            // Section 2: Contractors table
-            Text(
-              "All Contractors",
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                color: primaryColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: darkCardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkCardBg.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _contractorsStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(30),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(30),
-                      child: Text(
-                        'Error loading contractors',
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
-                  }
-                  final docs = snapshot.data?.docs ?? [];
-                  if (docs.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(30),
-                      child: Center(child: Text('No contractors found.')),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(
-                        primaryColor.withOpacity(0.12),
-                      ),
-                      headingTextStyle: TextStyle(
-                        color: primaryColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                      columnSpacing: 36,
-                      dataRowHeight: 52,
-                      columns: const [
-                        DataColumn(label: Text('S.No.')),
-                        DataColumn(label: Text('Contractor Name')),
-                        DataColumn(label: Text('Project Stage')),
-                      ],
-                      rows: List<DataRow>.generate(docs.length, (index) {
-                        final data = docs[index].data();
-                        return DataRow(
-                          cells: [
-                            DataCell(Text('${index + 1}')),
-                            DataCell(Text(data['contractorName'] ?? '')),
-                            DataCell(Text(data['contractorField'] ?? '')),
-                          ],
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _contractorsStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.all(30),
+                          child: Center(child: CircularProgressIndicator()),
                         );
-                      }),
-                    ),
-                  );
-                },
-              ),
+                      }
+                      if (snapshot.hasError) {
+                        return Padding(
+                          padding: const EdgeInsets.all(30),
+                          child: Text(
+                            'Error loading contractors',
+                            style: TextStyle(
+                              color: Colors.red.shade400,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }
+                      final docs = snapshot.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(30),
+                          child: Center(
+                            child: Text(
+                              'No contractors found.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor: WidgetStateProperty.all(
+                            Colors.white.withValues(alpha: 0.1),
+                          ),
+                          headingTextStyle: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
+                          columnSpacing: 36,
+                          dataRowHeight: 52,
+                          columns: const [
+                            DataColumn(label: Text('S.No.')),
+                            DataColumn(label: Text('Contractor Name')),
+                            DataColumn(label: Text('Project Stage')),
+                          ],
+                          rows: List<DataRow>.generate(docs.length, (index) {
+                            final data = docs[index].data();
+                            return DataRow(
+                              cells: [
+                                DataCell(Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(color: Colors.white),
+                                )),
+                                DataCell(Text(
+                                  data['contractorName'] ?? '',
+                                  style: const TextStyle(color: Colors.white),
+                                )),
+                                DataCell(Text(
+                                  data['contractorField'] ?? '',
+                                  style: const TextStyle(color: Colors.white),
+                                )),
+                              ],
+                            );
+                          }),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
         ),
       ),
     );
@@ -283,37 +324,63 @@ class _ContractorPageState extends State<ContractorPage> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLength: maxLength,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
-        filled: true,
-
-        counterText: '',
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            maxLength: maxLength,
+            maxLines: maxLines,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            validator: validator,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0A183D),
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              filled: false,
+              counterText: '',
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: primaryColor, width: 2.5),
-        ),
-      ),
+      ],
     );
   }
 
@@ -333,45 +400,73 @@ class _ContractorPageState extends State<ContractorPage> {
         final currentValue = stages.contains(_selectedProjectField)
             ? _selectedProjectField
             : null;
-        return DropdownButtonFormField<String>(
-          value: currentValue,
-          decoration: InputDecoration(
-            labelText: "Project Stage",
-            labelStyle: TextStyle(
-              color: primaryColor,
-              fontWeight: FontWeight.w700,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Project Stage",
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
             ),
-            filled: true,
-
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: DropdownButtonFormField<String>(
+                value: currentValue,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                decoration: InputDecoration(
+                  hintText: "Select Project Stage",
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  filled: false,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: stages
+                    .map(
+                      (stage) => DropdownMenuItem(
+                        value: stage,
+                        child: Text(stage),
+                      ),
+                    )
+                    .toList(),
+                onChanged: stages.isNotEmpty
+                    ? (v) => setState(() => _selectedProjectField = v)
+                    : null,
+                validator: (v) =>
+                    v == null ? "Please select a project stage" : null,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
             ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: primaryColor, width: 2.5),
-            ),
-          ),
-          items: stages
-              .map(
-                (stage) => DropdownMenuItem(value: stage, child: Text(stage)),
-              )
-              .toList(),
-          onChanged: stages.isNotEmpty
-              ? (v) => setState(() => _selectedProjectField = v)
-              : null,
-          validator: (v) => v == null ? "Please select a project stage" : null,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-          ),
-          dropdownColor: Colors.white,
+          ],
         );
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
@@ -25,17 +26,14 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   DateTime? startDate;
   DateTime? endDate;
 
-  // Tracks which siteSupervisorMap doc ID corresponds to each site name
-  // Key: site field value, Value: document ID
   Map<String, String> _siteToDocId = {};
-  // Full document data cache keyed by doc ID
   Map<String, Map<String, dynamic>> _docCache = {};
+  Map<String, Map<String, dynamic>> _siteDocCache = {};
 
   final locationController = TextEditingController();
   final commentsController = TextEditingController();
 
   List<String> siteList = [];
-  // Supervisor data: list of {id, fullName} maps from Firestore 'supervisor' collection
   List<Map<String, String>> _supervisorList = [];
 
   Color get primaryColor => Theme.of(context).colorScheme.primary;
@@ -47,7 +45,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     _fetchSupervisors();
   }
 
-  /// Fetches all supervisors from the 'supervisor' collection to populate the Supervisor ID dropdown.
   void _fetchSupervisors() async {
     try {
       final snapshot = await FirestoreService.getCollection('supervisor').get();
@@ -71,14 +68,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     }
   }
 
-  // Cache of Site collection document data keyed by doc ID
-  Map<String, Map<String, dynamic>> _siteDocCache = {};
-
-  /// Fetches all documents from siteSupervisorMap and populates the site dropdown.
-  /// Path: /organisation/{OrgID}/siteSupervisorMap
   void _fetchSiteSupervisorMapDocs() async {
     try {
-      // 1. Fetch all site docs from 'Site' and cache their data
       final sitesSnapshot = await FirestoreService.getCollection('Site').get();
       final List<String> allSiteIds = [];
       final Map<String, Map<String, dynamic>> siteDocCache = {};
@@ -89,7 +80,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         }
       }
 
-      // 2. Fetch all mappings from 'siteSupervisorMap'
       final snapshot = await FirestoreService.getCollection(
         'siteSupervisorMap',
       ).get();
@@ -122,17 +112,13 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     }
   }
 
-  /// Retrieves the project name for a given site by querying the 'projects' collection.
-  /// Tries multiple field names and query strategies to handle inconsistent data.
   Future<Map<String, dynamic>> _fetchProjectDataForSite(String siteId) async {
     try {
-      // Try 1: query projects by siteId field
       var projSnap = await FirestoreService.getCollection('projects')
           .where('siteId', isEqualTo: siteId)
           .limit(1)
           .get();
 
-      // Try 2: if siteId query returned nothing, try querying by siteName from the Site doc
       if (projSnap.docs.isEmpty) {
         final siteData = _siteDocCache[siteId];
         final sName = siteData?['siteName']?.toString();
@@ -153,16 +139,12 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     return {};
   }
 
-  /// Extracts the project name from project data, trying multiple field names.
   String _extractProjectName(Map<String, dynamic> pData) {
-    // projects collection sometimes stores the name in 'projectName', sometimes in 'siteName'
     final name = (pData['projectName']?.toString() ?? '').trim();
     if (name.isNotEmpty) return name;
     return (pData['siteName']?.toString() ?? '').trim();
   }
 
-  /// Auto-fills all form fields from the cached siteSupervisorMap document
-  /// corresponding to the selected site name.
   void _autoFillFromSite(String siteName) async {
     final docId = _siteToDocId[siteName];
     if (docId != null) {
@@ -174,23 +156,27 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         DateTime? sDate = _parseDate(data['startDate']);
         DateTime? eDate = _parseDate(data['endDate']);
 
-        // If key fields are missing from the map doc, fetch from projects collection
         if (pName.isEmpty || sDate == null || eDate == null) {
           final pData = await _fetchProjectDataForSite(siteName);
           if (pData.isNotEmpty) {
             if (pName.isEmpty) pName = _extractProjectName(pData);
-            if (pStage.isEmpty) pStage = (pData['projectStage']?.toString() ?? '').trim();
-            if (loc.isEmpty) loc = (pData['location'] ?? pData['siteLocation'])?.toString() ?? '';
-            sDate ??= _parseDate(pData['plannedStartDate']) ?? _parseDate(pData['startDate']);
-            eDate ??= _parseDate(pData['plannedEndDate']) ?? _parseDate(pData['endDate']);
+            if (pStage.isEmpty)
+              pStage = (pData['projectStage']?.toString() ?? '').trim();
+            if (loc.isEmpty)
+              loc = (pData['location'] ?? pData['siteLocation'])?.toString() ??
+                  '';
+            sDate ??= _parseDate(pData['plannedStartDate']) ??
+                _parseDate(pData['startDate']);
+            eDate ??= _parseDate(pData['plannedEndDate']) ??
+                _parseDate(pData['endDate']);
           }
         }
 
-        // Final fallback: use siteName from the Site collection
         if (pName.isEmpty) {
           final siteData = _siteDocCache[siteName];
           pName = (siteData?['siteName']?.toString() ?? '').trim();
-          if (loc.isEmpty) loc = (siteData?['location']?.toString() ?? '').trim();
+          if (loc.isEmpty)
+            loc = (siteData?['location']?.toString() ?? '').trim();
           sDate ??= _parseDate(siteData?['startDate']);
           eDate ??= _parseDate(siteData?['endDate']);
         }
@@ -211,7 +197,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       }
     }
 
-    // Fallback: it's a newly created site with no siteSupervisorMap entry
     setState(() {
       selectedSupervisorId = '';
       selectedSupervisor = '';
@@ -225,7 +210,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     });
 
     try {
-      // 1. Try fetching from the projects collection
       final pData = await _fetchProjectDataForSite(siteName);
       String pName = '';
       String pStage = '';
@@ -237,15 +221,18 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         pName = _extractProjectName(pData);
         pStage = (pData['projectStage']?.toString() ?? '').trim();
         loc = (pData['location'] ?? pData['siteLocation'])?.toString() ?? '';
-        sDate = _parseDate(pData['plannedStartDate']) ?? _parseDate(pData['startDate']);
-        eDate = _parseDate(pData['plannedEndDate']) ?? _parseDate(pData['endDate']);
+        sDate = _parseDate(pData['plannedStartDate']) ??
+            _parseDate(pData['startDate']);
+        eDate = _parseDate(pData['plannedEndDate']) ??
+            _parseDate(pData['endDate']);
       }
 
-      // 2. Fallback to Site collection data for any still-missing fields
       final siteData = _siteDocCache[siteName];
       if (siteData != null) {
-        if (pName.isEmpty) pName = (siteData['siteName']?.toString() ?? '').trim();
-        if (loc.isEmpty) loc = (siteData['location']?.toString() ?? '').trim();
+        if (pName.isEmpty)
+          pName = (siteData['siteName']?.toString() ?? '').trim();
+        if (loc.isEmpty)
+          loc = (siteData['location']?.toString() ?? '').trim();
         sDate ??= _parseDate(siteData['startDate']);
         eDate ??= _parseDate(siteData['endDate']);
       }
@@ -259,19 +246,17 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         endDate = eDate;
       });
     } catch (e) {
-      debugPrint('Error auto-filling from site $siteName: $e');
+      debugPrint('Error auto-filling for new site $siteName: $e');
     }
   }
 
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     if (value is Timestamp) return value.toDate();
-    if (value is String) {
+    if (value is String && value.isNotEmpty) {
       try {
         return DateTime.parse(value);
-      } catch (_) {
-        return null;
-      }
+      } catch (_) {}
     }
     return null;
   }
@@ -280,8 +265,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     setState(() {
       selectedSite = null;
       selectedSupervisor = null;
-      selectedProjectStage = null;
       selectedSupervisorId = null;
+      selectedProjectStage = null;
       projectName = null;
       siteComments = null;
       locationController.clear();
@@ -292,88 +277,50 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     });
   }
 
-  /// Finds the siteSupervisorMap doc ID for the selected site from the local cache.
-  Future<String?> findDocIdBySiteId(String siteName) async {
-    // Prefer the cached mapping populated from _fetchSiteSupervisorMapDocs
-    if (_siteToDocId.containsKey(siteName)) {
-      return _siteToDocId[siteName];
-    }
-    // Fallback: query Firestore directly
-    final querySnapshot = await FirestoreService.getCollection(
-      'siteSupervisorMap',
-    ).where('site', isEqualTo: siteName).limit(1).get();
-    if (querySnapshot.docs.isNotEmpty) {
-      return querySnapshot.docs.first.id;
-    }
-    return null;
-  }
-
   void saveForm() async {
-    if (selectedSite == null ||
-        selectedSupervisor == null ||
-        selectedProjectStage == null ||
-        locationController.text.isEmpty ||
-        joinedDate == null ||
-        startDate == null ||
-        endDate == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill all required fields.')),
-      );
+    if (selectedSite == null || selectedSite!.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a site.')));
       return;
     }
+
     try {
-      String siteId = selectedSite ?? '';
-      String? docId = await findDocIdBySiteId(siteId);
-      String sanitizedLocation = locationController.text
-          .replaceAll('/', '_')
-          .replaceAll(',', '')
-          .replaceAll(' ', '_');
-      String sanitizedSupervisor = (selectedSupervisor ?? '')
-          .replaceAll('/', '_')
-          .replaceAll(',', '')
-          .replaceAll(' ', '_');
-      String sanitizedSupervisorId = (selectedSupervisorId ?? '')
-          .replaceAll('/', '_')
-          .replaceAll(',', '')
-          .replaceAll(' ', '_');
-      docId ??=
-          '${siteId}_${sanitizedLocation}_${sanitizedSupervisorId}_$sanitizedSupervisor';
-      Map<String, dynamic> data = {
-        "joinedOn": joinedDate!.toIso8601String(),
-        "startDate": startDate!.toIso8601String(),
-        "endDate": endDate!.toIso8601String(),
-        "location": locationController.text,
-        "projectStage": selectedProjectStage,
-        "site": selectedSite,
-        "projectName": projectName ?? '',
-        "siteComments": commentsController.text,
-        "supervisor": selectedSupervisor,
-        "Supervisor ID": selectedSupervisorId,
+      final docIdToUse =
+          _siteToDocId[selectedSite] ?? selectedSite!.replaceAll(' ', '');
+
+      final Map<String, dynamic> dataToSave = {
+        'site': selectedSite,
+        'Supervisor ID': selectedSupervisorId ?? '',
+        'supervisor': selectedSupervisor ?? '',
+        'projectName': projectName ?? '',
+        'projectStage': selectedProjectStage ?? '',
+        'location': locationController.text.trim(),
+        'siteComments': commentsController.text.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
       };
-      DocumentReference docRef = FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).doc(docId);
-      DocumentSnapshot docSnapshot = await docRef.get();
+
+      if (startDate != null) dataToSave['startDate'] = startDate;
+      if (endDate != null) dataToSave['endDate'] = endDate;
+      if (joinedDate != null) dataToSave['joinedOn'] = joinedDate;
+
+      await FirestoreService.getCollection('siteSupervisorMap')
+          .doc(docIdToUse)
+          .set(dataToSave, SetOptions(merge: true));
+
       if (!mounted) return;
-      if (docSnapshot.exists) {
-        await docRef.update(data);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Entry updated successfully!')));
-      } else {
-        await docRef.set(data);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Entry created successfully!')));
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Form saved successfully!')),
+      );
+
+      _fetchSiteSupervisorMapDocs();
       resetForm();
     } catch (e) {
-      print('Error saving form: $e');
+      debugPrint('Error saving form: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error saving form.')));
+      ).showSnackBar(const SnackBar(content: Text('Error saving form.')));
     }
   }
 
@@ -386,487 +333,812 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return GlassScaffold(
-      title: 'Site-Supervisor Mapping',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: LayoutBuilder(
-        builder: (context, constraints) {
-          double horizontalPadding = constraints.maxWidth * 0.06; // 6%
-          double verticalPadding = constraints.maxHeight * 0.025; // 2.5%
-          double cardPadding = constraints.maxWidth < 500 ? 16 : 24;
-          double fontSize = constraints.maxWidth < 350 ? 13 : 16;
-          double titleFontSize = constraints.maxWidth < 400 ? 18 : 22;
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: 25,
+      padding: EdgeInsets.zero,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header Row ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Text(
+                    'Site-Supervisor Mapping',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildResponsiveButton('Entry', isEntrySelected, () {
-                      setState(() => isEntrySelected = true);
-                    }),
-                    SizedBox(width: constraints.maxWidth * 0.04),
-                    _buildResponsiveButton('Info', !isEntrySelected, () {
-                      setState(() => isEntrySelected = false);
-                    }),
-                  ],
+
+            // ── Dark Pill Mode Switcher ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => isEntrySelected = true),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isEntrySelected
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.edit_note_rounded,
+                              size: 18,
+                              color: isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'ENTRY',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: isEntrySelected
+                                    ? Colors.white
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => isEntrySelected = false),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: !isEntrySelected
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 18,
+                              color: !isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'INFO',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: !isEntrySelected
+                                    ? Colors.white
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Scrollable Tab Content ──────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    child: isEntrySelected
+                        ? _buildEntrySection(darkCardBg, primaryColor)
+                        : _buildInfoTableSection(darkCardBg, primaryColor),
+                  ),
                 ),
-                SizedBox(height: verticalPadding),
-                if (isEntrySelected)
-                  _buildEntrySection(
-                    context,
-                    cardPadding,
-                    fontSize,
-                    titleFontSize,
-                  )
-                else
-                  _buildInfoTableSection(context, fontSize),
-              ],
+              ),
             ),
-          );
-        },
-      ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildResponsiveButton(
-    String text,
-    bool isSelected,
-    VoidCallback onPressed,
-  ) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isSelected ? primaryColor : Colors.white,
-        foregroundColor: isSelected ? Colors.white : primaryColor,
-        side: BorderSide(color: primaryColor, width: isSelected ? 2.5 : 1.5),
-        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 30),
-        textStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        elevation: isSelected ? 6 : 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        shadowColor: isSelected ? primaryColor.withOpacity(0.4) : null,
-      ),
-      onPressed: onPressed,
-      child: Text(text),
-    );
-  }
-
-  Widget _buildEntrySection(
-    BuildContext context,
-    double cardPadding,
-    double fontSize,
-    double titleFontSize,
-  ) {
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: primaryColor, width: 1.8),
-    );
-    final filledBackground = Colors.white;
-
+  // ── ENTRY SECTION ─────────────────────────────────────────────────────────
+  Widget _buildEntrySection(Color darkCardBg, Color primaryColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          elevation: 9,
-          shadowColor: primaryColor.withOpacity(0.30),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: darkCardBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: darkCardBg.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Padding(
-            padding: EdgeInsets.all(cardPadding),
-            child: Column(
-              children: [
-                Text(
-                  'Mapping Details',
-                  style: TextStyle(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                    letterSpacing: 0.6,
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Mapping Details',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
                 ),
-                SizedBox(height: 28),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: selectedSite,
-                  hint: Text(
-                    'Select Site',
-                    style: TextStyle(color: primaryColor, fontSize: fontSize),
-                  ),
-                  items: siteList.map((site) {
-                    return DropdownMenuItem(
-                      value: site,
-                      child: Text(
-                        site,
-                        style: TextStyle(fontSize: fontSize),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedSite = value;
-                    });
-                    if (value != null) {
-                      _autoFillFromSite(value);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Site',
-                    prefixIcon: Icon(
-                      Icons.location_on_outlined,
-                      color: primaryColor,
-                    ),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-                  borderRadius: BorderRadius.circular(12),
-                  dropdownColor: Colors.white,
-                  elevation: 4,
+              ),
+              const SizedBox(height: 18),
+
+              // Select Site Dropdown
+              _buildSiteDropdown(),
+              const SizedBox(height: 14),
+
+              // Project Name (read-only)
+              _buildTextField(
+                label: 'Project Name',
+                controller: TextEditingController(text: projectName ?? ''),
+                hint: 'Auto-filled from site selection',
+                readOnly: true,
+                icon: Icons.business_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Location
+              _buildTextField(
+                label: 'Location',
+                controller: locationController,
+                hint: 'Enter site location',
+                icon: Icons.location_on_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Supervisor ID Dropdown
+              _buildSupervisorIdDropdown(),
+              const SizedBox(height: 14),
+
+              // Supervisor Name (read-only)
+              _buildTextField(
+                label: 'Supervisor Name',
+                controller: TextEditingController(text: selectedSupervisor ?? ''),
+                hint: 'Auto-filled from ID selection',
+                readOnly: true,
+                icon: Icons.person_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Project Stage (read-only)
+              _buildTextField(
+                label: 'Project Stage',
+                controller: TextEditingController(text: selectedProjectStage ?? ''),
+                hint: 'Auto-filled from site selection',
+                readOnly: true,
+                icon: Icons.timeline_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Site (read-only)
+              _buildTextField(
+                label: 'Site',
+                controller: TextEditingController(text: selectedSite ?? ''),
+                hint: 'Auto-filled from site selection',
+                readOnly: true,
+                icon: Icons.store_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Site Comments
+              _buildTextField(
+                label: 'Site Comments',
+                controller: commentsController,
+                hint: 'Enter site comments or instructions',
+                maxLines: 3,
+                icon: Icons.comment_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Start Date (read-only)
+              _buildTextField(
+                label: 'Start Date',
+                controller: TextEditingController(
+                  text: startDate != null
+                      ? DateFormat('yyyy-MM-dd').format(startDate!)
+                      : '',
                 ),
-                SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Project Name',
-                    prefixIcon: Icon(
-                      Icons.business_outlined,
-                      color: primaryColor,
-                    ),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(text: projectName ?? ''),
-                  style: TextStyle(fontSize: fontSize),
+                hint: 'Auto-filled start date',
+                readOnly: true,
+                icon: Icons.calendar_today_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // End Date (read-only)
+              _buildTextField(
+                label: 'End Date',
+                controller: TextEditingController(
+                  text: endDate != null
+                      ? DateFormat('yyyy-MM-dd').format(endDate!)
+                      : '',
                 ),
-                SizedBox(height: 20),
-                TextField(
-                  controller: locationController,
-                  decoration: InputDecoration(
-                    labelText: 'Location',
-                    prefixIcon: Icon(Icons.place_outlined, color: primaryColor),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
-                      ? selectedSupervisorId
-                      : null,
-                  hint: Text(
-                    'Select Supervisor ID',
-                    style: TextStyle(color: primaryColor, fontSize: fontSize),
-                  ),
-                  items: _supervisorList.map((sup) {
-                    return DropdownMenuItem<String>(
-                      value: sup['id'],
-                      child: Text(
-                        '${sup['id']} - ${sup['fullName']}',
-                        style: TextStyle(fontSize: fontSize),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedSupervisorId = value;
-                      // Auto-fill supervisor name from the selected ID
-                      final match = _supervisorList.firstWhere(
-                        (s) => s['id'] == value,
-                        orElse: () => {'id': '', 'fullName': ''},
-                      );
-                      selectedSupervisor = match['fullName'] ?? '';
-                    });
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Supervisor ID',
-                    prefixIcon: Icon(Icons.badge_outlined, color: primaryColor),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  icon: Icon(Icons.arrow_drop_down, color: primaryColor),
-                  borderRadius: BorderRadius.circular(12),
-                  dropdownColor: Colors.white,
-                  elevation: 4,
-                ),
-                SizedBox(height: 14),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Supervisor',
-                    prefixIcon: Icon(Icons.person_outline, color: primaryColor),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(
-                    text: selectedSupervisor ?? '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Project Stage',
-                    prefixIcon: Icon(Icons.work_outline, color: primaryColor),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(
-                    text: selectedProjectStage ?? '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Site',
-                    prefixIcon: Icon(
-                      Icons.location_on_outlined,
-                      color: primaryColor,
-                    ),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(
-                    text: selectedSite ?? '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                TextField(
-                  controller: commentsController,
-                  decoration: InputDecoration(
-                    labelText: 'Site Comments',
-                    prefixIcon: Icon(
-                      Icons.comment_outlined,
-                      color: primaryColor,
-                    ),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  maxLines: 4,
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Start Date',
-                    hintText: 'Start Date',
-                    prefixIcon: Icon(
-                      Icons.calendar_today_outlined,
-                      color: primaryColor,
-                    ),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(
-                    text: startDate != null
-                        ? DateFormat('yyyy-MM-dd').format(startDate!)
-                        : '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                TextFormField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'End Date',
-                    hintText: 'End Date',
-                    prefixIcon: Icon(Icons.calendar_month, color: primaryColor),
-                    border: inputBorder,
-                    filled: true,
-                    fillColor: filledBackground,
-                    labelStyle: TextStyle(color: primaryColor),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 18,
-                    ),
-                  ),
-                  controller: TextEditingController(
-                    text: endDate != null
-                        ? DateFormat('yyyy-MM-dd').format(endDate!)
-                        : '',
-                  ),
-                  style: TextStyle(fontSize: fontSize),
-                ),
-                SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () => _selectAnyDate(context, dateType: 'joined'),
-                  child: AbsorbPointer(
-                    child: TextFormField(
-                      decoration: InputDecoration(
-                        labelText: 'Joined On',
-                        hintText: 'Select Joined On Date',
-                        prefixIcon: Icon(
-                          Icons.calendar_today_outlined,
-                          color: primaryColor,
-                        ),
-                        border: inputBorder,
-                        filled: true,
-                        fillColor: filledBackground,
-                        labelStyle: TextStyle(color: primaryColor),
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 18,
-                        ),
-                      ),
-                      controller: TextEditingController(
-                        text: joinedDate != null
-                            ? DateFormat('yyyy-MM-dd').format(joinedDate!)
-                            : '',
-                      ),
-                      style: TextStyle(fontSize: fontSize),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                hint: 'Auto-filled end date',
+                readOnly: true,
+                icon: Icons.event_rounded,
+              ),
+              const SizedBox(height: 14),
+
+              // Joined On Date Picker
+              _buildDateField(
+                label: 'Joined On',
+                date: joinedDate,
+                onTap: () => _selectAnyDate(context, dateType: 'joined'),
+              ),
+            ],
           ),
         ),
-        SizedBox(height: 32),
-        _buildActionButtons(context, fontSize),
+        const SizedBox(height: 20),
+
+        // Action buttons
+        _buildActionButtons(primaryColor),
+        const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildInfoTableSection(BuildContext context, double fontSize) {
-    // Use the already-fetched cache if available; otherwise trigger a fresh fetch
+  Widget _buildSiteDropdown() {
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select Site *',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            value: selectedSite,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Select Site',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(
+                  Icons.location_on_rounded,
+                  color: brandIconColor,
+                  size: 22,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: siteList.map((site) {
+              return DropdownMenuItem(
+                value: site,
+                child: Text(
+                  site,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                selectedSite = value;
+              });
+              if (value != null) {
+                _autoFillFromSite(value);
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSupervisorIdDropdown() {
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Supervisor ID *',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            value: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
+                ? selectedSupervisorId
+                : null,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Select Supervisor ID',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(
+                  Icons.badge_rounded,
+                  color: brandIconColor,
+                  size: 22,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: _supervisorList.map((sup) {
+              return DropdownMenuItem<String>(
+                value: sup['id'],
+                child: Text(
+                  '${sup['id']} - ${sup['fullName']}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                selectedSupervisorId = value;
+                final match = _supervisorList.firstWhere(
+                  (s) => s['id'] == value,
+                  orElse: () => {'id': '', 'fullName': ''},
+                );
+                selectedSupervisor = match['fullName'] ?? '';
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    bool readOnly = false,
+    int maxLines = 1,
+    IconData? icon,
+  }) {
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: controller,
+            readOnly: readOnly,
+            maxLines: maxLines,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: brandIconColor, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    date == null
+                        ? 'Select Joined Date'
+                        : DateFormat('MMM d, yyyy').format(date),
+                    style: TextStyle(
+                      color: date == null
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(Color primaryColor) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => _showSaveConfirmationDialog(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: const Color(0xFF0A183D),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 6,
+                shadowColor: primaryColor.withValues(alpha: 0.4),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.save_rounded,
+                    size: 20,
+                    color: Color(0xFF0A183D),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'SAVE MAPPING',
+                    style: TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: resetForm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              elevation: 0,
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
+                  'RESET',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── INFO TABLE SECTION ────────────────────────────────────────────────────
+  Widget _buildInfoTableSection(Color darkCardBg, Color primaryColor) {
     if (_docCache.isNotEmpty) {
-      return _buildInfoCards(context, fontSize, _docCache);
+      return _buildInfoCards(darkCardBg, primaryColor, _docCache);
     }
     return FutureBuilder<QuerySnapshot>(
       future: FirestoreService.getCollection('siteSupervisorMap').get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32.0),
-              child: CircularProgressIndicator(
-                color: primaryColor,
-                strokeWidth: 3,
-              ),
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
             ),
           );
         }
         if (snapshot.hasError) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32.0),
-              child: Text(
-                'Error loading site info.',
-                style: TextStyle(color: primaryColor, fontSize: fontSize),
-              ),
+            child: Text(
+              'Error loading site info: ${snapshot.error}',
+              style: const TextStyle(color: Color(0xFF0A183D)),
             ),
           );
         }
         final docs = snapshot.data?.docs ?? [];
         if (docs.isEmpty) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32.0),
-              child: Text(
-                'No site mapping data available.',
-                style: TextStyle(color: primaryColor, fontSize: fontSize),
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.map_rounded,
+                  size: 64,
+                  color: primaryColor.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No site mapping data available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Create your first mapping in the "ENTRY" tab',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           );
         }
-        // Build a temporary cache from FutureBuilder results
+
         final Map<String, Map<String, dynamic>> tempCache = {
           for (final doc in docs)
             doc.id: doc.data() as Map<String, dynamic>? ?? {},
         };
-        return _buildInfoCards(context, fontSize, tempCache);
+        return _buildInfoCards(darkCardBg, primaryColor, tempCache);
       },
     );
   }
 
   Widget _buildInfoCards(
-    BuildContext context,
-    double fontSize,
+    Color darkCardBg,
+    Color primaryColor,
     Map<String, Map<String, dynamic>> cache,
   ) {
     final entries = cache.entries.toList();
     if (entries.isEmpty) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
-          child: Text(
-            'No site mapping data available.',
-            style: TextStyle(color: primaryColor, fontSize: fontSize),
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.map_rounded,
+              size: 64,
+              color: primaryColor.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No site mapping data available',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Create your first mapping in the "ENTRY" tab',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -896,97 +1168,97 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             ? DateFormat('yyyy-MM-dd').format(_parseDate(data['joinedOn'])!)
             : '-';
 
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 14),
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: primaryColor.withOpacity(0.15)),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: darkCardBg,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: darkCardBg.withValues(alpha: 0.2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header row: site icon + site name + doc ID badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: primaryColor.withOpacity(0.1),
-                        border: Border.all(
-                          color: primaryColor.withOpacity(0.3),
-                          width: 1,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor.withValues(alpha: 0.18),
+                    ),
+                    child: Icon(Icons.location_city_rounded,
+                        color: primaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          site != '-' && site.isNotEmpty ? site : 'No Site',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      child: Icon(Icons.location_city, color: primaryColor),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            site != '-' && site.isNotEmpty ? site : 'No Site',
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            docId,
                             style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: primaryColor,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              docId,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: primaryColor,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10.0),
-                  child: Divider(height: 1, thickness: 1),
-                ),
-                // Details grid
-                _infoRow(Icons.person_outline, 'Supervisor', supervisor),
-                _infoRow(Icons.badge_outlined, 'Supervisor ID', supervisorId),
-                _infoRow(Icons.business_outlined, 'Project', projectNameVal),
-                _infoRow(Icons.work_outline, 'Stage', projectStage),
-                _infoRow(Icons.place_outlined, 'Location', location),
-                if (siteComments.isNotEmpty)
-                  _infoRow(Icons.comment_outlined, 'Comments', siteComments),
-                const SizedBox(height: 8),
-                // Dates row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _dateChip(Icons.calendar_today, 'Start', startDateStr),
-                    _dateChip(Icons.event_available, 'End', endDateStr),
-                    _dateChip(Icons.login, 'Joined', joinedStr),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10.0),
+                child: Divider(height: 1, color: Color(0xFF334155)),
+              ),
+
+              _infoRow(Icons.person_rounded, 'Supervisor', supervisor),
+              _infoRow(Icons.badge_rounded, 'Supervisor ID', supervisorId),
+              _infoRow(Icons.business_rounded, 'Project', projectNameVal),
+              _infoRow(Icons.timeline_rounded, 'Stage', projectStage),
+              _infoRow(Icons.location_on_rounded, 'Location', location),
+              if (siteComments.isNotEmpty)
+                _infoRow(Icons.comment_rounded, 'Comments', siteComments),
+
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _dateChip(Icons.calendar_today_rounded, 'Start', startDateStr),
+                  _dateChip(Icons.event_available_rounded, 'End', endDateStr),
+                  _dateChip(Icons.login_rounded, 'Joined', joinedStr),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -999,20 +1271,24 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: primaryColor),
+          Icon(icon, size: 15, color: const Color(0xFFCBD5E1)),
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.black54,
+              color: Color(0xFFCBD5E1),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1024,22 +1300,22 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   Widget _dateChip(IconData icon, String label, String value) {
     return Column(
       children: [
-        Icon(icon, size: 14, color: primaryColor),
+        Icon(icon, size: 14, color: const Color(0xFFCBD5E1)),
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 11,
-            color: Colors.grey[600],
+            color: Color(0xFF94A3B8),
             fontWeight: FontWeight.w500,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
-            color: Colors.grey[800],
-            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -1070,7 +1346,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               surface: Colors.white,
               onSurface: themeColor,
             ),
-            dialogTheme: DialogThemeData(),
           ),
           child: child!,
         );
@@ -1089,115 +1364,31 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     }
   }
 
-  Widget _buildActionButtons(BuildContext context, double fontSize) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Flexible(
-          child: _buildActionButton(
-            context,
-            icon: Icons.save,
-            label: 'Save',
-            color: primaryColor,
-            onPressed: () => _showSaveConfirmationDialog(context),
-            fontSize: fontSize,
-          ),
-        ),
-        SizedBox(width: 20),
-        Flexible(
-          child: _buildActionButton(
-            context,
-            icon: Icons.refresh,
-            label: 'Reset',
-            color: Colors.deepOrange,
-            onPressed: resetForm,
-            fontSize: fontSize,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-    required double fontSize,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.25),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: color, size: fontSize + 16),
-            onPressed: onPressed,
-            padding: EdgeInsets.all(14),
-            constraints: BoxConstraints(),
-            splashRadius: 26,
-          ),
-        ),
-        SizedBox(height: 8),
-        FittedBox(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: fontSize - 1,
-              color: color,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-
-
   void _showSaveConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
           ),
           title: Text(
             'Confirm Save',
             style: TextStyle(
               color: primaryColor,
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
-              letterSpacing: 0.5,
+              fontWeight: FontWeight.bold,
+              fontSize: 19,
             ),
           ),
-          content: Text(
+          content: const Text(
             'Your details will be saved. Do you want to continue?',
-            style: TextStyle(fontSize: 16),
+            style: TextStyle(fontSize: 15),
           ),
-          actionsPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          actionsPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           actions: [
             TextButton(
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
@@ -1205,14 +1396,14 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                padding: EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                foregroundColor: const Color(0xFF0A183D),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 'Save',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();

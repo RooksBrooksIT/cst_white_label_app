@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 
@@ -14,7 +15,6 @@ class AddVehicleLogPage extends StatefulWidget {
 
 class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   final _formKey = GlobalKey<FormState>();
-  // Removed _firestore field
 
   final TextEditingController _fromLocationController = TextEditingController();
   final TextEditingController _toLocationController = TextEditingController();
@@ -59,7 +59,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     TimeOfDay initialTime = TimeOfDay.now();
     if (controller.text.isNotEmpty) {
       try {
-        // Try parsing existing time to set initial picker time
         final parsedTime = DateFormat('hh:mm a').parse(controller.text);
         initialTime = TimeOfDay(
           hour: parsedTime.hour,
@@ -67,7 +66,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         );
       } catch (e) {
         try {
-          // Fallback if it was saved in HH:mm format
           final parsedTime = DateFormat('HH:mm').parse(controller.text);
           initialTime = TimeOfDay(
             hour: parsedTime.hour,
@@ -119,7 +117,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         _loadMaterials(),
       ]);
     } catch (e) {
-      print('Error loading initial data: $e');
       _showErrorSnackBar('Failed to load data. Please try again.');
     } finally {
       if (!mounted) return;
@@ -138,20 +135,18 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       final names = snapshot.docs
           .map((doc) => doc['driverName'] as String? ?? '')
           .where((name) => name.isNotEmpty)
-          .toSet() // Ensure uniqueness
+          .toSet()
           .toList();
 
       if (!mounted) return;
       setState(() {
         _driverNames = names;
-        // Validate current selection
         if (_selectedDriver != null &&
             !_driverNames.contains(_selectedDriver)) {
           _selectedDriver = null;
         }
       });
     } catch (e) {
-      print('Error loading drivers: $e');
       rethrow;
     }
   }
@@ -174,10 +169,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               return siteName.toString();
             })
             .where((name) => name.isNotEmpty)
-            .toSet() // Ensure uniqueness
+            .toSet()
             .toList();
 
-        // Validate current selections
         if (_selectedFromSite != null &&
             !_siteNames.contains(_selectedFromSite)) {
           _selectedFromSite = null;
@@ -187,7 +181,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         }
       });
     } catch (e) {
-      print('Error loading sites: $e');
       rethrow;
     }
   }
@@ -219,14 +212,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       if (!mounted) return;
       setState(() {
         _vehicles = vehicles;
-        // Validate current selection
         if (_selectedVehicle != null &&
             !_vehicles.any((v) => v['id'] == _selectedVehicle)) {
           _selectedVehicle = null;
         }
       });
     } catch (e) {
-      print('Error loading vehicles: $e');
       rethrow;
     }
   }
@@ -262,7 +253,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                       .toString();
             }
           } catch (e) {
-            print('Error fetching unit for material $materialName: $e');
+            // Ignore unit fetch error
           }
         }
 
@@ -275,7 +266,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
       if (!mounted) return;
       setState(() {
-        // Ensure material names are unique for the dropdown
         final uniqueMaterials = <String, Map<String, dynamic>>{};
         for (var material in materialsWithUnits) {
           final name = material['materialName'] as String;
@@ -285,7 +275,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         }
         _materials = uniqueMaterials.values.toList();
 
-        // Validate current selection
         if (_selectedMaterial != null &&
             !_materials.any((m) => m['materialName'] == _selectedMaterial)) {
           _selectedMaterial = null;
@@ -293,7 +282,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         }
       });
     } catch (e) {
-      print('Error loading materials: $e');
       rethrow;
     }
   }
@@ -314,7 +302,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       final nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
       return 'VM${nextNumber.toString().padLeft(3, '0')}';
     } catch (e) {
-      print('Error generating movement ID: $e');
       return 'VM001';
     }
   }
@@ -372,14 +359,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       final dateFormatted = DateFormat('yyyy-MM-dd').format(_selectedDate);
       final timestamp = FieldValue.serverTimestamp();
 
-      // Create a unique document ID
       final docId =
           '${movementId}_${_selectedVehicle}_${DateTime.now().millisecondsSinceEpoch}';
 
       String fromLocation = '';
       String toLocation = '';
 
-      // Determine locations based on movement type
       switch (_movementType) {
         case 'Company → Site':
           fromLocation = 'Company';
@@ -395,15 +380,12 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           break;
       }
 
-      // Get selected vehicle details for additional info
       final selectedVehicle = _vehicles.firstWhere(
         (v) => v['id'] == _selectedVehicle,
         orElse: () => {'id': '', 'modelName': '', 'numberPlate': ''},
       );
 
-      // Complete movement data for Firestore
       final movementData = {
-        // Basic Information
         'movementId': movementId,
         'docId': docId,
         'vehicleId': _selectedVehicle ?? '',
@@ -411,39 +393,24 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         'vehicleNumberPlate': selectedVehicle['numberPlate'] ?? '',
         'date': dateFormatted,
         'timestamp': _selectedDate,
-
-        // Movement Details
         'movementType': _movementType,
         'fromLocation': fromLocation,
         'toLocation': toLocation,
-
-        // Driver Information
         'driverName': _selectedDriver ?? '',
-
-        // Time Information
         'startTime': _startTimeController.text.trim(),
         'endTime': _endTimeController.text.trim(),
-
-        // Material Information
         'materialType': _selectedMaterial ?? '',
         'materialUnit': _selectedUnit,
         'quantity': _quantityController.text.trim(),
         'quantityValue': double.tryParse(_quantityController.text.trim()) ?? 0,
-
-        // Distance Information
         'distanceKm': _distanceController.text.trim(),
         'distanceValue': double.tryParse(_distanceController.text.trim()) ?? 0,
-
-        // Additional Information
         'remarks': _remarksController.text.trim(),
-
-        // System Fields
         'createdAt': timestamp,
         'updatedAt': timestamp,
         'status': 'Active',
       };
 
-      // Save to Firestore
       await FirestoreService.getCollection(
         'vehicleMovements',
       ).doc(docId).set(movementData);
@@ -451,7 +418,6 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       _showSuccessSnackBar('Vehicle movement logged successfully!');
       _resetForm();
     } catch (e) {
-      print('Error saving movement: $e');
       _showErrorSnackBar('Failed to save movement: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -543,14 +509,42 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       );
     }
 
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     return GlassScaffold(
       title: 'Vehicle Movement Log',
       onBack: () => Navigator.pop(context),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: _loadInitialData,
-          tooltip: 'Reload Data',
+        Padding(
+          padding: const EdgeInsets.only(right: 16.0),
+          child: Center(
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                onPressed: _loadInitialData,
+                tooltip: 'Reload Data',
+              ),
+            ),
+          ),
         ),
       ],
       body: SafeArea(
@@ -568,69 +562,90 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Basic Information Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Basic Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Basic Information',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 16),
-                            // Vehicle Dropdown
-                            DropdownButtonFormField<String>(
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Select Vehicle *',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: DropdownButtonFormField<String>(
                               value: _selectedVehicle,
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
                               decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText: 'Select Vehicle',
-                                prefixIcon: const Icon(Icons.local_shipping),
-                                errorText: _vehicles.isEmpty
-                                    ? 'No vehicles available'
-                                    : null,
+                                hintText: 'Select Vehicle',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.local_shipping_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
                               ),
                               items: _vehicles
                                   .map<DropdownMenuItem<String>>(
                                     (vehicle) => DropdownMenuItem<String>(
                                       value: vehicle['id'],
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            vehicle['modelName'],
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          // Text(
-                                          //   vehicle['modelName'],
-                                          //   style: TextStyle(
-                                          //     fontSize: 14,
-                                          //
-                                          //   ),
-                                          // ),
-                                          // if (vehicle['numberPlate'] != null &&
-                                          //     vehicle['numberPlate']
-                                          //         .toString()
-                                          //         .isNotEmpty)
-                                          //   Text(
-                                          //     'Plate: ${vehicle['numberPlate']}',
-                                          //     style: TextStyle(
-                                          //       fontSize: 12,
-                                          //
-                                          //     ),
-                                          //   ),
-                                        ],
+                                      child: Text(
+                                        vehicle['modelName'] ?? '',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14.5,
+                                          color: Color(0xFF0A183D),
+                                        ),
                                       ),
                                     ),
                                   )
@@ -647,134 +662,204 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                   : null,
                               isExpanded: true,
                             ),
-                            const SizedBox(height: 12),
-                            // Selected Vehicle Info
-                            if (_selectedVehicle != null)
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.blue.shade100,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Selected Vehicle:',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _vehicles.firstWhere(
-                                              (v) =>
-                                                  v['id'] == _selectedVehicle,
-                                              orElse: () => {
-                                                'id': '',
-                                                'modelName': '',
-                                              },
-                                            )['modelName'],
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                          ),
+                          if (_vehicles.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 6.0, left: 4.0),
+                              child: Text(
+                                'No vehicles available',
+                                style: TextStyle(
+                                  color: Color(0xFFF87171),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            const SizedBox(height: 12),
-                            // Date Selection
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: Theme.of(context).colorScheme.primary,
+                            ),
+                          const SizedBox(height: 14),
+                          // Selected Vehicle Info
+                          if (_selectedVehicle != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
                                 ),
-                                const SizedBox(width: 8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_rounded,
+                                    color: Colors.white70,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Selected Vehicle:',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFFCBD5E1),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _vehicles.firstWhere(
+                                            (v) =>
+                                                v['id'] == _selectedVehicle,
+                                            orElse: () => {
+                                              'id': '',
+                                              'modelName': '',
+                                            },
+                                          )['modelName'],
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          // Date Selection
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     'Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
-                                    style: const TextStyle(fontSize: 16),
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                                 ElevatedButton(
                                   onPressed: () => _selectDate(context),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: const Color(0xFF0A183D),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
                                   ),
-                                  child: const Text('Change Date'),
+                                  child: const Text(
+                                    'Change Date',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
                     // Movement Type Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Movement Type',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Movement Type',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
-                            DropdownButtonFormField<String>(
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: DropdownButtonFormField<String>(
                               value: _movementType,
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                labelText: 'Select Movement Type',
-                                prefixIcon: Icon(Icons.swap_horiz),
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              decoration: InputDecoration(
+                                hintText: 'Select Movement Type',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.swap_horiz_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
                               ),
-                              items:
-                                  [
-                                        'Company → Site',
-                                        'Site → Site',
-                                        'Site → Company',
-                                      ]
-                                      .map<DropdownMenuItem<String>>(
-                                        (type) => DropdownMenuItem<String>(
-                                          value: type,
-                                          child: Text(type),
-                                        ),
-                                      )
-                                      .toList(),
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              items: [
+                                'Company → Site',
+                                'Site → Site',
+                                'Site → Company',
+                              ]
+                                  .map<DropdownMenuItem<String>>(
+                                    (type) => DropdownMenuItem<String>(
+                                      value: type,
+                                      child: Text(type),
+                                    ),
+                                  )
+                                  .toList(),
                               onChanged: (value) {
                                 setState(() {
                                   _movementType = value!;
@@ -782,43 +867,89 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                 _updateLocationFields();
                               },
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
                     // Locations Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Locations',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Locations',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
+                          ),
+                          const SizedBox(height: 14),
 
-                            // From Location
-                            if (_movementType != 'Company → Site')
-                              Column(
-                                children: [
-                                  DropdownButtonFormField<String>(
+                          // From Location
+                          if (_movementType != 'Company → Site')
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'From Site *',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: DropdownButtonFormField<String>(
                                     value: _selectedFromSite,
+                                    dropdownColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
                                     decoration: InputDecoration(
-                                      border: const OutlineInputBorder(),
-                                      labelText: 'From Site',
-                                      prefixIcon: const Icon(Icons.location_on),
-                                      errorText: _siteNames.isEmpty
-                                          ? 'No sites available'
-                                          : null,
+                                      hintText: 'From Site',
+                                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.location_on_rounded,
+                                        color: Color(0xFF0A183D),
+                                      ),
+                                    ),
+                                    style: const TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                     items: _siteNames
                                         .map<DropdownMenuItem<String>>(
@@ -843,21 +974,70 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                       return null;
                                     },
                                   ),
-                                  const SizedBox(height: 12),
+                                ),
+                                if (_siteNames.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6.0, left: 4.0),
+                                    child: Text(
+                                      'No sites available',
+                                      style: TextStyle(
+                                        color: Color(0xFFF87171),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 14),
+                              ],
+                            ),
+
+                          // To Location
+                          if (_movementType != 'Site → Company') ...[
+                            const Text(
+                              'To Site *',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
                                 ],
                               ),
-
-                            // To Location
-                            if (_movementType != 'Site → Company')
-                              DropdownButtonFormField<String>(
+                              child: DropdownButtonFormField<String>(
                                 value: _selectedToSite,
+                                dropdownColor: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
                                 decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
-                                  labelText: 'To Site',
-                                  prefixIcon: const Icon(Icons.location_on),
-                                  errorText: _siteNames.isEmpty
-                                      ? 'No sites available'
-                                      : null,
+                                  hintText: 'To Site',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.location_on_rounded,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  color: Color(0xFF0A183D),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                                 items: _siteNames
                                     .map<DropdownMenuItem<String>>(
@@ -882,39 +1062,96 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                   return null;
                                 },
                               ),
+                            ),
+                            if (_siteNames.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6.0, left: 4.0),
+                                child: Text(
+                                  'No sites available',
+                                  style: TextStyle(
+                                    color: Color(0xFFF87171),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
 
                     // Driver & Material Information Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Driver & Material',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Driver & Material',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
-                            // Driver Dropdown
-                            DropdownButtonFormField<String>(
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Select Driver *',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: DropdownButtonFormField<String>(
                               value: _selectedDriver,
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
                               decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText: 'Select Driver',
-                                prefixIcon: const Icon(Icons.person),
-                                errorText: _driverNames.isEmpty
-                                    ? 'No drivers available'
-                                    : null,
+                                hintText: 'Select Driver',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.person_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
                               ),
                               items: _driverNames
                                   .map<DropdownMenuItem<String>>(
@@ -935,226 +1172,542 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                                   ? 'Please select a driver'
                                   : null,
                             ),
-                            const SizedBox(height: 12),
-                            // Material Information
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: DropdownButtonFormField<String>(
-                                    value: _selectedMaterial,
-                                    decoration: InputDecoration(
-                                      border: const OutlineInputBorder(),
-                                      labelText: 'Material Type',
-                                      prefixIcon: const Icon(Icons.inventory),
-                                      errorText: _materials.isEmpty
-                                          ? 'No materials available'
-                                          : null,
-                                    ),
-                                    items: _materials
-                                        .map<DropdownMenuItem<String>>(
-                                          (material) =>
-                                              DropdownMenuItem<String>(
-                                                value:
-                                                    material['materialName']
-                                                        as String? ??
-                                                    '',
-                                                child: Text(
-                                                  material['materialName']
-                                                          as String? ??
-                                                      '',
-                                                ),
-                                              ),
-                                        )
-                                        .toList(),
-                                    onChanged: _materials.isEmpty
-                                        ? null
-                                        : _onMaterialSelected,
-                                    validator: (value) => value == null
-                                        ? 'Please select a material'
-                                        : null,
-                                  ),
+                          ),
+                          if (_driverNames.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 6.0, left: 4.0),
+                              child: Text(
+                                'No drivers available',
+                                style: TextStyle(
+                                  color: Color(0xFFF87171),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 1,
-                                  child: TextFormField(
-                                    controller: _quantityController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      labelText: 'Quantity',
-                                      border: const OutlineInputBorder(),
-                                      prefixIcon: const Icon(Icons.scale),
-                                      suffixText: _selectedUnit.isNotEmpty
-                                          ? _selectedUnit
-                                          : null,
-                                      suffixStyle: TextStyle(
-                                        color: Theme.of(context).primaryColor,
-                                        fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          const SizedBox(height: 14),
+                          // Material Information
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Material Type *',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                    validator: (value) =>
-                                        value == null || value.isEmpty
-                                        ? 'Enter quantity'
-                                        : null,
-                                  ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: DropdownButtonFormField<String>(
+                                        value: _selectedMaterial,
+                                        dropdownColor: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        decoration: InputDecoration(
+                                          hintText: 'Material Type',
+                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 14,
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.inventory_2_rounded,
+                                            color: Color(0xFF0A183D),
+                                          ),
+                                        ),
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        items: _materials
+                                            .map<DropdownMenuItem<String>>(
+                                              (material) =>
+                                                  DropdownMenuItem<String>(
+                                                    value:
+                                                        material['materialName']
+                                                            as String? ??
+                                                        '',
+                                                    child: Text(
+                                                      material['materialName']
+                                                              as String? ??
+                                                          '',
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                            )
+                                            .toList(),
+                                        onChanged: _materials.isEmpty
+                                            ? null
+                                            : _onMaterialSelected,
+                                        validator: (value) => value == null
+                                            ? 'Please select a material'
+                                            : null,
+                                      ),
+                                    ),
+                                    if (_materials.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 6.0, left: 4.0),
+                                        child: Text(
+                                          'No materials available',
+                                          style: TextStyle(
+                                            color: Color(0xFFF87171),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            if (_selectedUnit.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Unit: $_selectedUnit',
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 1,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Quantity *',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: TextFormField(
+                                        controller: _quantityController,
+                                        keyboardType: TextInputType.number,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'Qty',
+                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 14,
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.scale_rounded,
+                                            color: Color(0xFF0A183D),
+                                          ),
+                                          suffixText: _selectedUnit.isNotEmpty
+                                              ? _selectedUnit
+                                              : null,
+                                          suffixStyle: const TextStyle(
+                                            color: Color(0xFF0A183D),
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        validator: (value) =>
+                                            value == null || value.isEmpty
+                                            ? 'Enter qty'
+                                            : null,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
+                          ),
+                          if (_selectedUnit.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                'Unit: $_selectedUnit',
+                                style: const TextStyle(
+                                  color: Color(0xFF22C55E),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
 
                     // Time & Distance Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Time & Distance',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).primaryColor,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Time & Distance',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _startTimeController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Start Time',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                      hintText: 'hh:mm a',
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Start Time *',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                    readOnly: true,
-                                    onTap: () => _selectTime(
-                                      context,
-                                      _startTimeController,
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: TextFormField(
+                                        controller: _startTimeController,
+                                        readOnly: true,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'hh:mm a',
+                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 14,
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.access_time_rounded,
+                                            color: Color(0xFF0A183D),
+                                          ),
+                                        ),
+                                        onTap: () => _selectTime(
+                                          context,
+                                          _startTimeController,
+                                        ),
+                                        validator: (value) =>
+                                            value == null || value.isEmpty
+                                            ? 'Enter start time'
+                                            : null,
+                                      ),
                                     ),
-                                    validator: (value) =>
-                                        value == null || value.isEmpty
-                                        ? 'Enter start time'
-                                        : null,
-                                  ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _endTimeController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'End Time',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                      hintText: 'hh:mm a',
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'End Time *',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                    readOnly: true,
-                                    onTap: () => _selectTime(
-                                      context,
-                                      _endTimeController,
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: TextFormField(
+                                        controller: _endTimeController,
+                                        readOnly: true,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'hh:mm a',
+                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 14,
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.access_time_rounded,
+                                            color: Color(0xFF0A183D),
+                                          ),
+                                        ),
+                                        onTap: () => _selectTime(
+                                          context,
+                                          _endTimeController,
+                                        ),
+                                        validator: (value) =>
+                                            value == null || value.isEmpty
+                                            ? 'Enter end time'
+                                            : null,
+                                      ),
                                     ),
-                                    validator: (value) =>
-                                        value == null || value.isEmpty
-                                        ? 'Enter end time'
-                                        : null,
-                                  ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Distance (km) *',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            TextFormField(
+                            child: TextFormField(
                               controller: _distanceController,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Distance (km)',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.speed),
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Distance in km',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.speed_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
                               ),
                               validator: (value) =>
                                   value == null || value.isEmpty
                                   ? 'Enter distance'
                                   : null,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
                     // Remarks Card
-                    Card(
-                      elevation: 4,
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Additional Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).primaryColor,
-                              ),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Additional Information',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
-                            TextFormField(
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Remarks',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: TextFormField(
                               controller: _remarksController,
-                              decoration: const InputDecoration(
-                                labelText: 'Remarks',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.note),
-                              ),
                               maxLines: 3,
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Enter remarks...',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.all(16),
+                                prefixIcon: const Icon(
+                                  Icons.note_alt_rounded,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
                     // Submit Button
-                    Center(
-                      child: _isSubmitting
-                          ? const Column(
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 16),
-                                Text('Saving movement log...'),
-                              ],
-                            )
-                          : ElevatedButton.icon(
-                              onPressed: _submitForm,
-                              icon: const Icon(Icons.save),
-                              label: const Text('Save Movement Log'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: _isSubmitting
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
-                                textStyle: const TextStyle(fontSize: 16),
+                              )
+                            : ElevatedButton.icon(
+                                onPressed: _submitForm,
+                                icon: const Icon(Icons.save_rounded, size: 20),
+                                label: const Text(
+                                  'Save Movement Log',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryColor,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 6,
+                                  shadowColor: primaryColor.withValues(alpha: 0.4),
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                   ],

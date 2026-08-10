@@ -183,11 +183,11 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0B1942),
+                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                            color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -203,12 +203,12 @@ class _BrandingEditScreenState extends State<BrandingEditScreen> {
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Brand Color',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0A183D),
+                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
                         letterSpacing: -0.4,
                       ),
                     ),
