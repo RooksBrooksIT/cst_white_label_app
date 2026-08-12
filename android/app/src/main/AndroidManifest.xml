@@ -59,5 +59,23 @@
             <action android:name="android.intent.action.DIAL" />
             <data android:scheme="tel" />
         </intent>
+        <!-- UPI Intent Scheme for Android 11+ Package Visibility -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PAY" />
+            <data android:scheme="upi" />
+        </intent>
+        <!-- Installed UPI Application Packages -->
+        <package android:name="com.google.android.apps.nfc.pay" />
+        <package android:name="com.google.android.apps.tez" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.cred.pay" />
     </queries>
 </manifest>
+

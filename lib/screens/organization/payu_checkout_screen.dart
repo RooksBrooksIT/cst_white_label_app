@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:demo_cst/services/payu_service.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PayUCheckoutScreen extends StatefulWidget {
   final PayUParams params;
@@ -17,7 +18,7 @@ class PayUCheckoutScreen extends StatefulWidget {
 }
 
 class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   bool _isLoading = true;
   bool _hasSubmitted = false;
 
@@ -27,8 +28,8 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     _initWebView();
   }
 
-  void _initWebView() {
-    final postDataMap = PayUService.buildPostData(widget.params);
+  Future<void> _initWebView() async {
+    final postDataMap = await PayUService.buildPostDataAsync(widget.params);
 
     // Build self-submitting HTML form for PayU POST request
     final String htmlContent = '''
@@ -93,6 +94,12 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'PayUBridge',
+        onMessageReceived: (JavaScriptMessage message) {
+          _handleBridgeData(message.message);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -101,6 +108,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
           },
           onPageFinished: (String url) {
             if (mounted) setState(() => _isLoading = false);
+            _injectResponseExtractor();
             _checkUrlNavigation(url);
           },
           onNavigationRequest: (NavigationRequest request) {
@@ -112,6 +120,10 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
         ),
       )
       ..loadRequest(Uri.parse('data:text/html;base64,$contentBase64'));
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   String _escapeHtml(String text) {
@@ -123,8 +135,83 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
         .replaceAll("'", '&#39;');
   }
 
+  void _injectResponseExtractor() {
+    _controller?.runJavaScript('''
+      try {
+        const url = window.location.href;
+        if (url.includes('/success') || url.includes('/failure') || url.includes('status=')) {
+          const data = {};
+          const searchParams = new URLSearchParams(window.location.search);
+          searchParams.forEach((v, k) => data[k] = v);
+          const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+          hashParams.forEach((v, k) => data[k] = v);
+          const inputs = document.querySelectorAll('input');
+          inputs.forEach(i => { if (i.name && i.value) data[i.name] = i.value; });
+          data['_pageUrl'] = url;
+          if (window.PayUBridge) {
+            window.PayUBridge.postMessage(JSON.stringify(data));
+          }
+        }
+      } catch(e) {}
+    ''');
+  }
+
+  void _handleBridgeData(String jsonString) {
+    if (_hasSubmitted) return;
+    try {
+      final Map<String, dynamic> parsed = jsonDecode(jsonString);
+      final String pageUrl = parsed['_pageUrl']?.toString() ?? '';
+      final Map<String, String> rawData = parsed.map((k, v) => MapEntry(k, v.toString()));
+
+      final isSuccess = pageUrl.contains('/success') || rawData['status'] == 'success';
+      final isFailure = pageUrl.contains('/failure') || rawData['status'] == 'failure' || rawData['status'] == 'failed';
+
+      if (isSuccess && !_hasSubmitted) {
+        _hasSubmitted = true;
+        debugPrint('\n=================== PAYU BRIDGE SUCCESS DETECTED ===================');
+        debugPrint('Extracted Data: $rawData');
+        debugPrint('===================================================================\n');
+
+        final result = PayUResult(
+          isSuccess: true,
+          txnid: rawData['txnid'] ?? widget.params.txnid,
+          payuMoneyId: rawData['mihpayid'] ?? rawData['payuMoneyId'],
+          rawData: rawData,
+        );
+        Navigator.pop(context, result);
+      } else if (isFailure && !_hasSubmitted) {
+        _hasSubmitted = true;
+        debugPrint('\n=================== PAYU BRIDGE FAILURE DETECTED ===================');
+        debugPrint('Extracted Data: $rawData');
+        debugPrint('===================================================================\n');
+
+        final result = PayUResult(
+          isSuccess: false,
+          txnid: rawData['txnid'] ?? widget.params.txnid,
+          errorMessage: rawData['error_Message'] ?? 'Payment failed or was cancelled.',
+          rawData: rawData,
+        );
+        Navigator.pop(context, result);
+      }
+    } catch (e) {
+      debugPrint('PayU Bridge parsing exception: $e');
+    }
+  }
+
   NavigationDecision _checkUrlNavigation(String url) {
     debugPrint('PayU Navigated URL: $url');
+
+    final String lowerUrl = url.toLowerCase();
+    // Intercept native Android UPI Intent & deep-link schemes
+    if (lowerUrl.startsWith('upi://') ||
+        lowerUrl.startsWith('intent://') ||
+        lowerUrl.startsWith('tez://') ||
+        lowerUrl.startsWith('phonepe://') ||
+        lowerUrl.startsWith('paytmmp://') ||
+        lowerUrl.startsWith('gpay://')) {
+      _handleUpiIntentLaunch(url);
+      return NavigationDecision.prevent;
+    }
 
     final uri = Uri.parse(url);
 
@@ -135,6 +222,11 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
         uri.queryParameters['status'] == 'success') {
       if (!_hasSubmitted) {
         _hasSubmitted = true;
+        debugPrint('\n=================== PAYU PAYMENT SUCCESS CALLBACK ===================');
+        debugPrint('Navigated URL: $url');
+        debugPrint('Raw Parameters: ${uri.queryParameters}');
+        debugPrint('=====================================================================\n');
+
         final payuMoneyId = uri.queryParameters['mihpayid'] ?? uri.queryParameters['payuMoneyId'];
         final result = PayUResult(
           isSuccess: true,
@@ -155,6 +247,11 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
         uri.queryParameters['status'] == 'failure') {
       if (!_hasSubmitted) {
         _hasSubmitted = true;
+        debugPrint('\n=================== PAYU PAYMENT FAILURE CALLBACK ===================');
+        debugPrint('Navigated URL: $url');
+        debugPrint('Raw Parameters: ${uri.queryParameters}');
+        debugPrint('=====================================================================\n');
+
         final errorMsg = uri.queryParameters['error_Message'] ?? 'Payment failed or was cancelled by user.';
         final result = PayUResult(
           isSuccess: false,
@@ -168,6 +265,253 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     }
 
     return NavigationDecision.navigate;
+  }
+
+  Future<void> _handleUpiIntentLaunch(String rawUrl) async {
+    debugPrint('\n=================== UPI INTENT LAUNCH DETECTED ===================');
+    debugPrint('Raw Intent URL: $rawUrl');
+    debugPrint('=================================================================\n');
+
+    try {
+      final Uri uri = Uri.parse(rawUrl);
+      final bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        debugPrint('PayUCheckoutScreen: Could not launch intent URL directly, showing dialog...');
+        _showNoUpiAppDialog();
+      }
+    } catch (e) {
+      debugPrint('PayUCheckoutScreen: Exception launching UPI intent: $e');
+      _showNoUpiAppDialog();
+    }
+  }
+
+  void _showNoUpiAppDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 10),
+            Text('No UPI App Found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'No compatible UPI application (Google Pay, PhonePe, Paytm, etc.) was found on your device.\n\nPlease install a UPI application or choose Card / NetBanking to complete payment.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF5A759E)),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0B1942),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _completeTestSuccess() {
+    if (_hasSubmitted) return;
+    _hasSubmitted = true;
+    final testData = PayUService.createTestResponseData(
+      params: widget.params,
+      isSuccess: true,
+    );
+    debugPrint('\n=================== SANDBOX QUICK TEST SUCCESS ===================');
+    debugPrint('Test Response Payload: $testData');
+    debugPrint('==================================================================\n');
+
+    final result = PayUResult(
+      isSuccess: true,
+      txnid: widget.params.txnid,
+      payuMoneyId: testData['mihpayid'],
+      rawData: testData,
+    );
+    Navigator.pop(context, result);
+  }
+
+  void _completeTestFailure() {
+    if (_hasSubmitted) return;
+    _hasSubmitted = true;
+    final testData = PayUService.createTestResponseData(
+      params: widget.params,
+      isSuccess: false,
+    );
+    debugPrint('\n=================== SANDBOX QUICK TEST FAILURE ===================');
+    debugPrint('Test Response Payload: $testData');
+    debugPrint('==================================================================\n');
+
+    final result = PayUResult(
+      isSuccess: false,
+      txnid: widget.params.txnid,
+      errorMessage: 'Test payment was cancelled by user.',
+      rawData: testData,
+    );
+    Navigator.pop(context, result);
+  }
+
+  void _showTestInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.developer_mode_rounded, color: Color(0xFF1E88E5), size: 26),
+            SizedBox(width: 10),
+            Text('Sandbox Test Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTestInfoRow('Environment', 'Sandbox (Test Mode)'),
+            _buildTestInfoRow('Merchant Key', widget.params.merchantKey),
+            _buildTestInfoRow('Merchant ID', widget.params.merchantId ?? '9193759'),
+            _buildTestInfoRow('Test UPI VPA', 'success@payu'),
+            _buildTestInfoRow('Test Card Number', '4012 0000 0000 0001'),
+            _buildTestInfoRow('Test Card Expiry/CVV', '12/30 • 123'),
+            const SizedBox(height: 10),
+            const Text(
+              'Use "Quick Test Success" to simulate successful test gateway callbacks immediately without waiting for web responses.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF5A759E)),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0B1942),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTestInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF5A759E))),
+          SelectableText(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0A183D))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSandboxToolbar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF93C5FD), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E40AF).withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1D4ED8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'SANDBOX',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'PayU Sandbox Mode Active',
+                  style: TextStyle(
+                    color: Color(0xFF1E40AF),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
+                onPressed: _showTestInfoDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _completeTestSuccess,
+                  icon: const Icon(Icons.bolt_rounded, size: 16),
+                  label: const Text(
+                    'Quick Test Success',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _completeTestFailure,
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text(
+                  'Cancel',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC2626),
+                  side: const BorderSide(color: Color(0xFFFCA5A5)),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool> _onWillPop() async {
@@ -379,7 +723,8 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              if (widget.params.isSandbox) _buildSandboxToolbar(),
+              const SizedBox(height: 8),
 
               // Linear Progress Bar if Loading
               if (_isLoading)
@@ -408,7 +753,13 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: WebViewWidget(controller: _controller),
+                      child: _controller != null
+                          ? WebViewWidget(controller: _controller!)
+                          : const Center(
+                              child: CircularProgressIndicator(
+                                color: darkNavy,
+                              ),
+                            ),
                     ),
                   ),
                 ),

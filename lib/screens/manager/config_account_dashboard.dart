@@ -2,9 +2,9 @@ import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/manager/config_material_information.dart';
 import 'package:demo_cst/screens/manager/site_supervisor_config.dart';
 import 'package:demo_cst/screens/manager/config_mat_sub_cat.dart';
@@ -14,15 +14,15 @@ import 'package:demo_cst/screens/manager/config_layout_and_drawing.dart';
 import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
 import 'package:demo_cst/screens/manager/contractor_page.dart';
 import 'package:demo_cst/screens/manager/labour_screen.dart';
-import 'package:demo_cst/screens/manager/manager_expenses_homescreen.dart';
 import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 import 'package:demo_cst/screens/manager/material_screen.dart';
 import 'package:demo_cst/screens/manager/project_category_screen.dart';
 import 'package:demo_cst/screens/manager/project_contract_screen.dart';
 import 'package:demo_cst/screens/manager/project_screen.dart';
 import 'package:demo_cst/screens/manager/project_stage_config.dart';
 import 'package:demo_cst/screens/manager/project_sub_category_screen.dart';
+import 'package:demo_cst/screens/manager/project_status_screen.dart';
+import 'package:demo_cst/screens/manager/project_configuration_screen.dart';
 import 'package:demo_cst/screens/manager/site_screen.dart';
 import 'package:demo_cst/screens/manager/site_supervisor_map_screen.dart';
 import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
@@ -47,7 +47,8 @@ class ConfigAccountDashboard extends StatefulWidget {
   const ConfigAccountDashboard({super.key, this.showLogout = true});
 
   @override
-  State<ConfigAccountDashboard> createState() => _ConfigAccountDashboardState();
+  State<ConfigAccountDashboard> createState() =>
+      _ConfigAccountDashboardState();
 }
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
@@ -76,37 +77,27 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     }
   }
 
-  // Dashboard items grouped by section with enhanced data
+  // Dashboard items grouped by section with clean categories & icons
   final Map<String, List<DashboardItem>> groupedItems = {
-    "Configuration": [
+    "Project Configurations": [
       DashboardItem(
-        'Project Category',
-        Icons.category_rounded,
-        Colors.orange,
-        'Define and manage project categories',
-        Colors.orange,
+        'Project Configuration',
+        Icons.tune_rounded,
+        const Color(0xFF0A183D),
+        'Manage all 5 project settings in one place',
+        const Color(0xFF0A183D),
       ),
+    ],
+    "Project Management": [
       DashboardItem(
-        'Project Sub Category',
-        Icons.subtitles_rounded,
-        Colors.purple,
-        'Create detailed sub-categories',
-        Colors.purple,
+        'Project',
+        Icons.work_rounded,
+        Colors.indigo,
+        'Oversee project portfolio',
+        Colors.indigo,
       ),
-      DashboardItem(
-        'Project Stage',
-        Icons.flag_rounded,
-        Colors.red,
-        'Configure project milestones',
-        Colors.red,
-      ),
-      DashboardItem(
-        'Project Contract',
-        Icons.assignment_rounded,
-        Colors.teal,
-        'Manage legal agreements',
-        Colors.teal,
-      ),
+    ],
+    "Material Management": [
       DashboardItem(
         'Material Master',
         Icons.inventory_2_rounded,
@@ -116,7 +107,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
       DashboardItem(
         'Material Sub Category Master',
-        Icons.category_rounded,
+        Icons.category_outlined,
         Colors.blue,
         'Organize material types',
         Colors.blue,
@@ -136,38 +127,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.lightGreen,
       ),
       DashboardItem(
-        'Labour',
-        Icons.engineering_rounded,
-        Colors.brown,
-        'Labour management',
-        Colors.brown,
-      ),
-      DashboardItem(
-        'Workers Configuration',
-        Icons.people_rounded,
-        const Color(0xFF8E24AA),
-        'Worker profiles and roles',
-        const Color(0xFF8E24AA),
-      ),
-      DashboardItem(
-        'Vehicle Configuration',
-        Icons.settings_rounded,
-        Colors.red,
-        'Vehicle specifications',
-        Colors.red,
-      ),
-    ],
-    "Project Configuration": [
-      DashboardItem(
-        'Project',
-        Icons.work_rounded,
-        Colors.orangeAccent,
-        'Oversee project portfolios',
-        Colors.orangeAccent,
-      ),
-    ],
-    "Material Configuration": [
-      DashboardItem(
         'Material Movements',
         Icons.swap_horiz_rounded,
         Colors.deepPurple,
@@ -175,7 +134,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.deepPurple,
       ),
     ],
-    "Site & Supervisor": [
+    "Site & Operations": [
       DashboardItem(
         'Site',
         Icons.location_city_rounded,
@@ -205,30 +164,21 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.deepOrange,
       ),
     ],
-    "Tools & Equipment": [
+    "Labour & Contractors": [
       DashboardItem(
-        'Tools Master',
-        Icons.handyman_rounded,
-        Colors.indigo,
-        'Tools inventory database',
-        Colors.indigo,
+        'Labour',
+        Icons.engineering_rounded,
+        Colors.brown,
+        'Labour management',
+        Colors.brown,
       ),
       DashboardItem(
-        'Tools Movement',
-        Icons.directions_walk_rounded,
-        Colors.deepOrangeAccent,
-        'Track tool assignments',
-        Colors.deepOrangeAccent,
+        'Workers Configuration',
+        Icons.people_rounded,
+        const Color(0xFF8E24AA),
+        'Worker profiles and roles',
+        const Color(0xFF8E24AA),
       ),
-      DashboardItem(
-        'Tools Inventory',
-        Icons.inventory_rounded,
-        Colors.pink,
-        'Current stock status',
-        Colors.pink,
-      ),
-    ],
-    "Labour & Contractor": [
       DashboardItem(
         'Contractor',
         Icons.person_4_rounded,
@@ -290,7 +240,30 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF9C27B0),
       ),
     ],
-    "Diagrams & Expenses": [
+    "Tools & Equipment": [
+      DashboardItem(
+        'Tools Master',
+        Icons.handyman_rounded,
+        Colors.indigo,
+        'Tools inventory database',
+        Colors.indigo,
+      ),
+      DashboardItem(
+        'Tools Movement',
+        Icons.directions_walk_rounded,
+        Colors.deepOrangeAccent,
+        'Track tool assignments',
+        Colors.deepOrangeAccent,
+      ),
+      DashboardItem(
+        'Tools Inventory',
+        Icons.inventory_rounded,
+        Colors.pink,
+        'Current stock status',
+        Colors.pink,
+      ),
+    ],
+    "Blueprints & Expenses": [
       DashboardItem(
         'Layout and Drawings',
         Icons.upload_file_rounded,
@@ -308,10 +281,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     ],
     "Support & Info": [
       DashboardItem(
+        'Support',
+        Icons.help_outline_rounded,
+        Colors.teal,
+        'Get support and help',
+        Colors.teal,
+      ),
+      DashboardItem(
         'Privacy Policy',
         Icons.privacy_tip_rounded,
         Colors.blueGrey,
-        'View our privacy policy',
+        'View privacy policy',
         Colors.blueGrey,
       ),
     ],
@@ -325,27 +305,53 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       title: _currentIndex == 0
           ? 'Management Console'
           : _currentIndex == 1
-          ? 'Projects'
-          : _currentIndex == 2
-          ? 'Daily Site Entry'
-          : 'Manager Expenses',
+              ? 'Projects'
+              : _currentIndex == 2
+                  ? 'Daily Site Entry'
+                  : 'Manager Expenses',
       onBack: _currentIndex == 0
           ? () => Navigator.pop(context)
           : () => setState(() => _currentIndex = 0),
-      actions: widget.showLogout
-          ? [
-              IconButton(
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
-                onPressed: () => _showLogoutConfirmation(context),
-                tooltip: 'Logout',
+      actions: [
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A183D).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.refresh_rounded,
+              color: Color(0xFF0A183D),
+              size: 18,
+            ),
+          ),
+          tooltip: 'Refresh Console',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            setState(() {});
+          },
+        ),
+        if (widget.showLogout) ...[
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 8),
-            ]
-          : null,
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Colors.red,
+                size: 18,
+              ),
+            ),
+            onPressed: () => _showLogoutConfirmation(context),
+            tooltip: 'Logout',
+          ),
+        ],
+        const SizedBox(width: 8),
+      ],
       padding: EdgeInsets.zero,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: _currentIndex == 0
@@ -359,13 +365,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   ),
                 );
               },
-              backgroundColor: theme.primaryColor,
+              backgroundColor: const Color(0xFF0A183D),
               elevation: 4,
               shape: const CircleBorder(),
               child: const Icon(
                 Icons.add_rounded,
                 color: Colors.white,
-                size: 32,
+                size: 30,
               ),
             )
           : null,
@@ -396,7 +402,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   _currentIndex == 1,
                   () => setState(() => _currentIndex = 1),
                 ),
-                const SizedBox(width: 40), // Space for FAB
+                const SizedBox(width: 40),
                 _buildNavItem(
                   context,
                   Icons.edit_note_rounded,
@@ -430,8 +436,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     controller: _scrollController,
                     physics: const BouncingScrollPhysics(),
                     slivers: [
+                      // Manager Header Banner
+                      SliverToBoxAdapter(
+                        child: _buildManagerHeaderBanner(context),
+                      ),
                       ..._buildGridSections(context, constraints.maxWidth),
-                      const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+                      const SliverPadding(padding: EdgeInsets.only(bottom: 90)),
                     ],
                   );
                 },
@@ -450,7 +460,117 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  List<Widget> _buildGridSections(BuildContext context, double availableWidth) {
+  /// Professional Header Banner displaying manager profile & status
+  Widget _buildManagerHeaderBanner(BuildContext context) {
+    final hPad = Responsive.horizontalPadding(context);
+    final theme = Theme.of(context);
+    final darkAccent = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              darkAccent,
+              Color.alphaBlend(
+                theme.primaryColor.withValues(alpha: 0.35),
+                darkAccent,
+              ),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: darkAccent.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Operational Management Console',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _managerName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: const [
+                  Icon(
+                    Icons.verified_user_rounded,
+                    color: Color(0xFF34D399),
+                    size: 14,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Active',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildGridSections(
+      BuildContext context, double availableWidth) {
     final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
     final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
     final hPad = Responsive.horizontalPadding(context);
@@ -465,30 +585,24 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 12),
+            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 10),
             child: Row(
               children: [
                 Container(
                   width: 4,
-                  height: 24,
+                  height: 20,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        items.first.color,
-                        items.first.color.withValues(alpha: 0.5),
-                      ],
-                    ),
+                    color: items.first.color,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Text(
                   sectionTitle,
                   style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 16),
-                    fontWeight: FontWeight.bold,
+                    fontSize: Responsive.fontSize(context, 15),
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0A183D),
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -496,17 +610,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
-                    vertical: 4,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
                     color: items.first.color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     '${items.length}',
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
                       color: items.first.color,
                     ),
                   ),
@@ -527,8 +641,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
               childAspectRatio: childAspectRatio,
             ),
           ),
@@ -540,77 +654,65 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   Widget _buildGridItem(DashboardItem item) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Theme.of(context).cardColor,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (item.title == 'Privacy Policy') {
-            _launchPrivacyPolicy(context);
-          } else {
-            _navigateToScreen(context, item.title);
-          }
-        },
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Theme.of(context).cardColor,
-            border: Border.all(
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 12,
-                spreadRadius: 1,
-                offset: const Offset(0, 4),
-              ),
-            ],
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            if (item.title == 'Privacy Policy') {
+              _launchPrivacyPolicy(context);
+            } else {
+              _navigateToScreen(context, item.title);
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [item.color, item.color.withValues(alpha: 0.7)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.color.withValues(alpha: 0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: item.color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: 20),
+                  child: Icon(item.icon, color: item.color, size: 22),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   item.title,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
                     letterSpacing: -0.2,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   item.subtitle,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w500,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.2,
                   ),
@@ -626,10 +728,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  void _triggerHapticFeedback() {
-    HapticFeedback.mediumImpact();
-  }
-
   void _showLogoutConfirmation(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -641,7 +739,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         return AlertDialog(
           backgroundColor: theme.cardColor,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
           ),
           title: Row(
             children: [
@@ -651,31 +749,22 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.logout_rounded, color: Colors.red, size: 24),
+                child: const Icon(Icons.logout_rounded, color: Colors.red, size: 24),
               ),
               const SizedBox(width: 12),
               const Text(
                 'Logout',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ],
           ),
           content: Text(
-            'Are you sure you want to logout?',
+            'Are you sure you want to logout from the Management Console?',
             style: theme.textTheme.bodyLarge,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -695,12 +784,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
               child: const Text(
@@ -749,11 +834,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   }
 
   void _navigateToScreen(BuildContext context, String title) {
-    final routeMap = {
+    final routeMap = <String, Widget>{
+      'Project Configuration': const ProjectConfigurationScreen(initialIndex: 0),
       'Project Category': const ProjectCategoryScreen(),
       'Project Sub Category': const ProjectSubCategoryScreen(),
       'Project Stage': const ProjectStageConfig(),
       'Project Contract': const ProjectContractScreen(),
+      'Project Status': const ProjectStatusScreen(),
       'Site': const SiteScreen(),
       'Supervisor': const SiteSupervisorConfig(),
       'Site-Supervisor Map': SiteSupervisorMapScreen(),

@@ -69,12 +69,112 @@ class _PricingScreenState extends State<PricingScreen> {
     return '₹${price.toString().replaceAllMapped(format, (Match m) => '${m[1]},')}';
   }
 
+  Future<Map<String, String>?> _showPaymentMethodBottomSheet(double amount) async {
+    return await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Select Payment Method",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0A183D)),
+                ),
+                Text(
+                  "₹${amount.toStringAsFixed(0)}",
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Direct app launch powered by PayU",
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF5A759E)),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF4285F4))),
+              title: const Text("Google Pay (GPay)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+              subtitle: const Text("Opens GPay app directly", style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'TEZ'}),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFF3E8FF), child: Icon(Icons.mobile_friendly_rounded, color: Color(0xFF5F259F))),
+              title: const Text("PhonePe", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+              subtitle: const Text("Opens PhonePe app directly", style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'PHONEPE'}),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFE0F2FE), child: Icon(Icons.payment_rounded, color: Color(0xFF00BAF2))),
+              title: const Text("Paytm UPI", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+              subtitle: const Text("Opens Paytm app directly", style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'PAYTM'}),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFECFDF5), child: Icon(Icons.apps_rounded, color: Color(0xFF10B981))),
+              title: const Text("Other UPI Apps", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+              subtitle: const Text("Select from all installed UPI apps", style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'INTENT'}),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFF1F5F9), child: Icon(Icons.credit_card_rounded, color: Color(0xFF0B1942))),
+              title: const Text("Credit / Debit Card & NetBanking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+              subtitle: const Text("Visa, MasterCard, SBI, HDFC, ICICI", style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+              onTap: () => Navigator.pop(context, {'pg': 'CC', 'bankcode': 'CC'}),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   Future<void> _register() async {
     final double amount = _calculatePlanAmount();
     PayUResult? payuResult;
-
     // Handle PayU Payment Gateway for Paid Plans
     if (_selectedPlanType != 'Free Trial' && amount > 0) {
+      final selectedMethod = await _showPaymentMethodBottomSheet(amount);
+      if (!mounted || selectedMethod == null) return; // User closed sheet or unmounted
+
+
       final txnId = PayUService.generateTxnId();
       final payUParams = PayUParams(
         merchantId: PayUService.activeMerchantId,
@@ -83,10 +183,12 @@ class _PricingScreenState extends State<PricingScreen> {
         txnid: txnId,
         amount: amount,
         productInfo: '${widget.orgName} $_selectedPlan Plan ($_selectedPlanType)',
-        firstName: widget.orgName.isEmpty ? 'Organization' : widget.orgName,
-        email: widget.email.isEmpty ? 'org@example.com' : widget.email,
+        firstName: widget.orgName.isEmpty ? (widget.username.isEmpty ? 'Organization' : widget.username) : widget.orgName,
+        email: widget.email.isEmpty ? 'customer@example.com' : widget.email,
         phone: widget.phone.isEmpty ? '9999999999' : widget.phone,
         isSandbox: !PayUService.isProduction,
+        pg: selectedMethod['pg']!,
+        bankcode: selectedMethod['bankcode']!,
       );
 
       final result = await Navigator.push<PayUResult>(
@@ -246,7 +348,32 @@ class _PricingScreenState extends State<PricingScreen> {
             .catchError((_) {});
       }
 
+      // Verify payment & confirm subscription status via Cloud Function backend
+      if (payuResult != null && payuResult.isSuccess) {
+        try {
+          await PayUService.verifyAndActivateSubscriptionOnBackend(
+            orgId: orgId,
+            txnid: payuResult.txnid,
+            payuMoneyId: payuResult.payuMoneyId,
+            rawData: payuResult.rawData,
+            planDetails: {
+              'planName': _selectedPlan,
+              'planType': _selectedPlanType,
+              'amount': amount,
+              'payerName': widget.orgName.isEmpty ? widget.username : widget.orgName,
+              'payerEmail': widget.email,
+              'payerPhone': widget.phone,
+              'username': widget.username,
+            },
+
+          );
+        } catch (backendError) {
+          debugPrint('Backend subscription verification note: $backendError');
+        }
+      }
+
       // Auto-login using AuthService with fallback
+
       try {
         await AuthService().login(UserRole.organization, {
           'username': widget.username.isEmpty ? 'admin' : widget.username,
