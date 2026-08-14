@@ -54,7 +54,11 @@ class ConfigAccountDashboard extends StatefulWidget {
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerName = 'Manager';
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   int _currentIndex = 0;
+  String _selectedCategory = 'All';
+  String _searchQuery = '';
+  bool _isGridView = false;
 
   @override
   void initState() {
@@ -65,6 +69,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -101,67 +106,67 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       DashboardItem(
         'Material Master',
         Icons.inventory_2_rounded,
-        Colors.green,
+        const Color(0xFF10B981),
         'Central material database',
-        Colors.green,
+        const Color(0xFF10B981),
       ),
       DashboardItem(
         'Material Sub Category Master',
         Icons.category_outlined,
         Colors.blue,
         'Organize material types',
-        Colors.blue,
+        const Color(0xFF3B82F6),
       ),
       DashboardItem(
         'Material Config',
         Icons.settings_applications_rounded,
-        Colors.deepOrange,
-        'Material specifications',
-        Colors.deepOrange,
+        const Color(0xFFF59E0B),
+        'Material specifications and rules',
+        const Color(0xFFF59E0B),
       ),
       DashboardItem(
         'Material Availability',
         Icons.check_circle_rounded,
-        Colors.lightGreen,
-        'Real-time stock status',
-        Colors.lightGreen,
+        const Color(0xFF84CC16),
+        'Real-time stock status monitoring',
+        const Color(0xFF84CC16),
       ),
       DashboardItem(
         'Material Movements',
         Icons.swap_horiz_rounded,
-        Colors.deepPurple,
-        'Track material transfers',
-        Colors.deepPurple,
+        const Color(0xFF7C3AED),
+        'Track material transfers between sites',
+        const Color(0xFF7C3AED),
       ),
     ],
     "Site & Operations": [
       DashboardItem(
         'Site',
         Icons.location_city_rounded,
-        Colors.green,
-        'Manage construction sites',
-        Colors.green,
+        const Color(0xFF10B981),
+        'Manage active construction sites',
+        const Color(0xFF10B981),
       ),
       DashboardItem(
         'Supervisor',
         Icons.supervisor_account_rounded,
-        Colors.blueGrey,
-        'Supervisor profiles',
-        Colors.blueGrey,
+        const Color(0xFF64748B),
+        'Supervisor profiles and credentials',
+        const Color(0xFF64748B),
       ),
       DashboardItem(
         'Site-Supervisor Map',
         Icons.map_rounded,
-        Colors.redAccent,
-        'Assign supervisors to sites',
-        Colors.redAccent,
+        const Color(0xFFEF4444),
+        'Assign supervisors to specific sites',
+        const Color(0xFFEF4444),
       ),
       DashboardItem(
         'Manager Daily Site Entry',
         Icons.edit_note_rounded,
-        Colors.deepOrange,
+        const Color(0xFFEA580C),
         'Log daily site progress and expenses',
-        Colors.deepOrange,
+        const Color(0xFFEA580C),
       ),
     ],
     "Labour & Contractors": [
@@ -182,16 +187,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       DashboardItem(
         'Contractor',
         Icons.person_4_rounded,
-        Colors.deepPurple,
-        'Contractor profiles',
-        Colors.deepPurple,
+        const Color(0xFF7C3AED),
+        'Contractor directory and agreements',
+        const Color(0xFF7C3AED),
       ),
       DashboardItem(
         'Contractor Entry',
         Icons.person_add_rounded,
-        Colors.deepPurpleAccent,
+        const Color(0xFF8B5CF6),
         'Register new contractors',
-        Colors.deepPurpleAccent,
+        const Color(0xFF8B5CF6),
       ),
     ],
     "Workers Management": [
@@ -199,45 +204,45 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Workers Site Mapping',
         Icons.place_rounded,
         const Color(0xFFF57C00),
-        'Assign workers to sites',
+        'Assign workers to active sites',
         const Color(0xFFF57C00),
       ),
       DashboardItem(
         'Workers Availability',
         Icons.assessment_rounded,
-        Colors.indigo,
-        'Site worker availability report',
-        Colors.indigo,
+        const Color(0xFF4F46E5),
+        'Site worker availability reports',
+        const Color(0xFF4F46E5),
       ),
       DashboardItem(
         'Workers Attendance',
         Icons.fact_check_rounded,
-        Colors.blueGrey,
-        'Track attendance records',
-        Colors.blueGrey,
+        const Color(0xFF475569),
+        'Track attendance and wages',
+        const Color(0xFF475569),
       ),
     ],
     "Vehicle Fleet": [
       DashboardItem(
-        'Vehicle Driver Configuration',
-        Icons.person_rounded,
-        Colors.blue,
-        'Driver profiles',
-        Colors.blue,
+        'Vehicle Fleet',
+        Icons.settings_rounded,
+        Colors.red,
+        'Vehicle specifications',
+        Colors.red,
       ),
       DashboardItem(
         'Vehicle Details',
         Icons.directions_car_rounded,
-        Colors.green,
-        'Fleet information',
-        Colors.green,
+        const Color(0xFF059669),
+        'Fleet vehicle information',
+        const Color(0xFF059669),
       ),
       DashboardItem(
         'Vehicle Inventory',
         Icons.inventory_2_rounded,
-        const Color(0xFF9C27B0),
-        'Fleet stock status',
-        const Color(0xFF9C27B0),
+        const Color(0xFF9333EA),
+        'Fleet stock and assignment status',
+        const Color(0xFF9333EA),
       ),
     ],
     "Tools & Equipment": [
@@ -267,16 +272,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       DashboardItem(
         'Layout and Drawings',
         Icons.upload_file_rounded,
-        Colors.cyan,
-        'Project blueprints',
-        Colors.cyan,
+        const Color(0xFF06B6D4),
+        'Project blueprints and schematics',
+        const Color(0xFF06B6D4),
       ),
       DashboardItem(
         'Manager Expenses',
         Icons.account_balance_wallet_rounded,
-        Colors.blue,
-        'Expense tracking',
-        Colors.blue,
+        const Color(0xFF2563EB),
+        'Track manager expenditure logs',
+        const Color(0xFF2563EB),
       ),
     ],
     "Support & Info": [
@@ -299,9 +304,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return GlassScaffold(
+      extendBody: true,
       title: _currentIndex == 0
           ? 'Management Console'
           : _currentIndex == 1
@@ -378,7 +382,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: theme.cardColor,
+        color: const Color(0xFF0A183D),
         elevation: 8,
         child: Center(
           child: ConstrainedBox(
@@ -434,11 +438,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 builder: (context, constraints) {
                   return CustomScrollView(
                     controller: _scrollController,
-                    physics: const BouncingScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     slivers: [
                       // Manager Header Banner
                       SliverToBoxAdapter(
                         child: _buildManagerHeaderBanner(context),
+                      ),
+                      // Search Box & Category Filters
+                      SliverToBoxAdapter(
+                        child: _buildSearchAndFilterBar(context),
                       ),
                       ..._buildGridSections(context, constraints.maxWidth),
                       const SliverPadding(padding: EdgeInsets.only(bottom: 90)),
@@ -569,28 +579,265 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
+  /// Interactive Search Bar, Category Filter Chips & View Mode Toggle
+  Widget _buildSearchAndFilterBar(BuildContext context) {
+    final hPad = Responsive.horizontalPadding(context);
+    final theme = Theme.of(context);
+
+    final categories = ['All', ...groupedItems.keys];
+
+    // Compute total items for current filter
+    int totalFilteredItems = 0;
+    for (var entry in groupedItems.entries) {
+      if (_selectedCategory == 'All' || _selectedCategory == entry.key) {
+        if (_searchQuery.isEmpty) {
+          totalFilteredItems += entry.value.length;
+        } else {
+          totalFilteredItems += entry.value
+              .where((item) =>
+                  item.title.toLowerCase().contains(_searchQuery) ||
+                  item.subtitle.toLowerCase().contains(_searchQuery))
+              .length;
+        }
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search Box & View Mode Toggle Row
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim().toLowerCase();
+                      });
+                    },
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF0A183D),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search modules, tools, settings...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: theme.primaryColor,
+                        size: 20,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear_rounded,
+                                color: Colors.grey.shade600,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // View mode switch button (Grid vs List)
+              Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  tooltip: _isGridView
+                      ? 'Switch to List View'
+                      : 'Switch to Grid View',
+                  icon: Icon(
+                    _isGridView
+                        ? Icons.view_list_rounded
+                        : Icons.grid_view_rounded,
+                    color: theme.primaryColor,
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    setState(() => _isGridView = !_isGridView);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Category Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: categories.map((cat) {
+                final isSelected = _selectedCategory == cat;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    selected: isSelected,
+                    showCheckmark: false,
+                    label: Text(cat),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF0A183D),
+                    ),
+                    backgroundColor: Colors.white.withValues(alpha: 0.7),
+                    selectedColor: theme.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isSelected
+                            ? theme.primaryColor
+                            : Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    onSelected: (selected) {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _selectedCategory = cat;
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Quick status indicator line
+          Row(
+            children: [
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'Found $totalFilteredItems matching module(s)'
+                    : 'Showing $totalFilteredItems module(s)',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+              if (_selectedCategory != 'All' || _searchQuery.isNotEmpty) ...[
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _selectedCategory = 'All';
+                    });
+                  },
+                  child: Text(
+                    'Reset Filters',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _buildGridSections(
       BuildContext context, double availableWidth) {
-    final crossAxisCount = Responsive.gridCrossAxisCount(availableWidth);
-    final childAspectRatio = Responsive.gridChildAspectRatio(availableWidth);
+    const headerTextColor = Color(0xFF0A183D);
     final hPad = Responsive.horizontalPadding(context);
+
+    final int crossAxisCount =
+        availableWidth < 600 ? 2 : availableWidth < 1024 ? 3 : 4;
+
+    final double childAspectRatio = availableWidth < 600
+        ? 1.08
+        : availableWidth < 1024
+            ? 1.15
+            : 1.25;
+
     List<Widget> slivers = [];
+    int totalRenderedItems = 0;
 
     for (var entry in groupedItems.entries) {
       final sectionTitle = entry.key;
-      final items = entry.value;
+
+      if (_selectedCategory != 'All' && _selectedCategory != sectionTitle) {
+        continue;
+      }
+
+      var items = entry.value;
+
+      if (_searchQuery.isNotEmpty) {
+        items = items.where((item) {
+          return item.title.toLowerCase().contains(_searchQuery) ||
+              item.subtitle.toLowerCase().contains(_searchQuery);
+        }).toList();
+      }
 
       if (items.isEmpty) continue;
+      totalRenderedItems += items.length;
 
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 10),
+            padding: EdgeInsets.fromLTRB(hPad, 18, hPad, 10),
             child: Row(
               children: [
                 Container(
                   width: 4,
-                  height: 20,
+                  height: 18,
                   decoration: BoxDecoration(
                     color: items.first.color,
                     borderRadius: BorderRadius.circular(4),
@@ -602,18 +849,18 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   style: TextStyle(
                     fontSize: Responsive.fontSize(context, 15),
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0A183D),
+                    color: headerTextColor,
                     letterSpacing: -0.3,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                    horizontal: 10,
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: items.first.color.withValues(alpha: 0.1),
+                    color: items.first.color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
@@ -631,19 +878,76 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         ),
       );
 
-      slivers.add(
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: hPad),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildGridItem(items[index]),
-              childCount: items.length,
+      if (_isGridView) {
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: hPad),
+            sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _buildGridItem(items[index]),
+                childCount: items.length,
+              ),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: childAspectRatio,
+              ),
             ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: childAspectRatio,
+          ),
+        );
+      } else {
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: hPad),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildListItem(context, items[index]),
+                ),
+                childCount: items.length,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    if (totalRenderedItems == 0) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 40),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.search_off_rounded,
+                    size: 56,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No configurations found',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: headerTextColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Try adjusting your search query or selecting "All" category',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -653,17 +957,24 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return slivers;
   }
 
-  Widget _buildGridItem(DashboardItem item) {
+  Widget _buildListItem(
+    BuildContext context,
+    DashboardItem item,
+  ) {
+    const cardBg = Colors.white;
+    const titleColor = Color(0xFF0A183D);
+    final subtitleColor = Colors.grey.shade600;
+
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.12),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: const Color(0xFF0A183D).withValues(alpha: 0.07),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -682,15 +993,121 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: item.color.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: item.color.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Icon(
+                    item.icon,
+                    color: item.color,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: subtitleColor,
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: item.color.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: item.color,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridItem(DashboardItem item) {
+    const cardBg = Colors.white;
+    const titleColor = Color(0xFF0A183D);
+    final subtitleColor = Colors.grey.shade600;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.9),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.07),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            if (item.title == 'Privacy Policy') {
+              _launchPrivacyPolicy(context);
+            } else {
+              _navigateToScreen(context, item.title);
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: item.color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: item.color.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Icon(item.icon, color: item.color, size: 22),
                 ),
@@ -698,9 +1115,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Text(
                   item.title,
                   style: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A183D),
+                    color: titleColor,
                     letterSpacing: -0.2,
                   ),
                   textAlign: TextAlign.center,
@@ -711,9 +1128,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 Text(
                   item.subtitle,
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: subtitleColor,
                     height: 1.2,
                   ),
                   textAlign: TextAlign.center,
@@ -750,6 +1167,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.logout_rounded, color: Colors.red, size: 24),
+              
               ),
               const SizedBox(width: 12),
               const Text(
@@ -806,25 +1224,41 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     bool isActive,
     VoidCallback onTap,
   ) {
-    final theme = Theme.of(context);
-    final color = isActive ? theme.primaryColor : Colors.grey;
+    final activeIconColor = Colors.white;
+    final activeBgColor = Colors.white.withValues(alpha: 0.22);
+    final inactiveColor = Colors.white.withValues(alpha: 0.65);
 
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(20),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: isActive ? activeBgColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                color: isActive ? activeIconColor : inactiveColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 10,
+              style: TextStyle(
+                color: isActive ? activeIconColor : inactiveColor,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 10.5,
               ),
             ),
           ],
@@ -832,6 +1266,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     );
   }
+
+
 
   void _navigateToScreen(BuildContext context, String title) {
     final routeMap = <String, Widget>{
@@ -871,7 +1307,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Workers Site Mapping': WorkerMappingPage(),
       'Workers Availability': const WorkersAvailabilityReportPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),
-      'Vehicle Configuration': AddVehicleLogPage(),
+      'Vehicle Fleet': AddVehicleLogPage(),
       'Vehicle Driver Configuration': VehicleDriverConfigPage(),
       "Vehicle Details": VehicleDetailsPage(),
       "Vehicle Inventory": VehicleInventoryReportPage(),
@@ -913,4 +1349,71 @@ class DashboardItem {
     this.subtitle,
     this.gradientColor,
   );
+}
+
+class FloatingNotchedShadowPainter extends CustomPainter {
+  final Color shadowColor;
+  final double elevation;
+
+  FloatingNotchedShadowPainter({
+    required this.shadowColor,
+    required this.elevation,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final clipper = FloatingNotchedClipper();
+    final path = clipper.getClip(size);
+
+    canvas.drawShadow(path, shadowColor, elevation, true);
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class FloatingNotchedClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    const double radius = 28.0;
+    const double notchRadius = 34.0;
+    final double centerX = w / 2;
+
+    final path = Path();
+    path.moveTo(radius, 0);
+
+    path.lineTo(centerX - notchRadius - 10, 0);
+
+    path.cubicTo(
+      centerX - notchRadius + 2, 0,
+      centerX - notchRadius + 4, notchRadius * 0.92,
+      centerX, notchRadius * 0.92,
+    );
+    path.cubicTo(
+      centerX + notchRadius - 4, notchRadius * 0.92,
+      centerX + notchRadius - 2, 0,
+      centerX + notchRadius + 10, 0,
+    );
+
+    path.lineTo(w - radius, 0);
+    path.arcToPoint(Offset(w, radius), radius: const Radius.circular(radius));
+    path.lineTo(w, h - radius);
+    path.arcToPoint(Offset(w - radius, h), radius: const Radius.circular(radius));
+    path.lineTo(radius, h);
+    path.arcToPoint(Offset(0, h - radius), radius: const Radius.circular(radius));
+    path.lineTo(0, radius);
+    path.arcToPoint(Offset(radius, 0), radius: const Radius.circular(radius));
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

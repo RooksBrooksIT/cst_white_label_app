@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class MaterialAvailability extends StatefulWidget {
@@ -536,213 +537,339 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   @override
   Widget build(BuildContext context) {
-    
-
+    final theme = Theme.of(context);
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
-    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 24.0 : 32.0);
 
     return GlassScaffold(
-      title: 'Material Availability',
-      onBack: () => Navigator.pop(context),
+      padding: EdgeInsets.zero,
       body: SafeArea(
-        bottom: true,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-            child: _isLoadingMaterials
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          children: [
+            // Top Header Row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  SizedBox(height: 16),
                   Text(
-                    'Loading materials...',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    'Material Availability',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
+            ),
+
+            // Tab Bar
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-            )
-          : SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 24.0,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _switchToNewMode,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _isNewMode ? theme.primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          'NEW',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: _isNewMode ? Colors.white : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _switchToUpdateMode,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: !_isNewMode ? theme.primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          'UPDATE',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: !_isNewMode ? Colors.white : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            // Content
+            Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Mode Selection Buttons
-                      _buildModeSelectionButtons(isMobile, isTablet, isDesktop),
-                      const SizedBox(height: 24),
-
-                      // Add/Update Material Section based on mode
-                      _isNewMode
-                          ? _buildNewMaterialSection(
-                              isMobile,
-                              isTablet,
-                              isDesktop,
-                            )
-                          : _buildUpdateMaterialSection(
-                              isMobile,
-                              isTablet,
-                              isDesktop,
-                            ),
-                    ],
-                  ),
+                  constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                  child: _isLoadingMaterials
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  theme.primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Loading materials...',
+                                style: TextStyle(fontSize: 16, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          child: _isNewMode
+                              ? _buildNewMaterialSection(isMobile, isTablet, isDesktop)
+                              : _buildUpdateMaterialSection(isMobile, isTablet, isDesktop),
+                        ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildModeSelectionButtons(
-    bool isMobile,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    final padding = isMobile ? 12.0 : 16.0;
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: _switchToNewMode,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isNewMode
-                  ? Theme.of(context).primaryColor
-                  : Colors.white,
-              foregroundColor: _isNewMode
-                  ? Colors.white
-                  : Theme.of(context).primaryColor,
-              padding: EdgeInsets.symmetric(vertical: padding),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(
-                  color: Theme.of(context).primaryColor,
-                  width: _isNewMode ? 0 : 2,
-                ),
-              ),
-              elevation: _isNewMode ? 2 : 0,
-            ),
-            child: Text(
-              'New',
-              style: TextStyle(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: isMobile ? 12 : 16),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: _switchToUpdateMode,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: !_isNewMode
-                  ? Theme.of(context).primaryColor
-                  : Colors.white,
-              foregroundColor: !_isNewMode
-                  ? Colors.white
-                  : Theme.of(context).primaryColor,
-              padding: EdgeInsets.symmetric(vertical: padding),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(
-                  color: Theme.of(context).primaryColor,
-                  width: !_isNewMode ? 0 : 2,
-                ),
-              ),
-              elevation: !_isNewMode ? 2 : 0,
-            ),
-            child: Text(
-              'Update',
-              style: TextStyle(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // Mode selection buttons removed — now handled inline in build() tab bar
 
   Widget _buildNewMaterialSection(
     bool isMobile,
     bool isTablet,
     bool isDesktop,
   ) {
+    final theme = Theme.of(context);
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Add New Material',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Material Dropdown for New
-        _buildNewMaterialDropdown(),
-        const SizedBox(height: 24),
-
-        // Count Input
-        _buildCountInput(),
-        const SizedBox(height: 32),
-
-        // Submit Button for New
-        _buildNewSubmitButton(),
-
-        // Info Section for New
-        const SizedBox(height: 32),
+        // Material Selection Card
         Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: darkCardBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: darkCardBg.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Theme.of(context).primaryColor.withOpacity(0.7),
-                    size: 20,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E88E5),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1E88E5).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_box_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'New Material Logic',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).primaryColor,
-                      ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Add New Material',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Select material and enter count to add',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                '• If same material exists today, counts will be summed\n'
-                '• Example: Existing 12 + New 12 = Total 24\n'
-                '• Use this for adding new stock to existing materials',
-                style: TextStyle(fontSize: 12, height: 1.5),
+              const SizedBox(height: 22),
+              _buildWhiteDropdown(
+                label: 'Select Material',
+                icon: Icons.inventory_2_rounded,
+                value: _selectedMaterial,
+                items: _materialNames
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedMaterial = v),
+                hintText: 'Choose a material to add',
+              ),
+              if (_materialNames.isEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'No materials found. Please add materials to the collection first.',
+                  style: TextStyle(
+                    color: Colors.orange[300],
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              _buildWhiteTextField(
+                label: 'Count to Add',
+                icon: Icons.pin_rounded,
+                hintText: 'Enter count to add',
+                controller: _countController,
+                keyboardType: TextInputType.number,
+                onChanged: (v) => setState(() => _count = int.tryParse(v) ?? 0),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Enter a number greater than 0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFCBD5E1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Submit Button
+        _buildNewSubmitButton(),
+
+        // Info section
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: darkCardBg.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: theme.primaryColor,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'New Material Logic',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: theme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '• If same material exists today, counts will be summed\n'
+                      '• Example: Existing 12 + New 12 = Total 24\n'
+                      '• Use this for adding new stock to existing materials',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.6,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -756,324 +883,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     bool isTablet,
     bool isDesktop,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Update Material Count',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Material Dropdown for Update (only shows existing materials)
-        _buildUpdateMaterialDropdown(),
-        const SizedBox(height: 24),
-
-        // Operation Type Checkboxes
-        if (_selectedMaterialToUpdate != null) _buildOperationCheckboxes(),
-        const SizedBox(height: 24),
-
-        // Display existing count
-        if (_selectedMaterialToUpdate != null && _existingCount > 0)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Theme.of(context).primaryColor.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.inventory_2_outlined,
-                  color: Theme.of(context).primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Current Count for "$_selectedMaterialToUpdate"',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$_existingCount units',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        if (_selectedMaterialToUpdate != null && _existingCount == 0)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_outlined,
-                  color: Colors.orange[700],
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No existing count found for "$_selectedMaterialToUpdate". This will create a new entry.',
-                    style: TextStyle(fontSize: 14, color: Colors.orange[700]),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 24),
-
-        // Count Input
-        _buildCountInput(),
-        const SizedBox(height: 32),
-
-        // Submit Button for Update
-        _buildUpdateSubmitButton(),
-
-        // Info Section for Update
-        const SizedBox(height: 32),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.7),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Update Material Logic',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _addToExisting
-                    ? '• Adds the new count to existing count\n'
-                          '• Example: Current 22 + Add 22 = Total 44\n'
-                          '• Use this for adding more stock to existing materials'
-                    : '• Replaces the current count with new value\n'
-                          '• Example: Current 22 → Update 44 = Total 44\n'
-                          '• Use this for correcting or setting exact counts',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOperationCheckboxes() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Operation Type *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            // Add Checkbox
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _addToExisting
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _addToExisting
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
-                    width: _addToExisting ? 2 : 1,
-                  ),
-                ),
-                child: CheckboxListTile(
-                  title: const Text(
-                    'Add',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text('Add to existing count'),
-                  value: _addToExisting,
-                  onChanged: _onAddToExistingChanged,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Update Checkbox
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _updateExisting
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _updateExisting
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
-                    width: _updateExisting ? 2 : 1,
-                  ),
-                ),
-                child: CheckboxListTile(
-                  title: const Text(
-                    'Update',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text('Replace existing count'),
-                  value: _updateExisting,
-                  onChanged: _onUpdateExistingChanged,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _addToExisting
-              ? 'The entered count will be added to the existing count'
-              : 'The existing count will be replaced with the entered count',
-          style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNewMaterialDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Select Material *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButtonFormField<String>(
-              value: _selectedMaterial,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                hintText: 'Choose a material to add',
-              ),
-              hint: const Text(
-                'Choose a material to add',
-                style: TextStyle(color: Colors.grey),
-              ),
-              items: _materialNames.map((String material) {
-                return DropdownMenuItem<String>(
-                  value: material,
-                  child: Text(material, style: const TextStyle(fontSize: 16)),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedMaterial = newValue;
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select a material';
-                }
-                return null;
-              },
-              icon: Icon(
-                Icons.arrow_drop_down,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-        ),
-        if (_materialNames.isEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'No materials found. Please add materials to the collection first.',
-            style: TextStyle(color: Colors.orange[700], fontSize: 14),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildUpdateMaterialDropdown() {
-    // Get unique material names from availability data
+    final theme = Theme.of(context);
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
     final availableMaterials = _availabilityData
         .map((data) => data['materialName'] as String)
         .toSet()
@@ -1082,136 +893,523 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Select Material to Update *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Material Selection Card
         Container(
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
+            color: darkCardBg,
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                color: darkCardBg.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButtonFormField<String>(
-              value: _selectedMaterialToUpdate,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF43A047),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF43A047).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.edit_note_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Update Material Count',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Modify existing material stock count',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              _buildWhiteDropdown(
+                label: 'Select Material to Update',
+                icon: Icons.inventory_2_rounded,
+                value: _selectedMaterialToUpdate,
+                items: availableMaterials
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: _onUpdateMaterialSelected,
                 hintText: 'Choose a material to update',
               ),
-              hint: const Text(
-                'Choose a material to update',
-                style: TextStyle(color: Colors.grey),
+              if (availableMaterials.isEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'No materials available to update. Please add materials first.',
+                  style: TextStyle(color: Colors.orange[300], fontSize: 13),
+                ),
+              ],
+
+              // Operation type checkboxes
+              if (_selectedMaterialToUpdate != null) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Operation Type',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _onAddToExistingChanged(true),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _addToExisting
+                                ? theme.primaryColor
+                                : Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _addToExisting
+                                  ? theme.primaryColor
+                                  : Colors.white.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_circle_outline_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Add',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _onUpdateExistingChanged(true),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _updateExisting
+                                ? theme.primaryColor
+                                : Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _updateExisting
+                                  ? theme.primaryColor
+                                  : Colors.white.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.swap_horiz_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Replace',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              // Existing count display
+              if (_selectedMaterialToUpdate != null && _existingCount > 0) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.primaryColor.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        color: theme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current: "$_selectedMaterialToUpdate"',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$_existingCount units',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: theme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (_selectedMaterialToUpdate != null && _existingCount == 0) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange[300],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'No existing count found. This will create a new entry.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[200],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+              _buildWhiteTextField(
+                label: 'New Count',
+                icon: Icons.pin_rounded,
+                hintText: 'Enter new count',
+                controller: _countController,
+                keyboardType: TextInputType.number,
+                onChanged: (v) => setState(() => _count = int.tryParse(v) ?? 0),
               ),
-              items: availableMaterials.map((String material) {
-                return DropdownMenuItem<String>(
-                  value: material,
-                  child: Text(material, style: const TextStyle(fontSize: 16)),
-                );
-              }).toList(),
-              onChanged: _onUpdateMaterialSelected,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select a material';
-                }
-                return null;
-              },
-              icon: Icon(
-                Icons.arrow_drop_down,
-                color: Theme.of(context).colorScheme.primary,
+              const SizedBox(height: 6),
+              const Text(
+                'Enter a number greater than 0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFCBD5E1),
+                ),
               ),
-            ),
+            ],
           ),
         ),
-        if (availableMaterials.isEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'No materials available to update. Please add materials first.',
-            style: TextStyle(color: Colors.orange[700], fontSize: 14),
+        const SizedBox(height: 20),
+
+        // Submit Button
+        _buildUpdateSubmitButton(),
+
+        // Info section
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: darkCardBg.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: theme.primaryColor,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Update Material Logic',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: theme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _addToExisting
+                          ? '• Adds the new count to existing count\n'
+                                '• Example: Current 22 + Add 22 = Total 44\n'
+                                '• Use this for adding more stock to existing materials'
+                          : '• Replaces the current count with new value\n'
+                                '• Example: Current 22 → Update 44 = Total 44\n'
+                                '• Use this for correcting or setting exact counts',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.6,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildCountInput() {
+  // _buildOperationCheckboxes replaced by inline toggle buttons in _buildUpdateMaterialSection
+
+  // Shared white text field helper (matches Material Config style)
+  Widget _buildWhiteTextField({
+    required String label,
+    required IconData icon,
+    required String hintText,
+    required TextEditingController controller,
+    TextInputType? keyboardType,
+    void Function(String)? onChanged,
+  }) {
+    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _isNewMode ? 'Count to Add *' : 'New Count *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 4,
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: TextFormField(
-            controller: _countController,
-            keyboardType: TextInputType.number,
+            controller: controller,
+            keyboardType: keyboardType,
+            onChanged: onChanged,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
             decoration: InputDecoration(
-              border: InputBorder.none,
+              hintText: hintText,
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Icon(
+                  icon,
+                  color: brandIconColor,
+                  size: 22,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
-                vertical: 12,
+                vertical: 14,
               ),
-              hintText: _isNewMode ? 'Enter count to add' : 'Enter new count',
-              hintStyle: const TextStyle(color: Colors.grey),
             ),
-            style: const TextStyle(fontSize: 16),
-            onChanged: (value) {
-              setState(() {
-                _count = int.tryParse(value) ?? 0;
-              });
-            },
           ),
         ),
-        const SizedBox(height: 4),
-        Text('Enter a number greater than 0', style: TextStyle(fontSize: 14)),
+      ],
+    );
+  }
+
+  // Shared white dropdown helper (matches Material Config style)
+  Widget _buildWhiteDropdown({
+    required String label,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required Function(String?) onChanged,
+    IconData icon = Icons.list_alt_rounded,
+    String? hintText,
+  }) {
+    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            value: (value != null && items.any((i) => i.value == value)) ? value : null,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: hintText ?? 'Select $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Icon(
+                  icon,
+                  color: brandIconColor,
+                  size: 22,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            items: items,
+            onChanged: onChanged,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildNewSubmitButton() {
+    final theme = Theme.of(context);
     return SizedBox(
+      height: 52,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _submitNewMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          elevation: 2,
-          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          backgroundColor: theme.primaryColor,
+          foregroundColor: const Color(0xFF0A183D),
+          alignment: Alignment.center,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 6,
+          shadowColor: theme.primaryColor.withValues(alpha: 0.4),
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1219,17 +1417,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A183D)),
                 ),
               )
             : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add, size: 20),
+                  Icon(Icons.add_rounded, size: 20, color: Color(0xFF0A183D)),
                   SizedBox(width: 8),
                   Text(
-                    'Add Material',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    'ADD MATERIAL',
+                    style: TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ],
               ),
@@ -1238,17 +1441,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   }
 
   Widget _buildUpdateSubmitButton() {
+    final theme = Theme.of(context);
     return SizedBox(
+      height: 52,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _updateExistingMaterial,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          elevation: 2,
-          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          backgroundColor: theme.primaryColor,
+          foregroundColor: const Color(0xFF0A183D),
+          alignment: Alignment.center,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 6,
+          shadowColor: theme.primaryColor.withValues(alpha: 0.4),
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1256,19 +1464,25 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A183D)),
                 ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_addToExisting ? Icons.add : Icons.update, size: 20),
+                  Icon(
+                    _addToExisting ? Icons.add_rounded : Icons.swap_horiz_rounded,
+                    size: 20,
+                    color: const Color(0xFF0A183D),
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    _addToExisting ? 'Add to Material' : 'Update Material',
+                    _addToExisting ? 'ADD TO MATERIAL' : 'UPDATE MATERIAL',
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0A183D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
                     ),
                   ),
                 ],

@@ -7,6 +7,8 @@ import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/widgets/glass_button.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;
@@ -673,11 +675,15 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Text(
+      title,
+      style: TextStyle(
+        fontWeight: FontWeight.w800,
+        fontSize: 18,
+        color: isDark ? Colors.white : const Color(0xFF0A183D),
+        letterSpacing: -0.4,
       ),
     );
   }
@@ -688,41 +694,80 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     IconData icon,
   ) {
     final theme = Theme.of(context);
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: theme.primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 16,
-        ),
-        isDense: true,
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            style: TextStyle(
+              fontSize: 15,
+              color: textColor,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(
+                icon,
+                size: 20,
+                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: borderColor, width: 1.0),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: borderColor, width: 1.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: primaryColor, width: 1.8),
+              ),
+              filled: true,
+              fillColor: fieldBg,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 16,
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
       ),
-      keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
     );
   }
 
   Widget _buildSummaryTable() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+    final headerTextColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final bodyTextColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-        color: Colors.white,
+        border: Border.all(color: borderColor),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -733,15 +778,18 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           child: DataTable(
             columnSpacing: 16,
             horizontalMargin: 12,
-            headingRowHeight: 40,
-            dataRowHeight: 40,
-            columns: const [
+            headingRowHeight: 44,
+            dataRowHeight: 42,
+            headingRowColor: WidgetStateProperty.all(
+              isDark ? primaryColor.withValues(alpha: 0.25) : primaryColor.withValues(alpha: 0.08),
+            ),
+            columns: [
               DataColumn(
                 label: SizedBox(
                   width: 80,
                   child: Text(
                     'Type',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -750,7 +798,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                   width: 100,
                   child: Text(
                     'Item',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -759,7 +807,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                   width: 60,
                   child: Text(
                     'Qty',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -768,11 +816,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                   width: 100,
                   child: Text(
                     'Amount',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
-              DataColumn(label: SizedBox(width: 40)),
+              const DataColumn(label: SizedBox(width: 40)),
             ],
             rows: [
               ...materials.asMap().entries.map((entry) {
@@ -780,10 +828,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 var m = entry.value;
                 return DataRow(
                   cells: [
-                    const DataCell(
+                    DataCell(
                       SizedBox(
                         width: 80,
-                        child: Text('Material', style: TextStyle(fontSize: 12)),
+                        child: Text('Material', style: TextStyle(fontSize: 12, color: bodyTextColor)),
                       ),
                     ),
                     DataCell(
@@ -791,7 +839,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         width: 100,
                         child: Text(
                           m['type']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w600),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -801,7 +849,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         width: 60,
                         child: Text(
                           '${m['quantity'] ?? 0}',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor),
                         ),
                       ),
                     ),
@@ -813,7 +861,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                             m['type']?.toString() ?? '',
                             m['quantity'] ?? 0,
                           ),
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -821,10 +869,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                       SizedBox(
                         width: 40,
                         child: IconButton(
-                          icon: Icon(
-                            Icons.delete,
-                            color: theme.colorScheme.error.withOpacity(0.7),
-                            size: 16,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
                           ),
                           onPressed: () => _removeMaterial(idx),
                           padding: EdgeInsets.zero,
@@ -839,10 +887,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 var l = entry.value;
                 return DataRow(
                   cells: [
-                    const DataCell(
+                    DataCell(
                       SizedBox(
                         width: 80,
-                        child: Text('Labour', style: TextStyle(fontSize: 12)),
+                        child: Text('Labour', style: TextStyle(fontSize: 12, color: bodyTextColor)),
                       ),
                     ),
                     DataCell(
@@ -850,7 +898,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         width: 100,
                         child: Text(
                           l['type']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w600),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -860,7 +908,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         width: 60,
                         child: Text(
                           '${l['count'] ?? 0}',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor),
                         ),
                       ),
                     ),
@@ -872,7 +920,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                             l['type']?.toString() ?? '',
                             l['count'] ?? 0,
                           ),
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -880,10 +928,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                       SizedBox(
                         width: 40,
                         child: IconButton(
-                          icon: Icon(
-                            Icons.delete,
-                            color: theme.colorScheme.error.withOpacity(0.7),
-                            size: 16,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
                           ),
                           onPressed: () => _removeLabour(idx),
                           padding: EdgeInsets.zero,
@@ -895,97 +943,28 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
               }),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Food', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${foodCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Food', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${foodCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Transport', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${transportCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Transport', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${transportCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Fuel', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${fuelCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Fuel', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${fuelCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
@@ -999,8 +978,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                       child: Text(
                         'Total',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: headerTextColor,
                         ),
                       ),
                     ),
@@ -1011,9 +991,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                       child: Text(
                         '₹${_getTotalAmount()}',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                         ),
                       ),
                     ),
@@ -1079,6 +1059,15 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+
     return GlassScaffold(
       title: 'Daily Site Entry',
       appBarForegroundColor: Colors.white,
@@ -1087,19 +1076,20 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         builder: (context, constraints) {
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(
-              horizontal: 8.0,
-              vertical: 12.0,
+              horizontal: 16.0,
+              vertical: 16.0,
             ),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 600,
+                  maxWidth: 800,
                   minHeight: constraints.maxHeight,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     GlassCard(
+                      color: cardBg,
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1109,24 +1099,44 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               Icon(
                                 Icons.construction,
                                 size: 22,
-                                color: theme.primaryColor,
+                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: DropdownButtonFormField<String>(
                                   value: selectedSiteId,
                                   isExpanded: true,
+                                  dropdownColor: dropdownBg,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                   decoration: InputDecoration(
                                     labelText: 'Site Id (Supervisor Only)',
+                                    labelStyle: TextStyle(
+                                      color: labelColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: borderColor, width: 1.0),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: borderColor, width: 1.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: primaryColor, width: 1.8),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey[50],
+                                    fillColor: fieldBg,
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                      horizontal: 12,
+                                      vertical: 12,
+                                      horizontal: 14,
                                     ),
                                   ),
                                   items: supervisorSites
@@ -1136,6 +1146,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           child: Text(
                                             site['siteId'] ?? '',
                                             overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: textColor,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
                                       )
@@ -1181,92 +1196,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Supervisor: ${supervisorName ?? widget.userName}',
-                                      style: const TextStyle(fontSize: 16),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (supervisorId != null &&
-                                        supervisorId!.isNotEmpty)
-                                      Text(
-                                        'ID: $supervisorId',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          const SizedBox(height: 12),
+                          _buildModernSiteRow(
+                            Icons.person,
+                            'Supervisor',
+                            '${supervisorName ?? widget.userName}${supervisorId != null && supervisorId!.isNotEmpty ? ' (ID: $supervisorId)' : ''}',
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Project Name: $projectName',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                          _buildModernSiteRow(
+                            Icons.business,
+                            'Project Name',
+                            projectName ?? 'Not found',
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Location: $siteLocation',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                          _buildModernSiteRow(
+                            Icons.location_on,
+                            'Location',
+                            siteLocation ?? 'Unknown',
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.stairs_outlined,
-                                size: 20,
-                                color: theme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Project Stage: ${selectedProjectPhase ?? "Not assigned"}',
-                                  style: const TextStyle(fontSize: 16),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                          _buildModernSiteRow(
+                            Icons.stairs_outlined,
+                            'Project Stage',
+                            selectedProjectPhase ?? 'Not assigned',
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -1274,9 +1223,17 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               Icon(
                                 Icons.calendar_today,
                                 size: 20,
-                                color: theme.primaryColor,
+                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                               ),
                               const SizedBox(width: 8),
+                              Text(
+                                'Date: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: labelColor,
+                                ),
+                              ),
                               Flexible(
                                 child: Text(
                                   selectedDate != null
@@ -1284,7 +1241,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           ' ',
                                         )[0]
                                       : 'No date chosen',
-                                  style: const TextStyle(fontSize: 16),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: textColor,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1292,9 +1253,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               TextButton.icon(
                                 onPressed: _pickDate,
                                 icon: const Icon(Icons.edit, size: 16),
-                                label: const Text('Change'),
+                                label: const Text(
+                                  'Change',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
                                 style: TextButton.styleFrom(
-                                  foregroundColor: theme.primaryColor,
+                                  foregroundColor: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                                   padding: EdgeInsets.zero,
                                   minimumSize: Size.zero,
                                 ),
@@ -1304,883 +1268,982 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
                     // Add Entry Text
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: Text(
                         'Add Entry',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          color: textColor,
                         ),
                       ),
                     ),
-                    const Divider(height: 16),
+                    const SizedBox(height: 12),
 
                     // Material Details Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Material Details'),
-                            const SizedBox(height: 8),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingMaterials
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : materialError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
+                    GlassCard(
+                      color: cardBg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Material Details'),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: isLoadingMaterials
+                                        ? const Center(
+                                            child:
+                                                CircularProgressIndicator(),
+                                          )
+                                        : materialError != null
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Text(
+                                              materialError!,
+                                              style: const TextStyle(
+                                                color: Colors.redAccent,
                                               ),
-                                              child: Text(
-                                                materialError!,
+                                            ),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Search & Select Material',
                                                 style: TextStyle(
-                                                  color:
-                                                      theme.colorScheme.error,
+                                                  color: labelColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Material...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          materialOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .startsWith(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedMaterial =
-                                                            filtered.contains(
-                                                              selectedMaterial,
-                                                            )
-                                                            ? selectedMaterial
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedMaterial = null;
-                                                      }
-                                                      _filteredMaterialOptions =
-                                                          filtered;
-                                                    });
-                                                  },
+                                              const SizedBox(height: 4),
+                                              TextField(
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedMaterial,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Material',
-                                                    prefixIcon: const Icon(
-                                                      Icons.category_outlined,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
+                                                decoration: InputDecoration(
+                                                  hintText:
+                                                      'Search Material...',
+                                                  hintStyle: TextStyle(
+                                                    color: labelColor,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
                                                   ),
-                                                  items:
-                                                      (_filteredMaterialOptions ??
-                                                              materialOptions)
-                                                          .map(
-                                                            (
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                onChanged: (query) {
+                                                  setState(() {
+                                                    final q = query
+                                                        .toLowerCase();
+                                                    final filtered =
+                                                        materialOptions
+                                                            .where(
+                                                              (item) => item
+                                                                  .toLowerCase()
+                                                                  .startsWith(
+                                                                    q,
+                                                                  ),
+                                                            )
+                                                            .toList();
+                                                    filtered.sort(
+                                                      (a, b) => a
+                                                          .toLowerCase()
+                                                          .compareTo(
+                                                            b.toLowerCase(),
+                                                          ),
+                                                    );
+                                                    if (filtered.isNotEmpty) {
+                                                      selectedMaterial =
+                                                          filtered.contains(
+                                                            selectedMaterial,
+                                                          )
+                                                          ? selectedMaterial
+                                                          : filtered.first;
+                                                    } else {
+                                                      selectedMaterial = null;
+                                                    }
+                                                    _filteredMaterialOptions =
+                                                        filtered;
+                                                  });
+                                                },
+                                              ),
+                                              const SizedBox(height: 8),
+                                              DropdownButtonFormField<String>(
+                                                value: selectedMaterial,
+                                                isExpanded: true,
+                                                dropdownColor: dropdownBg,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.category_outlined,
+                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                items:
+                                                    (_filteredMaterialOptions ??
+                                                            materialOptions)
+                                                        .map(
+                                                          (
+                                                            item,
+                                                          ) => DropdownMenuItem(
+                                                            value: item,
+                                                            child: Text(
                                                               item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: TextStyle(
+                                                                fontSize: 14,
+                                                                color: textColor,
+                                                                fontWeight: FontWeight.w700,
                                                               ),
                                                             ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedMaterial =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextField(
-                                            controller: materialQtyController,
-                                            decoration: InputDecoration(
-                                              labelText: 'Qty',
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                onChanged: (value) =>
+                                                    setState(
+                                                      () => selectedMaterial =
+                                                          value,
+                                                    ),
                                               ),
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 8,
-                                                    horizontal: 12,
-                                                  ),
+                                            ],
+                                          ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Qty',
+                                          style: TextStyle(
+                                            color: labelColor,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        TextField(
+                                          controller: materialQtyController,
+                                          style: TextStyle(
+                                            color: textColor,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: borderColor, width: 1.0),
                                             ),
-                                            keyboardType: TextInputType.number,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                materialQty =
-                                                    int.tryParse(value) ?? 0;
-                                              });
-                                            },
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Builder(
-                                            builder: (context) {
-                                              final price =
-                                                  materialPrices[selectedMaterial ??
-                                                      ''] ??
-                                                  0;
-                                              final qty = materialQty;
-                                              final total = price * qty;
-                                              return Text(
-                                                '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: total > 0
-                                                      ? theme.primaryColor
-                                                      : Colors.grey[500],
-                                                  fontWeight: total > 0
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: borderColor, width: 1.0),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                            ),
+                                            filled: true,
+                                            fillColor: fieldBg,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                  horizontal: 14,
                                                 ),
-                                              );
-                                            },
                                           ),
-                                        ],
-                                      ),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              materialQty =
+                                                  int.tryParse(value) ?? 0;
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Builder(
+                                          builder: (context) {
+                                            final price =
+                                                materialPrices[selectedMaterial ??
+                                                    ''] ??
+                                                0;
+                                            final qty = materialQty;
+                                            final total = price * qty;
+                                            return Text(
+                                              '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: total > 0
+                                                    ? const Color(0xFF10B981)
+                                                    : labelColor,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                );
-                              },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassButton(
+                                  label: 'Add Material',
+                                  icon: Icons.add,
+                                  onPressed: isLoadingMaterials || materialOptions.isEmpty
+                                      ? null
+                                      : _addMaterial,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GlassButton(
+                                  label: _showCustomMaterialFields ? 'Hide Others' : 'Others',
+                                  icon: Icons.more_horiz,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showCustomMaterialFields = !_showCustomMaterialFields;
+                                    });
+                                  },
+                                  isSecondary: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_showCustomMaterialFields) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              'Material Name',
+                              style: TextStyle(
+                                color: labelColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: _customMaterialNameController,
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Qty',
+                                        style: TextStyle(
+                                          color: labelColor,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      TextField(
+                                        controller: _customMaterialQtyController,
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor, width: 1.0),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor, width: 1.0),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                          ),
+                                          filled: true,
+                                          fillColor: fieldBg,
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Unit Price (₹)',
+                                        style: TextStyle(
+                                          color: labelColor,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      TextField(
+                                        controller: _customMaterialPriceController,
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor, width: 1.0),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor, width: 1.0),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                          ),
+                                          filled: true,
+                                          fillColor: fieldBg,
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingMaterials ||
-                                        materialOptions.isEmpty
-                                    ? null
-                                    : _addMaterial,
-                                label: const Text(
-                                  'Add Material',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
+                            GlassButton(
+                              label: 'Add Custom Material',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomMaterial,
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomMaterialFields =
-                                      !_showCustomMaterialFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_showCustomMaterialFields) ...[
-                              TextField(
-                                controller: _customMaterialNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Material Name',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customMaterialQtyController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Qty',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller:
-                                          _customMaterialPriceController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Unit Price (₹)',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Builder(
-                                builder: (context) {
-                                  final qty =
-                                      int.tryParse(
-                                        _customMaterialQtyController.text,
-                                      ) ??
-                                      0;
-                                  final price =
-                                      int.tryParse(
-                                        _customMaterialPriceController.text,
-                                      ) ??
-                                      0;
-                                  final total = qty * price;
-                                  return Text(
-                                    'Total Amount: $qty × ₹$price = ₹$total',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: total > 0
-                                          ? theme.primaryColor
-                                          : Colors.grey[500],
-                                      fontWeight: total > 0
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomMaterial,
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: theme.primaryColor,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Material'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomMaterialFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.grey[200],
-                                        foregroundColor: Colors.black87,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
 
                     // Labour Details Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Labour Details'),
-                            const SizedBox(height: 8),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: isLoadingLabours
-                                          ? const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : labourError != null
-                                          ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8.0,
+                    GlassCard(
+                      color: cardBg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Labour Details'),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: isLoadingLabours
+                                        ? const Center(
+                                            child:
+                                                CircularProgressIndicator(),
+                                          )
+                                        : labourError != null
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Text(
+                                              labourError!,
+                                              style: const TextStyle(
+                                                color: Colors.redAccent,
                                               ),
-                                              child: Text(
-                                                labourError!,
+                                            ),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Search & Select Labour',
                                                 style: TextStyle(
-                                                  color:
-                                                      theme.colorScheme.error,
+                                                  color: labelColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            )
-                                          : Column(
-                                              children: [
-                                                TextField(
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        hintText:
-                                                            'Search Labour...',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            EdgeInsets.symmetric(
-                                                              vertical: 8,
-                                                              horizontal: 12,
-                                                            ),
-                                                      ),
-                                                  onChanged: (query) {
-                                                    setState(() {
-                                                      final q = query
-                                                          .toLowerCase();
-                                                      final filtered =
-                                                          labourOptions
-                                                              .where(
-                                                                (item) => item
-                                                                    .toLowerCase()
-                                                                    .startsWith(
-                                                                      q,
-                                                                    ),
-                                                              )
-                                                              .toList();
-                                                      filtered.sort(
-                                                        (a, b) => a
-                                                            .toLowerCase()
-                                                            .compareTo(
-                                                              b.toLowerCase(),
-                                                            ),
-                                                      );
-                                                      if (filtered.isNotEmpty) {
-                                                        selectedLabour =
-                                                            filtered.contains(
-                                                              selectedLabour,
-                                                            )
-                                                            ? selectedLabour
-                                                            : filtered.first;
-                                                      } else {
-                                                        selectedLabour = null;
-                                                      }
-                                                      _filteredLabourOptions =
-                                                          filtered;
-                                                    });
-                                                  },
+                                              const SizedBox(height: 4),
+                                              TextField(
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                DropdownButtonFormField<String>(
-                                                  value: selectedLabour,
-                                                  isExpanded: true,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Labour',
-                                                    prefixIcon: const Icon(
-                                                      Icons.group,
-                                                    ),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    filled: true,
-                                                    fillColor: Colors.grey[50],
-                                                    isDense: true,
-                                                    contentPadding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12,
-                                                        ),
+                                                decoration: InputDecoration(
+                                                  hintText:
+                                                      'Search Labour...',
+                                                  hintStyle: TextStyle(
+                                                    color: labelColor,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
                                                   ),
-                                                  items:
-                                                      (_filteredLabourOptions ??
-                                                              labourOptions)
-                                                          .map(
-                                                            (
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                onChanged: (query) {
+                                                  setState(() {
+                                                    final q = query
+                                                        .toLowerCase();
+                                                    final filtered =
+                                                        labourOptions
+                                                            .where(
+                                                              (item) => item
+                                                                  .toLowerCase()
+                                                                  .startsWith(
+                                                                    q,
+                                                                  ),
+                                                            )
+                                                            .toList();
+                                                    filtered.sort(
+                                                      (a, b) => a
+                                                          .toLowerCase()
+                                                          .compareTo(
+                                                            b.toLowerCase(),
+                                                          ),
+                                                    );
+                                                    if (filtered.isNotEmpty) {
+                                                      selectedLabour =
+                                                          filtered.contains(
+                                                            selectedLabour,
+                                                          )
+                                                          ? selectedLabour
+                                                          : filtered.first;
+                                                    } else {
+                                                      selectedLabour = null;
+                                                    }
+                                                    _filteredLabourOptions =
+                                                        filtered;
+                                                  });
+                                                },
+                                              ),
+                                              const SizedBox(height: 8),
+                                              DropdownButtonFormField<String>(
+                                                value: selectedLabour,
+                                                isExpanded: true,
+                                                dropdownColor: dropdownBg,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.group,
+                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 14,
+                                                      ),
+                                                ),
+                                                items:
+                                                    (_filteredLabourOptions ??
+                                                            labourOptions)
+                                                        .map(
+                                                          (
+                                                            item,
+                                                          ) => DropdownMenuItem(
+                                                            value: item,
+                                                            child: Text(
                                                               item,
-                                                            ) => DropdownMenuItem(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: TextStyle(
+                                                                fontSize: 14,
+                                                                color: textColor,
+                                                                fontWeight: FontWeight.w700,
                                                               ),
                                                             ),
-                                                          )
-                                                          .toList(),
-                                                  onChanged: (value) =>
-                                                      setState(
-                                                        () => selectedLabour =
-                                                            value,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextField(
-                                            controller: labourQtyController,
-                                            decoration: InputDecoration(
-                                              labelText: 'Count',
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                onChanged: (value) =>
+                                                    setState(
+                                                      () => selectedLabour =
+                                                          value,
+                                                    ),
                                               ),
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 8,
-                                                    horizontal: 12,
-                                                  ),
+                                            ],
+                                          ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Count',
+                                          style: TextStyle(
+                                            color: labelColor,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        TextField(
+                                          controller: labourQtyController,
+                                          style: TextStyle(
+                                            color: textColor,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: borderColor, width: 1.0),
                                             ),
-                                            keyboardType: TextInputType.number,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                labourQty =
-                                                    int.tryParse(value) ?? 0;
-                                              });
-                                            },
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Builder(
-                                            builder: (context) {
-                                              final salary =
-                                                  labourSalaries[selectedLabour ??
-                                                      ''] ??
-                                                  0;
-                                              final count = labourQty;
-                                              final total = salary * count;
-                                              return Text(
-                                                '$count × ₹${salary.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: total > 0
-                                                      ? theme.primaryColor
-                                                      : Colors.grey[500],
-                                                  fontWeight: total > 0
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: borderColor, width: 1.0),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                              borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                            ),
+                                            filled: true,
+                                            fillColor: fieldBg,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                  horizontal: 14,
                                                 ),
-                                              );
-                                            },
                                           ),
-                                        ],
-                                      ),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              labourQty =
+                                                  int.tryParse(value) ?? 0;
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Builder(
+                                          builder: (context) {
+                                            final salary =
+                                                labourSalaries[selectedLabour ??
+                                                    ''] ??
+                                                0;
+                                            final count = labourQty;
+                                            final total = salary * count;
+                                            return Text(
+                                              '$count × ₹${salary.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: total > 0
+                                                    ? const Color(0xFF10B981)
+                                                    : labelColor,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                );
-                              },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassButton(
+                                  label: 'Add Labour',
+                                  icon: Icons.person_add,
+                                  onPressed: isLoadingLabours || labourOptions.isEmpty
+                                      ? null
+                                      : _addLabour,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GlassButton(
+                                  label: _showCustomLabourFields ? 'Hide Others' : 'Others',
+                                  icon: Icons.more_horiz,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showCustomLabourFields = !_showCustomLabourFields;
+                                    });
+                                  },
+                                  isSecondary: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_showCustomLabourFields) ...[
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _customLabourNameController,
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: 'Labour Type',
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customLabourCountController,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Count',
+                                      labelStyle: TextStyle(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                      ),
+                                      filled: true,
+                                      fillColor: fieldBg,
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _customLabourSalaryController,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Salary (₹)',
+                                      labelStyle: TextStyle(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                      ),
+                                      filled: true,
+                                      fillColor: fieldBg,
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add, size: 18),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onPressed:
-                                    isLoadingLabours || labourOptions.isEmpty
-                                    ? null
-                                    : _addLabour,
-                                label: const Text(
-                                  'Add Labour',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
+                            GlassButton(
+                              label: 'Add Custom Labour',
+                              icon: Icons.playlist_add,
+                              onPressed: _addCustomLabour,
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showCustomLabourFields =
-                                      !_showCustomLabourFields;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
-                              ),
-                              child: const Text('Others'),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_showCustomLabourFields) ...[
-                              TextField(
-                                controller: _customLabourNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Labour Type',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customLabourCountController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Count',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _customLabourSalaryController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Salary (₹)',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Builder(
-                                builder: (context) {
-                                  final count =
-                                      int.tryParse(
-                                        _customLabourCountController.text,
-                                      ) ??
-                                      0;
-                                  final salary =
-                                      int.tryParse(
-                                        _customLabourSalaryController.text,
-                                      ) ??
-                                      0;
-                                  final total = count * salary;
-                                  return Text(
-                                    'Total Amount: $count × ₹$salary = ₹$total',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: total > 0
-                                          ? theme.primaryColor
-                                          : Colors.grey[500],
-                                      fontWeight: total > 0
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: _addCustomLabour,
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: theme.primaryColor,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Add Labour'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showCustomLabourFields = false;
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.grey[200],
-                                        foregroundColor: Colors.black87,
-                                      ),
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
 
                     // Additional Costs Card
-                    Card(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      surfaceTintColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSectionHeader('Additional Costs'),
-                            const SizedBox(height: 12),
-                            _buildCostInput(
-                              'Food Cost',
-                              foodCost,
-                              Icons.fastfood,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Transport Cost',
-                              transportCost,
-                              Icons.directions_car,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildCostInput(
-                              'Fuel Cost',
-                              fuelCost,
-                              Icons.local_gas_station,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Today's Summary Header & Table
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: _buildSectionHeader('Today\'s Summary'),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSummaryTable(),
-
-                    const SizedBox(height: 16),
-
-                    // Action Buttons
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
+                    GlassCard(
+                      color: cardBg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setState(() {
-                                  materials.clear();
-                                  labours.clear();
-                                  selectedMaterial = materialOptions.isNotEmpty
-                                      ? materialOptions.first
-                                      : null;
-                                  selectedLabour = labourOptions.isNotEmpty
-                                      ? labourOptions.first
-                                      : null;
-                                  materialQty = 0;
-                                  materialQtyController.text = '0';
-                                  labourQty = 0;
-                                  labourQtyController.text = '0';
-                                  foodCost.text = '0';
-                                  transportCost.text = '0';
-                                  fuelCost.text = '0';
-                                });
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: const Text('Reset'),
-                            ),
+                          _buildSectionHeader('Additional Costs'),
+                          const SizedBox(height: 16),
+                          _buildCostInput(
+                            'Food Cost',
+                            foodCost,
+                            Icons.fastfood,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isSaving ? null : _saveToFirestore,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: isSaving
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Save Entry'),
-                            ),
+                          _buildCostInput(
+                            'Transport Cost',
+                            transportCost,
+                            Icons.directions_car,
+                          ),
+                          _buildCostInput(
+                            'Fuel Cost',
+                            fuelCost,
+                            Icons.local_gas_station,
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // Today's Summary Header & Table
+                    GlassCard(
+                      color: cardBg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Today\'s Summary'),
+                          const SizedBox(height: 12),
+                          _buildSummaryTable(),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Reset',
+                            icon: Icons.refresh,
+                            onPressed: () {
+                              setState(() {
+                                materials.clear();
+                                labours.clear();
+                                selectedMaterial = materialOptions.isNotEmpty
+                                    ? materialOptions.first
+                                    : null;
+                                selectedLabour = labourOptions.isNotEmpty
+                                    ? labourOptions.first
+                                    : null;
+                                materialQty = 0;
+                                materialQtyController.text = '0';
+                                labourQty = 0;
+                                labourQtyController.text = '0';
+                                foodCost.text = '0';
+                                transportCost.text = '0';
+                                fuelCost.text = '0';
+                              });
+                            },
+                            isSecondary: true,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GlassButton(
+                            label: 'Save Entry',
+                            icon: Icons.save,
+                            onPressed: isSaving ? null : _saveToFirestore,
+                            isLoading: isSaving,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildModernSiteRow(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    final valueColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: iconColor),
+          const SizedBox(width: 10),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: labelColor,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

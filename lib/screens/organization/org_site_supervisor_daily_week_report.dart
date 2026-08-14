@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -416,6 +415,12 @@ class _DailySitePaymentReportScreenState
         if (fontSizeBase > 22) fontSizeBase = 22;
 
         final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+        final borderColor = isDark
+            ? Colors.white.withValues(alpha: 0.12)
+            : const Color(0xFFE2E8F0);
+
         return Padding(
           padding: EdgeInsets.symmetric(
             horizontal: horizontalPadding,
@@ -428,16 +433,18 @@ class _DailySitePaymentReportScreenState
                 child: Container(
                   padding: EdgeInsets.all(horizontalPadding),
                   decoration: BoxDecoration(
-                    color: theme.cardColor,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.25)
+                            : theme.primaryColor.withValues(alpha: 0.06),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
                     ],
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: borderColor),
                   ),
                   child: _buildReportForm(context, fontSizeBase),
                 ),
@@ -450,12 +457,61 @@ class _DailySitePaymentReportScreenState
   }
 
   Widget _buildReportForm(BuildContext context, double fontSizeBase) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
     final weeks = _getWeeksOfMonth(selectedYear, selectedMonth);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Form Header
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.assessment_rounded,
+                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Site Payment Report',
+                    style: TextStyle(
+                      fontSize: fontSizeBase * 1.25,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0A183D),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Filter and generate supervisor weekly payment reports',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: fontSizeBase * 1.5),
         _buildDropdownField(
           label: 'Site ID',
           value: selectedSiteId,
@@ -469,7 +525,6 @@ class _DailySitePaymentReportScreenState
               paymentRecords = [];
               totalAmount = 0.0;
             });
-            // Call AFTER setState so selectedSiteId is committed before auto-fill reads it
             _updateProjectAndSupervisor();
           },
         ),
@@ -506,23 +561,33 @@ class _DailySitePaymentReportScreenState
             );
           },
         ),
-        SizedBox(height: fontSizeBase * 2.5),
-        const Text(
-          'Weeks:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF64748B),
-            fontSize: 14,
-            letterSpacing: 0.5,
-          ),
+        SizedBox(height: fontSizeBase * 2.0),
+        Row(
+          children: [
+            Icon(
+              Icons.date_range_rounded,
+              size: 18,
+              color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'SELECT WEEK',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : primaryColor,
+                fontSize: 13,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
         ),
         SizedBox(height: fontSizeBase),
-        _buildWeekChips(weeks, fontSizeBase, colorScheme),
+        _buildWeekChips(weeks, fontSizeBase),
         SizedBox(height: fontSizeBase * 2.5),
         if (selectedWeekIndex != null && weekDates.isNotEmpty)
-          _buildPaymentTable(fontSizeBase, colorScheme),
-        SizedBox(height: fontSizeBase * 3),
-        _buildActionButtons(fontSizeBase, colorScheme),
+          _buildPaymentTable(fontSizeBase),
+        SizedBox(height: fontSizeBase * 2.5),
+        _buildActionButtons(fontSizeBase),
       ],
     );
   }
@@ -535,15 +600,32 @@ class _DailySitePaymentReportScreenState
     required ValueChanged<String?> onChanged,
   }) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return DropdownButtonFormField<String>(
       decoration: _inputDecoration(label, fontSizeBase),
       value: value,
-      dropdownColor: theme.cardColor,
+      dropdownColor: dropdownBg,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: textColor,
+        fontWeight: FontWeight.w700,
+      ),
       items: items
           .map(
             (id) => DropdownMenuItem(
               value: id,
-              child: Text(id, style: TextStyle(fontSize: fontSizeBase)),
+              child: Text(
+                id,
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           )
           .toList(),
@@ -556,28 +638,47 @@ class _DailySitePaymentReportScreenState
     required TextEditingController controller,
     required double fontSizeBase,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       decoration: _inputDecoration(label, fontSizeBase),
       readOnly: true,
-      style: TextStyle(fontSize: fontSizeBase, color: const Color(0xFF1E293B)),
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: isDark ? Colors.white : const Color(0xFF0A183D),
+        fontWeight: FontWeight.w700,
+      ),
       controller: controller,
     );
   }
 
   Widget _buildMonthDropdown(double fontSizeBase) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Month', fontSizeBase * 0.9),
       value: selectedMonth,
       isExpanded: true,
-      dropdownColor: theme.cardColor,
+      dropdownColor: dropdownBg,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: textColor,
+        fontWeight: FontWeight.w700,
+      ),
       items: List.generate(12, (i) => i + 1)
           .map(
             (m) => DropdownMenuItem(
               value: m,
               child: Text(
                 DateFormat.MMMM().format(DateTime(0, m)),
-                style: TextStyle(fontSize: fontSizeBase),
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           )
@@ -596,18 +697,32 @@ class _DailySitePaymentReportScreenState
 
   Widget _buildYearDropdown(double fontSizeBase) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return DropdownButtonFormField<int>(
       decoration: _inputDecoration('Year', fontSizeBase * 0.9),
       value: selectedYear,
       isExpanded: true,
-      dropdownColor: theme.cardColor,
+      dropdownColor: dropdownBg,
+      style: TextStyle(
+        fontSize: fontSizeBase,
+        color: textColor,
+        fontWeight: FontWeight.w700,
+      ),
       items: years
           .map(
             (y) => DropdownMenuItem(
               value: y,
               child: Text(
                 y.toString(),
-                style: TextStyle(fontSize: fontSizeBase),
+                style: TextStyle(
+                  fontSize: fontSizeBase,
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           )
@@ -627,55 +742,129 @@ class _DailySitePaymentReportScreenState
   Widget _buildWeekChips(
     List<List<DateTime>> weeks,
     double fontSizeBase,
-    ColorScheme colorScheme,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       children: List.generate(weeks.length, (i) {
         final isSelected = selectedWeekIndex == i;
-        return ChoiceChip(
-          label: Text(
-            'Week ${i + 1}',
-            style: TextStyle(
-              color: isSelected
-                  ? colorScheme.onPrimary
-                  : const Color(0xFF64748B),
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        final chipBg = isSelected
+            ? (isDark ? primaryColor : darkAccent)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : primaryColor.withValues(alpha: 0.05));
+
+        final chipBorder = isSelected
+            ? (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.15)
+                : const Color(0xFFCBD5E1));
+
+        final chipTextColor = isSelected
+            ? Colors.white
+            : (isDark ? Colors.white : const Color(0xFF0A183D));
+
+        return InkWell(
+          onTap: () => _onWeekSelected(i),
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              color: chipBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: chipBorder,
+                width: isSelected ? 2.0 : 1.0,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: (isDark ? primaryColor : darkAccent)
+                            .withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  'Week ${i + 1}',
+                  style: TextStyle(
+                    color: chipTextColor,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
-          selected: isSelected,
-          selectedColor: colorScheme.primary,
-          backgroundColor: const Color(0xFFF1F5F9),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          onSelected: (_) => _onWeekSelected(i),
-          showCheckmark: false,
         );
       }),
     );
   }
 
-  Widget _buildPaymentTable(double fontSizeBase, ColorScheme colorScheme) {
+  Widget _buildPaymentTable(double fontSizeBase) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final titleColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.15)
+        : const Color(0xFFCBD5E1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Payments for Week ${selectedWeekIndex! + 1}:',
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+        Row(
+          children: [
+            Icon(
+              Icons.receipt_rounded,
+              size: 18,
+              color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Payments for Week ${selectedWeekIndex! + 1}:',
+              style: TextStyle(
+                color: titleColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : primaryColor.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Table(
             columnWidths: const {
@@ -685,24 +874,29 @@ class _DailySitePaymentReportScreenState
             children: [
               TableRow(
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.05),
+                  color: primaryColor,
                 ),
                 children: [
                   _buildTableCell('Date', isHeader: true),
-                  _buildTableCell('Payment', isHeader: true),
+                  _buildTableCell('Payment (₹)', isHeader: true),
                 ],
               ),
               ...paymentRecords.map((rec) {
                 String dateStr = '';
                 if (rec['paymentDate'] != null) {
                   try {
-                    DateTime dt = (rec['paymentDate'] as Timestamp).toDate();
+                    DateTime dt = DateFormat('yyyy-MM-dd').parse(rec['paymentDate'].toString());
                     dateStr = DateFormat('EEE, MMM d, y').format(dt);
                   } catch (e) {
                     dateStr = rec['paymentDate'].toString();
                   }
                 }
                 return TableRow(
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.03)
+                        : const Color(0xFFF8FAFC),
+                  ),
                   children: [
                     _buildTableCell(dateStr),
                     _buildTableCell(rec['paymentAmount']?.toString() ?? '0'),
@@ -711,12 +905,14 @@ class _DailySitePaymentReportScreenState
               }),
               TableRow(
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.02),
+                  color: isDark
+                      ? primaryColor.withValues(alpha: 0.2)
+                      : primaryColor.withValues(alpha: 0.08),
                 ),
                 children: [
-                  _buildTableCell('Total', isTotal: true),
+                  _buildTableCell('Total Payment', isTotal: true),
                   _buildTableCell(
-                    totalAmount.toStringAsFixed(2),
+                    '₹${totalAmount.toStringAsFixed(2)}',
                     isTotal: true,
                   ),
                 ],
@@ -733,75 +929,103 @@ class _DailySitePaymentReportScreenState
     bool isHeader = false,
     bool isTotal = false,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
+    Color cellTextColor;
+    if (isHeader) {
+      cellTextColor = Colors.white;
+    } else if (isTotal) {
+      cellTextColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    } else {
+      cellTextColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       child: Text(
         text,
         style: TextStyle(
-          fontWeight: isHeader || isTotal ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? const Color(0xFF64748B) : const Color(0xFF1E293B),
-          fontSize: isHeader ? 12 : 14,
+          fontWeight: isHeader || isTotal ? FontWeight.w800 : FontWeight.w500,
+          color: cellTextColor,
+          fontSize: isHeader ? 13 : (isTotal ? 15 : 14),
         ),
       ),
     );
   }
 
-  Widget _buildActionButtons(double fontSizeBase, ColorScheme colorScheme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildActionButton(
-          onTap: _onCancel,
-          icon: Icons.refresh_rounded,
-          color: const Color(0xFFF59E0B), // Amber 500
-          label: 'Reset',
-        ),
-        _buildActionButton(
-          onTap: _onPrint,
-          icon: Icons.print_rounded,
-          color: colorScheme.primary,
-          label: 'Print',
-        ),
-      ],
-    );
-  }
+  Widget _buildActionButtons(double fontSizeBase) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final buttonBg = isDark ? primaryColor : AppTheme.getDarkAccent(primaryColor);
 
-  Widget _buildActionButton({
-    required VoidCallback onTap,
-    required IconData icon,
-    required Color color,
-    required String label,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(30),
-          child: Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+        Expanded(
+          child: SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _onCancel,
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: 18,
+                color: isDark ? Colors.white : const Color(0xFF0A183D),
+              ),
+              label: Text(
+                'Reset',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0A183D),
                 ),
-              ],
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white,
+                foregroundColor: isDark ? Colors.white : const Color(0xFF0A183D),
+                side: BorderSide(
+                  color: isDark ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFCBD5E1),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
             ),
-            child: Icon(icon, color: Colors.white, size: 28),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: _onPrint,
+              icon: const Icon(
+                Icons.print_rounded,
+                size: 20,
+                color: Colors.white,
+              ),
+              label: const Text(
+                'Print PDF Report',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: buttonBg,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                shadowColor: buttonBg.withValues(alpha: 0.35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -809,24 +1033,35 @@ class _DailySitePaymentReportScreenState
   }
 
   InputDecoration _inputDecoration(String label, double fontSize) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      labelStyle: TextStyle(
+        fontSize: 14,
+        color: labelColor,
+        fontWeight: FontWeight.w600,
+      ),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: fieldBg,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor, width: 1.0),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor, width: 1.0),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 2,
+          color: primaryColor,
+          width: 1.8,
         ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

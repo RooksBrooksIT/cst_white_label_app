@@ -35,27 +35,35 @@ class GlassCard extends StatelessWidget {
     final isMobile = Responsive.isMobile(context);
     final defaultPadding = EdgeInsets.all(isMobile ? 16 : 24);
     final currentPadding = padding ?? defaultPadding;
+    final Color cardBg = color ?? theme.cardColor;
+    final bool isDarkBg = cardBg.computeLuminance() < 0.5;
+
+    final Color titleColor = isDarkBg ? Colors.white : const Color(0xFF0A183D);
+    final Color subtitleColor = isDarkBg
+        ? Colors.white.withValues(alpha: 0.75)
+        : const Color(0xFF475569);
 
     return Container(
       width: width,
       margin: margin ?? const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: color ?? theme.cardColor,
-        borderRadius: BorderRadius.circular(borderRadius ?? 24),
-        border:
-            border ?? Border.all(color: const Color(0xFFD4E3F4), width: 1.2),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(borderRadius ?? 20),
+        border: border ??
+            Border.all(
+              color: isDarkBg
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : const Color(0xFFE2E8F0),
+              width: 1.0,
+            ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B1942).withOpacity(0.06),
-            blurRadius: 20,
-            spreadRadius: 1,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: const Color(0xFF0B1942).withOpacity(0.03),
-            blurRadius: 6,
+            color: isDarkBg
+                ? cardBg.withValues(alpha: 0.25)
+                : const Color(0xFF0A183D).withValues(alpha: 0.06),
+            blurRadius: 12,
             spreadRadius: 0,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -63,7 +71,7 @@ class GlassCard extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(borderRadius ?? 24),
+          borderRadius: BorderRadius.circular(borderRadius ?? 20),
           child: Padding(
             padding: currentPadding,
             child: Column(
@@ -81,9 +89,9 @@ class GlassCard extends StatelessWidget {
                             Text(
                               title!,
                               style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface,
-                                fontSize: isMobile ? 16 : 18,
+                                fontWeight: FontWeight.w800,
+                                color: titleColor,
+                                fontSize: isMobile ? 16.5 : 18,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -92,7 +100,7 @@ class GlassCard extends StatelessWidget {
                               Text(
                                 subtitle!,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: subtitleColor,
                                   fontSize: 12.5,
                                   height: 1.3,
                                 ),
@@ -104,7 +112,9 @@ class GlassCard extends StatelessWidget {
                       if (onTap != null)
                         Icon(
                           Icons.arrow_forward_ios_rounded,
-                          color: theme.colorScheme.primary,
+                          color: isDarkBg
+                              ? Colors.white70
+                              : const Color(0xFF64748B),
                           size: 16,
                         ),
                     ],

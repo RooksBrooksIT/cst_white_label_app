@@ -1,7 +1,7 @@
-import 'package:demo_cst/utils/responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class WorkerMappingPage extends StatefulWidget {
@@ -493,25 +493,25 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 16),
+      padding: const EdgeInsets.only(top: 16, bottom: 12),
       child: Row(
         children: [
           Container(
             width: 4,
             height: 20,
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
+              color: const Color(0xFF0A183D),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(
             title.toUpperCase(),
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 12),
+            style: const TextStyle(
+              fontSize: 13,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF94A3B8),
-              letterSpacing: 2.0,
+              color: Color(0xFF0A183D),
+              letterSpacing: 1.5,
             ),
           ),
         ],
@@ -520,24 +520,75 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   }
 
   Widget _buildSiteSelectionSection() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Site Dropdown
-            DropdownButtonFormField<String>(
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Site',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: DropdownButtonFormField<String>(
               isExpanded: true,
               value: _selectedSite,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(16),
               decoration: InputDecoration(
-                labelText: 'Site *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.construction),
+                hintText: 'Select Site',
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                prefixIcon: const Icon(
+                  Icons.construction_rounded,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+              style: const TextStyle(
+                color: Color(0xFF0A183D),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
               ),
               items: _isLoadingSites
                   ? [
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: null,
                         child: Text('Loading sites...'),
                       ),
@@ -556,36 +607,42 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     }).toList(),
               onChanged: _onSiteSelected,
             ),
+          ),
 
-            SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-            // Auto-filled Supervisor and Project Name
-            if (_selectedSupervisor != null || _selectedProjectName != null)
-              Column(
-                children: [
-                  _buildReadOnlyField(
-                    'Supervisor',
-                    _selectedSupervisor ?? 'Not available',
-                  ),
-                  SizedBox(height: 12),
-                  _buildReadOnlyField(
-                    'Project Name',
-                    _selectedProjectName ?? 'Not available',
-                  ),
-                ],
-              )
-            else if (_selectedSite != null)
-              Text(
-                'No supervisor/project details found for this site',
-                style: TextStyle(color: Colors.orange),
+          // Auto-filled Supervisor and Project Name
+          if (_selectedSupervisor != null || _selectedProjectName != null)
+            Column(
+              children: [
+                _buildReadOnlyField(
+                  'Supervisor',
+                  _selectedSupervisor ?? 'Not available',
+                ),
+                const SizedBox(height: 12),
+                _buildReadOnlyField(
+                  'Project Name',
+                  _selectedProjectName ?? 'Not available',
+                ),
+              ],
+            )
+          else if (_selectedSite != null)
+            const Text(
+              'No supervisor/project details found for this site',
+              style: TextStyle(
+                color: Colors.orangeAccent,
+                fontWeight: FontWeight.w600,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildWorkerSelectionSection() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     // Filter out workers that are already in the list
     final availableWorkers = _workers.where((worker) {
       return !_selectedWorkersList.any(
@@ -593,190 +650,271 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       );
     }).toList();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // Worker Dropdown and Add Button Section
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: _selectedWorkerId,
-                        decoration: InputDecoration(
-                          labelText: 'Select Worker',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        items: _isLoadingWorkers
-                            ? [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: Text('Loading workers...'),
-                                ),
-                              ]
-                            : availableWorkers.map<DropdownMenuItem<String>>((
-                                worker,
-                              ) {
-                                final String name =
-                                    worker['name']?.toString().trim() ?? '';
-                                final String displayName = name.isNotEmpty
-                                    ? name
-                                    : 'Unnamed (${worker['id']})';
-                                return DropdownMenuItem<String>(
-                                  value: worker['id'] as String?,
-                                  child: Text(
-                                    displayName,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                        onChanged: _onWorkerSelected,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      height: 56, // Match the dropdown height
-                      width: 70,
-                      child: FilledButton(
-                        onPressed: _addWorkerToList,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF22C55E),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Icon(Icons.add_rounded),
-                      ),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 16),
-
-                // Auto-filled Worker Details
-                if (_selectedWorkerDesignation != null ||
-                    _selectedWorkerSalary != null)
-                  Column(
-                    children: [
-                      _buildReadOnlyField(
-                        'Designation',
-                        _selectedWorkerDesignation ?? 'Not available',
-                      ),
-                      SizedBox(height: 12),
-                      _buildReadOnlyField(
-                        'Salary',
-                        _selectedWorkerSalary ?? 'Not available',
-                      ),
-                      SizedBox(height: 12),
-                      if (_selectedWorkerPhone != null)
-                        _buildReadOnlyField(
-                          'Phone',
-                          _selectedWorkerPhone ?? 'Not available',
-                        ),
-                    ],
-                  )
-                else if (_selectedWorkerId != null)
-                  Text(
-                    'No details found for this worker',
-                    style: TextStyle(color: Colors.orange),
-                  ),
-              ],
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Select Worker',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
             ),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: _selectedWorkerId,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    decoration: InputDecoration(
+                      hintText: 'Select Worker',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.person_rounded,
+                        color: Color(0xFF0A183D),
+                      ),
+                    ),
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    items: _isLoadingWorkers
+                        ? [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('Loading workers...'),
+                            ),
+                          ]
+                        : availableWorkers.map<DropdownMenuItem<String>>((
+                            worker,
+                          ) {
+                            final String name =
+                                worker['name']?.toString().trim() ?? '';
+                            final String displayName = name.isNotEmpty
+                                ? name
+                                : 'Unnamed (${worker['id']})';
+                            return DropdownMenuItem<String>(
+                              value: worker['id'] as String?,
+                              child: Text(
+                                displayName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                    onChanged: _onWorkerSelected,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 52,
+                width: 56,
+                child: FilledButton(
+                  onPressed: _addWorkerToList,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 26),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Auto-filled Worker Details
+          if (_selectedWorkerDesignation != null ||
+              _selectedWorkerSalary != null)
+            Column(
+              children: [
+                _buildReadOnlyField(
+                  'Designation',
+                  _selectedWorkerDesignation ?? 'Not available',
+                ),
+                const SizedBox(height: 12),
+                _buildReadOnlyField(
+                  'Salary',
+                  _selectedWorkerSalary ?? 'Not available',
+                ),
+                const SizedBox(height: 12),
+                if (_selectedWorkerPhone != null)
+                  _buildReadOnlyField(
+                    'Phone',
+                    _selectedWorkerPhone ?? 'Not available',
+                  ),
+              ],
+            )
+          else if (_selectedWorkerId != null)
+            const Text(
+              'No details found for this worker',
+              style: TextStyle(
+                color: Colors.orangeAccent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildWorkersTable() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              children: [
-                Text(
-                  'Selected Workers (${_selectedWorkersList.length})',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkCardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: darkCardBg.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Selected Workers (${_selectedWorkersList.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+              if (_selectedWorkersList.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedWorkersList.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.clear_all_rounded, size: 18),
+                  label: const Text('Clear All'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFF87171),
                   ),
                 ),
-                if (_selectedWorkersList.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _selectedWorkersList.clear();
-                      });
-                    },
-                    icon: Icon(Icons.clear_all, size: 16),
-                    label: Text('Clear All'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  ),
-              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
             ),
-            SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
-                  columns: [
-                    DataColumn(label: Text('No.')),
-                    DataColumn(label: Text('Worker Name')),
-                    DataColumn(label: Text('Designation')),
-                    DataColumn(label: Text('Salary')),
-                    DataColumn(label: Text('Phone')),
-                    DataColumn(label: Text('Action')),
-                  ],
-                  rows: _selectedWorkersList.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final worker = entry.value;
-                    return DataRow(
-                      cells: [
-                        DataCell(Text('${index + 1}')),
-                        DataCell(Text(worker['workerName'] ?? '')),
-                        DataCell(Text(worker['workerDesignation'] ?? '')),
-                        DataCell(Text(worker['workerSalary'] ?? '')),
-                        DataCell(Text(worker['workerPhone'] ?? '')),
-                        DataCell(
-                          IconButton(
-                            icon: Icon(
-                              Icons.delete,
-                              color: Colors.red,
-                              size: 20,
-                            ),
-                            onPressed: () => _removeWorkerFromList(index),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(
+                  Colors.white.withValues(alpha: 0.1),
+                ),
+                headingTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+                columns: const [
+                  DataColumn(label: Text('No.')),
+                  DataColumn(label: Text('Worker Name')),
+                  DataColumn(label: Text('Designation')),
+                  DataColumn(label: Text('Salary')),
+                  DataColumn(label: Text('Phone')),
+                  DataColumn(label: Text('Action')),
+                ],
+                rows: _selectedWorkersList.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final worker = entry.value;
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(
+                        '${index + 1}',
+                        style: const TextStyle(color: Colors.white),
+                      )),
+                      DataCell(Text(
+                        worker['workerName'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      )),
+                      DataCell(Text(
+                        worker['workerDesignation'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      )),
+                      DataCell(Text(
+                        worker['workerSalary'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      )),
+                      DataCell(Text(
+                        worker['workerPhone'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      )),
+                      DataCell(
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Color(0xFFF87171),
+                            size: 20,
                           ),
+                          onPressed: () => _removeWorkerFromList(index),
                         ),
-                      ],
-                    );
-                  }).toList(),
-                ),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -784,82 +922,123 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   Widget _buildReadOnlyField(String label, String value) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(4),
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFCBD5E1),
+            ),
           ),
-          SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 16)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSubmitButton() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     return Column(
       children: [
         if (!_isFormComplete && _selectedSite != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12.0),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                color: Colors.orange.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.orange[800]),
-                  SizedBox(width: 8),
+                  const Icon(Icons.info_outline_rounded, size: 18, color: Colors.orange),
+                  const SizedBox(width: 8),
                   Text(
                     _selectedWorkersList.isEmpty
                         ? 'Add at least one worker to save mapping'
                         : 'Waiting for site details...',
-                    style: TextStyle(
-                      color: Colors.orange[900],
+                    style: const TextStyle(
+                      color: Colors.orange,
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: (_isFormComplete && !_isSubmitting)
-                ? _submitMapping
-                : null,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              disabledBackgroundColor: Colors.grey[200],
-            ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(strokeWidth: 3),
-                  )
-                : const Text(
-                    'SAVE SITE MAPPING',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: darkCardBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: darkCardBg.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: (_isFormComplete && !_isSubmitting)
+                  ? _submitMapping
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: const Color(0xFF0A183D),
+                disabledBackgroundColor: Colors.white.withValues(alpha: 0.15),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.45),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 6,
+                shadowColor: primaryColor.withValues(alpha: 0.4),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF0A183D),
+                        ),
+                      ),
+                    )
+                  : const Text(
+                      'SAVE SITE MAPPING',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
                     ),
-                  ),
+            ),
           ),
         ),
       ],

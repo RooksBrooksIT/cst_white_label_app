@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 
@@ -37,7 +38,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     super.initState();
   }
 
-  // Function to check if username already exists
   Future<bool> _isUsernameUnique(String username) async {
     try {
       final querySnapshot = await FirestoreService.getCollection(
@@ -50,7 +50,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     }
   }
 
-  // Function to check if contact number already exists
   Future<bool> _isContactNoUnique(String contactNo) async {
     try {
       final querySnapshot = await FirestoreService.getCollection(
@@ -63,7 +62,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     }
   }
 
-  // Function to validate unique fields and submit form
   Future<void> _validateAndSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -79,7 +77,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       final username = _userNameController.text.trim();
       final contactNo = _contactNoController.text.trim();
 
-      // Check for unique username
       bool isUsernameUnique = await _isUsernameUnique(username);
       if (!isUsernameUnique) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +94,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         return;
       }
 
-      // Check for unique contact number
       bool isContactNoUnique = await _isContactNoUnique(contactNo);
       if (!isContactNoUnique) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,7 +111,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         return;
       }
 
-      // If both are unique, proceed with saving
       await _createSupervisorAccount();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -168,7 +163,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             'Edit Supervisor',
             style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
           ),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
               child: Form(
@@ -176,7 +171,6 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Photo Upload
                     GestureDetector(
                       onTap: () async {
                         try {
@@ -189,63 +183,54 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                               newImageFile = File(pickedFile.path);
                             });
                           }
-                        } catch (e) {
-                          // Ignore error
-                        }
+                        } catch (e) {}
                       },
                       child: Container(
-                        height: 120,
-                        width: 120,
+                        height: 100,
+                        width: 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.grey[200],
-                          border: Border.all(color: primaryColor),
+                          color: primaryColor.withValues(alpha: 0.1),
+                          border: Border.all(color: primaryColor, width: 2),
                           image: newImageFile != null
                               ? DecorationImage(
                                   image: FileImage(newImageFile!),
                                   fit: BoxFit.cover,
                                 )
-                              : (existingPhotoUrl.isNotEmpty &&
-                                        existingPhotoUrl !=
-                                            'Photo URL or Placeholder'
-                                    ? DecorationImage(
-                                        image: NetworkImage(existingPhotoUrl),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null),
+                              : existingPhotoUrl.isNotEmpty &&
+                                      existingPhotoUrl != 'Photo URL or Placeholder'
+                                  ? DecorationImage(
+                                      image: NetworkImage(existingPhotoUrl),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                         ),
-                        child:
-                            newImageFile == null &&
+                        child: (newImageFile == null &&
                                 (existingPhotoUrl.isEmpty ||
-                                    existingPhotoUrl ==
-                                        'Photo URL or Placeholder')
-                            ? Icon(
-                                Icons.camera_alt,
-                                size: 40,
-                                color: Colors.grey,
-                              )
+                                    existingPhotoUrl == 'Photo URL or Placeholder'))
+                            ? Icon(Icons.add_a_photo, size: 40, color: primaryColor)
                             : null,
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: fullNameCtrl,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Full Name',
+                        prefixIcon: Icon(Icons.person),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: userNameCtrl,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'User Name',
+                        prefixIcon: Icon(Icons.account_circle),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -253,55 +238,59 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                       obscureText: !isPasswordVisible,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        border: OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock),
+                        border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           icon: Icon(
                             isPasswordVisible
                                 ? Icons.visibility
                                 : Icons.visibility_off,
-                            color: primaryColor,
                           ),
-                          onPressed: () => setDialogState(
-                            () => isPasswordVisible = !isPasswordVisible,
-                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              isPasswordVisible = !isPasswordVisible;
+                            });
+                          },
                         ),
                       ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: designationCtrl,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Designation',
+                        prefixIcon: Icon(Icons.work),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: contactNoCtrl,
                       keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Contact No',
+                        prefixIcon: Icon(Icons.phone),
+                        border: OutlineInputBorder(),
+                      ),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(10),
                       ],
-                      decoration: InputDecoration(
-                        labelText: 'Contact No',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Required';
-                        if (val.length != 10) return 'Must be 10 digits';
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v.trim().length != 10) return 'Must be 10 digits';
                         return null;
                       },
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: emailCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email (Optional)',
+                        prefixIcon: Icon(Icons.email),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -312,109 +301,87 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           ),
           actions: [
             TextButton(
-              onPressed: isSubmittingEdit
-                  ? null
-                  : () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: TextStyle(color: primaryColor)),
+              onPressed: isSubmittingEdit ? null : () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: isSubmittingEdit
                   ? null
                   : () async {
-                      if (_editFormKey.currentState!.validate()) {
-                        setDialogState(() => isSubmittingEdit = true);
-                        try {
-                          String photoUrl = existingPhotoUrl;
-                          if (newImageFile != null) {
+                      if (!_editFormKey.currentState!.validate()) return;
+                      setDialogState(() => isSubmittingEdit = true);
+
+                      try {
+                        String photoUrl = existingPhotoUrl;
+                        if (newImageFile != null) {
+                          try {
                             final storageRef = FirebaseStorage.instance
                                 .ref()
                                 .child('supervisor_photos')
-                                .child('$documentId.jpg');
+                                .child('${documentId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
                             await storageRef.putFile(newImageFile!);
                             photoUrl = await storageRef.getDownloadURL();
+                          } catch (e) {
+                            debugPrint('Photo upload failed: $e');
                           }
+                        }
 
-                          final updatedData = {
-                            'FullName': fullNameCtrl.text.trim(),
-                            'UserName': userNameCtrl.text.trim(),
-                            'Password': passwordCtrl.text.trim(),
-                            'Designation': designationCtrl.text.trim(),
-                            'ContactNo': contactNoCtrl.text.trim(),
-                            'Email': emailCtrl.text.trim(),
-                            'Photo': photoUrl.isNotEmpty
-                                ? photoUrl
-                                : 'Photo URL or Placeholder',
-                          };
+                        await FirestoreService.getCollection('supervisor').doc(documentId).update({
+                          'FullName': fullNameCtrl.text.trim(),
+                          'UserName': userNameCtrl.text.trim(),
+                          'Password': passwordCtrl.text.trim(),
+                          'Designation': designationCtrl.text.trim(),
+                          'ContactNo': contactNoCtrl.text.trim(),
+                          'Email': emailCtrl.text.trim(),
+                          'Photo': photoUrl,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
 
-                          await FirestoreService.getCollection(
-                            'supervisor',
-                          ).doc(documentId).update(updatedData);
-
-                          Navigator.of(context).pop(true);
-                        } catch (e) {
+                        if (context.mounted) {
+                          Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: $e'),
-                              backgroundColor: Colors.red,
+                            const SnackBar(
+                              content: Text('Supervisor updated successfully!'),
+                              backgroundColor: Colors.green,
                             ),
                           );
-                          setDialogState(() => isSubmittingEdit = false);
+                          setState(() {});
                         }
+                      } catch (e) {
+                        setDialogState(() => isSubmittingEdit = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red),
+                        );
                       }
                     },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
               child: isSubmittingEdit
-                  ? SizedBox(
+                  ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : Text('Save', style: TextStyle(color: Colors.white)),
+                  : const Text('Save Changes'),
             ),
           ],
         ),
       ),
-    ).then((result) {
-      if (result == true) {
-        if (mounted) {
-          DialogUtils.showSuccessDialog(
-            context,
-            message: 'Supervisor updated successfully!',
-          );
-        }
-        setState(() {}); // Refresh list
-      }
-    });
+    );
   }
 
-  // Function to create supervisor account
   Future<void> _createSupervisorAccount() async {
     try {
-      final snapshot = await FirestoreService.getCollection('supervisor').get();
-      int maxNumber = 0;
-      for (var doc in snapshot.docs) {
-        final id = doc.id;
-        final match = RegExp(r'SP(\d+)_').firstMatch(id);
-        if (match != null) {
-          final num = int.tryParse(match.group(1)!);
-          if (num != null && num > maxNumber) {
-            maxNumber = num;
-          }
-        }
+      final snapshot = await FirestoreService.getCollection('supervisor')
+          .orderBy('SupervisorId', descending: true)
+          .limit(1)
+          .get();
+
+      int nextNumber = 1;
+      if (snapshot.docs.isNotEmpty) {
+        final lastId = snapshot.docs.first['SupervisorId'] as String? ?? 'SUP000';
+        final numberStr = lastId.replaceAll(RegExp(r'[^0-9]'), '');
+        nextNumber = (int.tryParse(numberStr) ?? 0) + 1;
       }
-      final nextNumber = maxNumber + 1;
-      final supervisorNumber = nextNumber.toString().padLeft(3, '0');
-      final username = _userNameController.text.trim();
-      final supervisorId = 'SP${supervisorNumber}_$username';
-      final documentId = supervisorId;
+      final newSupervisorId = 'SUP${nextNumber.toString().padLeft(3, '0')}';
 
       String photoUrl = '';
       if (_imageFile != null) {
@@ -422,116 +389,122 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           final storageRef = FirebaseStorage.instance
               .ref()
               .child('supervisor_photos')
-              .child('$documentId.jpg');
-
+              .child('${newSupervisorId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
           await storageRef.putFile(_imageFile!);
           photoUrl = await storageRef.getDownloadURL();
         } catch (e) {
-          print('Error uploading photo: $e');
+          debugPrint('Storage upload error: $e');
         }
       }
 
       final supervisorData = {
-        'SupervisorId': supervisorId,
+        'SupervisorId': newSupervisorId,
         'FullName': _fullNameController.text.trim(),
-        'UserName': username,
+        'UserName': _userNameController.text.trim(),
         'Password': _passwordController.text.trim(),
         'Designation': _designationController.text.trim(),
         'ContactNo': _contactNoController.text.trim(),
         'Email': _emailController.text.trim(),
-        'Photo': photoUrl.isNotEmpty ? photoUrl : 'Photo URL or Placeholder',
-        'CreatedAt': FieldValue.serverTimestamp(),
+        'Photo': photoUrl,
+        'createdAt': FieldValue.serverTimestamp(),
       };
 
-      await FirestoreService.getCollection(
-        'supervisor',
-      ).doc(documentId).set(supervisorData);
+      await FirestoreService.getCollection('supervisor')
+          .doc(newSupervisorId)
+          .set(supervisorData);
 
-      // Show success dialog
       if (mounted) {
-        await DialogUtils.showSuccessDialog(
-          context,
-          message: 'Your supervisor details have been saved successfully.',
-        );
+        _showSuccessDialog(newSupervisorId);
       }
-
-      // Clear form
-      _resetForm();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error, size: 20),
-              SizedBox(width: 8),
-              Text('Failed to create supervisor account: $e'),
-            ],
-          ),
+          content: Text('Failed to create supervisor account: $e'),
           backgroundColor: Colors.red,
         ),
       );
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(String supervisorId) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (BuildContext dialogContext) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Lottie.asset(
-                    'assets/animation/success.json',
-                    width: 100,
-                    height: 100,
-                    repeat: false,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Success!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: primaryColor,
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your supervisor details have been saved successfully.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
+                    Lottie.asset(
+                      'assets/animation/success.json',
+                      width: 120,
+                      height: 120,
+                      repeat: false,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Success!',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Supervisor Account Created!\nID: $supervisorId',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
+                      foregroundColor: const Color(0xFF0A183D),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 12,
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      Navigator.pop(dialogContext);
+                      _resetForm();
+                      setState(() {
+                        _selectedTab = 1;
+                      });
                     },
-                    child: const Text('OK', style: TextStyle(fontSize: 16)),
+                    child: const Text(
+                      'CONTINUE',
+                      style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -540,24 +513,25 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   }
 
   void _resetForm() {
-    _formKey.currentState!.reset();
+    _formKey.currentState?.reset();
     _fullNameController.clear();
     _userNameController.clear();
     _passwordController.clear();
+    _designationController.clear();
     _contactNoController.clear();
     _emailController.clear();
-    _designationController.clear();
     setState(() {
       _imageFile = null;
+      _isPasswordVisible = false;
     });
   }
 
   @override
   void dispose() {
+    _designationController.dispose();
     _fullNameController.dispose();
     _userNameController.dispose();
     _passwordController.dispose();
-    _designationController.dispose();
     _contactNoController.dispose();
     _emailController.dispose();
     super.dispose();
@@ -565,207 +539,318 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return GlassScaffold(
-      title: 'Site Supervisor Configuration',
-      onBack: () => Navigator.pop(context),
+      padding: EdgeInsets.zero,
       body: SafeArea(
-        bottom: true,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isMobile ? double.infinity : 600,
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
-                // Top Two Buttons
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Container(
+        child: Column(
+          children: [
+            // ── Header Row ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 0
-                                  ? primaryColor
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedTab = 0;
-                                });
-                              },
-                              child: Text(
-                                'Create Supervisor',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTab == 0
-                                      ? Colors.white
-                                      : primaryColor,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 1
-                                  ? primaryColor
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedTab = 1;
-                                });
-                              },
-                              child: Text(
-                                'Supervisors Info',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTab == 1
-                                      ? Colors.white
-                                      : primaryColor,
-                                ),
-                              ),
-                            ),
-                          ),
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                // Content
-                Expanded(
-                  child: _selectedTab == 0
-                      ? _buildCreateForm()
-                      : _buildInfoTable(),
-                ),
-              ],
+                  Text(
+                    'Site Supervisor Configuration',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  // ----------------------- CREATE TAB CONTENT -----------------------
-  Widget _buildCreateForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 24),
-            _buildTextField('Full Name', _fullNameController, isRequired: true),
-            const SizedBox(height: 16),
-            _buildTextField('User Name', _userNameController, isRequired: true),
-            const SizedBox(height: 16),
-            _buildTextField(
-              'Password',
-              _passwordController,
-              isRequired: true,
-              isPassword: true,
+            // ── Dark Pill Mode Switcher ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedTab = 0),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedTab == 0
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_add_rounded,
+                              size: 16,
+                              color: _selectedTab == 0
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'CREATE SUPERVISOR',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                                color: _selectedTab == 0
+                                    ? Colors.white
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedTab = 1),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedTab == 1
+                              ? primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.supervisor_account_rounded,
+                              size: 16,
+                              color: _selectedTab == 1
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'SUPERVISORS INFO',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                                color: _selectedTab == 1
+                                    ? Colors.white
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              'Designation',
-              _designationController,
-              isRequired: true,
+
+            // ── Tab Content ─────────────────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: _selectedTab == 0
+                      ? _buildCreateForm(darkCardBg, primaryColor)
+                      : _buildInfoTable(darkCardBg, primaryColor),
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              'Contact No',
-              _contactNoController,
-              keyboardType: TextInputType.phone,
-              isRequired: true,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(10),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              'Email',
-              _emailController,
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 20),
-            _buildPhotoUpload(),
-            const SizedBox(height: 30),
-            _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: primaryColor.withOpacity(0.3)),
-          ),
-          child: Column(
-            children: [
-              Icon(Icons.person_add_alt_1, size: 40, color: primaryColor),
-              const SizedBox(height: 8),
-              Text(
-                'Create Supervisor Account',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
-                ),
-                textAlign: TextAlign.center,
+  // ── CREATE TAB CONTENT ──────────────────────────────────────────────────
+  Widget _buildCreateForm(Color darkCardBg, Color primaryColor) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Please fill in all required fields (*)',
-                style: TextStyle(fontSize: 14),
-                textAlign: TextAlign.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Card Header Note
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E88E5),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1E88E5)
+                                  .withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.person_add_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Create Supervisor Account',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Please fill in all required fields (*)',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+
+                  _buildTextField(
+                    'Full Name',
+                    _fullNameController,
+                    isRequired: true,
+                    icon: Icons.person_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    'User Name',
+                    _userNameController,
+                    isRequired: true,
+                    icon: Icons.account_circle_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    'Password',
+                    _passwordController,
+                    isRequired: true,
+                    isPassword: true,
+                    icon: Icons.lock_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    'Designation',
+                    _designationController,
+                    isRequired: true,
+                    icon: Icons.badge_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    'Contact No',
+                    _contactNoController,
+                    keyboardType: TextInputType.phone,
+                    isRequired: true,
+                    icon: Icons.phone_rounded,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    'Email',
+                    _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    icon: Icons.email_rounded,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildPhotoUpload(primaryColor),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 20),
+
+            _buildActionButtons(primaryColor),
+            const SizedBox(height: 24),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -776,78 +861,102 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     bool isPassword = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
+    IconData? icon,
   }) {
+    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label + (isRequired ? ' *' : ''),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: primaryColor,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'Enter $label',
-            hintStyle: TextStyle(),
-            filled: true,
-            fillColor: Colors.grey[50],
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: primaryColor, width: 2),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            suffixIcon: isPassword
-                ? IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: primaryColor,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  )
-                : null,
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          obscureText: isPassword ? !_isPasswordVisible : false,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          validator: (value) {
-            if (isRequired && (value == null || value.isEmpty)) {
-              return 'This field is required';
-            }
-            if (label == 'Contact No' && value != null && value.isNotEmpty) {
-              if (value.length != 10) {
-                return 'Phone number must be 10 digits';
+          child: TextFormField(
+            controller: controller,
+            obscureText: isPassword ? !_isPasswordVisible : false,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: icon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(icon, color: brandIconColor, size: 22),
+                    )
+                  : null,
+              suffixIcon: isPassword
+                  ? IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
+                        color: brandIconColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+            validator: (value) {
+              if (isRequired && (value == null || value.trim().isEmpty)) {
+                return 'This field is required';
               }
-            }
-            if (label == 'Email' && value != null && value.isNotEmpty) {
-              if (!RegExp(
-                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-              ).hasMatch(value)) {
-                return 'Please enter a valid email address';
+              if (label == 'Contact No' &&
+                  value != null &&
+                  value.trim().isNotEmpty) {
+                if (value.trim().length != 10) {
+                  return 'Phone number must be 10 digits';
+                }
               }
-            }
-            return null;
-          },
-          cursorColor: primaryColor,
-          style: TextStyle(fontSize: 15),
+              if (label == 'Email' && value != null && value.trim().isNotEmpty) {
+                if (!RegExp(
+                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                ).hasMatch(value.trim())) {
+                  return 'Please enter a valid email address';
+                }
+              }
+              return null;
+            },
+          ),
         ),
       ],
     );
@@ -871,27 +980,31 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     }
   }
 
-  Widget _buildPhotoUpload() {
+  Widget _buildPhotoUpload(Color primaryColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Supervisor Photo',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: primaryColor,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: _pickImage,
           child: Container(
-            height: 150,
+            height: 140,
             width: double.infinity,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.3),
+                style: BorderStyle.solid,
+              ),
               image: _imageFile != null
                   ? DecorationImage(
                       image: FileImage(_imageFile!),
@@ -900,23 +1013,40 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   : null,
             ),
             child: _imageFile == null
-                ? Center(
+                ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.camera_alt, size: 40),
-                        const SizedBox(height: 8),
-                        Text('Upload Supervisor Photo', style: TextStyle()),
-                        const SizedBox(height: 4),
-                        Text('(Optional)', style: TextStyle(fontSize: 12)),
+                        Icon(
+                          Icons.camera_alt_rounded,
+                          size: 36,
+                          color: Color(0xFFCBD5E1),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Upload Supervisor Photo',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '(Optional)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
                       ],
                     ),
                   )
                 : Align(
                     alignment: Alignment.topRight,
                     child: IconButton(
-                      icon: Icon(
-                        Icons.cancel,
+                      icon: const Icon(
+                        Icons.cancel_rounded,
                         color: Colors.white,
                         shadows: [Shadow(color: Colors.black, blurRadius: 4)],
                       ),
@@ -933,60 +1063,85 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(Color primaryColor) {
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton(
-            onPressed: _isSubmitting ? null : _validateAndSubmit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _validateAndSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: const Color(0xFF0A183D),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 6,
+                shadowColor: primaryColor.withValues(alpha: 0.4),
               ),
-              elevation: 2,
-            ),
-            child: _isSubmitting
-                ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF0A183D)),
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_add_rounded,
+                          size: 20,
+                          color: Color(0xFF0A183D),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'CREATE SUPERVISOR',
+                          style: TextStyle(
+                            color: Color(0xFF0A183D),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
                     ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_add, size: 20),
-                      SizedBox(width: 8),
-                      Text('Create ', style: TextStyle(fontSize: 16)),
-                    ],
-                  ),
+            ),
           ),
         ),
         const SizedBox(width: 12),
-        Container(width: 1, height: 40),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton(
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
             onPressed: _isSubmitting ? null : _resetForm,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
               ),
-              side: BorderSide(color: primaryColor),
+              elevation: 0,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: const Row(
               children: [
-                Icon(Icons.refresh, size: 20, color: primaryColor),
-                SizedBox(width: 8),
+                Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                SizedBox(width: 6),
                 Text(
-                  'Reset',
-                  style: TextStyle(fontSize: 16, color: primaryColor),
+                  'RESET',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ],
             ),
@@ -996,30 +1151,31 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     );
   }
 
-  // ----------------------- INFO TAB CONTENT -----------------------
-  Widget _buildInfoTable() {
+  // ── SUPERVISORS INFO TAB CONTENT ─────────────────────────────────────────
+  Widget _buildInfoTable(Color darkCardBg, Color primaryColor) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.info, color: primaryColor, size: 18),
-              SizedBox(width: 8),
-              Text(
+              Icon(Icons.info_outline_rounded, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              const Text(
                 'Supervisors Information',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: primaryColor,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0A183D),
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  color: darkCardBg,
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: FutureBuilder<QuerySnapshot>(
                   future: FirestoreService.getCollection('supervisor').get(),
@@ -1029,7 +1185,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                       '$count supervisors',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w800,
                         color: primaryColor,
                       ),
                     );
@@ -1045,46 +1201,16 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            primaryColor,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Loading supervisors...',
-                        style: TextStyle(fontSize: 16, color: primaryColor),
-                      ),
-                    ],
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                   ),
                 );
               }
               if (snapshot.hasError) {
                 return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error, size: 50, color: Colors.red),
-                      SizedBox(height: 16),
-                      Text(
-                        'Failed to load supervisors',
-                        style: TextStyle(fontSize: 16, color: Colors.red),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '${snapshot.error}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                  child: Text(
+                    'Failed to load supervisors: ${snapshot.error}',
+                    style: const TextStyle(color: Color(0xFF0A183D)),
                   ),
                 );
               }
@@ -1094,31 +1220,38 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.people, size: 60, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
+                      Icon(
+                        Icons.people_outline_rounded,
+                        size: 64,
+                        color: primaryColor.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
                         'No Supervisors Found',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0A183D),
                         ),
                       ),
-                      SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 6),
+                      const Text(
                         'Create your first supervisor account',
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                        style: TextStyle(
+                          color: Color(0xFF475569),
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 );
               }
+
               final supervisors = data.docs;
               return ListView.builder(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12),
                 itemCount: supervisors.length,
                 itemBuilder: (context, index) {
                   final doc = supervisors[index];
@@ -1128,157 +1261,176 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                   final supervisorId = data['SupervisorId'] ?? '';
                   final password = data['Password'] ?? '';
                   final designation = data['Designation'] ?? '';
+                  final contactNo = data['ContactNo'] ?? '';
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey.shade200),
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: darkCardBg,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: darkCardBg.withValues(alpha: 0.2),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Photo
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: primaryColor.withOpacity(0.1),
-                                  border: Border.all(
-                                    color: primaryColor.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child:
-                                      photoUrl.toString().isNotEmpty &&
-                                          photoUrl != 'Photo URL or Placeholder'
-                                      ? Image.network(
-                                          photoUrl,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  Icon(
-                                                    Icons.person,
-                                                    color: primaryColor,
-                                                  ),
-                                        )
-                                      : Icon(Icons.person, color: primaryColor),
-                                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Avatar
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primaryColor.withValues(alpha: 0.18),
                               ),
-                              const SizedBox(width: 16),
-                              // Info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      supervisorName.isNotEmpty
-                                          ? supervisorName
-                                          : 'No Name',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (designation.isNotEmpty)
-                                      Text(
-                                        designation,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: primaryColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        supervisorId,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
+                              child: ClipOval(
+                                child: photoUrl.toString().isNotEmpty &&
+                                        photoUrl != 'Photo URL or Placeholder'
+                                    ? Image.network(
+                                        photoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) => Icon(
+                                          Icons.person_rounded,
                                           color: primaryColor,
                                         ),
+                                      )
+                                    : Icon(
+                                        Icons.person_rounded,
+                                        color: primaryColor,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+
+                            // Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    supervisorName.isNotEmpty
+                                        ? supervisorName
+                                        : 'No Name',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  if (designation.isNotEmpty)
+                                    Text(
+                                      designation,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFFCBD5E1),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              // Edit Action
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: primaryColor.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.edit,
-                                    color: primaryColor,
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    _editSupervisorInfo(doc.id, data);
-                                  },
-                                  tooltip: 'Edit Info',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12.0),
-                            child: Divider(height: 1, thickness: 1),
-                          ),
-                          // Password Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.lock_outline,
-                                    size: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Password:',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          primaryColor.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      supervisorId,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: primaryColor,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
+                            ),
+
+                            // Edit Action
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_rounded,
+                                color: Color(0xFF60A5FA),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                _editSupervisorInfo(doc.id, data);
+                              },
+                              tooltip: 'Edit Info',
+                            ),
+                          ],
+                        ),
+                        if (contactNo.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_rounded,
+                                  size: 14, color: Color(0xFFCBD5E1)),
+                              const SizedBox(width: 6),
                               Text(
-                                password,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Monospace',
-                                  color: Colors.black87,
+                                contactNo,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFFE2E8F0),
                                 ),
                               ),
                             ],
                           ),
                         ],
-                      ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Divider(
+                            height: 1,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        // Password Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 14,
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Password:',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFFCBD5E1),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              password,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Monospace',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   );
                 },

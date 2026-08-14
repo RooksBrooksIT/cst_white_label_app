@@ -258,8 +258,7 @@ class _OrganizationInsightsScreenState
 
     return GlassScaffold(
       title: 'Expenses Report',
-      appBarBackgroundColor: Theme.of(context).colorScheme.primary,
-      appBarForegroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       body: Center(
         child: ConstrainedBox(

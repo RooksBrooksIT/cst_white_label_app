@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
@@ -271,37 +272,158 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final theme = Theme.of(context);
+    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return GlassScaffold(
-      title: 'Workers Configuration',
-      onBack: () => Navigator.pop(context),
-      bottom: TabBar(
-        controller: _tabController,
-        indicatorColor: Colors.white,
-        indicatorWeight: 3,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
-        ),
-        tabs: const [
-          Tab(text: 'CREATE NEW'),
-          Tab(text: 'WORKERS LIST'),
-        ],
-      ),
+      padding: EdgeInsets.zero,
       body: SafeArea(
-        bottom: true,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-            child: TabBarView(
-          controller: _tabController,
-          children: [_buildCreateWorkerTab(), _buildWorkersListTab()],
-        ),
-          ),
+        child: Column(
+          children: [
+            // ── Header ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Text(
+                    'Workers Configuration',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
+            ),
+
+            // ── Dark pill tab bar ──────────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: darkCardBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: darkCardBg.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(0),
+                      child: AnimatedBuilder(
+                        animation: _tabController,
+                        builder: (context, _) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _tabController.index == 0
+                                ? theme.primaryColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'CREATE NEW',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: _tabController.index == 0
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(1),
+                      child: AnimatedBuilder(
+                        animation: _tabController,
+                        builder: (context, _) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _tabController.index == 1
+                                ? theme.primaryColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'WORKERS LIST',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: _tabController.index == 1
+                                  ? Colors.white
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Tab content ───────────────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobile ? double.infinity : 600,
+                  ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildCreateWorkerTab(),
+                      _buildWorkersListTab(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -319,9 +441,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                 const Text(
                   'Basic Information',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -345,9 +468,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                 const Text(
                   'Job Details',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -380,9 +504,10 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                 const Text(
                   'Additional Information',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -407,56 +532,79 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
   }
 
   Widget _buildDesignationDropdown() {
-    final theme = Theme.of(context);
+    final brandIconColor =
+        AppTheme.getDarkAccent(Theme.of(context).primaryColor);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Designation *',
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: DropdownButtonFormField<String>(
             value: _selectedDesignation,
             isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
             decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
-              prefixIcon: Icon(
-                Icons.work_outline,
-                color: theme.colorScheme.primary,
-                size: 20,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(
+                  Icons.work_outline,
+                  color: brandIconColor,
+                  size: 22,
+                ),
+              ),
+              hintText: 'Select Designation',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            hint: const Text('Select Designation'),
-            dropdownColor: theme.cardColor,
             items: _designations.map<DropdownMenuItem<String>>((designation) {
               final designationValue =
                   designation['designation']?.toString() ?? '';
               final salaryValue = designation['salary']?.toString() ?? '';
-
               return DropdownMenuItem<String>(
                 value: designationValue.isEmpty ? null : designationValue,
-                child: Text(designationValue),
                 onTap: () {
                   setState(() {
                     _salaryController.text = salaryValue;
-                    // Keep it editable or set to true if we want to allow immediate override
                     _isSalaryEditable = true;
                   });
                 },
+                child: Text(designationValue),
               );
             }).toList(),
             onChanged: (String? value) {
@@ -636,14 +784,18 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       children: [
         Text(
           data['name'] ?? '',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(height: 12),
         _buildInfoRow(Icons.phone_outlined, data['phoneNumber'] ?? ''),
         _buildInfoRow(Icons.work_outline, '${data['designation'] ?? ''}'),
         _buildInfoRow(
           Icons.attach_money_rounded,
-          'Salary: ₹${data['salary']?.toString() ?? '0'}',
+          'Salary: \u20b9${data['salary']?.toString() ?? '0'}',
         ),
         _buildInfoRow(
           Icons.calendar_today_outlined,
@@ -660,12 +812,15 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey[600]),
+          Icon(icon, size: 16, color: const Color(0xFFCBD5E1)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFFE2E8F0),
+              ),
             ),
           ),
         ],

@@ -5,6 +5,7 @@ import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
+import '/utils/app_theme.dart';
 
 class SiteStatusReportScreen extends StatefulWidget {
   const SiteStatusReportScreen({super.key});
@@ -124,46 +125,53 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Site Status Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final cardAccent = AppTheme.getCardAccent(primaryColor);
+
+        return GlassScaffold(
+          title: 'Site Status Report',
+          appBarForegroundColor: Colors.white,
+          onBack: () => Navigator.pop(context),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 600,
+              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildErrorView(theme)
+                  : SingleChildScrollView(
+                      padding: EdgeInsets.all(isMobile ? 16 : 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeaderCard(theme, cardAccent),
+                          const SizedBox(height: 24),
+                          _buildSelectorSection(theme, cardAccent),
+                          const SizedBox(height: 40),
+                          GlassButton(
+                            label: 'GENERATE REPORT',
+                            onPressed:
+                                (_selectedStatus == null || _statusOptions.isEmpty)
+                                ? null
+                                : _handleReport,
+                          ),
+                          const SizedBox(height: 12),
+                          GlassButton(
+                            label: 'CANCEL',
+                            onPressed: () => Navigator.pop(context),
+                            isSecondary: true,
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
           ),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-              ? _buildErrorView(theme)
-              : SingleChildScrollView(
-                  padding: EdgeInsets.all(isMobile ? 16 : 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeaderCard(theme),
-                      const SizedBox(height: 24),
-                      _buildSelectorSection(theme),
-                      const SizedBox(height: 40),
-                      GlassButton(
-                        label: 'GENERATE REPORT',
-                        onPressed:
-                            (_selectedStatus == null || _statusOptions.isEmpty)
-                            ? null
-                            : _handleReport,
-                      ),
-                      const SizedBox(height: 12),
-                      GlassButton(
-                        label: 'CANCEL',
-                        onPressed: () => Navigator.pop(context),
-                        isSecondary: true,
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -189,18 +197,19 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
     );
   }
 
-  Widget _buildHeaderCard(ThemeData theme) {
+  Widget _buildHeaderCard(ThemeData theme, Color cardAccent) {
     return GlassCard(
-      color: theme.primaryColor.withOpacity(0.05),
       child: Row(
         children: [
-          Icon(Icons.insights_outlined, color: theme.primaryColor, size: 24),
+          Icon(Icons.insights_outlined, color: cardAccent, size: 26),
           const SizedBox(width: 16),
-          Flexible(
+          Expanded(
             child: Text(
               'Track project status and financial health. Select a status to generate a detailed analytics report.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
                 height: 1.4,
               ),
             ),
@@ -210,33 +219,56 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
     );
   }
 
-  Widget _buildSelectorSection(ThemeData theme) {
+  Widget _buildSelectorSection(ThemeData theme, Color cardAccent) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'FILTER BY STATUS',
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 13,
+              color: cardAccent,
               letterSpacing: 1.2,
             ),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             value: _selectedStatus,
+            dropdownColor: Colors.white,
+            iconEnabledColor: cardAccent,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
             decoration: InputDecoration(
               labelText: 'Project State',
-              prefixIcon: const Icon(Icons.flag_outlined),
+              labelStyle: const TextStyle(
+                color: Color(0xFF5A759E),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              prefixIcon: Icon(Icons.flag_outlined, color: cardAccent),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: theme.cardColor,
+              fillColor: Colors.white,
             ),
             items: _statusOptions
-                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(
+                        s,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ))
                 .toList(),
             onChanged: (v) => setState(() => _selectedStatus = v),
           ),

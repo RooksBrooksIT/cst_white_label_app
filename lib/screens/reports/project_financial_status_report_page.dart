@@ -7,6 +7,7 @@ import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
+import '/utils/app_theme.dart';
 
 class ProjectFinancialStatusReportPage extends StatefulWidget {
   const ProjectFinancialStatusReportPage({super.key});
@@ -80,56 +81,65 @@ class _ProjectFinancialStatusReportPageState
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Financial Status Entry',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildInfoCard(theme),
-                const SizedBox(height: 24),
-                _buildFormCard(theme),
-                const SizedBox(height: 32),
-                GlassButton(
-                  label: 'VIEW FINANCIAL STATUS',
-                  onPressed: _showFinancialStatus,
-                  icon: Icons.pie_chart_outline,
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final cardAccent = AppTheme.getCardAccent(primaryColor);
+
+        return GlassScaffold(
+          title: 'Financial Status Entry',
+          appBarForegroundColor: Colors.white,
+          onBack: () => Navigator.pop(context),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 600,
+              ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildInfoCard(theme, cardAccent),
+                    const SizedBox(height: 24),
+                    _buildFormCard(theme, cardAccent),
+                    const SizedBox(height: 32),
+                    GlassButton(
+                      label: 'VIEW FINANCIAL STATUS',
+                      onPressed: _showFinancialStatus,
+                      icon: Icons.pie_chart_outline,
+                    ),
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      label: 'VIEW PROJECT INDICATOR',
+                      onPressed: _showProjectIndicator,
+                      icon: Icons.analytics_outlined,
+                      isSecondary: true,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                GlassButton(
-                  label: 'VIEW PROJECT INDICATOR',
-                  onPressed: _showProjectIndicator,
-                  icon: Icons.analytics_outlined,
-                  isSecondary: true,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildInfoCard(ThemeData theme) {
+  Widget _buildInfoCard(ThemeData theme, Color cardAccent) {
     return GlassCard(
-      color: theme.primaryColor.withOpacity(0.05),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: theme.primaryColor),
+          Icon(Icons.info_outline, color: cardAccent, size: 26),
           const SizedBox(width: 16),
-          Expanded(
+          const Expanded(
             child: Text(
               'Select a site to generate comprehensive financial and performance analytics.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
+                height: 1.4,
               ),
             ),
           ),
@@ -138,16 +148,17 @@ class _ProjectFinancialStatusReportPageState
     );
   }
 
-  Widget _buildFormCard(ThemeData theme) {
+  Widget _buildFormCard(ThemeData theme, Color cardAccent) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'PROJECT PARAMETERS',
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 13,
+              color: cardAccent,
               letterSpacing: 1.2,
             ),
           ),
@@ -157,12 +168,30 @@ class _ProjectFinancialStatusReportPageState
               : DropdownButtonFormField<String>(
                   value: selectedSiteId,
                   isExpanded: true,
-                  decoration: _inputDecoration('Select Site ID', Icons.search),
+                  dropdownColor: Colors.white,
+                  iconEnabledColor: cardAccent,
+                  style: const TextStyle(
+                    color: Color(0xFF0A183D),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: _inputDecoration(
+                    'Select Site ID',
+                    Icons.search,
+                    cardAccent,
+                  ),
                   items: siteIds
                       .map(
                         (id) => DropdownMenuItem(
                           value: id,
-                          child: Text(id, overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            id,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF0A183D),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       )
                       .toList(),
@@ -174,31 +203,65 @@ class _ProjectFinancialStatusReportPageState
           const SizedBox(height: 16),
           TextField(
             controller: siteNameController,
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
             decoration: _inputDecoration(
               'Site Name',
               Icons.location_on_outlined,
+              cardAccent,
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: projectNameController,
-            decoration: _inputDecoration('Project Name', Icons.work_outline),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: _inputDecoration(
+              'Project Name',
+              Icons.work_outline,
+              cardAccent,
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: ownerNameController,
-            decoration: _inputDecoration('Owner Name', Icons.person_outline),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: _inputDecoration(
+              'Owner Name',
+              Icons.person_outline,
+              cardAccent,
+            ),
           ),
         ],
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
+  InputDecoration _inputDecoration(String label, IconData icon, Color cardAccent) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      labelStyle: const TextStyle(
+        color: Color(0xFF5A759E),
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+      prefixIcon: Icon(icon, color: cardAccent),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
     );
   }
 

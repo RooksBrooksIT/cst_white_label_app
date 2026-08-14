@@ -467,6 +467,11 @@ class __ProjectConfigSectionCardState
               Expanded(
                 child: TextField(
                   controller: _inputController,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF0A183D),
+                    fontWeight: FontWeight.w600,
+                  ),
                   decoration: InputDecoration(
                     hintText: meta.hintText,
                     hintStyle: TextStyle(
@@ -479,25 +484,25 @@ class __ProjectConfigSectionCardState
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: theme.dividerColor.withValues(alpha: 0.2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFCBD5E1),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: theme.dividerColor.withValues(alpha: 0.2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFCBD5E1),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
                         color: meta.themeColor,
-                        width: 1.5,
+                        width: 1.8,
                       ),
                     ),
                     filled: true,
-                    fillColor: theme.cardColor,
+                    fillColor: Colors.white,
                   ),
                   onSubmitted: (_) => _addItem(),
                 ),

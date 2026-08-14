@@ -30,11 +30,13 @@ class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
 
   @override
-  _OrganizationDashboardState createState() => _OrganizationDashboardState();
+  State<OrganizationDashboard> createState() => _OrganizationDashboardState();
 }
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
+  final PageController _statCardsPageController = PageController(viewportFraction: 0.88);
+  int _currentStatCardIndex = 0;
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
   String _userName = '';
   String _userRole = 'Organization Administrator';
@@ -99,6 +101,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   void dispose() {
     _subscriptionListener?.cancel();
     _scrollController.dispose();
+    _statCardsPageController.dispose();
     super.dispose();
   }
 
@@ -450,7 +453,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Section Title Header
+              // Section Title Header with Navigation Controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -473,89 +476,200 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       ),
                     ],
                   ),
-                  if (isLoading)
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF0A183D),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A183D).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$totalProjects Total',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0A183D),
+                  Row(
+                    children: [
+                      if (isLoading)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF0A183D),
+                          ),
+                        )
+                      else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A183D).withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$totalProjects Total',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0A183D),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                        const SizedBox(width: 8),
+                        // Scroll Arrows
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: _currentStatCardIndex > 0
+                                    ? () {
+                                        _statCardsPageController.previousPage(
+                                          duration: const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        );
+                                      }
+                                    : null,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(10),
+                                  bottomLeft: Radius.circular(10),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.chevron_left_rounded,
+                                    size: 18,
+                                    color: _currentStatCardIndex > 0
+                                        ? const Color(0xFF0A183D)
+                                        : Colors.grey.shade400,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 12,
+                                color: Colors.grey.withValues(alpha: 0.3),
+                              ),
+                              InkWell(
+                                onTap: _currentStatCardIndex < 3
+                                    ? () {
+                                        _statCardsPageController.nextPage(
+                                          duration: const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        );
+                                      }
+                                    : null,
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(10),
+                                  bottomRight: Radius.circular(10),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: _currentStatCardIndex < 3
+                                        ? const Color(0xFF0A183D)
+                                        : Colors.grey.shade400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
 
-              // Stat Cards Grid
+              // Stat Cards Horizontal Scroll (One by One)
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final isWide = constraints.maxWidth > 550;
-                  return GridView.count(
-                    crossAxisCount: isWide ? 4 : 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: isWide ? 1.4 : 1.35,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
+                  final List<Map<String, dynamic>> statCards = [
+                    {
+                      'title': 'Total Projects',
+                      'value': '$totalProjects',
+                      'subtitle': 'Registered portfolio',
+                      'icon': Icons.apartment_rounded,
+                      'accentColor': const Color(0xFF3B82F6),
+                      'bgColor': const Color(0xFFEFF6FF),
+                      'textColor': const Color(0xFF1E40AF),
+                    },
+                    {
+                      'title': 'Ongoing / Active',
+                      'value': '$ongoingCount',
+                      'subtitle': 'In active execution',
+                      'icon': Icons.play_circle_fill_rounded,
+                      'accentColor': const Color(0xFF10B981),
+                      'bgColor': const Color(0xFFECFDF5),
+                      'textColor': const Color(0xFF065F46),
+                    },
+                    {
+                      'title': 'Completed',
+                      'value': '$completedCount',
+                      'subtitle': 'Successfully closed',
+                      'icon': Icons.check_circle_rounded,
+                      'accentColor': const Color(0xFF6366F1),
+                      'bgColor': const Color(0xFFEEF2FF),
+                      'textColor': const Color(0xFF3730A3),
+                    },
+                    {
+                      'title': 'Planning / Hold',
+                      'value': '${planningCount + onHoldCount}',
+                      'subtitle': '$planningCount plan • $onHoldCount hold',
+                      'icon': Icons.pending_actions_rounded,
+                      'accentColor': const Color(0xFFF59E0B),
+                      'bgColor': const Color(0xFFFFFBEB),
+                      'textColor': const Color(0xFF92400E),
+                    },
+                  ];
+
+                  return Column(
                     children: [
-                      // 1. Total Projects Stat Card
-                      _buildStatCard(
-                        title: 'Total Projects',
-                        value: '$totalProjects',
-                        subtitle: 'Registered portfolio',
-                        icon: Icons.apartment_rounded,
-                        accentColor: const Color(0xFF3B82F6), // Vibrant Blue
-                        bgColor: const Color(0xFFEFF6FF),
-                        textColor: const Color(0xFF1E40AF),
+                      SizedBox(
+                        height: 125,
+                        child: PageView.builder(
+                          controller: _statCardsPageController,
+                          itemCount: statCards.length,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentStatCardIndex = index;
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            final stat = statCards[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              child: _buildStatCard(
+                                title: stat['title'] as String,
+                                value: stat['value'] as String,
+                                subtitle: stat['subtitle'] as String,
+                                icon: stat['icon'] as IconData,
+                                accentColor: stat['accentColor'] as Color,
+                                bgColor: stat['bgColor'] as Color,
+                                textColor: stat['textColor'] as Color,
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      // 2. Active / Ongoing Stat Card
-                      _buildStatCard(
-                        title: 'Ongoing / Active',
-                        value: '$ongoingCount',
-                        subtitle: 'In active execution',
-                        icon: Icons.play_circle_fill_rounded,
-                        accentColor: const Color(0xFF10B981), // Emerald Green
-                        bgColor: const Color(0xFFECFDF5),
-                        textColor: const Color(0xFF065F46),
-                      ),
-                      // 3. Completed Stat Card
-                      _buildStatCard(
-                        title: 'Completed',
-                        value: '$completedCount',
-                        subtitle: 'Successfully closed',
-                        icon: Icons.check_circle_rounded,
-                        accentColor: const Color(0xFF6366F1), // Indigo
-                        bgColor: const Color(0xFFEEF2FF),
-                        textColor: const Color(0xFF3730A3),
-                      ),
-                      // 4. Planning / On Hold Stat Card
-                      _buildStatCard(
-                        title: 'Planning / Hold',
-                        value: '${planningCount + onHoldCount}',
-                        subtitle: '$planningCount plan • $onHoldCount hold',
-                        icon: Icons.pending_actions_rounded,
-                        accentColor: const Color(0xFFF59E0B), // Amber
-                        bgColor: const Color(0xFFFFFBEB),
-                        textColor: const Color(0xFF92400E),
+                      const SizedBox(height: 10),
+                      // Animated Indicator Dots
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(statCards.length, (index) {
+                          final isSelected = _currentStatCardIndex == index;
+                          final cardAccent = statCards[index]['accentColor'] as Color;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            height: 6,
+                            width: isSelected ? 22 : 6,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? cardAccent
+                                  : cardAccent.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          );
+                        }),
                       ),
                     ],
                   );

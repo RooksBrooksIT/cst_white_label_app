@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class ManagerConfigScreen extends StatefulWidget {
   const ManagerConfigScreen({super.key});
@@ -317,14 +318,23 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   }
 
   Widget _buildTabToggle(bool isDesktop, bool isTablet, bool isMobile) {
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0),
       ),
       child: Container(
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: Colors.grey[300]!),
+          color: darkCardBg,
+          borderRadius: BorderRadius.circular(16.0),
+          boxShadow: [
+            BoxShadow(
+              color: darkCardBg.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -347,19 +357,20 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedTab = index),
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: EdgeInsets.symmetric(vertical: isDesktop ? 16.0 : 12.0),
           decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8.0),
+            color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12.0),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: isDesktop ? 17.0 : 15.0,
-              fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : primaryColor,
+              fontSize: isDesktop ? 16.0 : 14.5,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected ? const Color(0xFF0A183D) : Colors.white,
             ),
           ),
         ),
@@ -368,88 +379,103 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   }
 
   Widget _buildCreateForm(bool isDesktop, bool isTablet, bool isMobile) {
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 20.0)),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _buildTextField(
-              'Full Name',
-              _fullNameController,
-              isRequired: true,
-              icon: Icons.person,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
+      child: Container(
+        padding: EdgeInsets.all(isDesktop ? 32.0 : 20.0),
+        decoration: BoxDecoration(
+          color: darkCardBg,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: darkCardBg.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildTextField(
-              'User Name',
-              _userNameController,
-              isRequired: true,
-              icon: Icons.alternate_email,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildTextField(
-              'Password',
-              _passwordController,
-              isRequired: true,
-              isPassword: true,
-              icon: Icons.lock,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildDropdown(
-              'Designation',
-              _selectedDesignation,
-              _designationList,
-              (val) => setState(() => _selectedDesignation = val),
-              icon: Icons.badge,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildDropdown(
-              'Department',
-              _selectedDepartment,
-              _departmentList,
-              (val) => setState(() => _selectedDepartment = val),
-              icon: Icons.business,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildTextField(
-              'Contact No',
-              _contactNoController,
-              isRequired: true,
-              keyboardType: TextInputType.phone,
-              icon: Icons.phone,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 20.0 : 16.0),
-            _buildTextField(
-              'Email',
-              _emailController,
-              keyboardType: TextInputType.emailAddress,
-              icon: Icons.email,
-              isDesktop: isDesktop,
-              isTablet: isTablet,
-              isMobile: isMobile,
-            ),
-            SizedBox(height: isDesktop ? 40.0 : 32.0),
-            _buildActionButtons(isDesktop, isTablet, isMobile),
           ],
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _buildTextField(
+                'Full Name',
+                _fullNameController,
+                isRequired: true,
+                icon: Icons.person,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildTextField(
+                'User Name',
+                _userNameController,
+                isRequired: true,
+                icon: Icons.alternate_email,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildTextField(
+                'Password',
+                _passwordController,
+                isRequired: true,
+                isPassword: true,
+                icon: Icons.lock,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildDropdown(
+                'Designation',
+                _selectedDesignation,
+                _designationList,
+                (val) => setState(() => _selectedDesignation = val),
+                icon: Icons.badge,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildDropdown(
+                'Department',
+                _selectedDepartment,
+                _departmentList,
+                (val) => setState(() => _selectedDepartment = val),
+                icon: Icons.business,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildTextField(
+                'Contact No',
+                _contactNoController,
+                isRequired: true,
+                keyboardType: TextInputType.phone,
+                icon: Icons.phone,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 20.0 : 16.0),
+              _buildTextField(
+                'Email',
+                _emailController,
+                keyboardType: TextInputType.emailAddress,
+                icon: Icons.email,
+                isDesktop: isDesktop,
+                isTablet: isTablet,
+                isMobile: isMobile,
+              ),
+              SizedBox(height: isDesktop ? 36.0 : 28.0),
+              _buildActionButtons(isDesktop, isTablet, isMobile),
+            ],
+          ),
         ),
       ),
     );
@@ -472,21 +498,26 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         Text(
           '$label${isRequired ? ' *' : ''}',
           style: TextStyle(
-            fontSize: isDesktop ? 16.0 : 14.0,
-            fontWeight: FontWeight.w600,
-            color: primaryColor,
+            fontSize: isDesktop ? 15.0 : 13.5,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFFCBD5E1),
           ),
         ),
-        SizedBox(height: isDesktop ? 12.0 : 8.0),
+        SizedBox(height: isDesktop ? 10.0 : 8.0),
         TextFormField(
           controller: controller,
           obscureText: isPassword && !_isPasswordVisible,
           keyboardType: keyboardType,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
           decoration: InputDecoration(
             prefixIcon: Icon(
               icon,
               color: primaryColor,
-              size: isDesktop ? 24.0 : 20.0,
+              size: isDesktop ? 22.0 : 20.0,
             ),
             suffixIcon: isPassword
                 ? IconButton(
@@ -494,7 +525,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
                       _isPasswordVisible
                           ? Icons.visibility
                           : Icons.visibility_off,
-                      color: primaryColor,
+                      color: const Color(0xFF5A759E),
                     ),
                     onPressed: () => setState(
                       () => _isPasswordVisible = !_isPasswordVisible,
@@ -502,15 +533,24 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
                   )
                 : null,
             hintText: 'Enter $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: Colors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: primaryColor, width: 2.0),
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
           validator: (value) => (isRequired && (value == null || value.isEmpty))
@@ -537,33 +577,58 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
         Text(
           '$label *',
           style: TextStyle(
-            fontSize: isDesktop ? 16.0 : 14.0,
-            fontWeight: FontWeight.w600,
-            color: primaryColor,
+            fontSize: isDesktop ? 15.0 : 13.5,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFFCBD5E1),
           ),
         ),
-        SizedBox(height: isDesktop ? 12.0 : 8.0),
+        SizedBox(height: isDesktop ? 10.0 : 8.0),
         DropdownButtonFormField<String>(
           value: value,
+          dropdownColor: Colors.white,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
           items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .map((e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(
+                      e,
+                      style: const TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ))
               .toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             prefixIcon: Icon(
               icon,
               color: primaryColor,
-              size: isDesktop ? 24.0 : 20.0,
+              size: isDesktop ? 22.0 : 20.0,
             ),
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: Colors.white,
+            hintText: 'Select $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: primaryColor, width: 2.0),
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
           validator: (val) => val == null ? 'Please select $label' : null,
@@ -573,53 +638,67 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   }
 
   Widget _buildActionButtons(bool isDesktop, bool isTablet, bool isMobile) {
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton(
-            onPressed: _isSubmitting ? null : _validateAndSubmit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _validateAndSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: darkCardBg,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: darkCardBg.withValues(alpha: 0.35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
               ),
+              child: _isSubmitting
+                  ? SizedBox(
+                      height: isDesktop ? 24.0 : 20.0,
+                      width: isDesktop ? 24.0 : 20.0,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'Create Account',
+                      style: TextStyle(
+                        fontSize: isDesktop ? 16.0 : 15.0,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
             ),
-            child: _isSubmitting
-                ? SizedBox(
-                    height: isDesktop ? 24.0 : 20.0,
-                    width: isDesktop ? 24.0 : 20.0,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    'Create Account',
-                    style: TextStyle(
-                      fontSize: isDesktop ? 17.0 : 16.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
           ),
         ),
         SizedBox(width: isDesktop ? 16.0 : 12.0),
         Expanded(
-          child: OutlinedButton(
-            onPressed: _resetForm,
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              onPressed: _resetForm,
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                foregroundColor: Colors.white,
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
               ),
-              side: BorderSide(color: primaryColor),
-            ),
-            child: Text(
-              'Reset',
-              style: TextStyle(
-                fontSize: isDesktop ? 17.0 : 16.0,
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
+              child: Text(
+                'Reset',
+                style: TextStyle(
+                  fontSize: isDesktop ? 16.0 : 15.0,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -629,19 +708,26 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
   }
 
   Widget _buildInfoTable(bool isDesktop, bool isTablet, bool isMobile) {
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('manager').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final managers = snapshot.data!.docs;
-        if (managers.isEmpty)
+        if (managers.isEmpty) {
           return Center(
             child: Text(
               'No managers found.',
-              style: TextStyle(fontSize: isDesktop ? 16.0 : 14.0),
+              style: TextStyle(
+                fontSize: isDesktop ? 16.0 : 14.0,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           );
+        }
 
         return ListView.builder(
           padding: EdgeInsets.all(isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0)),
@@ -650,33 +736,56 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen> {
             final data = managers[index].data() as Map<String, dynamic>;
             return Card(
               margin: EdgeInsets.only(bottom: isDesktop ? 16.0 : 12.0),
+              color: darkCardBg,
+              elevation: 4,
+              shadowColor: darkCardBg.withValues(alpha: 0.25),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+                borderRadius: BorderRadius.circular(16.0),
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
               ),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: primaryColor.withOpacity(0.1),
-                  child: Icon(Icons.person, color: primaryColor),
+                  backgroundColor: Colors.white.withValues(alpha: 0.15),
+                  child: const Icon(Icons.person, color: Colors.white),
                 ),
                 title: Text(
                   data['FullName'] ?? 'No Name',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                     fontSize: isDesktop ? 16.0 : 14.0,
                   ),
                 ),
                 subtitle: Text(
                   '${data['Designation']} • ${data['Department']}',
-                  style: TextStyle(fontSize: isDesktop ? 14.0 : 12.0),
-                ),
-                trailing: Text(
-                  data['Status'] ?? 'Active',
                   style: TextStyle(
-                    color: (data['Status'] == 'Active')
-                        ? Colors.green
-                        : Colors.red,
-                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFCBD5E1),
                     fontSize: isDesktop ? 14.0 : 12.0,
+                  ),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (data['Status'] == 'Active')
+                        ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                        : Colors.red.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    data['Status'] ?? 'Active',
+                    style: TextStyle(
+                      color: (data['Status'] == 'Active')
+                          ? const Color(0xFF10B981)
+                          : Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: isDesktop ? 13.0 : 11.5,
+                    ),
                   ),
                 ),
                 onTap: () =>

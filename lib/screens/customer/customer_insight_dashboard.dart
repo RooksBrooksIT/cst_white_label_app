@@ -76,7 +76,6 @@ class CustomerWorkProgress extends StatelessWidget {
 
     return GlassScaffold(
       title: 'Insights Dashboard',
-      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       padding: EdgeInsets.zero,
       body: Center(

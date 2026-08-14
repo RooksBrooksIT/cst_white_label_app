@@ -18,6 +18,7 @@ class GlassScaffold extends StatelessWidget {
   final Widget? endDrawer;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
   final double? toolbarHeight;
+  final bool extendBody;
 
   const GlassScaffold({
     super.key,
@@ -35,6 +36,7 @@ class GlassScaffold extends StatelessWidget {
     this.endDrawer,
     this.floatingActionButtonLocation,
     this.toolbarHeight = 70,
+    this.extendBody = false,
   });
 
   @override
@@ -43,14 +45,18 @@ class GlassScaffold extends StatelessWidget {
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
         final theme = Theme.of(context);
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
         final hasAppBar =
             title != null ||
             onBack != null ||
             (actions != null && actions!.isNotEmpty) ||
             bottom != null;
 
+        final isDark = theme.brightness == Brightness.dark;
+        final defaultFgColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
         final effectiveBgColor = appBarBackgroundColor ?? Colors.transparent;
-        final effectiveFgColor = appBarForegroundColor ?? const Color(0xFF0A183D);
+        final effectiveFgColor = appBarForegroundColor ?? defaultFgColor;
 
         final dynamicGradientColors = AppTheme.getBackgroundGradientColors(primaryColor);
 
@@ -85,7 +91,7 @@ class GlassScaffold extends StatelessWidget {
                               fontSize: Responsive.fontSize(context, 20),
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.4,
-                              color: const Color(0xFF0A183D),
+                              color: effectiveFgColor,
                             ),
                           )
                         : null,
@@ -96,11 +102,11 @@ class GlassScaffold extends StatelessWidget {
                               height: 38,
                               margin: const EdgeInsets.only(left: 16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0B1942),
+                                color: darkAccent,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF0B1942).withValues(alpha: 0.25),
+                                    color: darkAccent.withValues(alpha: 0.25),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -120,9 +126,9 @@ class GlassScaffold extends StatelessWidget {
                         : null,
                     actions: actions,
                     bottom: bottom,
-                    systemOverlayStyle: const SystemUiOverlayStyle(
+                    systemOverlayStyle: SystemUiOverlayStyle(
                       statusBarColor: Colors.transparent,
-                      statusBarIconBrightness: Brightness.dark,
+                      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
                     ),
                     shape: const RoundedRectangleBorder(),
                   )
@@ -131,9 +137,10 @@ class GlassScaffold extends StatelessWidget {
             floatingActionButtonLocation: floatingActionButtonLocation,
             drawer: drawer,
             endDrawer: endDrawer,
+            extendBody: extendBody,
             body: SafeArea(
               top: true,
-              bottom: true,
+              bottom: !extendBody,
               left: false,
               right: false,
               child: Padding(

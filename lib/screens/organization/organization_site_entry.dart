@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '/services/firestore_service.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
 import '/services/expense_service.dart';
 import 'package:intl/intl.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
+import '/utils/app_theme.dart';
 
 class OrganizationSiteEntry extends StatefulWidget {
   final String userName;
@@ -565,41 +565,86 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     }
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-    );
-  }
-
   Widget _buildCostInput(
     String label,
     TextEditingController controller,
     IconData icon,
   ) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 16,
-        ),
-        isDense: true,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            style: TextStyle(
+              fontSize: 15,
+              color: textColor,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(
+                icon,
+                size: 20,
+                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: borderColor, width: 1.0),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: borderColor, width: 1.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: primaryColor, width: 1.8),
+              ),
+              filled: true,
+              fillColor: fieldBg,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 16,
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
       ),
-      keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
     );
   }
 
   Widget _buildSummaryTable() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+    final headerTextColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final bodyTextColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -610,15 +655,18 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           child: DataTable(
             columnSpacing: 16,
             horizontalMargin: 12,
-            headingRowHeight: 40,
-            dataRowHeight: 40,
-            columns: const [
+            headingRowHeight: 44,
+            dataRowHeight: 42,
+            headingRowColor: WidgetStateProperty.all(
+              isDark ? primaryColor.withValues(alpha: 0.25) : primaryColor.withValues(alpha: 0.08),
+            ),
+            columns: [
               DataColumn(
                 label: SizedBox(
                   width: 80,
                   child: Text(
                     'Type',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -627,7 +675,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                   width: 100,
                   child: Text(
                     'Item',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -636,7 +684,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                   width: 60,
                   child: Text(
                     'Qty',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
@@ -645,11 +693,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                   width: 100,
                   child: Text(
                     'Amount',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: headerTextColor),
                   ),
                 ),
               ),
-              DataColumn(label: SizedBox(width: 40)),
+              const DataColumn(label: SizedBox(width: 40)),
             ],
             rows: [
               ...materials.asMap().entries.map((entry) {
@@ -657,10 +705,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                 var m = entry.value;
                 return DataRow(
                   cells: [
-                    const DataCell(
+                    DataCell(
                       SizedBox(
                         width: 80,
-                        child: Text('Material', style: TextStyle(fontSize: 12)),
+                        child: Text('Material', style: TextStyle(fontSize: 12, color: bodyTextColor)),
                       ),
                     ),
                     DataCell(
@@ -668,7 +716,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 100,
                         child: Text(
                           m['type']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w600),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -678,7 +726,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 60,
                         child: Text(
                           '${m['quantity'] ?? 0}',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor),
                         ),
                       ),
                     ),
@@ -690,7 +738,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             m['type']?.toString() ?? '',
                             m['quantity'] ?? 0,
                           ),
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -699,10 +747,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 40,
                         height: 40,
                         child: IconButton(
-                          icon: Icon(
-                            Icons.delete,
-                            color: Colors.red[300],
-                            size: 16,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
                           ),
                           onPressed: () => _removeMaterial(idx),
                           padding: EdgeInsets.zero,
@@ -717,10 +765,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                 var l = entry.value;
                 return DataRow(
                   cells: [
-                    const DataCell(
+                    DataCell(
                       SizedBox(
                         width: 80,
-                        child: Text('Labour', style: TextStyle(fontSize: 12)),
+                        child: Text('Labour', style: TextStyle(fontSize: 12, color: bodyTextColor)),
                       ),
                     ),
                     DataCell(
@@ -728,7 +776,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 100,
                         child: Text(
                           l['type']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w600),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -738,7 +786,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 60,
                         child: Text(
                           '${l['count'] ?? 0}',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor),
                         ),
                       ),
                     ),
@@ -750,7 +798,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             l['type']?.toString() ?? '',
                             l['count'] ?? 0,
                           ),
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -759,10 +807,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         width: 40,
                         height: 40,
                         child: IconButton(
-                          icon: Icon(
-                            Icons.delete,
-                            color: Colors.red[300],
-                            size: 16,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
                           ),
                           onPressed: () => _removeLabour(idx),
                           padding: EdgeInsets.zero,
@@ -774,97 +822,28 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
               }),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Food', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${foodCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Food', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${foodCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Transport', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${transportCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Transport', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${transportCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
               DataRow(
                 cells: [
-                  const DataCell(
-                    SizedBox(
-                      width: 80,
-                      child: Text('Fuel', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const DataCell(
-                    SizedBox(
-                      width: 60,
-                      child: Text('-', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  DataCell(
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${fuelCost.text}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  DataCell(SizedBox(width: 80, child: Text('Fuel', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 60, child: Text('-', style: TextStyle(fontSize: 12, color: bodyTextColor)))),
+                  DataCell(SizedBox(width: 100, child: Text('₹${fuelCost.text}', style: TextStyle(fontSize: 12, color: bodyTextColor, fontWeight: FontWeight.w700)))),
                   const DataCell(SizedBox(width: 40)),
                 ],
               ),
@@ -878,8 +857,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                       child: Text(
                         'Total',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: headerTextColor,
                         ),
                       ),
                     ),
@@ -890,9 +870,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                       child: Text(
                         '₹${_getTotalAmount()}',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                         ),
                       ),
                     ),
@@ -910,14 +890,46 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
 
     return GlassScaffold(
       title: 'Organiser Daily Site Entry',
       onBack: () => Navigator.pop(context),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-          onPressed: _refreshData,
+        Center(
+          child: Container(
+            width: 38,
+            height: 38,
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: _refreshData,
+              tooltip: 'Refresh',
+            ),
+          ),
         ),
       ],
       body: LayoutBuilder(
@@ -935,6 +947,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                   children: [
                     // Site info card
                     GlassCard(
+                      color: cardBg,
                       title: 'Site Information',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -944,17 +957,42 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                               : DropdownButtonFormField<String>(
                                   value: selectedSiteId,
                                   isExpanded: true,
+                                  dropdownColor: dropdownBg,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                   decoration: InputDecoration(
                                     labelText: 'Site ID',
+                                    labelStyle: TextStyle(
+                                      color: labelColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
                                     prefixIcon: Icon(
                                       Icons.construction,
-                                      color: theme.primaryColor,
+                                      color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                      size: 20,
                                     ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: borderColor, width: 1.0),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: borderColor, width: 1.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide(color: primaryColor, width: 1.8),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.white.withOpacity(0.05),
+                                    fillColor: fieldBg,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                   items: siteList
                                       .map(
@@ -963,8 +1001,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                           child: Text(
                                             '${site['siteId']} - ${site['siteName']}',
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 14,
+                                              color: textColor,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ),
@@ -1001,12 +1041,16 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                               Icon(
                                 Icons.calendar_today,
                                 size: 20,
-                                color: theme.primaryColor,
+                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                               ),
                               const SizedBox(width: 8),
-                              const Text(
+                              Text(
                                 'Date:',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: labelColor,
+                                  fontSize: 14,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Text(
@@ -1015,13 +1059,23 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                         'dd MMM yyyy',
                                       ).format(selectedDate!)
                                     : 'No date chosen',
-                                style: const TextStyle(fontSize: 16),
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: textColor,
+                                ),
                               ),
                               const Spacer(),
                               TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                ),
                                 onPressed: _pickDate,
                                 icon: const Icon(Icons.edit, size: 16),
-                                label: const Text('Change'),
+                                label: const Text(
+                                  'Change',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
                               ),
                             ],
                           ),
@@ -1033,6 +1087,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
                     // Material Details Card
                     GlassCard(
+                      color: cardBg,
                       title: 'Material Details',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1048,17 +1103,42 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             DropdownButtonFormField<String>(
                               value: selectedMaterial,
                               isExpanded: true,
+                              dropdownColor: dropdownBg,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
                               decoration: InputDecoration(
                                 labelText: 'Select Material',
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                                 prefixIcon: Icon(
                                   Icons.category_outlined,
-                                  color: theme.primaryColor,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                  size: 20,
                                 ),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                               items:
                                   (_filteredMaterialOptions ?? materialOptions)
@@ -1068,6 +1148,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                           child: Text(
                                             item,
                                             overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: textColor,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
                                       )
@@ -1076,15 +1161,41 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   setState(() => selectedMaterial = value),
                             ),
                             const SizedBox(height: 12),
+                            Text(
+                              'Quantity',
+                              style: TextStyle(
+                                color: labelColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             TextField(
                               controller: materialQtyController,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                                fontWeight: FontWeight.w800,
+                              ),
                               decoration: InputDecoration(
-                                labelText: 'Quantity',
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                               keyboardType: TextInputType.number,
                               onChanged: (value) {
@@ -1129,14 +1240,42 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                     if (_showCustomMaterialFields) ...[
                       const SizedBox(height: 16),
                       GlassCard(
+                        color: cardBg,
                         title: 'Custom Material',
                         child: Column(
                           children: [
                             TextField(
                               controller: _customMaterialNameController,
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
                                 labelText: 'Material Name',
-                                border: OutlineInputBorder(),
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1145,9 +1284,36 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Expanded(
                                   child: TextField(
                                     controller: _customMaterialQtyController,
-                                    decoration: const InputDecoration(
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: textColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
                                       labelText: 'Qty',
-                                      border: OutlineInputBorder(),
+                                      labelStyle: TextStyle(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                      ),
+                                      filled: true,
+                                      fillColor: fieldBg,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 16,
+                                      ),
                                     ),
                                     keyboardType: TextInputType.number,
                                   ),
@@ -1156,9 +1322,36 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 Expanded(
                                   child: TextField(
                                     controller: _customMaterialPriceController,
-                                    decoration: const InputDecoration(
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: textColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
                                       labelText: 'Unit Price (₹)',
-                                      border: OutlineInputBorder(),
+                                      labelStyle: TextStyle(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: borderColor, width: 1.0),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                      ),
+                                      filled: true,
+                                      fillColor: fieldBg,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 16,
+                                      ),
                                     ),
                                     keyboardType: TextInputType.number,
                                   ),
@@ -1180,6 +1373,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
                     // Labour Details Card
                     GlassCard(
+                      color: cardBg,
                       title: 'Labour Details',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1195,17 +1389,42 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             DropdownButtonFormField<String>(
                               value: selectedLabour,
                               isExpanded: true,
+                              dropdownColor: dropdownBg,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
                               decoration: InputDecoration(
                                 labelText: 'Select Labour',
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                                 prefixIcon: Icon(
                                   Icons.group,
-                                  color: theme.primaryColor,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                  size: 20,
                                 ),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                               items: (_filteredLabourOptions ?? labourOptions)
                                   .map(
@@ -1214,6 +1433,11 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                       child: Text(
                                         item,
                                         overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: textColor,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   )
@@ -1222,15 +1446,41 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                   setState(() => selectedLabour = value),
                             ),
                             const SizedBox(height: 12),
+                            Text(
+                              'Count',
+                              style: TextStyle(
+                                color: labelColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             TextField(
                               controller: labourQtyController,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                                fontWeight: FontWeight.w800,
+                              ),
                               decoration: InputDecoration(
-                                labelText: 'Count',
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                               keyboardType: TextInputType.number,
                               onChanged: (value) => setState(
@@ -1273,22 +1523,77 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                     if (_showCustomLabourFields) ...[
                       const SizedBox(height: 16),
                       GlassCard(
+                        color: cardBg,
                         title: 'Custom Labour',
                         child: Column(
                           children: [
                             TextField(
                               controller: _customLabourNameController,
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
                                 labelText: 'Designation Name',
-                                border: OutlineInputBorder(),
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: _customLabourSalaryController,
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
                                 labelText: 'Salary (₹)',
-                                border: OutlineInputBorder(),
+                                labelStyle: TextStyle(
+                                  color: labelColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
                               ),
                               keyboardType: TextInputType.number,
                             ),
@@ -1307,6 +1612,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
 
                     // Additional Costs
                     GlassCard(
+                      color: cardBg,
                       title: 'Additional Costs',
                       child: Column(
                         children: [
@@ -1336,6 +1642,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                     // Summary Section
                     if (materials.isNotEmpty || labours.isNotEmpty) ...[
                       GlassCard(
+                        color: cardBg,
                         title: 'Daily Summary',
                         child: _buildSummaryTable(),
                       ),
@@ -1383,20 +1690,34 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     String value,
     ThemeData theme,
   ) {
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    final valueColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: theme.primaryColor),
+          Icon(icon, size: 20, color: iconColor),
           const SizedBox(width: 12),
           Text(
             '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: labelColor,
+            ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),

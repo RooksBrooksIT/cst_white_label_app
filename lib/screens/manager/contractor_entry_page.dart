@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
@@ -26,11 +27,9 @@ class ContractorEntryPage extends StatefulWidget {
 
 class _ContractorEntryPageState extends State<ContractorEntryPage> {
   // --- Color Configuration and Utilities ---
-  // Professional slate colors
   Color get _primaryColor => Theme.of(context).primaryColor;
-  Color get _textColor =>
-      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF1E293B);
-  Color get _labelColor => const Color(0xFF64748B);
+  Color get _textColor => Colors.white;
+  Color get _labelColor => const Color(0xFFCBD5E1);
   Color get _borderColor => const Color.fromARGB(255, 76, 86, 99);
   Color get _secondaryColor => Theme.of(context).colorScheme.secondary;
   Color get _sectionBgColor => Theme.of(context).scaffoldBackgroundColor;
@@ -73,6 +72,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   String? siteIdError;
   dynamic contractStartDate;
   dynamic contractEndDate;
+
+  List<Map<String, dynamic>> contractorDocs = [];
+  List<String> contractorOptions = [];
+  bool isLoadingContractors = true;
 
   List<Map<String, dynamic>> materials = [];
   List<Map<String, dynamic>> labours = [];
@@ -133,6 +136,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     _fetchMaterialOptions();
     _fetchLabourOptions();
     _fetchSiteIds();
+    _fetchContractors();
   }
 
   @override
@@ -377,6 +381,71 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       setState(() {
         labourError = 'Failed to load labours';
         isLoadingLabours = false;
+      });
+    }
+  }
+
+  Future<void> _fetchContractors() async {
+    setState(() {
+      isLoadingContractors = true;
+    });
+    try {
+      final snapshot = await FirestoreService.contractors.get();
+      final docs = <Map<String, dynamic>>[];
+      final options = <String>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['contractorName']?.toString() ?? '';
+        if (name.isNotEmpty) {
+          docs.add(data);
+          options.add(name);
+        }
+      }
+      setState(() {
+        contractorDocs = docs;
+        contractorOptions = options;
+        // If pre-selected contractor exists, keep it; else set first
+        if (_selectedContractorName == null ||
+            !contractorOptions.contains(_selectedContractorName)) {
+          _selectedContractorName = contractorOptions.isNotEmpty
+              ? contractorOptions.first
+              : null;
+          if (_selectedContractorName != null) {
+            _contractorNameController.text = _selectedContractorName!;
+          }
+        }
+        isLoadingContractors = false;
+      });
+      // If we have a selected contractor, auto-fill project field
+      if (_selectedContractorName != null) {
+        await _fetchProjectForContractor(_selectedContractorName!);
+      }
+    } catch (e) {
+      debugPrint('Failed to load contractors: $e');
+      setState(() {
+        isLoadingContractors = false;
+      });
+    }
+  }
+
+  Future<void> _fetchProjectForContractor(String contractorName) async {
+    try {
+      // Find the contractor doc from our stored list
+      final contractorDoc = contractorDocs.firstWhere(
+        (doc) => doc['contractorName'] == contractorName,
+        orElse: () => {},
+      );
+      final contractorField =
+          contractorDoc['contractorField']?.toString() ?? '';
+      setState(() {
+        _selectedProjectField = contractorField;
+        _projectFieldController.text = contractorField;
+      });
+    } catch (e) {
+      debugPrint('Failed to fetch project for contractor: $e');
+      setState(() {
+        _selectedProjectField = null;
+        _projectFieldController.clear();
       });
     }
   }
@@ -737,7 +806,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (color ?? _primaryColor).withOpacity(0.1),
+            color: (color ?? _primaryColor).withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color ?? _primaryColor, size: 20),
@@ -745,10 +814,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
         const SizedBox(width: 12),
         Text(
           title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: _textColor,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+            color: Colors.white,
             letterSpacing: 0.3,
           ),
         ),
@@ -765,26 +834,32 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: _labelColor,
-            fontSize: 13,
-            letterSpacing: 0.5,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFCBD5E1),
+            fontSize: 13.5,
+            letterSpacing: 0.3,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _borderColor.withOpacity(0.3)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: child,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -798,9 +873,14 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       label: label,
       child: TextField(
         controller: controller,
+        style: const TextStyle(
+          color: Color(0xFF0A183D),
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+        ),
         decoration: InputDecoration(
           border: InputBorder.none,
-          prefixIcon: Icon(icon, size: 20, color: _secondaryColor),
+          prefixIcon: Icon(icon, size: 20, color: _primaryColor),
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
         ),
         keyboardType: TextInputType.number,
@@ -812,21 +892,24 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Widget _buildSummaryTable() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _borderColor.withOpacity(0.2)),
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 16,
-          horizontalMargin: 12,
-          headingRowHeight: 48,
+          horizontalMargin: 16,
+          headingRowHeight: 44,
           dataRowHeight: 48,
-          headingTextStyle: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: _labelColor,
-            fontSize: 12,
+          headingRowColor: WidgetStateProperty.all(
+            Colors.white.withValues(alpha: 0.1),
+          ),
+          headingTextStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            fontSize: 13,
           ),
           columns: const [
             DataColumn(label: Text('Type')),
@@ -841,22 +924,22 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
               var m = entry.value;
               return DataRow(
                 cells: [
-                  DataCell(
+                  const DataCell(
                     Text(
                       'Material',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
                     Text(
                       m['type']?.toString() ?? '',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: const TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
                     Text(
                       '${m['quantity'] ?? 0}',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: const TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
@@ -865,10 +948,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                         m['type']?.toString() ?? '',
                         m['quantity'] ?? 0,
                       ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _textColor,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -890,22 +973,22 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
               var l = entry.value;
               return DataRow(
                 cells: [
-                  DataCell(
+                  const DataCell(
                     Text(
                       'Labour',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
                     Text(
                       l['type']?.toString() ?? '',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: const TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
                     Text(
                       '${l['count'] ?? 0}',
-                      style: TextStyle(fontSize: 12, color: _textColor),
+                      style: const TextStyle(fontSize: 13, color: Colors.white),
                     ),
                   ),
                   DataCell(
@@ -914,10 +997,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                         l['type']?.toString() ?? '',
                         l['count'] ?? 0,
                       ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _textColor,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -936,75 +1019,75 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             }),
             DataRow(
               cells: [
-                DataCell(
+                const DataCell(
                   Text(
                     'Food',
-                    style: TextStyle(fontSize: 12, color: _labelColor),
+                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
                   ),
                 ),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
                 DataCell(
                   Text(
                     '₹${foodCost.text}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _textColor,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                DataCell(const SizedBox.shrink()),
+                const DataCell(SizedBox.shrink()),
               ],
             ),
             DataRow(
               cells: [
-                DataCell(
+                const DataCell(
                   Text(
                     'Transport',
-                    style: TextStyle(fontSize: 12, color: _labelColor),
+                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
                   ),
                 ),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
                 DataCell(
                   Text(
                     '₹${transportCost.text}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _textColor,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                DataCell(const SizedBox.shrink()),
+                const DataCell(SizedBox.shrink()),
               ],
             ),
             DataRow(
               cells: [
-                DataCell(
+                const DataCell(
                   Text(
                     'Fuel',
-                    style: TextStyle(fontSize: 12, color: _labelColor),
+                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
                   ),
                 ),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
-                DataCell(Text('-', style: TextStyle(fontSize: 12))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
+                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
                 DataCell(
                   Text(
                     '₹${fuelCost.text}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _textColor,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                DataCell(const SizedBox.shrink()),
+                const DataCell(SizedBox.shrink()),
               ],
             ),
             DataRow(
-              color: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              color: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.12)),
               cells: [
                 const DataCell(SizedBox.shrink()),
                 const DataCell(SizedBox.shrink()),
@@ -1012,9 +1095,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                   Text(
                     'TOTAL',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                       fontSize: 13,
-                      color: Color(0xFF1E293B),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1022,7 +1105,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                   Text(
                     '₹${_getTotalAmount()}',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                       fontSize: 14,
                       color: _primaryColor,
                     ),
@@ -1111,27 +1194,53 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
             color: _primaryColor,
           ),
           const SizedBox(height: 18),
-          _buildInputField(
-            label: 'Contractor Name',
-            child: TextField(
-              controller: _contractorNameController,
-              readOnly: widget.showLogout,
-              onChanged: (val) => _selectedContractorName = val,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Enter contractor name',
-              ),
-            ),
-          ),
+          isLoadingContractors
+              ? Center(child: CircularProgressIndicator(color: _primaryColor))
+              : _buildInputField(
+                  label: 'Contractor Name',
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: contractorOptions.contains(_selectedContractorName)
+                        ? _selectedContractorName
+                        : null,
+                    items: contractorOptions
+                        .map(
+                          (name) => DropdownMenuItem<String>(
+                            value: name,
+                            child: Text(name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: widget.showLogout
+                        ? null
+                        : (val) async {
+                            setState(() {
+                              _selectedContractorName = val;
+                              if (val != null) {
+                                _contractorNameController.text = val;
+                              }
+                            });
+                            if (val != null) {
+                              await _fetchProjectForContractor(val);
+                              // Also refresh site IDs since they depend on contractor
+                              await _fetchSiteIds();
+                            }
+                          },
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Select contractor',
+                    ),
+                  ),
+                ),
           _buildInputField(
             label: 'Project Field',
             child: TextField(
               controller: _projectFieldController,
-              readOnly: widget.showLogout,
+              readOnly: widget.showLogout || _selectedContractorName != null,
               onChanged: (val) => _selectedProjectField = val,
               decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: 'Enter project field',
+                hintText: 'Select a contractor to auto-fill',
               ),
             ),
           ),
@@ -1639,42 +1748,118 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       onBack: () => Navigator.pop(context),
       actions: widget.showLogout
           ? [
-              IconButton(
-                icon: const Icon(Icons.logout_rounded),
-                onPressed: _handleLogout,
-                tooltip: 'Logout',
+              Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: Center(
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: _handleLogout,
+                      tooltip: 'Logout',
+                    ),
+                  ),
+                ),
               ),
             ]
           : null,
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: hPad,
-          vertical: sectionSpacing,
-        ),
-        child: Column(
-          children: [
-            _buildContractorDetailsCard(),
-            SizedBox(height: sectionSpacing),
-            _buildMaterialSection(),
-            SizedBox(height: sectionSpacing),
-            _buildLabourSection(),
-            SizedBox(height: sectionSpacing),
-            _buildAdditionalCostsSection(),
-            SizedBox(height: sectionSpacing),
-            _buildSummarySection(),
-            const SizedBox(height: 32),
-            GlassButton(
-              onPressed: isSaving ? null : _saveToFirestore,
-              label: 'SAVE ENTRY',
-              isLoading: isSaving,
+            padding: EdgeInsets.symmetric(
+              horizontal: hPad,
+              vertical: sectionSpacing,
             ),
-            SizedBox(height: sectionSpacing * 2),
-          ],
-        ),
-      ),
+            child: Column(
+              children: [
+                _buildContractorDetailsCard(),
+                SizedBox(height: sectionSpacing),
+                _buildMaterialSection(),
+                SizedBox(height: sectionSpacing),
+                _buildLabourSection(),
+                SizedBox(height: sectionSpacing),
+                _buildAdditionalCostsSection(),
+                SizedBox(height: sectionSpacing),
+                _buildSummarySection(),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.getDarkAccent(_primaryColor),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.getDarkAccent(_primaryColor)
+                            .withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : _saveToFirestore,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: const Color(0xFF0A183D),
+                        disabledBackgroundColor:
+                            Colors.white.withValues(alpha: 0.15),
+                        disabledForegroundColor:
+                            Colors.white.withValues(alpha: 0.45),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 6,
+                        shadowColor: _primaryColor.withValues(alpha: 0.4),
+                      ),
+                      child: isSaving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF0A183D),
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'SAVE ENTRY',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: sectionSpacing * 2),
+              ],
+            ),
+          ),
         ),
       ),
     );

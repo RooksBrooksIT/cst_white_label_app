@@ -5,6 +5,7 @@ import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -217,55 +218,67 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Contractor Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          onPressed: expenses.isNotEmpty ? _generatePdf : null,
-        ),
-      ],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildFilterCard(theme),
-                const SizedBox(height: 24),
-                if (isLoadingExpenses)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else if (expenses.isNotEmpty)
-                  _buildReportSection(theme)
-                else if (selectedContractor != null && selectedSiteId != null)
-                  _buildEmptyState(theme),
-              ],
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final cardAccent = AppTheme.getCardAccent(primaryColor);
+
+        return GlassScaffold(
+          title: 'Contractor Report',
+          appBarForegroundColor: Colors.white,
+          onBack: () => Navigator.pop(context),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+              onPressed: expenses.isNotEmpty ? _generatePdf : null,
+            ),
+          ],
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 600,
+              ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildFilterCard(theme, cardAccent),
+                    const SizedBox(height: 24),
+                    if (isLoadingExpenses)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (expenses.isNotEmpty)
+                      _buildReportSection(theme)
+                    else if (selectedContractor != null && selectedSiteId != null)
+                      _buildEmptyState(theme),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildFilterCard(ThemeData theme) {
+  Widget _buildFilterCard(ThemeData theme, Color cardAccent) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Report Parameters',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Text(
+            'REPORT PARAMETERS',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: cardAccent,
+              letterSpacing: 1.2,
+            ),
           ),
           const SizedBox(height: 20),
           _buildDropdown(
@@ -280,12 +293,13 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
               }
             },
             isLoadingContractors,
+            cardAccent,
           ),
           const SizedBox(height: 16),
           _buildDropdown('Site ID', siteIdOptions, selectedSiteId, (v) {
             setState(() => selectedSiteId = v);
             _fetchExpenses(); // Auto-refresh report
-          }, isLoadingSites),
+          }, isLoadingSites, cardAccent),
           const SizedBox(height: 24),
           GlassButton(
             label: 'GENERATE REPORT',
@@ -304,15 +318,36 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     String? value,
     Function(String?) onChanged,
     bool loading,
+    Color cardAccent,
   ) {
-    final theme = Theme.of(context);
     return DropdownButtonFormField<String>(
       value: (value != null && items.contains(value)) ? value : null,
+      dropdownColor: Colors.white,
+      iconEnabledColor: cardAccent,
+      style: const TextStyle(
+        color: Color(0xFF0A183D),
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: const TextStyle(
+          color: Color(0xFF5A759E),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        prefixIcon: Icon(
+          label.contains('Contractor')
+              ? Icons.person_outline
+              : Icons.location_on_outlined,
+          color: cardAccent,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
         filled: true,
-        fillColor: theme.cardColor,
+        fillColor: Colors.white,
         suffixIcon: loading
             ? const SizedBox(
                 width: 12,
@@ -325,7 +360,16 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             : null,
       ),
       items: items
-          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+          .map((s) => DropdownMenuItem(
+                value: s,
+                child: Text(
+                  s,
+                  style: const TextStyle(
+                    color: Color(0xFF0A183D),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ))
           .toList(),
       onChanged: onChanged,
     );
@@ -505,6 +549,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
   }
 
   Future<void> _generatePdf() async {
+    await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
       Theme.of(context).primaryColor.value,
@@ -554,9 +599,11 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
+              font: PdfTemplates.boldFont,
             ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
           ),
         ],

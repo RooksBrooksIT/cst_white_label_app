@@ -1,8 +1,8 @@
-// pages/vehicle_details_page.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 // Custom input formatter for number plate
@@ -319,15 +319,43 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
 
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
+
     return GlassScaffold(
       title: 'Vehicle Details',
       onBack: () => Navigator.pop(context),
       actions: [
         if (_submittedVehicle != null && !_isEditing)
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _deleteVehicle,
-            tooltip: 'Delete Vehicle',
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFF87171),
+                    size: 18,
+                  ),
+                  onPressed: _deleteVehicle,
+                  tooltip: 'Delete Vehicle',
+                ),
+              ),
+            ),
           ),
       ],
       body: Center(
@@ -337,301 +365,423 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  // Generated ID Display
-                  if (_generatedId.isNotEmpty && !_isEditing)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.green[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Generated Vehicle ID:',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          Text(
-                            _generatedId,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    // Generated ID Display
+                    if (_generatedId.isNotEmpty && !_isEditing)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: darkCardBg,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: darkCardBg.withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Generated Vehicle ID:',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _generatedId,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF22C55E),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Form Container Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: darkCardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: darkCardBg.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ),
-
-                  // Form
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        // Vehicle Model Name Field
-                        TextFormField(
-                          controller: _modelNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Vehicle Model Name *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.directions_car),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter vehicle model name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Vehicle Number Plate Field with Formatting
-                        TextFormField(
-                          controller: _numberPlateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Vehicle Number Plate *',
-                            hintText: 'TN-00-XX-0000',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.confirmation_number),
-                            counterText: 'Format: TN-00-XX-0000',
-                          ),
-                          maxLength: 13,
-                          buildCounter:
-                              (
-                                context, {
-                                required currentLength,
-                                required isFocused,
-                                required maxLength,
-                              }) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    'Format: TN-00-XX-0000',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                );
-                              },
-                          textInputAction: TextInputAction.done,
-                          textCapitalization: TextCapitalization.characters,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[a-zA-Z0-9-]'),
-                            ),
-                            LengthLimitingTextInputFormatter(13),
-                            NumberPlateFormatter(),
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter vehicle number plate';
-                            }
-
-                            // Enhanced validation for TN-00-XX-0000 format
-                            final RegExp numberPlateRegex = RegExp(
-                              r'^TN-[0-9]{2}-[A-Z]{2}-[0-9]{4}$',
-                              caseSensitive: false,
-                            );
-
-                            if (!numberPlateRegex.hasMatch(value)) {
-                              return 'Invalid format. Use: TN-00-XX-0000\nExample: TN-01-AB-1234';
-                            }
-
-                            return null;
-                          },
-                          onChanged: (value) {
-                            // Additional auto-formatting as user types
-                            if (value.isNotEmpty && value.length <= 13) {
-                              final formatted = autoFormatNumberPlate(value);
-                              if (formatted != value) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  _numberPlateController.value =
-                                      _numberPlateController.value.copyWith(
-                                        text: formatted,
-                                        selection: TextSelection.collapsed(
-                                          offset: formatted.length,
-                                        ),
-                                      );
-                                });
-                              }
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Button Row
-                        Row(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_isEditing)
-                              Expanded(
-                                child: SizedBox(
-                                  height: 50,
-                                  child: OutlinedButton(
-                                    onPressed: _cancelEdit,
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                            const Text(
+                              'Vehicle Model Name *',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: TextFormField(
+                                controller: _modelNameController,
+                                style: const TextStyle(
+                                  color: Color(0xFF0A183D),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter Vehicle Model Name',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.directions_car_rounded,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter vehicle model name';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            const Text(
+                              'Vehicle Number Plate *',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: TextFormField(
+                                controller: _numberPlateController,
+                                style: const TextStyle(
+                                  color: Color(0xFF0A183D),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'TN-00-XX-0000',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.confirmation_number_rounded,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                maxLength: 13,
+                                buildCounter: (
+                                  context, {
+                                  required currentLength,
+                                  required isFocused,
+                                  required maxLength,
+                                }) {
+                                  return const Padding(
+                                    padding: EdgeInsets.only(top: 6.0),
+                                    child: Text(
+                                      'Format: TN-00-XX-0000',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFCBD5E1),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'Cancel',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
+                                  );
+                                },
+                                textInputAction: TextInputAction.done,
+                                textCapitalization: TextCapitalization.characters,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[a-zA-Z0-9-]'),
                                   ),
-                                ),
-                              ),
-                            if (_isEditing) const SizedBox(width: 12),
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _submitForm,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _isEditing
-                                        ? Colors.orange
-                                        : Theme.of(context).colorScheme.primary,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  Colors.white,
-                                                ),
-                                          ),
-                                        )
-                                      : Text(
-                                          _isEditing
-                                              ? 'Update Vehicle'
-                                              : 'Submit Vehicle',
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
-                                ),
+                                  LengthLimitingTextInputFormatter(13),
+                                  NumberPlateFormatter(),
+                                ],
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter vehicle number plate';
+                                  }
+
+                                  final RegExp numberPlateRegex = RegExp(
+                                    r'^TN-[0-9]{2}-[A-Z]{2}-[0-9]{4}$',
+                                    caseSensitive: false,
+                                  );
+
+                                  if (!numberPlateRegex.hasMatch(value)) {
+                                    return 'Invalid format. Use: TN-00-XX-0000\nExample: TN-01-AB-1234';
+                                  }
+
+                                  return null;
+                                },
+                                onChanged: (value) {
+                                  if (value.isNotEmpty && value.length <= 13) {
+                                    final formatted = autoFormatNumberPlate(value);
+                                    if (formatted != value) {
+                                      WidgetsBinding.instance.addPostFrameCallback((
+                                        _,
+                                      ) {
+                                        _numberPlateController.value =
+                                            _numberPlateController.value.copyWith(
+                                              text: formatted,
+                                              selection: TextSelection.collapsed(
+                                                offset: formatted.length,
+                                              ),
+                                            );
+                                      });
+                                    }
+                                  }
+                                },
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                            const SizedBox(height: 24),
 
-                  const SizedBox(height: 30),
-
-                  // Submitted Vehicle Details
-                  if (_submittedVehicle != null && !_isEditing)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Vehicle Details:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.edit,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                onPressed: _editVehicle,
-                                tooltip: 'Edit Vehicle',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          _buildDetailRow('Vehicle ID', _submittedVehicle!.id),
-                          _buildDetailRow(
-                            'Model Name',
-                            _submittedVehicle!.modelName,
-                          ),
-                          _buildDetailRow(
-                            'Number Plate',
-                            _submittedVehicle!.numberPlate,
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Row(
+                            // Button Row
+                            Row(
                               children: [
-                                Icon(
-                                  Icons.info,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
+                                if (_isEditing)
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 52,
+                                      child: OutlinedButton(
+                                        onPressed: _cancelEdit,
+                                        style: OutlinedButton.styleFrom(
+                                          backgroundColor: Colors.white.withValues(alpha: 0.12),
+                                          foregroundColor: Colors.white,
+                                          side: BorderSide(
+                                            color: Colors.white.withValues(alpha: 0.4),
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (_isEditing) const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    'Tap the edit icon to modify vehicle details',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context).colorScheme.primary,
-                                      fontStyle: FontStyle.italic,
+                                  child: SizedBox(
+                                    height: 52,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _submitForm,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _isEditing
+                                            ? Colors.orangeAccent
+                                            : primaryColor,
+                                        foregroundColor: const Color(0xFF0A183D),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        elevation: 6,
+                                        shadowColor: primaryColor.withValues(alpha: 0.4),
+                                      ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<Color>(
+                                                      Color(0xFF0A183D),
+                                                    ),
+                                              ),
+                                            )
+                                          : Text(
+                                              _isEditing
+                                                  ? 'Update Vehicle'
+                                                  : 'Submit Vehicle',
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
 
-                  // Edit Mode Indicator
-                  if (_isEditing)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(top: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, color: Colors.orange[700]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Editing Vehicle: ${_submittedVehicle!.id}',
-                              style: TextStyle(
-                                color: Colors.orange[700],
-                                fontWeight: FontWeight.bold,
+                    // Submitted Vehicle Details Card
+                    if (_submittedVehicle != null && !_isEditing) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: darkCardBg,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: darkCardBg.withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Vehicle Details:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit_rounded,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: _editVehicle,
+                                  tooltip: 'Edit Vehicle',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            _buildDetailRow('Vehicle ID', _submittedVehicle!.id),
+                            _buildDetailRow(
+                              'Model Name',
+                              _submittedVehicle!.modelName,
+                            ),
+                            _buildDetailRow(
+                              'Number Plate',
+                              _submittedVehicle!.numberPlate,
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Color(0xFFCBD5E1),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Tap the edit icon to modify vehicle details',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFFCBD5E1),
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                    ],
+
+                    // Edit Mode Indicator
+                    if (_isEditing)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(top: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit_rounded, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Editing Vehicle: ${_submittedVehicle!.id}',
+                                style: const TextStyle(
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
         ),
@@ -647,11 +797,19 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
           Text(
             '$label: ',
             style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFCBD5E1),
+              fontSize: 13.5,
             ),
           ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              fontSize: 14.5,
+            ),
+          ),
         ],
       ),
     );

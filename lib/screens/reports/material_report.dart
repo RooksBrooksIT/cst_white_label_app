@@ -5,8 +5,10 @@ import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
+import '/utils/app_theme.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' show TableHelper;
 import 'package:printing/printing.dart';
 import '/utils/pdf_templates.dart';
 
@@ -22,7 +24,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   String? selectedMaterial;
   bool isLoadingNames = true;
   bool isReportLoading = false;
-  List<_SiteMaterialRow> reportRows = [];
+  List<SiteMaterialRow> reportRows = [];
 
   @override
   void initState() {
@@ -39,7 +41,12 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     try {
       final snapshot = await FirestoreService.materialCategories.get();
       final names = snapshot.docs
-          .map((doc) => (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '').toString().trim())
+          .map(
+            (doc) =>
+                (doc.data()['matCategory'] ?? doc.data()['materialName'] ?? '')
+                    .toString()
+                    .trim(),
+          )
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();
@@ -60,7 +67,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     });
 
     try {
-      final q = await FirestoreService.getCollection('materialsInventory').where('materialName', isEqualTo: materialName).get();
+      final q = await FirestoreService.getCollection(
+        'materialsInventory',
+      ).where('materialName', isEqualTo: materialName).get();
       final Map<String, double> qtyBySite = {};
       for (final doc in q.docs) {
         final data = doc.data();
@@ -68,17 +77,27 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         if (sites is List) {
           for (final s in sites) {
             if (s is Map<String, dynamic>) {
-              final siteId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
+              final siteId = (s['siteId'] ?? s['siteid'] ?? '')
+                  .toString()
+                  .trim();
               if (siteId.isEmpty) continue;
               final qty = _parseNumber(s['materialQty']);
-              qtyBySite.update(siteId, (prev) => prev + qty, ifAbsent: () => qty);
+              qtyBySite.update(
+                siteId,
+                (prev) => prev + qty,
+                ifAbsent: () => qty,
+              );
             }
           }
         }
       }
 
-      final rows = qtyBySite.entries.map((e) => _SiteMaterialRow(siteId: e.key, qty: e.value)).toList();
-      rows.sort((a, b) => a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()));
+      final rows = qtyBySite.entries
+          .map((e) => SiteMaterialRow(siteId: e.key, qty: e.value))
+          .toList();
+      rows.sort(
+        (a, b) => a.siteId.toLowerCase().compareTo(b.siteId.toLowerCase()),
+      );
 
       setState(() {
         reportRows = rows;
@@ -92,7 +111,9 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   double _parseNumber(dynamic v) {
     if (v == null) return 0.0;
     if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
+    if (v is String) {
+      return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
+    }
     return 0.0;
   }
 
@@ -101,76 +122,129 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Material Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          onPressed: reportRows.isNotEmpty ? _generatePdf : null,
-        ),
-        IconButton(
-          icon: const Icon(Icons.refresh, color: Colors.white),
-          onPressed: selectedMaterial != null ? () => _fetchMaterialReport(selectedMaterial!) : null,
-        ),
-      ],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildSelectionCard(theme),
-                const SizedBox(height: 24),
-                if (selectedMaterial != null) ...[
-                  _buildReportHeader(theme),
-                  const SizedBox(height: 16),
-                  if (isReportLoading)
-                    const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-                  else if (reportRows.isEmpty)
-                    _buildEmptyState(theme)
-                  else
-                    _buildReportTable(theme),
-                ],
-              ],
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final cardAccent = AppTheme.getCardAccent(primaryColor);
+
+        return GlassScaffold(
+          title: 'Material Report',
+          appBarForegroundColor: Colors.white,
+          onBack: () => Navigator.pop(context),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+              onPressed: reportRows.isNotEmpty ? _generatePdf : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: selectedMaterial != null
+                  ? () => _fetchMaterialReport(selectedMaterial!)
+                  : null,
+            ),
+          ],
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 600,
+              ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildSelectionCard(theme, cardAccent),
+                    const SizedBox(height: 24),
+                    if (selectedMaterial != null) ...[
+                      _buildReportHeader(theme, cardAccent),
+                      const SizedBox(height: 16),
+                      if (isReportLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(40),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (reportRows.isEmpty)
+                        _buildEmptyState(theme)
+                      else
+                        _buildReportTable(theme, cardAccent),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildSelectionCard(ThemeData theme) {
+  Widget _buildSelectionCard(ThemeData theme, Color cardAccent) {
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Inventory Insights', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 4),
-          Text('Select a material to view its distribution across sites.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            'INVENTORY INSIGHTS',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              color: cardAccent,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Select a material to view its distribution across sites.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 20),
           if (isLoadingNames)
             const LinearProgressIndicator()
           else
             DropdownButtonFormField<String>(
               value: selectedMaterial,
+              dropdownColor: Colors.white,
+              iconEnabledColor: cardAccent,
+              style: const TextStyle(
+                color: Color(0xFF0A183D),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
               decoration: InputDecoration(
                 labelText: 'Material Name',
-                prefixIcon: const Icon(Icons.inventory_2_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelStyle: const TextStyle(
+                  color: Color(0xFF5A759E),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                prefixIcon: Icon(Icons.inventory_2_outlined, color: cardAccent),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
                 filled: true,
-                fillColor: theme.colorScheme.surface,
+                fillColor: Colors.white,
               ),
-              items: materialNames.map((name) => DropdownMenuItem(
-                value: name,
-                child: Text(name, style: TextStyle(color: theme.colorScheme.onSurface)),
-              )).toList(),
-              dropdownColor: theme.colorScheme.surfaceContainerHighest,
+              items: materialNames
+                  .map(
+                    (name) => DropdownMenuItem(
+                      value: name,
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
               onChanged: (val) {
                 setState(() => selectedMaterial = val);
                 if (val != null) _fetchMaterialReport(val);
@@ -181,16 +255,27 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     );
   }
 
-  Widget _buildReportHeader(ThemeData theme) {
+  Widget _buildReportHeader(ThemeData theme, Color cardAccent) {
     return Row(
       children: [
         Container(
           width: 4,
           height: 24,
-          decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+            color: cardAccent,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         const SizedBox(width: 12),
-        Text('DISTRIBUTION REPORT', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          'DISTRIBUTION REPORT',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: cardAccent,
+            fontSize: 13,
+          ),
+        ),
       ],
     );
   }
@@ -201,10 +286,21 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         child: Padding(
           padding: const EdgeInsets.all(40.0),
           child: Column(
-            children: [
-              Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.outlineVariant),
-              const SizedBox(height: 16),
-              const Text('No site data found for this material.', style: TextStyle(fontWeight: FontWeight.w500)),
+            children: const [
+              Icon(
+                Icons.inbox_outlined,
+                size: 48,
+                color: Colors.white70,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'No site data found for this material.',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
@@ -212,19 +308,38 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
     );
   }
 
-  Widget _buildReportTable(ThemeData theme) {
+  Widget _buildReportTable(ThemeData theme, Color cardAccent) {
     return GlassCard(
       padding: EdgeInsets.zero,
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.05), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B1942).withValues(alpha: 0.6),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Across active sites', style: TextStyle(fontWeight: FontWeight.w600)),
-                Text('${reportRows.length} sites', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Across active sites',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '${reportRows.length} sites',
+                  style: TextStyle(
+                    color: cardAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ),
           ),
@@ -232,12 +347,29 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: reportRows.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
             itemBuilder: (ctx, i) {
               final row = reportRows[i];
               return ListTile(
-                title: Text(row.siteId, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                trailing: Text(row.qty.toStringAsFixed(row.qty % 1 == 0 ? 0 : 2), style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor, fontSize: 16)),
+                title: Text(
+                  row.siteId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+                trailing: Text(
+                  row.qty.toStringAsFixed(row.qty % 1 == 0 ? 0 : 2),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor,
+                    fontSize: 16,
+                  ),
+                ),
               );
             },
           ),
@@ -245,9 +377,12 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       ),
     );
   }
+
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(
+      Theme.of(context).primaryColor.toARGB32(),
+    );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(
@@ -263,15 +398,33 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              PdfTemplates.buildMetaBox('Material Name', selectedMaterial ?? 'N/A', pdfPrimaryColor),
-              PdfTemplates.buildMetaBox('Total Sites', '${reportRows.length}', pdfPrimaryColor),
+              PdfTemplates.buildMetaBox(
+                'Material Name',
+                selectedMaterial ?? 'N/A',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
+                'Total Sites',
+                '${reportRows.length}',
+                pdfPrimaryColor,
+              ),
             ],
           ),
           pw.SizedBox(height: 24),
-          pw.Table.fromTextArray(
+          TableHelper.fromTextArray(
             headers: ['Site ID', 'Quantity'],
-            data: reportRows.map((r) => [r.siteId, r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2)]).toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            data: reportRows
+                .map(
+                  (r) => [
+                    r.siteId,
+                    r.qty.toStringAsFixed(r.qty % 1 == 0 ? 0 : 2),
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
             cellAlignment: pw.Alignment.centerLeft,
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
@@ -285,8 +438,8 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   }
 }
 
-class _SiteMaterialRow {
+class SiteMaterialRow {
   final String siteId;
   final double qty;
-  _SiteMaterialRow({required this.siteId, required this.qty});
+  SiteMaterialRow({required this.siteId, required this.qty});
 }

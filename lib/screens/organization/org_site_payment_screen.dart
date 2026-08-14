@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
@@ -371,19 +371,27 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final titleColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final subtitleColor = isDark ? Colors.white70 : const Color(0xFF475569);
+
     return Row(
       children: [
         Container(
           padding: EdgeInsets.all(isDesktop ? 16.0 : 12.0),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.1),
+            color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.12),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.2),
+              width: 1.5,
+            ),
           ),
           child: Icon(
             Icons.payments_rounded,
-            color: colorScheme.primary,
-            size: isDesktop ? 40.0 : 32.0,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            size: isDesktop ? 38.0 : 30.0,
           ),
         ),
         SizedBox(width: isDesktop ? 20.0 : 16.0),
@@ -394,16 +402,18 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               Text(
                 'Payment Entry',
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  fontSize: isDesktop ? 26.0 : null,
+                  fontWeight: FontWeight.w800,
+                  color: titleColor,
+                  fontSize: isDesktop ? 26.0 : 22.0,
+                  letterSpacing: -0.5,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 'Record site supervisor payments',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: isDesktop ? 15.0 : null,
+                  color: subtitleColor,
+                  fontSize: isDesktop ? 15.0 : 13.5,
                 ),
               ),
             ],
@@ -419,10 +429,16 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isTablet,
     bool isMobile,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (selectedSiteId != null && amount > 0)
+          _buildSummaryCard(context, isDesktop),
         GlassCard(
+          color: cardBg,
           padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,6 +449,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 isDesktop,
                 isTablet,
                 isMobile,
+                icon: Icons.assignment_rounded,
               ),
               SizedBox(height: isDesktop ? 24.0 : 20.0),
               _buildSiteDropdown(context, isDesktop, isTablet, isMobile),
@@ -452,6 +469,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         ),
         SizedBox(height: isDesktop ? 32.0 : 24.0),
         GlassCard(
+          color: cardBg,
           padding: EdgeInsets.all(isDesktop ? 24.0 : 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,6 +480,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 isDesktop,
                 isTablet,
                 isMobile,
+                icon: Icons.calendar_month_rounded,
               ),
               SizedBox(height: isDesktop ? 24.0 : 20.0),
               _buildPeriodSelection(context, isDesktop, isTablet, isMobile),
@@ -474,9 +493,87 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             ],
           ),
         ),
-        SizedBox(height: isDesktop ? 48.0 : 40.0),
+        SizedBox(height: isDesktop ? 40.0 : 32.0),
         _buildActionButtons(context, isDesktop, isTablet, isMobile),
       ],
+    );
+  }
+
+  Widget _buildSummaryCard(BuildContext context, bool isDesktop) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final formattedAmount = NumberFormat.currency(
+      symbol: '₹',
+      decimalDigits: 0,
+      locale: 'en_IN',
+    ).format(amount);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: EdgeInsets.only(bottom: isDesktop ? 24.0 : 20.0),
+      padding: EdgeInsets.all(isDesktop ? 20.0 : 16.0),
+      decoration: BoxDecoration(
+        color: isDark
+            ? primaryColor.withValues(alpha: 0.15)
+            : primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.25),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.receipt_long_rounded,
+              color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+              size: isDesktop ? 26 : 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Payment Summary',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${supervisor.isEmpty ? "Supervisor" : supervisor} • ${selectedSiteId ?? ""}',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 15 : 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0A183D),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formattedAmount,
+            style: TextStyle(
+              fontSize: isDesktop ? 20 : 18,
+              fontWeight: FontWeight.w900,
+              color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -487,6 +584,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return _buildDropdownContainer(
       context,
       label: 'Site ID',
@@ -496,15 +598,27 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       child: DropdownButtonFormField<String>(
         value: selectedSiteId,
         isExpanded: true,
-        dropdownColor: theme.cardColor,
+        dropdownColor: dropdownBg,
+        style: TextStyle(
+          color: textColor,
+          fontSize: isDesktop ? 15.0 : 13.5,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           hintText: 'Select Site ID',
+          hintStyle: TextStyle(
+            color: isDark ? Colors.white54 : const Color(0xFF64748B),
+            fontSize: isDesktop ? 15.0 : 13.5,
+            fontWeight: FontWeight.w500,
+          ),
           prefixIcon: Icon(
             Icons.place_rounded,
-            color: theme.primaryColor,
-            size: isDesktop ? 24.0 : 20.0,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            size: isDesktop ? 22.0 : 20.0,
           ),
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
             horizontal: isDesktop ? 16.0 : 12.0,
             vertical: isDesktop ? 12.0 : 8.0,
@@ -515,7 +629,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             value: site['id'],
             child: Text(
               site['display'] ?? '',
-              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+              style: TextStyle(
+                fontSize: isDesktop ? 15.0 : 13.5,
+                color: textColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           );
         }).toList(),
@@ -535,21 +653,25 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   }
 
   Widget _buildSupervisorField(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GlassTextField(
       controller: TextEditingController(text: supervisor),
       label: 'Supervisor',
       icon: Icons.person_rounded,
       readOnly: true,
+      labelColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
     );
   }
 
   Widget _buildAmountField(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GlassTextField(
       controller: amountController,
-      label: 'Amount',
+      label: 'Amount (₹)',
       icon: Icons.currency_rupee_rounded,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      labelColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
       onChanged: (value) {
         setState(() {
           amount = int.tryParse(value) ?? 0;
@@ -565,6 +687,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
     return _buildDropdownContainer(
       context,
       label: 'Project Stage',
@@ -574,15 +701,27 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
       child: DropdownButtonFormField<String>(
         value: selectedProjectStage,
         isExpanded: true,
-        dropdownColor: theme.cardColor,
+        dropdownColor: dropdownBg,
+        style: TextStyle(
+          color: textColor,
+          fontSize: isDesktop ? 15.0 : 13.5,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           hintText: 'Select Project Stage',
+          hintStyle: TextStyle(
+            color: isDark ? Colors.white54 : const Color(0xFF64748B),
+            fontSize: isDesktop ? 15.0 : 13.5,
+            fontWeight: FontWeight.w500,
+          ),
           prefixIcon: Icon(
             Icons.flag_rounded,
-            color: theme.primaryColor,
-            size: isDesktop ? 24.0 : 20.0,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            size: isDesktop ? 22.0 : 20.0,
           ),
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
             horizontal: isDesktop ? 16.0 : 12.0,
             vertical: isDesktop ? 12.0 : 8.0,
@@ -593,7 +732,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
             value: stage,
             child: Text(
               stage,
-              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+              style: TextStyle(
+                fontSize: isDesktop ? 15.0 : 13.5,
+                color: textColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           );
         }).toList(),
@@ -613,178 +756,128 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+
+    final yearWidget = _buildDropdownContainer(
+      context,
+      label: 'Year',
+      isDesktop: isDesktop,
+      isTablet: isTablet,
+      isMobile: isMobile,
+      child: DropdownButtonFormField<int>(
+        value: selectedPaymentYear,
+        isExpanded: true,
+        dropdownColor: dropdownBg,
+        style: TextStyle(
+          color: textColor,
+          fontSize: isDesktop ? 15.0 : 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: InputDecoration(
+          prefixIcon: Icon(
+            Icons.calendar_today_rounded,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            size: isDesktop ? 22.0 : 20.0,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16.0 : 12.0,
+            vertical: isDesktop ? 12.0 : 8.0,
+          ),
+        ),
+        items: paymentYears.map((y) {
+          return DropdownMenuItem<int>(
+            value: y,
+            child: Text(
+              y.toString(),
+              style: TextStyle(
+                fontSize: isDesktop ? 15.0 : 13.5,
+                color: textColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedPaymentYear = value!;
+            selectedPaymentWeekIndex = null;
+          });
+        },
+      ),
+    );
+
+    final monthWidget = _buildDropdownContainer(
+      context,
+      label: 'Month',
+      isDesktop: isDesktop,
+      isTablet: isTablet,
+      isMobile: isMobile,
+      child: DropdownButtonFormField<int>(
+        value: selectedPaymentMonth,
+        isExpanded: true,
+        dropdownColor: dropdownBg,
+        style: TextStyle(
+          color: textColor,
+          fontSize: isDesktop ? 15.0 : 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: InputDecoration(
+          prefixIcon: Icon(
+            Icons.calendar_month_rounded,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+            size: isDesktop ? 22.0 : 20.0,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16.0 : 12.0,
+            vertical: isDesktop ? 12.0 : 8.0,
+          ),
+        ),
+        items: List.generate(12, (i) => i + 1).map((m) {
+          return DropdownMenuItem<int>(
+            value: m,
+            child: Text(
+              DateFormat.MMMM().format(DateTime(0, m)),
+              style: TextStyle(
+                fontSize: isDesktop ? 15.0 : 13.5,
+                color: textColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedPaymentMonth = value!;
+            selectedPaymentWeekIndex = null;
+          });
+        },
+      ),
+    );
 
     if (isMobile) {
       return Column(
         children: [
-          _buildDropdownContainer(
-            context,
-            label: 'Year',
-            isDesktop: isDesktop,
-            isTablet: isTablet,
-            isMobile: isMobile,
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentYear,
-              isExpanded: true,
-              dropdownColor: theme.cardColor,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.calendar_today_rounded,
-                  color: theme.primaryColor,
-                  size: isDesktop ? 24.0 : 20.0,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 16.0 : 12.0,
-                  vertical: isDesktop ? 12.0 : 8.0,
-                ),
-              ),
-              items: paymentYears.map((y) {
-                return DropdownMenuItem<int>(
-                  value: y,
-                  child: Text(
-                    y.toString(),
-                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentYear = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
-          ),
+          yearWidget,
           SizedBox(height: isDesktop ? 20.0 : 16.0),
-          _buildDropdownContainer(
-            context,
-            label: 'Month',
-            isDesktop: isDesktop,
-            isTablet: isTablet,
-            isMobile: isMobile,
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentMonth,
-              isExpanded: true,
-              dropdownColor: theme.cardColor,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.calendar_month_rounded,
-                  color: theme.primaryColor,
-                  size: isDesktop ? 24.0 : 20.0,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 16.0 : 12.0,
-                  vertical: isDesktop ? 12.0 : 8.0,
-                ),
-              ),
-              items: List.generate(12, (i) => i + 1).map((m) {
-                return DropdownMenuItem<int>(
-                  value: m,
-                  child: Text(
-                    DateFormat.MMMM().format(DateTime(0, m)),
-                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentMonth = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
-          ),
+          monthWidget,
         ],
       );
     }
 
     return Row(
       children: [
-        Expanded(
-          child: _buildDropdownContainer(
-            context,
-            label: 'Year',
-            isDesktop: isDesktop,
-            isTablet: isTablet,
-            isMobile: isMobile,
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentYear,
-              isExpanded: true,
-              dropdownColor: theme.cardColor,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.calendar_today_rounded,
-                  color: theme.primaryColor,
-                  size: isDesktop ? 24.0 : 20.0,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 16.0 : 12.0,
-                  vertical: isDesktop ? 12.0 : 8.0,
-                ),
-              ),
-              items: paymentYears.map((y) {
-                return DropdownMenuItem<int>(
-                  value: y,
-                  child: Text(
-                    y.toString(),
-                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentYear = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
-          ),
-        ),
+        Expanded(child: yearWidget),
         SizedBox(width: isDesktop ? 20.0 : 16.0),
-        Expanded(
-          child: _buildDropdownContainer(
-            context,
-            label: 'Month',
-            isDesktop: isDesktop,
-            isTablet: isTablet,
-            isMobile: isMobile,
-            child: DropdownButtonFormField<int>(
-              value: selectedPaymentMonth,
-              isExpanded: true,
-              dropdownColor: theme.cardColor,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.calendar_month_rounded,
-                  color: theme.primaryColor,
-                  size: isDesktop ? 24.0 : 20.0,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 16.0 : 12.0,
-                  vertical: isDesktop ? 12.0 : 8.0,
-                ),
-              ),
-              items: List.generate(12, (i) => i + 1).map((m) {
-                return DropdownMenuItem<int>(
-                  value: m,
-                  child: Text(
-                    DateFormat.MMMM().format(DateTime(0, m)),
-                    style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedPaymentMonth = value!;
-                  selectedPaymentWeekIndex = null;
-                });
-              },
-            ),
-          ),
-        ),
+        Expanded(child: monthWidget),
       ],
     );
   }
@@ -798,24 +891,40 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     required bool isMobile,
   }) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(left: 4.0, bottom: isDesktop ? 12.0 : 8.0),
+          padding: EdgeInsets.only(left: 4.0, bottom: isDesktop ? 10.0 : 6.0),
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: isDesktop ? 15.0 : null,
+              color: labelColor,
+              fontWeight: FontWeight.w700,
+              fontSize: isDesktop ? 14.5 : 13.0,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: theme.dividerColor),
+            color: fieldBg,
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(color: borderColor, width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : primaryColor.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: child,
         ),
@@ -830,46 +939,83 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     bool isMobile,
   ) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final buttonBg = isDark
+        ? primaryColor
+        : AppTheme.getDarkAccent(primaryColor);
+    final resetBg = isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.white;
+    final resetTextColor = isDark
+        ? Colors.white
+        : const Color(0xFF0A183D);
+    final resetBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.25)
+        : const Color(0xFFCBD5E1);
+
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
-            onPressed: resetForm,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.onSurfaceVariant,
-              side: BorderSide(color: theme.dividerColor),
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 54,
+            child: OutlinedButton.icon(
+              onPressed: resetForm,
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: 18,
+                color: resetTextColor,
               ),
-            ),
-            child: Text(
-              'Reset',
-              style: TextStyle(fontSize: isDesktop ? 15.0 : 13.0),
+              label: Text(
+                'Reset',
+                style: TextStyle(
+                  fontSize: isDesktop ? 16.0 : 15.0,
+                  fontWeight: FontWeight.w800,
+                  color: resetTextColor,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: resetBg,
+                foregroundColor: resetTextColor,
+                side: BorderSide(color: resetBorderColor, width: 1.5),
+                elevation: isDark ? 0 : 2,
+                shadowColor: Colors.black.withValues(alpha: 0.05),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+              ),
             ),
           ),
         ),
         SizedBox(width: isDesktop ? 20.0 : 16.0),
         Expanded(
           flex: 2,
-          child: ElevatedButton(
-            onPressed: _submitPayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: isDesktop ? 20.0 : 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          child: SizedBox(
+            height: 54,
+            child: ElevatedButton.icon(
+              onPressed: _submitPayment,
+              icon: const Icon(
+                Icons.check_circle_rounded,
+                size: 20,
+                color: Colors.white,
               ),
-              elevation: 0,
-            ),
-            child: Text(
-              'Submit Payment',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onPrimary,
-                fontSize: isDesktop ? 15.0 : 13.0,
+              label: Text(
+                'Submit Payment',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: isDesktop ? 16.0 : 15.0,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: buttonBg,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                shadowColor: buttonBg.withValues(alpha: 0.35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
               ),
             ),
           ),
@@ -883,20 +1029,34 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     String title,
     bool isDesktop,
     bool isTablet,
-    bool isMobile,
-  ) {
+    bool isMobile, {
+    IconData? icon,
+  }) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(left: 4.0),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-          letterSpacing: 1.2,
-          fontSize: isDesktop ? 14.0 : null,
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final titleColor = isDark ? Colors.white : primaryColor;
+
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(
+            icon,
+            size: isDesktop ? 18.0 : 16.0,
+            color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: titleColor,
+            letterSpacing: 1.1,
+            fontSize: isDesktop ? 14.0 : 12.5,
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -908,7 +1068,9 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
   ) {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -919,6 +1081,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           isDesktop,
           isTablet,
           isMobile,
+          icon: Icons.date_range_rounded,
         ),
         SizedBox(height: isDesktop ? 16.0 : 12.0),
         weeks.isEmpty
@@ -926,14 +1089,20 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                 padding: EdgeInsets.all(isDesktop ? 20.0 : 16.0),
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(color: theme.dividerColor),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : primaryColor.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : const Color(0xFFCBD5E1),
+                  ),
                 ),
                 child: Text(
                   'No weeks available for selected month',
                   style: TextStyle(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                     fontSize: isDesktop ? 14.0 : 12.0,
                   ),
                 ),
@@ -951,6 +1120,26 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                       final endDate = DateFormat('MMM dd').format(week.last);
                       final isSelected = selectedPaymentWeekIndex == i;
 
+                      final cardBgColor = isSelected
+                          ? (isDark ? primaryColor : darkAccent)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : primaryColor.withValues(alpha: 0.04));
+
+                      final cardBorderColor = isSelected
+                          ? (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : const Color(0xFFCBD5E1));
+
+                      final titleTextColor = isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white : const Color(0xFF0A183D));
+
+                      final subTextColor = isSelected
+                          ? const Color(0xFFE0F2FE)
+                          : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B));
+
                       return InkWell(
                         onTap: () {
                           setState(() {
@@ -958,32 +1147,27 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             selectedDate = week.first;
                           });
                         },
-                        borderRadius: BorderRadius.circular(12.0),
-                        child: Container(
+                        borderRadius: BorderRadius.circular(16.0),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
                           width: width,
                           padding: EdgeInsets.symmetric(
-                            vertical: isDesktop ? 16.0 : 12.0,
+                            vertical: isDesktop ? 16.0 : 14.0,
                             horizontal: isDesktop ? 12.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? colorScheme.primary
-                                : theme.scaffoldBackgroundColor.withValues(
-                                    alpha: 0.5,
-                                  ),
-                            borderRadius: BorderRadius.circular(12.0),
+                            color: cardBgColor,
+                            borderRadius: BorderRadius.circular(16.0),
                             border: Border.all(
-                              color: isSelected
-                                  ? colorScheme.primary
-                                  : theme.dividerColor,
+                              color: cardBorderColor,
+                              width: isSelected ? 2.0 : 1.0,
                             ),
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: colorScheme.primary.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      blurRadius: 8.0,
+                                      color: (isDark ? primaryColor : darkAccent)
+                                          .withValues(alpha: 0.35),
+                                      blurRadius: 10.0,
                                       offset: const Offset(0, 4),
                                     ),
                                   ]
@@ -991,26 +1175,36 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                           ),
                           child: Column(
                             children: [
-                              Text(
-                                'Week ${i + 1}',
-                                style: TextStyle(
-                                  fontSize: isDesktop ? 16.0 : 14.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected
-                                      ? colorScheme.onPrimary
-                                      : colorScheme.onSurface,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (isSelected) ...[
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Text(
+                                    'Week ${i + 1}',
+                                    style: TextStyle(
+                                      fontSize: isDesktop ? 16.0 : 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: titleTextColor,
+                                    ),
+                                  ),
+                                ],
                               ),
                               SizedBox(height: isDesktop ? 6.0 : 4.0),
                               Text(
                                 '$startDate - $endDate',
                                 style: TextStyle(
-                                  fontSize: isDesktop ? 13.0 : 11.0,
-                                  color: isSelected
-                                      ? colorScheme.onPrimary.withValues(
-                                          alpha: 0.9,
-                                        )
-                                      : colorScheme.onSurfaceVariant,
+                                  fontSize: isDesktop ? 13.0 : 11.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: subTextColor,
                                 ),
                               ),
                             ],
@@ -1034,7 +1228,12 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
     final weeks = _getWeeksOfMonth(selectedPaymentYear, selectedPaymentMonth);
     final weekDays = weeks[selectedPaymentWeekIndex!];
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final cardBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1045,6 +1244,7 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           isDesktop,
           isTablet,
           isMobile,
+          icon: Icons.event_available_rounded,
         ),
         SizedBox(height: isDesktop ? 16.0 : 12.0),
         GestureDetector(
@@ -1068,11 +1268,11 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
               builder: (context, child) {
                 return Theme(
                   data: theme.copyWith(
-                    colorScheme: colorScheme.copyWith(
-                      primary: colorScheme.primary,
-                      onPrimary: colorScheme.onPrimary,
-                      surface: theme.cardColor,
-                      onSurface: colorScheme.onSurface,
+                    colorScheme: theme.colorScheme.copyWith(
+                      primary: primaryColor,
+                      onPrimary: AppTheme.getForegroundFor(primaryColor),
+                      surface: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      onSurface: isDark ? Colors.white : const Color(0xFF0A183D),
                     ),
                   ),
                   child: child!,
@@ -1085,13 +1285,22 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
           },
           child: Container(
             padding: EdgeInsets.symmetric(
-              vertical: isDesktop ? 20.0 : 16.0,
+              vertical: isDesktop ? 18.0 : 16.0,
               horizontal: isDesktop ? 20.0 : 16.0,
             ),
             decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-              border: Border.all(color: theme.dividerColor),
-              borderRadius: BorderRadius.circular(12.0),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16.0),
+              border: Border.all(color: borderColor, width: 1.0),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : primaryColor.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1100,8 +1309,8 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                   children: [
                     Icon(
                       Icons.calendar_today_rounded,
-                      color: colorScheme.primary,
-                      size: isDesktop ? 24.0 : 20.0,
+                      color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                      size: isDesktop ? 22.0 : 20.0,
                     ),
                     SizedBox(width: isDesktop ? 16.0 : 12.0),
                     Text(
@@ -1111,17 +1320,17 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
                             ).format(selectedDate!)
                           : 'Select Date',
                       style: TextStyle(
-                        fontSize: isDesktop ? 17.0 : 16.0,
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
+                        fontSize: isDesktop ? 16.0 : 15.0,
+                        color: textColor,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  size: isDesktop ? 20.0 : 16.0,
+                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  size: 16,
                 ),
               ],
             ),
@@ -1129,12 +1338,13 @@ class _SitePaymentScreenState extends State<SitePaymentScreen> {
         ),
         SizedBox(height: isDesktop ? 12.0 : 8.0),
         Padding(
-          padding: EdgeInsets.only(left: 4.0),
+          padding: const EdgeInsets.only(left: 4.0),
           child: Text(
             'Available: ${DateFormat('MMM dd').format(weekDays.first)} - ${DateFormat('MMM dd').format(weekDays.last)}',
             style: TextStyle(
               fontSize: isDesktop ? 13.0 : 12.0,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              color: subtextColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),

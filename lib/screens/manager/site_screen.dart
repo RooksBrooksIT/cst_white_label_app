@@ -51,6 +51,7 @@ class _SiteScreenState extends State<SiteScreen>
   bool _isGettingLocation = false;
   bool _isSaving = false;
 
+
   TabController? _tabController;
 
   @override
@@ -670,10 +671,10 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 
+  // ── NEW SITE TAB ──────────────────────────────────────────────────────────
   Widget _buildNewSiteTab() {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       physics: const BouncingScrollPhysics(),
@@ -1100,13 +1101,50 @@ class _SiteScreenState extends State<SiteScreen>
       stream: FirestoreService.getCollection('Site').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+            ),
+          );
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Color(0xFF0A183D)),
+            ),
+          );
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No sites available.'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_off_rounded,
+                  size: 64,
+                  color: primaryColor.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No sites available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Create a new site in the "NEW SITE" tab',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         final sites = snapshot.data!.docs;
@@ -1232,33 +1270,37 @@ class _SiteScreenState extends State<SiteScreen>
           keyboardType: keyboardType,
           readOnly: readOnly,
           onChanged: onChanged,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0A183D),
+          ),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
+            hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
             fillColor: readOnly
-                ? Colors.grey.withValues(alpha: 0.08)
-                : theme.cardColor,
+                ? Colors.grey.shade100
+                : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: theme.primaryColor,
-                width: 1.5,
+                width: 1.8,
               ),
             ),
           ),
@@ -1295,23 +1337,23 @@ class _SiteScreenState extends State<SiteScreen>
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Color(0xFF0A183D),
           ),
           decoration: InputDecoration(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
-            fillColor: theme.cardColor,
+            fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
               ),
             ),
           ),

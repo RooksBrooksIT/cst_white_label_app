@@ -1,13 +1,14 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '/services/expense_service.dart';
-import '/services/firestore_service.dart';
-import '/utils/pdf_templates.dart';
+import 'package:demo_cst/services/expense_service.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/pdf_templates.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class LabourData {
   String labourType;
@@ -44,11 +45,12 @@ class IncentiveCalculationSheet extends StatefulWidget {
 
 class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   Color get _primaryColor => Theme.of(context).primaryColor;
-  Color get _accentColor => Theme.of(context).colorScheme.secondary;
-  Color get _backgroundColor => Theme.of(context).scaffoldBackgroundColor;
-  Color get _cardColor => Theme.of(context).cardColor;
-  Color get _textColor =>
-      Theme.of(context).textTheme.bodyLarge?.color ?? const Color(0xFF2d3748);
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _accentColor => _isDark ? AppTheme.getCardAccent(_primaryColor) : _primaryColor;
+  Color get _cardColor => _isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get _textColor => _isDark ? Colors.white : const Color(0xFF0A183D);
+  Color get _subtextColor => _isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+  Color get _borderColor => _isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
 
   List<LabourData> _labourData = [];
   double _incentivePercentage = 10.0;
@@ -301,160 +303,159 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     final maxContentWidth = 900.0;
 
     if (!_loading && requestedDays == 0 && actualDays == 0) {
-      // Show message when no data is found after loading
-      return Scaffold(
-        backgroundColor: _backgroundColor,
-        appBar: AppBar(
-          backgroundColor: _primaryColor,
-          title: const Text(
-            'Incentive Sheet',
-            style: TextStyle(color: Colors.white),
-          ),
-          iconTheme: const IconThemeData(color: Colors.white),
-          elevation: 0,
-        ),
+      return GlassScaffold(
+        title: 'Incentive Sheet',
+        onBack: () => Navigator.pop(context),
         body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.info_outline, size: 48, color: _primaryColor),
-                const SizedBox(height: 16),
-                Text(
-                  'No request data found for this site and stage.',
-                  style: TextStyle(
-                    color: _primaryColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                  textAlign: TextAlign.center,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 48, color: _accentColor),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No request data found for this site and stage.',
+                      style: TextStyle(
+                        color: _textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Site ID: ${widget.siteId}\nStage: ${widget.projectStage}',
+                      style: TextStyle(color: _subtextColor),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _fetchLabourData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text(
+                        'RETRY',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Site ID: ${widget.siteId}\nStage: ${widget.projectStage}',
-                  style: TextStyle(color: _textColor.withOpacity(0.7)),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _fetchLabourData,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryColor,
-                  ),
-                  child: const Text(
-                    'RETRY',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        ),
-      ),
-      );
-    }
-
-    if (_loading) {
-      return Scaffold(
-        backgroundColor: _backgroundColor,
-        appBar: AppBar(
-          backgroundColor: _primaryColor,
-          title: const Text(
-            'Incentive Sheet',
-            style: TextStyle(color: Colors.white),
-          ),
-          iconTheme: const IconThemeData(color: Colors.white),
-          elevation: 0,
-        ),
-        body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Center(child: CircularProgressIndicator(color: _primaryColor)),
-        ),
-      ),
-      );
-    }
-
-    return WillPopScope(
-      onWillPop: () async {
-        return await _showUnsavedChangesDialog();
-      },
-      child: Scaffold(
-        backgroundColor: _backgroundColor,
-        appBar: AppBar(
-          backgroundColor: _primaryColor,
-          title: const Text(
-            'Incentive Sheet',
-            style: TextStyle(color: Colors.white),
-          ),
-          iconTheme: const IconThemeData(color: Colors.white),
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              onPressed: _generatePdf,
-            ),
-          ],
-        ),
-        body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 24 : (isTablet ? 20 : 16),
-            vertical: 16,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxContentWidth),
-              child: Column(
-                children: [
-                  _headerCard(),
-                  const SizedBox(height: 20),
-                  _daysSummaryCard(),
-                  const SizedBox(height: 20),
-                  _labourTableSection(),
-                  const SizedBox(height: 20),
-                  _summaryCards(),
-                  const SizedBox(height: 20),
-                  _incentiveSlider(),
-                  const SizedBox(height: 30),
-                  _actionButtons(),
-                  const SizedBox(height: 20),
-                ],
               ),
             ),
           ),
         ),
+      );
+    }
+
+    if (_loading) {
+      return GlassScaffold(
+        title: 'Incentive Sheet',
+        onBack: () => Navigator.pop(context),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Center(child: CircularProgressIndicator(color: _primaryColor)),
+          ),
         ),
-      ),
+      );
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) return;
+        final shouldLeave = await _showUnsavedChangesDialog();
+        if (shouldLeave && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: GlassScaffold(
+        title: 'Incentive Sheet',
+        onBack: () async {
+          final shouldLeave = await _showUnsavedChangesDialog();
+          if (shouldLeave && context.mounted) {
+            Navigator.pop(context);
+          }
+        },
+        actions: [
+          IconButton(
+            icon: Icon(Icons.picture_as_pdf_outlined, color: _textColor),
+            tooltip: 'Export PDF Report',
+            onPressed: _generatePdf,
+          ),
+        ],
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 24 : (isTablet ? 20 : 16),
+                vertical: 16,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: Column(
+                    children: [
+                      _headerCard(),
+                      const SizedBox(height: 20),
+                      _daysSummaryCard(),
+                      const SizedBox(height: 20),
+                      _labourTableSection(),
+                      const SizedBox(height: 20),
+                      _summaryCards(),
+                      const SizedBox(height: 20),
+                      _incentiveSlider(),
+                      const SizedBox(height: 30),
+                      _actionButtons(),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _labourTableSection() {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: _cardColor,
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 24,
           horizontalMargin: 16,
-          headingRowHeight: 50,
-          dataRowHeight: 40,
+          headingRowHeight: 48,
+          dataRowMinHeight: 40,
+          dataRowMaxHeight: 48,
           headingRowColor: WidgetStateProperty.all(
-            _primaryColor.withOpacity(0.9),
+            _isDark ? _primaryColor.withValues(alpha: 0.25) : _primaryColor.withValues(alpha: 0.08),
           ),
-          headingTextStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
+          headingTextStyle: TextStyle(
+            fontWeight: FontWeight.w800,
             fontSize: 14,
+            color: _textColor,
           ),
           columns: const [
             DataColumn(label: Text('Labour Type')),
@@ -467,7 +468,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
               (data) => DataRow(
                 cells: [
                   DataCell(
-                    Text(data.labourType, style: TextStyle(color: _textColor)),
+                    Text(data.labourType, style: TextStyle(color: _textColor, fontWeight: FontWeight.w600)),
                   ),
                   DataCell(
                     Text(
@@ -491,28 +492,28 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
               color: WidgetStateProperty.resolveWith<Color>((
                 Set<WidgetState> states,
               ) {
-                return _primaryColor.withOpacity(0.05);
+                return _primaryColor.withValues(alpha: 0.08);
               }),
               cells: [
-                const DataCell(
-                  Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                DataCell(
+                  Text('Total', style: TextStyle(fontWeight: FontWeight.w800, color: _textColor)),
                 ),
                 DataCell(
                   Text(
                     '₹${requestedTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.w800, color: _textColor),
                   ),
                 ),
                 DataCell(
                   Text(
                     '₹${approvedTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.w800, color: _textColor),
                   ),
                 ),
                 DataCell(
                   Text(
                     '₹${(actualTotal).toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.w800, color: _accentColor),
                   ),
                 ),
               ],
@@ -524,69 +525,83 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   }
 
   Widget _incentiveSlider() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      color: _cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Incentive Percentage',
-              style: TextStyle(
-                color: _primaryColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Incentive Percentage',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
             ),
-            const SizedBox(height: 8),
-            Slider(
-              value: _incentivePercentage,
-              min: 0,
-              max: 20,
-              divisions: 20,
-              label: '${_incentivePercentage.round()}%',
-              activeColor: _primaryColor,
-              inactiveColor: _primaryColor.withOpacity(0.3),
-              onChanged: (value) {
-                if (value > 20) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Percentage cannot exceed 20%'),
-                    ),
-                  );
-                } else {
-                  setState(() {
-                    _incentivePercentage = value;
-                  });
-                }
-              },
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('0%', style: TextStyle(color: _primaryColor)),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: _incentivePercentage,
+            min: 0,
+            max: 20,
+            divisions: 20,
+            label: '${_incentivePercentage.round()}%',
+            activeColor: _primaryColor,
+            inactiveColor: _primaryColor.withValues(alpha: 0.2),
+            onChanged: (value) {
+              if (value > 20) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Percentage cannot exceed 20%'),
                   ),
-                  decoration: BoxDecoration(
-                    color: _primaryColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${_incentivePercentage.round()}%',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                );
+              } else {
+                setState(() {
+                  _incentivePercentage = value;
+                });
+              }
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('0%', style: TextStyle(color: _subtextColor, fontWeight: FontWeight.w700)),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
                 ),
-                Text('20%', style: TextStyle(color: _primaryColor)),
-              ],
-            ),
-          ],
-        ),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primaryColor.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '${_incentivePercentage.round()}%',
+                  style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+              ),
+              Text('20%', style: TextStyle(color: _subtextColor, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -595,7 +610,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     return Row(
       children: [
         Expanded(
-          child: _summaryCard('Saved Amount', savedAmount, _primaryColor),
+          child: _summaryCard('Saved Amount', savedAmount, _accentColor),
         ),
         const SizedBox(width: 12),
         savedAmount > 0
@@ -603,32 +618,31 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                 child: _summaryCard(
                   'Incentive',
                   savedAmount * (_incentivePercentage / 100),
-                  _accentColor,
+                  _primaryColor,
                 ),
               )
             : Expanded(
-                child: Card(
-                  color: _cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _borderColor),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Icon(Icons.info_outline, color: _primaryColor),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your incentive is not allocated for this site.',
-                          style: TextStyle(
-                            color: _primaryColor,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      Icon(Icons.info_outline, color: _accentColor),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your incentive is not allocated for this site.',
+                        style: TextStyle(
+                          color: _textColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -637,91 +651,110 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
   }
 
   Widget _summaryCard(String label, double amount, Color color) {
-    return Card(
-      color: _cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: color.withOpacity(0.2), width: 1),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: color,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '₹${amount.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 18,
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₹${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 19,
+              color: color,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _daysSummaryCard() {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: _cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _stepChip(
-              Icons.assignment,
-              'Requested',
-              requestedDays,
-              const Color(0xFF4299e1),
-            ),
-            _stepChip(
-              Icons.verified,
-              'Approved',
-              approvedDays,
-              const Color(0xFFed8936),
-            ),
-            _stepChip(
-              Icons.today,
-              'Actual',
-              actualDays,
-              const Color(0xFF48bb78),
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _stepChip(
+            Icons.assignment_rounded,
+            'Requested',
+            requestedDays,
+            const Color(0xFF3B82F6),
+          ),
+          _stepChip(
+            Icons.verified_rounded,
+            'Approved',
+            approvedDays,
+            const Color(0xFFF59E0B),
+          ),
+          _stepChip(
+            Icons.today_rounded,
+            'Actual',
+            actualDays,
+            const Color(0xFF10B981),
+          ),
+        ],
       ),
     );
   }
 
   Widget _headerCard() {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: _cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _infoColumn(Icons.location_on, 'Site', widget.siteId),
-            const SizedBox(height: 16),
-            _infoColumn(Icons.person, 'Supervisor', widget.supervisor),
-            const SizedBox(height: 16),
-            _infoColumn(Icons.construction, 'Stage', widget.projectStage),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _infoColumn(Icons.location_on_rounded, 'Site ID', widget.siteId),
+          const SizedBox(height: 14),
+          _infoColumn(Icons.person_rounded, 'Supervisor', widget.supervisor),
+          const SizedBox(height: 14),
+          _infoColumn(Icons.construction_rounded, 'Stage', widget.projectStage),
+        ],
       ),
     );
   }
@@ -730,7 +763,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: _primaryColor, size: 20),
+        Icon(icon, color: _accentColor, size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -740,18 +773,18 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: _primaryColor,
+                  color: _subtextColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 value,
                 softWrap: true,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   color: _textColor,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -769,7 +802,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 24),
@@ -778,7 +811,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         Text(
           label,
           style: TextStyle(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             color: color,
             fontSize: 12,
           ),
@@ -787,13 +820,13 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             '$value',
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               color: color,
               fontSize: 14,
             ),
@@ -807,42 +840,49 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _styledButton('Save', _save, _primaryColor, Colors.white),
+        SizedBox(
+          height: 48,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.check_circle_rounded, size: 18),
+            label: const Text(
+              'Save',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 4,
+              shadowColor: _primaryColor.withValues(alpha: 0.4),
+            ),
+            onPressed: _save,
+          ),
+        ),
         const SizedBox(width: 12),
-        _styledButton(
-          'Cancel',
-          () async {
-            final leave = await _showUnsavedChangesDialog();
-            if (leave) {
-              if (mounted) Navigator.pop(context);
-            }
-          },
-          Colors.white,
-          _primaryColor,
-          border: true,
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            label: const Text(
+              'Cancel',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _textColor,
+              side: BorderSide(color: _borderColor),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              final leave = await _showUnsavedChangesDialog();
+              if (leave) {
+                if (mounted) Navigator.pop(context);
+              }
+            },
+          ),
         ),
       ],
-    );
-  }
-
-  Widget _styledButton(
-    String label,
-    VoidCallback onPressed,
-    Color bg,
-    Color fg, {
-    bool border = false,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: bg,
-        foregroundColor: fg,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        side: border ? BorderSide(color: _primaryColor, width: 1) : null,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        elevation: 0,
-      ),
-      child: Text(label, style: TextStyle(fontWeight: FontWeight.w600)),
     );
   }
 

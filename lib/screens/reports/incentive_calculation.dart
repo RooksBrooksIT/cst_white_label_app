@@ -4,6 +4,7 @@ import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/screens/reports/incentive_calculation_sheet.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class IncentiveCalculation extends StatefulWidget {
   const IncentiveCalculation({super.key});
@@ -65,19 +66,24 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
     final maxContentWidth = 900.0;
 
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final subtextColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+
     return GlassScaffold(
       title: 'Incentive Calculation',
-      appBarForegroundColor: Colors.white,
       onBack: () => Navigator.pop(context),
       body: Center(
         child: ConstrainedBox(
@@ -85,7 +91,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
           child: _loading
           ? Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
               ),
             )
           : SingleChildScrollView(
@@ -110,27 +116,31 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                 children: [
                                   Text(
                                     'Calculate Incentives',
-                                    style: theme.textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: textColor,
+                                      fontSize: 20,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6),
                                   Text(
                                     'Select site details to calculate incentives',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
+                                    style: TextStyle(
+                                      color: subtextColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
                                     ),
                                   ),
-                                  const SizedBox(height: 32),
+                                  const SizedBox(height: 24),
                                   Text(
                                     'Site Information',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: textColor,
+                                      fontSize: 16,
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 16),
                                   _buildDropdown(
                                     label: 'Site ID',
                                     value: _selectedSiteId,
@@ -153,32 +163,57 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         ? 'Please select Site ID'
                                         : null,
                                   ),
-                                  const SizedBox(height: 20),
-                                  TextFormField(
-                                    decoration: InputDecoration(
-                                      labelText: 'Supervisor Name',
-                                      prefixIcon: Icon(
-                                        Icons.person_outline,
-                                        color: colorScheme.primary,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                          color: theme.dividerColor,
+                                  const SizedBox(height: 16),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Supervisor Name',
+                                        style: TextStyle(
+                                          color: labelColor,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
                                         ),
                                       ),
-                                      filled: true,
-                                      fillColor: theme.cardColor,
-                                    ),
-                                    controller: TextEditingController(
-                                      text: _supervisorName,
-                                    ),
-                                    readOnly: true,
+                                      const SizedBox(height: 6),
+                                      TextFormField(
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                        ),
+                                        decoration: InputDecoration(
+                                          prefixIcon: Icon(
+                                            Icons.person_outline,
+                                            color: iconColor,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: borderColor),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                          ),
+                                          filled: true,
+                                          fillColor: fieldBg,
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 14,
+                                          ),
+                                        ),
+                                        controller: TextEditingController(
+                                          text: _supervisorName,
+                                        ),
+                                        readOnly: true,
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 16),
                                   _buildDropdown(
                                     label: 'Project Stage',
                                     value: _selectedProjectStage,
@@ -192,7 +227,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         ? 'Please select Project Stage'
                                         : null,
                                   ),
-                                  const SizedBox(height: 32),
+                                  const SizedBox(height: 28),
                                   GlassButton(
                                     label: 'CALCULATE',
                                     onPressed: _calculate,
@@ -212,25 +247,28 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.05),
+                            color: primaryColor.withValues(alpha: isDark ? 0.15 : 0.08),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: colorScheme.primary.withOpacity(0.1),
+                              color: primaryColor.withValues(alpha: 0.3),
+                              width: 1.0,
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.info_outline,
-                                color: colorScheme.primary,
+                                color: iconColor,
                                 size: 24,
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Text(
                                   'Select a site to view available project stages and calculate incentives',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
                                   ),
                                 ),
                               ),
@@ -256,28 +294,81 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
     String? Function(String?)? validator,
   }) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return DropdownButtonFormField<String>(
-      value: (value != null && items.contains(value)) ? value : null,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(Icons.list_alt, color: colorScheme.primary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.dividerColor),
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: labelColor,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
         ),
-        filled: true,
-        fillColor: theme.cardColor,
-      ),
-      style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface),
-      items: items.map((String value) {
-        return DropdownMenuItem<String>(value: value, child: Text(value));
-      }).toList(),
-      onChanged: onChanged,
-      validator: validator,
-      hint: Text('Select $label'),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: (value != null && items.contains(value)) ? value : null,
+          isExpanded: true,
+          dropdownColor: isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white,
+          decoration: InputDecoration(
+            prefixIcon: Icon(Icons.list_alt, color: iconColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
+            filled: true,
+            fillColor: fieldBg,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            color: textColor,
+            fontWeight: FontWeight.w700,
+          ),
+          items: items.map((String val) {
+            return DropdownMenuItem<String>(
+              value: val,
+              child: Text(
+                val,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+          validator: validator,
+          hint: Text(
+            'Select $label',
+            style: TextStyle(
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
